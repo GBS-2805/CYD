@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESP32 Phone_Widget — board render</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 36px 24px 64px;
+    background: #282a36; color: #f8f8f2;
+    font: 15px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font-size: 19px; letter-spacing: .08em; margin: 0 0 4px; font-weight: 600; }
+  p { color: #adb5cb; margin: 0 0 22px; max-width: 88ch; }
+  p code { color: #8be9fd; }
+  img {
+    display: block; width: 100%; height: auto; margin-top: 4px;
+    border: 1px solid #44475a; border-radius: 8px; background: #21222c;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>ESP32 Phone_Widget — board render</h1>
+<p>
+  Drawn from <code>cyd_phone_deck.ino</code>: the sketch's own layout rects, GMK Dracula
+  palette and 5×7 GLCD typeface, so it cannot drift from the firmware without the
+  renderer being edited too. Numbered markers are facts the repo states — pins from the
+  sketch, the CH340 and its DTR/RTS reset from measurements on the board. Part
+  <em>positions</em> are nominal.
+</p>
+
+<img src="renders/board.png" alt="ESP32-2432S024R running ESP32 Phone_Widget">
+
+</div>
+</body>
+</html>

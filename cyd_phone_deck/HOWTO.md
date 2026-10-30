@@ -1,4 +1,4 @@
-# HOWTO — CYD phone deck firmware
+# HOWTO — ESP32 Phone_Widget firmware
 
 Task-shaped instructions. Hardware, protocol and controls are in
 [README.md](README.md); current state and open issues are in
@@ -47,9 +47,9 @@ the fallback for an upload that will not sync, not as a step.
 
 ## Edit and compile it on the phone (ArduinoDroid)
 
-1. Copy the sketch from the app: **PROJECTS** → the Phone Deck card → **COPY
-   DROID**, then paste into a new ArduinoDroid sketch. **SAVE** writes it to
-   Downloads if you would rather open the file.
+1. Copy the sketch from the app: **PROJECTS** → the **ESP32 Phone_Widget** card
+   → **COPY DROID**, then paste into a new ArduinoDroid sketch. **SAVE** writes
+   it to Downloads if you would rather open the file.
 2. Keep it as one tab named `cyd_phone_deck.ino`. Do not add extra `.h` files.
 3. Board: **ESP32 Dev Module**. Install only Adafruit GFX, Adafruit ILI9341 and
    XPT2046_Touchscreen. **ArduinoBLE must not be installed** — it shadows the
@@ -85,14 +85,15 @@ invalidates stored fits and forces a fresh calibration after an update.
 The deck cannot read a phone by itself — it is a GATT peripheral. On Android,
 install the companion app from [`../android-companion`](../android-companion) and
 link it. On a laptop, use the `bleak` snippet in [README.md](README.md) or nRF
-Connect: connect to **Phone Deck** and write the three characteristics.
+Connect: connect to **ESP32 Phone_Widget** and write the three characteristics.
 
 Writes are plain write-with-response; **no pairing is needed** and the deck never
 appears in Android's Bluetooth settings list.
 
 ## Check the deck is alive
 
-- Serial monitor at **115200** right after boot: `[ble] advertising as "Phone Deck"`.
+- Serial monitor at **115200** right after boot: `[ble] advertising as "ESP32
+  Phone_Widget"`.
 - The deck screen should show the clock card, battery card and notification rows.
 - With the companion linked, the header pill and the deck's own `LINKED` badge
   agree within a second.
@@ -105,7 +106,8 @@ appears in Android's Bluetooth settings list.
 - The deck stops advertising while a phone holds the link. Disconnect that phone.
 
 **Phone will not reconnect after one success**
-- Forget the stale **Phone Deck** entry in Bluetooth settings (old HID builds left
+- Forget the stale **ESP32 Phone_Widget** entry in Bluetooth settings (old HID
+  builds left
   a keyboard bond).
 - Power-cycle the deck so it advertises again.
 

@@ -1,8 +1,8 @@
 /*
- * CYD Phone Deck - ESP32-2432S024R (2.4" resistive touch CYD)
+ * ESP32 Phone_Widget - ESP32-2432S024R (2.4" resistive touch CYD)
  *
  * A desk dashboard for your phone: clock, battery and notifications, drawn in
- * the same burnt-orange-on-charcoal style as the macro pad sketch.
+ * the GMK Dracula keycap palette.
  *
  * Where the data comes from:
  *   - Notifications: Apple Notification Center Service (ANCS). The deck
@@ -92,20 +92,21 @@ static constexpr int SCREEN_W = 320;
 static constexpr int SCREEN_H = 240;
 
 // ---------------------------------------------------------------- palette ---
-// Burnt-orange phosphor over warm charcoal: dark rounded cards, hairline
-// borders, one accent hue, generous gaps. Terminal colour, panel proportions.
+// GMK Dracula keycaps: near-black purple base, a lighter modifier, warm white
+// alphas and the set's neon legends. Flat cards, hairline borders, one accent
+// hue per role.
 
-static constexpr uint16_t C_BG = 0x10A3;         // #12141f slate black
-static constexpr uint16_t C_PANEL = 0x2148;      // #232840 card
-static constexpr uint16_t C_TILE = 0x2148;       // card
-static constexpr uint16_t C_TILE_HI = 0x298A;    // #2c3252 raised card
-static constexpr uint16_t C_EDGE = 0x3A0C;       // #3a4166 hairline
-static constexpr uint16_t C_TEXT = 0xEF5E;       // #e9eaf6 cool white
-static constexpr uint16_t C_DIM = 0x8C96;        // #8d93b0 blue grey
-static constexpr uint16_t C_ACCENT = 0x4E6E;     // #4fc8f5 cyan
-static constexpr uint16_t C_ACCENT_DIM = 0x22CD; // cyan at ~45%
-static constexpr uint16_t C_PINK = 0xFB75;       // #ff6ea9 action pink
-static constexpr uint16_t C_PURPLE = 0x8BDF;     // #8b7bff section violet
+static constexpr uint16_t C_BG = 0x2946;         // #282a36 base
+static constexpr uint16_t C_PANEL = 0x422B;      // #44475a modifier
+static constexpr uint16_t C_TILE = 0x422B;       // #44475a modifier
+static constexpr uint16_t C_TILE_HI = 0x52AD;    // #52566b modifier, lifted
+static constexpr uint16_t C_EDGE = 0x6394;       // #6272a4 comment hairline
+static constexpr uint16_t C_TEXT = 0xFFDE;       // #f8f8f2 alphas
+static constexpr uint16_t C_DIM = 0xADB9;        // #adb5cb comment lifted 50%
+static constexpr uint16_t C_ACCENT = 0x8F5F;     // #8be9fd cyan
+static constexpr uint16_t C_ACCENT_DIM = 0x6494; // cyan at ~45% over C_TILE
+static constexpr uint16_t C_PINK = 0xFBD8;       // #ff79c6 pink
+static constexpr uint16_t C_PURPLE = 0xBC9F;     // #bd93f9 purple
 
 static constexpr uint8_t CORNER_CARD = 10;
 static constexpr uint8_t CORNER_BUTTON = 8;
@@ -584,7 +585,7 @@ static void pushTime(time_t epoch) {
 
 // -------------------------------------------------------------- BLE state ---
 
-static const char *DEVICE_NAME = "Phone Deck";
+static const char *DEVICE_NAME = "ESP32 Phone_Widget";
 
 // ANCS only exists on iOS. Android has no equivalent service, so the deck gets
 // battery, clock and notifications from the Phone Link GATT service instead,
@@ -1163,7 +1164,8 @@ static void startBluetooth() {
 // section marker, then equal-width notification rows.
 static constexpr int HEADER_H = 34;
 
-static const Rect GEAR_BTN = {286, 6, 26, 22};
+// 26x22 was under a fingertip on a resistive panel; 32x24 clears it.
+static const Rect GEAR_BTN = {284, 5, 32, 24};
 static const Rect LINK_PILL = {204, 6, 76, 22};
 static const Rect BACK_BTN = {8, 6, 24, 24};
 
@@ -1250,11 +1252,11 @@ static const char *clockSourceLabel() {
 }
 
 static void drawGear(int cx, int cy, uint16_t color) {
-  tft.drawCircle(cx, cy, 4, color);
+  tft.drawCircle(cx, cy, 5, color);
   static const int8_t DX[8] = {0, 1, 1, 1, 0, -1, -1, -1};
   static const int8_t DY[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
   for (int i = 0; i < 8; ++i) {
-    tft.drawLine(cx + DX[i] * 4, cy + DY[i] * 4, cx + DX[i] * 6, cy + DY[i] * 6, color);
+    tft.drawLine(cx + DX[i] * 5, cy + DY[i] * 5, cx + DX[i] * 7, cy + DY[i] * 7, color);
   }
 }
 
@@ -1266,8 +1268,8 @@ static void drawHeader() {
   const Rect chip = {8, 7, 22, 20};
   tft.drawRoundRect(chip.x, chip.y, chip.w, chip.h, 6, C_EDGE);
   drawTextAt(">_", chip.x + 4, chip.y + 6, 1, C_ACCENT, C_BG);
-  drawTextAt("phone deck", 38, 5, 2, C_TEXT, C_BG);
-  drawTextAt("cyd terminal", 38, 21, 1, C_DIM, C_BG);
+  drawTextAt("Phone_Widget", 38, 5, 2, C_TEXT, C_BG);
+  drawTextAt("esp32 // cyd terminal", 38, 21, 1, C_DIM, C_BG);
 
   // Link pill.
   const Rect pill = LINK_PILL;

@@ -28,8 +28,9 @@ headers, ~300 lines. It reports, on screen and over serial:
 - **Nothing is written to NVS.** Flashing this over a board that already has a
   saved touch fit must not invalidate it, and a self-check that can break a good
   board is not a self-check.
-- **The LED test is timed, not button-driven.** The CYD has one BOOT button;
-  cycling every 4 seconds means the board can be tested with no hands on it.
+- **The LED test is timed, not button-driven.** The board has three buttons, with
+  BOOT and RESET on the back and the backlight on its own side switch, so cycling
+  every 4 seconds means the board can be tested with no hands on it.
 - **No BLE, no WiFi.** Every radio path is a way for the test to fail for a reason
   that is not the board. Serial and SPI are the whole dependency set.
 - **It reuses [`../cyd_phone_deck/toolchain.sh`](../cyd_phone_deck/toolchain.sh)**

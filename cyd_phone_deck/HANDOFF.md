@@ -1,4 +1,4 @@
-# Handoff — CYD phone deck firmware
+# Handoff — ESP32 Phone_Widget firmware
 
 State as of the last session. Read [README.md](README.md) for the hardware,
 protocol and controls; this file is the context that is not in the code.
@@ -27,6 +27,20 @@ The deck is **not** pairable in Android's Bluetooth settings by design. It is a
 GATT peripheral; nothing needs to be paired for Phone Link to work.
 
 ## Decisions that were expensive to reach
+
+- **Named ESP32 Phone_Widget, folder left alone.** The BLE name, the header
+  wordmark and every doc say that now. `cyd_phone_deck/` and
+  `cyd_phone_deck.ino` keep their names because ArduinoDroid compiles a single
+  `.ino` whose name must match its folder, and the companion app's Gradle copies
+  `../cyd_phone_deck/cyd_phone_deck.ino` into the APK. Renaming either would
+  break that build. **The companion's `DeckService` still matches names
+  containing "phone deck"**, so it will not find the deck until it is updated
+  for the new name in its own chat.
+- **GMK Dracula palette and a bigger gear.** Colours are the keycap set's:
+  #282a36 base, #44475a modifiers, #f8f8f2 alphas, #8be9fd cyan, #ff79c6 pink,
+  #bd93f9 purple, #6272a4 hairlines. `GEAR_BTN` grew from 26×22 to 32×24 and
+  `drawGear()` from a 12 px glyph to 14 px, because the old target was under a
+  fingertip on the resistive panel.
 
 - **Android has no ANCS.** Apple's notification service is iOS-only. The iOS
   code path is still in the sketch behind `ENABLE_ANCS`, currently `false`.
@@ -98,7 +112,7 @@ GATT peripheral; nothing needs to be paired for Phone Link to work.
 1. Confirm the deck links to the companion app in
    [`../android-companion`](../android-companion) and that all three cards fill.
 2. If the link drops and will not return, test the stale-bond theory first:
-   forget "Phone Deck" in the phone's Bluetooth settings.
+   forget "ESP32 Phone_Widget" in the phone's Bluetooth settings.
 3. Six notification slots exist and three are shown; older ones are dropped. If
    that feels tight, `drawBoardBody()` and the notice buffers are the place to
    look.

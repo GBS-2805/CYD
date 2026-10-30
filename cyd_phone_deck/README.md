@@ -1,8 +1,13 @@
-# CYD Phone Deck
+# ESP32 Phone_Widget
 
 A phone dashboard for the **ESP32-2432S024R** (2.4" resistive-touch CYD): clock,
-battery and notifications in a slate-and-cyan control-surface UI, with the same
-touch calibration flow as the macro pad sketch.
+battery and notifications, drawn in the **GMK Dracula** keycap palette — #282a36
+base, #44475a cards, #f8f8f2 alphas, and #8be9fd / #ff79c6 / #bd93f9 accents.
+
+The folder and the sketch file keep the name `cyd_phone_deck`: ArduinoDroid
+compiles one `.ino` whose name must match its folder, and the companion app's
+Gradle task copies that exact path into the APK. Everything a person reads — the
+BLE name, the header wordmark, these docs — says **ESP32 Phone_Widget**.
 
 The deck is a Bluetooth LE peripheral exposing a small GATT service called
 **Phone Link**. Something on the phone writes the time, battery level and
@@ -44,6 +49,33 @@ The RGB LED is three discrete LEDs between the GPIOs and 3.3 V, so each channel
 lights when its pin is LOW. `disableOnboardLed()` drives red, green and blue
 HIGH at boot, which keeps the LED dark; a floating channel glows cyan.
 
+The board carries three buttons: **BOOT** and **RESET** on the back, and a
+**battery switch** next to the battery connector. The backlight has its own
+switch at the side edge, not a button. The sketch reads none of them — BOOT and
+RESET matter only for flashing.
+
+Also on the back and unused by the firmware: a **TF** card slot, a speaker
+header, the battery JST, a 4P-1.25 connector, extended IO, and a
+temperature/humidity header. The module is an **ESP-WROOM-32**, so no PSRAM.
+
+## Renders
+
+There is exactly one render: `renders/board.png`, the board with the deck on it
+and numbered markers for the facts above. Regenerate it with
+`python3 renders/make_renders.py` (Pillow; it downloads Adafruit's `glcdfont.c`
+to `/tmp` at render time, so nothing third-party is vendored here). It draws
+from the sketch's own rects, colours and 5×7 typeface, so it cannot drift from
+the firmware without the script being edited too.
+
+It is hosted at
+<https://site-305e2d6f80d741269ef65fab1e38fdbd.freebuff.page>. That site is the
+static bundle in `site/`: `index.html`, `renders/board.png` and one
+asset-serving Worker, deployed from `site/manifest.json`. The script writes the
+fresh PNG into the bundle as well, so the hosted copy cannot lag the render.
+
+After any change to what the deck draws, regenerate it, redeploy the bundle and
+hand back that link, rather than describing the screen.
+
 ## Build
 
 Flashing, calibration and link testing step by step: [HOWTO.md](HOWTO.md).
@@ -70,14 +102,15 @@ compiles the sketch, in one idempotent command. See [HOWTO.md](HOWTO.md).
 
 1. Flash and let the deck boot. The first boot opens touch calibration: tap the
    four corner dots, then the three check dots.
-2. **Forget any old "Phone Deck" entry** in the phone's Bluetooth settings if you
-   paired the earlier HID build; that stale bond points at a keyboard service the
-   deck no longer has.
+2. **Forget any old "ESP32 Phone_Widget" entry** in the phone's Bluetooth
+   settings if you paired the earlier HID build; that stale bond points at a
+   keyboard service the deck no longer has.
 3. Install the companion app from [`android-companion`](../android-companion),
    grant notification access, and let it link. The deck should jump to
    `LINKED`, show the clock, battery and notification rows.
-4. If it stays empty, install **nRF Connect for Mobile**, scan for **Phone Deck**,
-   connect, and write the Phone Link characteristics (UUIDs below). If that
+4. If it stays empty, install **nRF Connect for Mobile**, scan for
+   **ESP32 Phone_Widget**, connect, and write the Phone Link characteristics
+   (UUIDs below). If that
    works, the deck and its display are fine and the problem is on the phone
    side.
 
@@ -148,7 +181,7 @@ asyncio.run(main())
 
 * Packet (28/31 bytes): flags `0x06` (3), the Phone Link 128-bit service UUID
   (18), and the shortened name "Phone" (7).
-* Scan response: the complete name "Phone Deck".
+* Scan response: the complete name "ESP32 Phone_Widget".
 * `startBluetooth()` waits 200 ms after configuring the payloads before starting
   advertising, because Bluedroid applies them asynchronously.
 

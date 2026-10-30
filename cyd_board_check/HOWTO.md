@@ -77,7 +77,8 @@ it leaves no trace.
 
 ## Recovery
 
-- **Stuck in the bootloader** (no boot log, no screen): hold **BOOT**, tap **RST**,
+- **Stuck in the bootloader** (no boot log, no screen): hold **BOOT**, tap **RESET**
+  (both are on the back of the board),
   release **BOOT**, then upload again.
 - **Screen white or blank but the serial report is fine**: the panel side is the
   problem, not the sketch. The board still works as a headless ESP32.

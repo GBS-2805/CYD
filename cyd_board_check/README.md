@@ -88,8 +88,9 @@ exactly that set, so there is no second copy of it here. Step by step:
 
 * Nothing is calibrated and nothing is written to flash: this sketch never touches
   NVS, so it cannot corrupt a board you already trust.
-* The LED test is timed rather than button-driven — the CYD has one BOOT button and
-  watching four seconds per channel beats holding it.
+* The LED test is timed rather than button-driven. The board has three buttons —
+  **BOOT** and **RESET** on the back, the backlight on its own switch at the side
+  edge — so the test runs itself instead of asking you to reach behind the board.
 * No SD card, no speaker, no WiFi or BLE radio test. It proves the parts the deck
   needs and stops there.
 * The touch mapping constants are guesses until a real panel has reported its own
