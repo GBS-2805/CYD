@@ -268,8 +268,12 @@ Identical to the sketch, checked against its `onWrite` handlers:
   by `gradle assembleDebug` instead, which is what produced the shipped APK.
 - Every relative Markdown link across the repo resolves.
 - `gradle assembleDebug` (Gradle 8.7, AGP 8.5.2, SDK 34, JDK 17) builds a debug
-  APK at `dist/PhoneDeckBridge-debug.apk` — 128,924 bytes as measured on the file
-  in `dist/`, for the Off-site build. `syncDeckSketch` ran:
+  APK at `dist/PhoneDeckBridge-debug.apk` — 97,757 bytes as measured on the file
+  in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build.
+  The earlier 128,924-byte APK unpacked to the same six entries with the same
+  uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
+  the archive was written, not in the code: both are `zipalign -c 4` clean and
+  verify with the same v2 signature. `syncDeckSketch` ran:
   `assets/deck/cyd_phone_deck.ino` is inside the APK and its MD5 matches
   `../cyd_phone_deck/cyd_phone_deck.ino`.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
