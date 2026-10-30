@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "id": "phone_deck",
-  "name": "ESP32 Phone_Widget",
+  "name": "Phone Deck",
   "sketch": "cyd_phone_deck.ino",
   "board": "2432S024R",
   "tagline": "INSIDE APP",
