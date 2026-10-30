@@ -43,7 +43,6 @@ done
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # this script lives in android-companion
 APP_DIR="$HERE"
-SKETCH="$HERE/../cyd_phone_deck/cyd_phone_deck.ino"
 APK_REL="app/build/outputs/apk/debug/app-debug.apk"
 DIST="$HERE/dist/PhoneDeckBridge-debug.apk"
 
@@ -204,15 +203,29 @@ printf '%s\n' "$BADGING" | grep -E '^package:|^sdkVersion|^targetSdkVersion' || 
 printf '%s\n' "$BADGING" | grep -q "name='dev.phonedesk.companion'" \
   || fail "package is not dev.phonedesk.companion"
 
-say "verify bundled sketch"
+say "verify bundled sketches"
 TMP="$(mktemp -d)"
-unzip -p "$APK" assets/deck/cyd_phone_deck.ino > "$TMP/sketch.ino" \
-  || fail "the APK has no assets/deck/cyd_phone_deck.ino"
-BUNDLED="$(md5of "$TMP/sketch.ino")"
-REPO_MD5="$(md5of "$SKETCH")"
+# Listed from the APK rather than from a list in this script: whatever the build
+# bundled gets checked, so a sketch added to build.gradle cannot ship unverified,
+# and a project removed from the repo cannot pass on a stale asset.
+ASSETS="$(unzip -Z1 "$APK" 'assets/deck/*.ino' 2>/dev/null || true)"
+[ -n "$ASSETS" ] || fail "the APK carries no assets/deck/*.ino; syncBundledSketches did not run"
+while IFS= read -r path; do
+  [ -n "$path" ] || continue
+  name="$(basename "$path")"
+  # Convention: a sketch is <folder>/<folder>.ino, so the source is derivable.
+  source="$HERE/../${name%.ino}/$name"
+  [ -f "$source" ] \
+    || fail "the APK carries assets/deck/$name but $source does not exist"
+  unzip -p "$APK" "$path" > "$TMP/$name" \
+    || fail "could not read $path from the APK"
+  BUNDLED="$(md5of "$TMP/$name")"
+  REPO_MD5="$(md5of "$source")"
+  printf '  %s\n    bundled %s\n    repo    %s\n' "$name" "$BUNDLED" "$REPO_MD5"
+  [ "$BUNDLED" = "$REPO_MD5" ] \
+    || fail "$name is stale; syncBundledSketches did not run"
+done <<< "$ASSETS"
 rm -rf "$TMP"
-printf '  bundled %s\n  repo    %s\n' "$BUNDLED" "$REPO_MD5"
-[ "$BUNDLED" = "$REPO_MD5" ] || fail "the bundled sketch is stale; syncDeckSketch did not run"
 
 # ---------------------------------------------------------------- ship it -----
 

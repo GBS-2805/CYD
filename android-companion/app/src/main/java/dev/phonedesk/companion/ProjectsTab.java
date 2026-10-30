@@ -385,12 +385,19 @@ final class ProjectsTab extends ScrollView {
         Actions.copyOrSay(activity, project.name + " recipe", text.toString());
     }
 
-    /** The deck sketch Gradle copied into the APK, or null when it is absent. */
+    /**
+     * The deck sketch Gradle copied into the APK, or null when it is absent. Matched
+     * by name because the shelf now carries every bundled sketch: taking the first
+     * bundled entry would hand the deck card whichever project sorts first.
+     */
     private FlashLibrary.Entry bundledEntry() {
+        FlashLibrary.Entry first = null;
         for (FlashLibrary.Entry entry : currentEntries) {
-            if (entry.bundled) return entry;
+            if (!entry.bundled) continue;
+            if (FlashLibrary.ASSET_DECK.equalsIgnoreCase(entry.name)) return entry;
+            if (first == null) first = entry;
         }
-        return null;
+        return first;
     }
 
     private static final String[] DECK_LIBRARIES = {

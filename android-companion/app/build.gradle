@@ -27,18 +27,32 @@ android {
     }
 }
 
-// The Flash tab ships the deck sketch inside the APK. Copying it at build time
-// keeps cyd_phone_deck/cyd_phone_deck.ino the single source of truth instead of
-// duplicating 2,000 lines into assets.
-tasks.register("syncDeckSketch", Copy) {
-    from("${rootDir}/../cyd_phone_deck") {
-        include "cyd_phone_deck.ino"
+// The Flash tab ships this repo's sketches inside the APK. Copying them at build
+// time keeps each project folder the single source of truth instead of
+// duplicating thousands of lines into assets.
+//
+// Adding a project: put its folder name here. The sketch inside it is
+// expected at <folder>/<folder>.ino and lands in assets/deck under that same
+// name, which is what FlashLibrary lists and what the toolchain checks against
+// the repo file of the same name.
+def bundledProjects = ["cyd_phone_deck"]
+
+tasks.register("syncBundledSketches", Copy) {
+    // assets/deck is generated output. Copy alone never deletes, so a project
+    // removed from the list would keep shipping its sketch forever.
+    doFirst {
+        delete("${projectDir}/src/main/assets/deck")
+    }
+    bundledProjects.each { name ->
+        from("${rootDir}/../${name}") {
+            include "${name}.ino"
+        }
     }
     into("${projectDir}/src/main/assets/deck")
 }
 
 afterEvaluate {
     tasks.named("preBuild").configure {
-        dependsOn("syncDeckSketch")
+        dependsOn("syncBundledSketches")
     }
 }

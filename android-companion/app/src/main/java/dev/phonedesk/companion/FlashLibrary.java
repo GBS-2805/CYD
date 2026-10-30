@@ -19,21 +19,27 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
- * The flash shelf: the deck sketch bundled in the APK plus any `.ino` / `.bin`
- * files the user imported, ready to hand to ArduinoDroid or a PC flasher.
+ * The flash shelf: every sketch bundled in the APK plus any `.ino` / `.bin` files
+ * the user imported, ready to hand to ArduinoDroid or a PC flasher.
  *
- * The bundled copy is produced by Gradle from `cyd_phone_deck/cyd_phone_deck.ino`
- * at build time, so the firmware in this repo stays the single source of truth.
+ * Bundled copies are produced by Gradle from the project folders at build time,
+ * so the firmware in this repo stays the single source of truth. Which sketches
+ * are bundled is decided by the `syncBundledSketches` task, not by this class:
+ * whatever lands in `assets/deck` is listed, so a new project needs no change here.
  */
 final class FlashLibrary {
 
     private static final String ASSET_DIR = "deck";
-    private static final String ASSET_SKETCH = "cyd_phone_deck.ino";
+    /** The deck's sketch, which the PROJECTS card copies into ArduinoDroid. */
+    static final String ASSET_DECK = "cyd_phone_deck.ino";
     private static final String DIR = "flash";
 
     static final class Entry {
@@ -67,9 +73,8 @@ final class FlashLibrary {
     static List<Entry> list(Context context) {
         List<Entry> out = new ArrayList<>();
 
-        byte[] bundled = readAsset(context);
-        if (bundled != null) {
-            out.add(new Entry(ASSET_SKETCH, bundled.length, true));
+        for (Map.Entry<String, byte[]> sketch : bundled(context).entrySet()) {
+            out.add(new Entry(sketch.getKey(), sketch.getValue().length, true));
         }
 
         File[] files = folder(context).listFiles();
@@ -97,7 +102,7 @@ final class FlashLibrary {
     }
 
     static byte[] readBytes(Context context, Entry entry) {
-        if (entry.bundled) return readAsset(context);
+        if (entry.bundled) return bundled(context).get(entry.name);
         try {
             return readAll(new FileInputStream(new File(folder(context), entry.name)));
         } catch (IOException e) {
@@ -106,7 +111,7 @@ final class FlashLibrary {
     }
 
     static boolean delete(Context context, Entry entry) {
-        if (entry.bundled) return false;  // the deck sketch is part of the app
+        if (entry.bundled) return false;  // bundled sketches are part of the app
         File file = new File(folder(context), entry.name);
         return file.delete();
     }
@@ -172,20 +177,32 @@ final class FlashLibrary {
         return "text/plain";
     }
 
-    // Read once: the Flash tab refreshes every second and the sketch is ~70 kB.
-    private static byte[] cachedAsset;
-    private static boolean assetLoaded;
+    // Every sketch in assets/deck, by file name, sorted. Read once: the Flash tab
+    // refreshes every second and each sketch is ~70 kB.
+    private static Map<String, byte[]> cachedBundled;
 
-    private static byte[] readAsset(Context context) {
-        if (assetLoaded) return cachedAsset;
-        assetLoaded = true;
+    private static Map<String, byte[]> bundled(Context context) {
+        if (cachedBundled != null) return cachedBundled;
+        Map<String, byte[]> out = new LinkedHashMap<>();
+        String[] names;
         try {
-            cachedAsset = readAll(context.getAssets().open(ASSET_DIR + "/" + ASSET_SKETCH));
+            names = context.getAssets().list(ASSET_DIR);
         } catch (IOException e) {
             // Build without Gradle: the asset sync task never ran.
-            cachedAsset = null;
+            names = new String[0];
         }
-        return cachedAsset;
+        if (names != null) {
+            Arrays.sort(names);
+            for (String name : names) {
+                try {
+                    out.put(name, readAll(context.getAssets().open(ASSET_DIR + "/" + name)));
+                } catch (IOException ignored) {
+                    // A directory entry or an unreadable asset: leave it off the shelf.
+                }
+            }
+        }
+        cachedBundled = out;
+        return cachedBundled;
     }
 
     private static byte[] readAll(InputStream in) throws IOException {

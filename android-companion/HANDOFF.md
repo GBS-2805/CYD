@@ -59,9 +59,13 @@ reason to add a resource pipeline.
   which is also the only place with COPY / SAVE / FLASH. `FlashLibrary` backs both.
 - **A text sketch is never flashable.** The APK carries ArduinoDroid source, not a
   compiled `.bin`, so the write path runs on imported images only.
-- Gradle task `syncDeckSketch` copies `../cyd_phone_deck/cyd_phone_deck.ino` into
-  `app/src/main/assets/deck/` before `preBuild`. The repo therefore keeps one copy
-  of the firmware; do not commit a duplicate into assets.
+- Gradle task `syncBundledSketches` copies each bundled project's sketch into
+  `app/src/main/assets/deck/` before `preBuild`, flat and named after its folder.
+  The list is `bundledProjects` in `app/build.gradle`, so the repo keeps one copy
+  of each sketch; do not commit a duplicate into assets. The destination is wiped
+  first, because `Copy` alone would leave a removed project's sketch in the APK
+  forever. `toolchain.sh` lists the assets back out of the built APK and compares
+  each one with `../<name>/<name>.ino`, so bundling a sketch cannot skip the check.
 - `FlashLibrary` reads that asset once and caches the bytes (the tab refreshes
   every shelf or board rebuild, and the sketch is ~70 kB).
 - Imported sketches are copied into `filesDir/flash` from a SAF URI, so the app
@@ -298,12 +302,12 @@ Identical to the sketch, checked against its `onWrite` handlers:
   by `gradle assembleDebug` instead, which is what produced the shipped APK.
 - Every relative Markdown link across the repo resolves.
 - `gradle assembleDebug` (Gradle 8.7, AGP 8.5.2, SDK 34, JDK 17) builds a debug
-  APK at `dist/PhoneDeckBridge-debug.apk` — 99,533 bytes as measured on the file
+  APK at `dist/PhoneDeckBridge-debug.apk` — 99,757 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build.
   The earlier 128,924-byte APK unpacked to the same six entries with the same
   uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
   the archive was written, not in the code: both are `zipalign -c 4` clean and
-  verify with the same v2 signature. `syncDeckSketch` ran:
+  verify with the same v2 signature. `syncBundledSketches` ran:
   `assets/deck/cyd_phone_deck.ino` is inside the APK and its MD5 matches
   `../cyd_phone_deck/cyd_phone_deck.ino`.
 - `./toolchain.sh` ran end to end from an **empty install root**
@@ -313,11 +317,16 @@ Identical to the sketch, checked against its `onWrite` handlers:
   `clean`, and the script's own checks passed: signature, `zipalign -c 4`,
   package `dev.phonedesk.companion`, minSdk 26, targetSdk 34, and a bundled-sketch
   MD5 equal to the repo file.
+- Bundling more than one sketch was proved by adding `cyd_board_check` to
+  `bundledProjects` for a single build: both `.ino` files landed in
+  `assets/deck/` and `toolchain.sh` printed a matching MD5 pair for each, after
+  which the list went back to the deck alone. The shipped APK carries one sketch;
+  what is general is the mechanism, not its current contents.
 - A fresh-toolchain run of unchanged sources produced **97,769 bytes** against
   the then-committed 97,757, so the APK is *not* byte-reproducible: dex files embed
-  build-time data. After the probe changes the script shipped **99,533 bytes**, and
-  `dist/` holds that artifact — every size in these docs refers to it. Quote the
-  size as ~96 kB, never as a checksum.
+  build-time data. The probe changes shipped **99,533 bytes**, and the flash-shelf
+  changes after them shipped **99,757 bytes**; `dist/` holds that artifact — every
+  size in these docs refers to it. Quote the size as ~97 kB, never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 34, the expected permission set, and
   `MainActivity` as the launchable activity.

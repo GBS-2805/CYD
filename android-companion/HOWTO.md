@@ -196,9 +196,9 @@ them, so the same command finishes in well under a minute. Set
 `OFFSITE_HOME=/some/path` to install somewhere else.
 
 The script builds with `clean` on purpose and then checks the result: signature,
-4-byte alignment, package name, min/target SDK and the MD5 of the sketch inside
-the APK against `../cyd_phone_deck/cyd_phone_deck.ino`. It prints the APK's size
-and SHA-256 last.
+4-byte alignment, package name, min/target SDK and the MD5 of every sketch inside
+the APK against its project folder (`../<folder>/<sketch>.ino`). It prints the
+APK's size and SHA-256 last.
 
 | Message | What it means |
 | --- | --- |
@@ -206,7 +206,7 @@ and SHA-256 last.
 | `could not download …` | no network, or a proxy that blocks adoptium/gradle/google |
 | `error: gradle build failed` | the last 40 lines of the Gradle log follow the message |
 | `Java compile was UP-TO-DATE` | something restored a build directory; drop `--no-clean` |
-| `the bundled sketch is stale` | `syncDeckSketch` did not run — check `../cyd_phone_deck/cyd_phone_deck.ino` exists |
+| `<sketch> is stale` | `syncBundledSketches` did not run — check that `../<folder>/<sketch>.ino` exists and is listed in `bundledProjects` |
 | `apksigner rejected the APK` | the `Android Debug` keystore in `~/.android` is missing or unreadable |
 
 The size is not byte-stable: two builds of the same sources differ by a dozen
