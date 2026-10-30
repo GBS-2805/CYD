@@ -203,28 +203,31 @@ printf '%s\n' "$BADGING" | grep -E '^package:|^sdkVersion|^targetSdkVersion' || 
 printf '%s\n' "$BADGING" | grep -q "name='dev.phonedesk.companion'" \
   || fail "package is not dev.phonedesk.companion"
 
-say "verify bundled sketches"
+say "verify bundled widgets"
 TMP="$(mktemp -d)"
-# Listed from the APK rather than from a list in this script: whatever the build
-# bundled gets checked, so a sketch added to build.gradle cannot ship unverified,
-# and a project removed from the repo cannot pass on a stale asset.
-ASSETS="$(unzip -Z1 "$APK" 'assets/deck/*.ino' 2>/dev/null || true)"
-[ -n "$ASSETS" ] || fail "the APK carries no assets/deck/*.ino; syncBundledSketches did not run"
-while IFS= read -r path; do
-  [ -n "$path" ] || continue
-  name="$(basename "$path")"
-  # Convention: a sketch is <folder>/<folder>.ino, so the source is derivable.
-  source="$HERE/../${name%.ino}/$name"
-  [ -f "$source" ] \
-    || fail "the APK carries assets/deck/$name but $source does not exist"
-  unzip -p "$APK" "$path" > "$TMP/$name" \
-    || fail "could not read $path from the APK"
-  BUNDLED="$(md5of "$TMP/$name")"
+# Read from the descriptors rather than from a list in this script: whatever the
+# build bundled gets checked, so a widget added to the repo cannot ship unverified.
+SEEN=0
+for descriptor in "$HERE"/../*/widget.json; do
+  [ -f "$descriptor" ] || continue
+  SEEN=1
+  ID="$(sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$descriptor" | head -1)"
+  NAME="$(sed -n 's/.*"sketch"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$descriptor" | head -1)"
+  [ -n "$ID" ] || fail "$descriptor has no id"
+  [ -n "$NAME" ] || NAME="$(basename "$(dirname "$descriptor")").ino"
+  source="$(dirname "$descriptor")/$NAME"
+  [ -f "$source" ] || fail "$descriptor names $NAME but $source does not exist"
+  # -s rather than unzip's exit status: some builds exit 0 and write nothing for
+  # a missing entry, which would read as a stale file instead of a missing one.
+  unzip -p "$APK" "assets/widgets/$ID/$NAME" > "$TMP/$NAME" 2>/dev/null || true
+  [ -s "$TMP/$NAME" ] \
+    || fail "the APK carries no assets/widgets/$ID/$NAME; syncWidgets did not run"
+  BUNDLED="$(md5of "$TMP/$NAME")"
   REPO_MD5="$(md5of "$source")"
-  printf '  %s\n    bundled %s\n    repo    %s\n' "$name" "$BUNDLED" "$REPO_MD5"
-  [ "$BUNDLED" = "$REPO_MD5" ] \
-    || fail "$name is stale; syncBundledSketches did not run"
-done <<< "$ASSETS"
+  printf '  %s\n    bundled %s\n    repo    %s\n' "$ID/$NAME" "$BUNDLED" "$REPO_MD5"
+  [ "$BUNDLED" = "$REPO_MD5" ] || fail "$ID/$NAME is stale; syncWidgets did not run"
+done
+[ "$SEEN" -eq 1 ] || fail "no */widget.json beside $HERE; nothing to verify"
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------- ship it -----

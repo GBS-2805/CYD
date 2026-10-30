@@ -59,15 +59,21 @@ reason to add a resource pipeline.
   which is also the only place with COPY / SAVE / FLASH. `FlashLibrary` backs both.
 - **A text sketch is never flashable.** The APK carries ArduinoDroid source, not a
   compiled `.bin`, so the write path runs on imported images only.
-- Gradle task `syncBundledSketches` copies each bundled project's sketch into
-  `app/src/main/assets/deck/` before `preBuild`, flat and named after its folder.
-  The list is `bundledProjects` in `app/build.gradle`, so the repo keeps one copy
-  of each sketch; do not commit a duplicate into assets. The destination is wiped
-  first, because `Copy` alone would leave a removed project's sketch in the APK
-  forever. `toolchain.sh` lists the assets back out of the built APK and compares
-  each one with `../<name>/<name>.ino`, so bundling a sketch cannot skip the check.
-- `FlashLibrary` reads that asset once and caches the bytes (the tab refreshes
-  every shelf or board rebuild, and the sketch is ~70 kB).
+- Each project folder carries a `widget.json` descriptor: `id`, `name`, `sketch`,
+  `board`, `libraries`, `never`, and a `ble` block with the service UUID and the
+  name fragments a deck advertises. Gradle task `syncWidgets` copies the
+  descriptor and the sketch it names into `app/src/main/assets/widgets/<id>/`
+  before `preBuild`, so the repo keeps one copy of each sketch; do not commit a
+  duplicate into assets. The destination is wiped first, because a copy alone
+  would leave a removed widget in the APK forever. `toolchain.sh` reads the
+  descriptors beside this folder, pulls `assets/widgets/<id>/<sketch>` back out of
+  the APK and compares it with the repo file, so a bundled sketch cannot skip the
+  check.
+- `WidgetCatalog` parses those descriptors once (one entry per
+  `assets/widgets/<id>/`), and `FlashLibrary` reads each sketch by its asset path
+  and caches the bytes (the tab refreshes every second and a sketch is ~70 kB). A
+  build that skipped Gradle has no descriptors and falls back to a built-in deck
+  entry, so the card never disappears.
 - Imported sketches are copied into `filesDir/flash` from a SAF URI, so the app
   owns them; deleting the app deletes them.
 - SAVE writes to `MediaStore.Downloads`, which needs Android 10+; below that the
@@ -128,11 +134,12 @@ URL and a flashing note. Decisions behind it:
   ArduinoBLE). The other three are prebuilt PlatformIO images — Bruce alone pins
   roughly 40 libraries — so their cards say "None" and point at the installer
   rather than pretending they can be compiled in ArduinoDroid.
-- **One-tap library setup.** `ProjectsTab.DECK_LIBRARIES` holds the three names; each
-  row has **INSTALL** (`installLibrary()`), which copies the name with
-  `copyQuiet()` and then opens ArduinoDroid's library screen, plus **COPY NAME**.
-  **INSTALL ALL** does the same with all three names on the clipboard; **COPY
-  ALL** only copies; **OPEN ARDUINODROID** opens the editor.
+- **One-tap library setup, driven by the descriptor.** The LIBRARIES card under an
+  INSIDE project reads `widget.libraries` and warns about anything in
+  `widget.never` ("Never install ArduinoBLE: …"). Each row has **INSTALL**
+  (`installLibrary()`), which copies the name and then opens ArduinoDroid's library
+  screen, plus **COPY NAME**. **INSTALL ALL** does the same with every name on the
+  clipboard; **COPY ALL** only copies; **OPEN ARDUINODROID** opens the editor.
 - **Library screen is resolved, not hard-coded.** `openArduinoDroidLibraryManager()`
   scans the installed package's activities for one whose class name contains
   "librar" and launches it explicitly, falling back to `openArduinoDroid()`. That
@@ -298,35 +305,37 @@ Identical to the sketch, checked against its `onWrite` handlers:
 - The last `javac 17` type check against the Android 14 (API 34) framework
   classes (`android-all`) covered the pre-split sources: 9 files, 22 classes, only
   deprecation notes from the pre-Android-13 `setValue`/`setWriteType` path.
-  **That check predates the four-tab split.** The current 18 sources are covered
+  **That check predates the four-tab split.** The current 19 sources are covered
   by `gradle assembleDebug` instead, which is what produced the shipped APK.
 - Every relative Markdown link across the repo resolves.
 - `gradle assembleDebug` (Gradle 8.7, AGP 8.5.2, SDK 34, JDK 17) builds a debug
-  APK at `dist/PhoneDeckBridge-debug.apk` — 99,757 bytes as measured on the file
+  APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build.
   The earlier 128,924-byte APK unpacked to the same six entries with the same
   uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
   the archive was written, not in the code: both are `zipalign -c 4` clean and
-  verify with the same v2 signature. `syncBundledSketches` ran:
-  `assets/deck/cyd_phone_deck.ino` is inside the APK and its MD5 matches
-  `../cyd_phone_deck/cyd_phone_deck.ino`.
+  verify with the same v2 signature. `syncWidgets` ran:
+  `assets/widgets/phone_deck/cyd_phone_deck.ino` is inside the APK with its
+  descriptor, and its MD5 matches `../cyd_phone_deck/cyd_phone_deck.ino`.
 - `./toolchain.sh` ran end to end from an **empty install root**
   (`OFFSITE_HOME=/tmp/offsite-fresh`) on 2026-10-30: it downloaded Temurin JDK
   17.0.21, Gradle 8.7, commandline-tools 11076708, then platform 34 and
-  build-tools 34.0.0, and finished in under a minute. Build ran 33 tasks with
+  build-tools 34.0.0, and finished in under a minute. Build ran 35 tasks with
   `clean`, and the script's own checks passed: signature, `zipalign -c 4`,
-  package `dev.phonedesk.companion`, minSdk 26, targetSdk 34, and a bundled-sketch
-  MD5 equal to the repo file.
-- Bundling more than one sketch was proved by adding `cyd_board_check` to
-  `bundledProjects` for a single build: both `.ino` files landed in
-  `assets/deck/` and `toolchain.sh` printed a matching MD5 pair for each, after
-  which the list went back to the deck alone. The shipped APK carries one sketch;
-  what is general is the mechanism, not its current contents.
+  package `dev.phonedesk.companion`, minSdk 26, targetSdk 34, and the
+  `phone_deck/cyd_phone_deck.ino` MD5 equal to the repo file.
+- **Bundled content is now a property of the descriptors, not of a list in the
+  build.** The shipped APK carries one widget, `assets/widgets/phone_deck/`
+  (descriptor plus sketch); adding `cyd_board_check` to a build under the previous
+  list-based task was what proved two sketches could coexist, and that experiment
+  is historical. What is general is the mechanism: a folder with a descriptor and
+  a sketch, nothing to edit in Java or Gradle.
 - A fresh-toolchain run of unchanged sources produced **97,769 bytes** against
   the then-committed 97,757, so the APK is *not* byte-reproducible: dex files embed
-  build-time data. The probe changes shipped **99,533 bytes**, and the flash-shelf
-  changes after them shipped **99,757 bytes**; `dist/` holds that artifact — every
-  size in these docs refers to it. Quote the size as ~97 kB, never as a checksum.
+  build-time data. The probe changes shipped **99,533 bytes**, the flash-shelf
+  changes **99,757 bytes**, and the widget-descriptor change **102,590 bytes**;
+  `dist/` holds that last artifact — every size in these docs refers to it. Quote
+  the size as ~100 kB, never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 34, the expected permission set, and
   `MainActivity` as the launchable activity.

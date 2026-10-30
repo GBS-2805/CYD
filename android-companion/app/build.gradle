@@ -27,32 +27,43 @@ android {
     }
 }
 
-// The Flash tab ships this repo's sketches inside the APK. Copying them at build
-// time keeps each project folder the single source of truth instead of
-// duplicating thousands of lines into assets.
+// Each project folder carries a widget.json descriptor naming its sketch. This
+// task copies the descriptor and the sketch it names into
+// app/src/main/assets/widgets/<id>/, which is what WidgetCatalog reads at runtime
+// and what toolchain.sh reads back out of the built APK.
 //
-// Adding a project: put its folder name here. The sketch inside it is
-// expected at <folder>/<folder>.ino and lands in assets/deck under that same
-// name, which is what FlashLibrary lists and what the toolchain checks against
-// the repo file of the same name.
-def bundledProjects = ["cyd_phone_deck"]
+// Adding a project: drop a folder beside this one holding its .ino and a
+// widget.json naming both. Nothing in this file needs to change.
+def widgetFiles = fileTree(rootDir.parentFile) {
+    include "*/widget.json"
+    exclude "android-companion/**"
+    exclude "**/build/**"
+}
 
-tasks.register("syncBundledSketches", Copy) {
-    // assets/deck is generated output. Copy alone never deletes, so a project
-    // removed from the list would keep shipping its sketch forever.
-    doFirst {
-        delete("${projectDir}/src/main/assets/deck")
-    }
-    bundledProjects.each { name ->
-        from("${rootDir}/../${name}") {
-            include "${name}.ino"
+tasks.register("syncWidgets") {
+    def out = layout.projectDirectory.dir("src/main/assets/widgets").asFile
+    inputs.files(widgetFiles)
+    outputs.dir(out)
+    doLast {
+        // assets/widgets is generated output. Copy alone never deletes, so a
+        // widget removed from the repo would keep shipping forever.
+        delete out
+        def parsed = new groovy.json.JsonSlurper()
+        widgetFiles.files.sort { it.path }.each { descriptor ->
+            def meta = parsed.parse(descriptor)
+            def id = meta.id
+            if (!id) throw new GradleException("${descriptor}: widget.json needs an id")
+            def sketchName = meta.sketch ?: "${descriptor.parentFile.name}.ino"
+            def sketch = new File(descriptor.parentFile, sketchName)
+            if (!sketch.isFile()) throw new GradleException("${descriptor}: ${sketchName} not found")
+            def dest = new File(out, id)
+            dest.mkdirs()
+            new File(dest, "widget.json").bytes = descriptor.bytes
+            new File(dest, sketchName).bytes = sketch.bytes
         }
     }
-    into("${projectDir}/src/main/assets/deck")
 }
 
 afterEvaluate {
-    tasks.named("preBuild").configure {
-        dependsOn("syncBundledSketches")
-    }
+    tasks.named("preBuild").configure { dependsOn("syncWidgets") }
 }

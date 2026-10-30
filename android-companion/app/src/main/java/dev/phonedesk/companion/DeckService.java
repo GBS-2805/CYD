@@ -41,6 +41,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
 import java.util.UUID;
@@ -530,11 +531,17 @@ public class DeckService extends Service {
         return name;
     }
 
+    /**
+     * A deck is any widget its descriptor claims: the Phone Link service UUID (kept
+     * as the legacy fallback) or one of the name fragments it advertises.
+     */
     private boolean looksLikeDeck(ScanResult result) {
         ScanRecord record = result.getScanRecord();
         if (record != null && record.getServiceUuids() != null) {
+            List<UUID> advertised = WidgetCatalog.services(this);
             for (ParcelUuid uuid : record.getServiceUuids()) {
                 if (SERVICE_UUID.equals(uuid.getUuid())) return true;
+                if (advertised.contains(uuid.getUuid())) return true;
             }
         }
 
@@ -548,7 +555,12 @@ public class DeckService extends Service {
         }
         if (name == null && record != null) name = record.getDeviceName();
         if (name == null) return false;
-        return name.toLowerCase().contains("phone deck");
+        String lower = name.toLowerCase(Locale.US);
+        if (lower.contains("phone deck")) return true;
+        for (String fragment : WidgetCatalog.nameMatches(this)) {
+            if (lower.contains(fragment)) return true;
+        }
+        return false;
     }
 
     // --------------------------------------------------------------- gatt ---

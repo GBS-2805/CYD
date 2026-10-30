@@ -121,7 +121,10 @@ final class ProjectsTab extends ScrollView {
             if (activeFilter >= 0 && project.status != activeFilter) continue;
             body.addView(projectCard(project));
             ++shown;
-            if (project.inside() && bundledEntry() != null) body.addView(deckLibraryCard());
+            if (project.inside()) {
+                WidgetCatalog.Widget widget = WidgetCatalog.forProject(activity, project.id);
+                if (widget != null) body.addView(libraryCard(widget));
+            }
         }
         if (shown == 0) {
             body.addView(Ui.text(activity, "Nothing in that status yet.", 12, Ui.DIM));
@@ -218,7 +221,8 @@ final class ProjectsTab extends ScrollView {
         primary.setPadding(0, Ui.dp(activity, 10), 0, 0);
 
         if (project.inside()) {
-            FlashLibrary.Entry bundled = bundledEntry();
+            WidgetCatalog.Widget widget = WidgetCatalog.forProject(activity, project.id);
+            FlashLibrary.Entry bundled = widget == null ? null : bundledEntry(widget.sketch);
             if (bundled != null) {
                 Button copy = Ui.action(activity, "COPY DROID", true);
                 copy.setOnClickListener(v -> Actions.copyOrSay(activity, bundled.name,
@@ -386,46 +390,43 @@ final class ProjectsTab extends ScrollView {
     }
 
     /**
-     * The deck sketch Gradle copied into the APK, or null when it is absent. Matched
-     * by name because the shelf now carries every bundled sketch: taking the first
-     * bundled entry would hand the deck card whichever project sorts first.
+     * The sketch this widget's descriptor names, or null when the APK does not
+     * carry it. Matched by name because the shelf holds every bundled widget:
+     * taking the first bundled entry would hand the card whichever sorts first.
      */
-    private FlashLibrary.Entry bundledEntry() {
-        FlashLibrary.Entry first = null;
+    private FlashLibrary.Entry bundledEntry(String sketch) {
         for (FlashLibrary.Entry entry : currentEntries) {
-            if (!entry.bundled) continue;
-            if (FlashLibrary.ASSET_DECK.equalsIgnoreCase(entry.name)) return entry;
-            if (first == null) first = entry;
+            if (entry.bundled && entry.name.equalsIgnoreCase(sketch)) return entry;
         }
-        return first;
+        return null;
     }
-
-    private static final String[] DECK_LIBRARIES = {
-            "Adafruit GFX Library",
-            "Adafruit ILI9341",
-            "XPT2046_Touchscreen"
-    };
 
     private static final String[] ARDUINODROID_PACKAGES = {
             "name.antonsmirnov.android.arduinodroid2",
             "name.antonsmirnov.android.arduinodroid"
     };
 
-    private LinearLayout deckLibraryCard() {
+    /** Libraries this widget needs, read from its descriptor rather than a list here. */
+    private LinearLayout libraryCard(WidgetCatalog.Widget widget) {
         LinearLayout card = Ui.card(activity);
 
-        TextView title = Ui.text(activity, "DECK LIBRARIES", 16, Ui.TEXT);
+        TextView title = Ui.text(activity, "LIBRARIES", 16, Ui.TEXT);
         card.addView(title);
 
-        TextView hint = Ui.text(activity,
-                "INSTALL copies the name and opens ArduinoDroid's library list. Never install "
-                        + "ArduinoBLE: it shadows the ESP32 BLE headers and every build fails.",
+        String warning = "";
+        if (!widget.never.isEmpty()) {
+            warning = " Never install " + String.join(" or ", widget.never)
+                    + ": it shadows the ESP32 BLE headers and every build fails.";
+        }
+        TextView hint = Ui.text(activity, widget.libraries.isEmpty()
+                ? "Nothing extra to install for " + widget.name + "."
+                : "INSTALL copies the name and opens ArduinoDroid's library list." + warning,
                 11, Ui.DIM);
         hint.setPadding(0, Ui.dp(activity, 6), 0, 0);
         hint.setLineSpacing(Ui.dp(activity, 2), 1f);
         card.addView(hint);
 
-        for (String library : DECK_LIBRARIES) {
+        for (String library : widget.libraries) {
             TextView name = Ui.text(activity, library, 13, Ui.TEXT);
             name.setPadding(0, Ui.dp(activity, 10), 0, 0);
             card.addView(name);
@@ -443,19 +444,20 @@ final class ProjectsTab extends ScrollView {
             card.addView(row);
         }
 
-        LinearLayout actions = Ui.row(activity);
-        actions.setPadding(0, Ui.dp(activity, 12), 0, 0);
+        if (!widget.libraries.isEmpty()) {
+            final String joined = String.join("\n", widget.libraries);
+            LinearLayout actions = Ui.row(activity);
+            actions.setPadding(0, Ui.dp(activity, 12), 0, 0);
 
-        Button all = Ui.action(activity, "INSTALL ALL", true);
-        all.setOnClickListener(v -> installLibrary("deck libraries",
-                String.join("\n", DECK_LIBRARIES)));
-        actions.addView(all);
+            Button all = Ui.action(activity, "INSTALL ALL", true);
+            all.setOnClickListener(v -> installLibrary(widget.name, joined));
+            actions.addView(all);
 
-        Button copyAll = Ui.action(activity, "COPY ALL", false);
-        copyAll.setOnClickListener(v -> Actions.copyOrSay(activity, "deck libraries",
-                String.join("\n", DECK_LIBRARIES)));
-        actions.addView(copyAll, spaced(8));
-        card.addView(actions);
+            Button copyAll = Ui.action(activity, "COPY ALL", false);
+            copyAll.setOnClickListener(v -> Actions.copyOrSay(activity, widget.name, joined));
+            actions.addView(copyAll, spaced(8));
+            card.addView(actions);
+        }
 
         Button open = Ui.action(activity, "OPEN ARDUINODROID", false);
         open.setOnClickListener(v -> openArduinoDroid());

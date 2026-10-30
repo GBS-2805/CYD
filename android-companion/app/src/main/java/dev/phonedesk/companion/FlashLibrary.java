@@ -19,9 +19,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -30,27 +29,27 @@ import java.util.Map;
  * The flash shelf: every sketch bundled in the APK plus any `.ino` / `.bin` files
  * the user imported, ready to hand to ArduinoDroid or a PC flasher.
  *
- * Bundled copies are produced by Gradle from the project folders at build time,
- * so the firmware in this repo stays the single source of truth. Which sketches
- * are bundled is decided by the `syncBundledSketches` task, not by this class:
- * whatever lands in `assets/deck` is listed, so a new project needs no change here.
+ * Bundled copies come from the `widget.json` descriptors, which Gradle turns into
+ * `assets/widgets/<id>/` at build time, so the firmware in this repo stays the
+ * single source of truth. Which sketches appear is decided by
+ * {@link WidgetCatalog}, not by this class: a new widget needs no change here.
  */
 final class FlashLibrary {
 
-    private static final String ASSET_DIR = "deck";
-    /** The deck's sketch, which the PROJECTS card copies into ArduinoDroid. */
-    static final String ASSET_DECK = "cyd_phone_deck.ino";
     private static final String DIR = "flash";
 
     static final class Entry {
         final String name;
         final long size;
+        /** Where the sketch sits inside the APK, or null for an imported file. */
+        final String assetPath;
         final boolean bundled;
 
-        Entry(String name, long size, boolean bundled) {
+        Entry(String name, long size, String assetPath) {
             this.name = name;
             this.size = size;
-            this.bundled = bundled;
+            this.assetPath = assetPath;
+            this.bundled = assetPath != null;
         }
 
         boolean textual() {
@@ -73,15 +72,19 @@ final class FlashLibrary {
     static List<Entry> list(Context context) {
         List<Entry> out = new ArrayList<>();
 
-        for (Map.Entry<String, byte[]> sketch : bundled(context).entrySet()) {
-            out.add(new Entry(sketch.getKey(), sketch.getValue().length, true));
+        for (WidgetCatalog.Widget widget : WidgetCatalog.all(context)) {
+            byte[] bytes = readAsset(context, widget.assetPath);
+            // No syncWidgets run, or a descriptor naming a sketch that was not
+            // packaged: leave it off the shelf rather than offer an empty copy.
+            if (bytes == null) continue;
+            out.add(new Entry(widget.sketch, bytes.length, widget.assetPath));
         }
 
         File[] files = folder(context).listFiles();
         if (files != null) {
             List<Entry> imported = new ArrayList<>();
             for (File file : files) {
-                if (file.isFile()) imported.add(new Entry(file.getName(), file.length(), false));
+                if (file.isFile()) imported.add(new Entry(file.getName(), file.length(), null));
             }
             Collections.sort(imported, new java.util.Comparator<Entry>() {
                 @Override
@@ -102,7 +105,7 @@ final class FlashLibrary {
     }
 
     static byte[] readBytes(Context context, Entry entry) {
-        if (entry.bundled) return bundled(context).get(entry.name);
+        if (entry.assetPath != null) return readAsset(context, entry.assetPath);
         try {
             return readAll(new FileInputStream(new File(folder(context), entry.name)));
         } catch (IOException e) {
@@ -111,7 +114,7 @@ final class FlashLibrary {
     }
 
     static boolean delete(Context context, Entry entry) {
-        if (entry.bundled) return false;  // bundled sketches are part of the app
+        if (entry.assetPath != null) return false;  // bundled sketches are part of the app
         File file = new File(folder(context), entry.name);
         return file.delete();
     }
@@ -177,32 +180,24 @@ final class FlashLibrary {
         return "text/plain";
     }
 
-    // Every sketch in assets/deck, by file name, sorted. Read once: the Flash tab
-    // refreshes every second and each sketch is ~70 kB.
-    private static Map<String, byte[]> cachedBundled;
+    // Bundled sketches by asset path, read once: the Flash tab refreshes every
+    // second and each sketch is ~70 kB. A miss is cached as null so an absent
+    // asset is not reopened on every refresh.
+    private static final Map<String, byte[]> cachedAssets = new HashMap<>();
 
-    private static Map<String, byte[]> bundled(Context context) {
-        if (cachedBundled != null) return cachedBundled;
-        Map<String, byte[]> out = new LinkedHashMap<>();
-        String[] names;
-        try {
-            names = context.getAssets().list(ASSET_DIR);
-        } catch (IOException e) {
-            // Build without Gradle: the asset sync task never ran.
-            names = new String[0];
-        }
-        if (names != null) {
-            Arrays.sort(names);
-            for (String name : names) {
-                try {
-                    out.put(name, readAll(context.getAssets().open(ASSET_DIR + "/" + name)));
-                } catch (IOException ignored) {
-                    // A directory entry or an unreadable asset: leave it off the shelf.
-                }
+    private static byte[] readAsset(Context context, String path) {
+        if (path == null) return null;
+        synchronized (cachedAssets) {
+            if (cachedAssets.containsKey(path)) return cachedAssets.get(path);
+            byte[] bytes = null;
+            try {
+                bytes = readAll(context.getAssets().open(path));
+            } catch (IOException ignored) {
+                // Build without Gradle: the asset sync task never ran.
             }
+            cachedAssets.put(path, bytes);
+            return bytes;
         }
-        cachedBundled = out;
-        return cachedBundled;
     }
 
     private static byte[] readAll(InputStream in) throws IOException {

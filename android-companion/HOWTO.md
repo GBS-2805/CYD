@@ -196,9 +196,9 @@ them, so the same command finishes in well under a minute. Set
 `OFFSITE_HOME=/some/path` to install somewhere else.
 
 The script builds with `clean` on purpose and then checks the result: signature,
-4-byte alignment, package name, min/target SDK and the MD5 of every sketch inside
-the APK against its project folder (`../<folder>/<sketch>.ino`). It prints the
-APK's size and SHA-256 last.
+4-byte alignment, package name, min/target SDK and the MD5 of every widget's
+sketch inside the APK against the file its descriptor names
+(`../<folder>/<sketch>.ino`). It prints the APK's size and SHA-256 last.
 
 | Message | What it means |
 | --- | --- |
@@ -206,12 +206,13 @@ APK's size and SHA-256 last.
 | `could not download …` | no network, or a proxy that blocks adoptium/gradle/google |
 | `error: gradle build failed` | the last 40 lines of the Gradle log follow the message |
 | `Java compile was UP-TO-DATE` | something restored a build directory; drop `--no-clean` |
-| `<sketch> is stale` | `syncBundledSketches` did not run — check that `../<folder>/<sketch>.ino` exists and is listed in `bundledProjects` |
+| `<id>/<sketch> is stale` | `syncWidgets` did not run — check that the folder's `widget.json` names an existing sketch |
+| `the APK carries no assets/widgets/…` | the descriptor exists but the build skipped the task; build through Gradle |
 | `apksigner rejected the APK` | the `Android Debug` keystore in `~/.android` is missing or unreadable |
 
 The size is not byte-stable: two builds of the same sources differ by a dozen
 bytes because the dex files carry build-time data. Treat the printed number as
-"about 96 kB", not as a checksum.
+"about 100 kB", not as a checksum.
 
 ## Flash the deck from the phone over USB
 

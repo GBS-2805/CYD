@@ -8,5 +8,5 @@ local.properties
 *.iml
 captures/
 
-# Build output copied into the app for the Flash tab
-app/src/main/assets/deck/
+# Build output copied into the app for the Flash tab (syncWidgets)
+app/src/main/assets/widgets/
