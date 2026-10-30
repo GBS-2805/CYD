@@ -36,11 +36,22 @@ GATT peripheral; nothing needs to be paired for Phone Link to work.
   break that build. **The companion's `DeckService` still matches names
   containing "phone deck"**, so it will not find the deck until it is updated
   for the new name in its own chat.
-- **GMK Dracula palette and a bigger gear.** Colours are the keycap set's:
-  #282a36 base, #44475a modifiers, #f8f8f2 alphas, #8be9fd cyan, #ff79c6 pink,
-  #bd93f9 purple, #6272a4 hairlines. `GEAR_BTN` grew from 26×22 to 32×24 and
-  `drawGear()` from a 12 px glyph to 14 px, because the old target was under a
-  fingertip on the resistive panel.
+- **GMK Dracula palette and a bigger gear.** Base #282a36, modifiers #44475a,
+  alphas #f8f8f2, hairlines #6272a4, and the accent roles are the set's pastel
+  caps: #9decf5 cyan for the link and status, #ffa8d5 rose for the one action and
+  a low battery, #c6b6ff lavender for the section marker and the bound phone,
+  #f4efa8 butter for the unread count and unread app tile, #aaead4 mint for
+  `CHG`. `GEAR_BTN` grew from 26×22 to 32×24 and `drawGear()` from a 12 px glyph
+  to 14 px, because the old target was under a fingertip on the resistive panel.
+- **One board, one phone.** `DEVICE_TAG` comes from `ESP.getEfuseMac()` (low 24
+  bits), so the advertised name is unique per module and survives re-flashing;
+  the header subtitle carries the same tag. The first phone to connect is stored
+  in NVS (`identity`/`owner`) and `peerAllowed` gates all three Phone Link write
+  callbacks, so a second phone connects but changes nothing. Holding the gear
+  1.2 s clears the binding. Deliberately no PIN or pairing ritual: the deck is a
+  desk gadget, and a stranger in radio range is out of threat model. Consequence
+  to keep in mind: a second phone in the same room is refused silently apart
+  from the serial log, because a toast would need an event the UI does not have.
 
 - **Android has no ANCS.** Apple's notification service is iOS-only. The iOS
   code path is still in the sketch behind `ENABLE_ANCS`, currently `false`.
@@ -89,6 +100,11 @@ GATT peripheral; nothing needs to be paired for Phone Link to work.
   auto-reset works and an `arduino-cli upload` from a computer needs no BOOT press.
 
 ## Not verified
+
+- **The binding has never run on a phone.** `claimPeer` is the first thing in
+  `onConnect` and every write callback checks `peerAllowed`, but no board here
+  has been through "phone A binds, phone B is refused, gear hold releases".
+  Test that before trusting the NVS write path on a fresh module.
 
 - **No run on a phone since the HID removal and the new advertising packet.**
   Nothing has confirmed the deck links cleanly to the companion app.

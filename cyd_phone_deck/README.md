@@ -2,7 +2,8 @@
 
 A phone dashboard for the **ESP32-2432S024R** (2.4" resistive-touch CYD): clock,
 battery and notifications, drawn in the **GMK Dracula** keycap palette — #282a36
-base, #44475a cards, #f8f8f2 alphas, and #8be9fd / #ff79c6 / #bd93f9 accents.
+base, #44475a cards, #f8f8f2 alphas, and the set's pastel accent caps:
+#9decf5 cyan, #ffa8d5 rose, #c6b6ff lavender, #f4efa8 butter, #aaead4 mint.
 
 The folder and the sketch file keep the name `cyd_phone_deck`: ArduinoDroid
 compiles one `.ino` whose name must match its folder, and the companion app's
@@ -181,9 +182,31 @@ asyncio.run(main())
 
 * Packet (28/31 bytes): flags `0x06` (3), the Phone Link 128-bit service UUID
   (18), and the shortened name "Phone" (7).
-* Scan response: the complete name "ESP32 Phone_Widget".
+* Scan response: the complete name `ESP32 Phone_Widget <TAG>`, where `TAG` is the
+  low 24 bits of the chip's MAC in uppercase hex, e.g. `ESP32 Phone_Widget
+  A1B2C3`. No two boards advertise the same name.
 * `startBluetooth()` waits 200 ms after configuring the payloads before starting
   advertising, because Bluedroid applies them asynchronously.
+
+## One board, one phone
+
+Every board is its own widget and answers to one phone, so a shelf of decks is a
+list of distinct devices rather than a row of identical entries.
+
+* `DEVICE_TAG` is the low 24 bits of the ESP32's efuse MAC, read once at boot
+  with `ESP.getEfuseMac()` and printed as six uppercase hex digits.
+* The BLE name is `ESP32 Phone_Widget <TAG>`; the header subtitle shows
+  `esp32 // #<TAG>` so the screen and the scan list match.
+* The first phone to connect is written to NVS (`identity` / `owner`) and
+  becomes the only phone the deck listens to. Another phone can still connect,
+  but its writes are dropped in the Phone Link callbacks and the link is not
+  counted, so the deck keeps showing `OFFLINE`.
+* Hold the gear for 1.2 s on the board screen to forget the bound phone. The
+  serial log prints `[id] binding cleared`, and the next phone to connect claims
+  the board.
+* The binding is in NVS, so re-flashing does not clear it — only the gear hold
+  (or an erase-flash) does. Because the tag comes from the MAC, re-flashing also
+  keeps the same name; two different boards differ in both.
 
 ## Limits worth knowing
 

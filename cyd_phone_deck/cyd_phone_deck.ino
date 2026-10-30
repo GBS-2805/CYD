@@ -28,7 +28,12 @@
  *   - Tap a notification for the full text, then DISMISS or BACK.
  *   - Hold a notification to dismiss it on the phone.
  *   - Tap the gear (top right) for brightness and calibration.
+ *   - Hold the gear for 1.2 s to forget the phone this board is bound to.
  *   - Hold the title for 1.5 s, or touch the screen at boot, to calibrate.
+ *
+ * Every board is its own widget: the advertised name carries a tag read from
+ * the chip's efuse MAC, and the first phone to connect claims the board. Other
+ * phones are refused until the gear is held, so one deck answers to one phone.
  */
 
 #include <Arduino.h>
@@ -93,8 +98,10 @@ static constexpr int SCREEN_H = 240;
 
 // ---------------------------------------------------------------- palette ---
 // GMK Dracula keycaps: near-black purple base, a lighter modifier, warm white
-// alphas and the set's neon legends. Flat cards, hairline borders, one accent
-// hue per role.
+// alphas, and the pastel accent caps from the set's accent kits. Flat cards,
+// hairline borders, one pastel hue per role - cyan for the link, rose for the
+// one action, lavender for the section marker, butter for the unread count,
+// mint for charging.
 
 static constexpr uint16_t C_BG = 0x2946;         // #282a36 base
 static constexpr uint16_t C_PANEL = 0x422B;      // #44475a modifier
@@ -103,10 +110,12 @@ static constexpr uint16_t C_TILE_HI = 0x52AD;    // #52566b modifier, lifted
 static constexpr uint16_t C_EDGE = 0x6394;       // #6272a4 comment hairline
 static constexpr uint16_t C_TEXT = 0xFFDE;       // #f8f8f2 alphas
 static constexpr uint16_t C_DIM = 0xADB9;        // #adb5cb comment lifted 50%
-static constexpr uint16_t C_ACCENT = 0x8F5F;     // #8be9fd cyan
-static constexpr uint16_t C_ACCENT_DIM = 0x6494; // cyan at ~45% over C_TILE
-static constexpr uint16_t C_PINK = 0xFBD8;       // #ff79c6 pink
-static constexpr uint16_t C_PURPLE = 0xBC9F;     // #bd93f9 purple
+static constexpr uint16_t C_ACCENT = 0x9F7E;     // #9decf5 pastel cyan
+static constexpr uint16_t C_ACCENT_DIM = 0x6C94; // pastel cyan at 45% over C_TILE
+static constexpr uint16_t C_PINK = 0xFD5A;       // #ffa8d5 pastel rose
+static constexpr uint16_t C_PURPLE = 0xC5BF;     // #c6b6ff pastel lavender
+static constexpr uint16_t C_YELLOW = 0xF775;     // #f4efa8 pastel butter
+static constexpr uint16_t C_MINT = 0xAF5A;       // #aaead4 pastel mint
 
 static constexpr uint8_t CORNER_CARD = 10;
 static constexpr uint8_t CORNER_BUTTON = 8;
@@ -585,7 +594,74 @@ static void pushTime(time_t epoch) {
 
 // -------------------------------------------------------------- BLE state ---
 
-static const char *DEVICE_NAME = "ESP32 Phone_Widget";
+// --------------------------------------------------------------- identity ---
+// Each board is a distinct widget. The tag is the low 24 bits of the chip's
+// efuse MAC, which is unique per module and cannot be cloned by re-flashing, so
+// two decks running this sketch never advertise the same name.
+//
+// The first phone to connect claims the board: its address is written to NVS
+// and every other phone is refused (writes ignored, link not counted) until the
+// gear is held for 1.2 s on the board screen, which clears the binding.
+
+Preferences identityPrefs;
+char DEVICE_TAG[7] = "000000";
+char DEVICE_NAME[32] = "ESP32 Phone_Widget";
+bool ownerKnown = false;
+uint8_t ownerBda[6] = {0, 0, 0, 0, 0, 0};
+char ownerLabel[18] = "unbound";
+
+// True only while the connected peer is this board's owner; the Phone Link
+// write callbacks check it, so a stranger's writes never reach the UI.
+static volatile bool peerAllowed = false;
+
+static void bdaToText(const uint8_t bda[6], char *out, size_t outLen) {
+  snprintf(out, outLen, "%02X:%02X:%02X:%02X:%02X:%02X", bda[5], bda[4], bda[3],
+           bda[2], bda[1], bda[0]);
+}
+
+static void initIdentity() {
+  const uint64_t mac = ESP.getEfuseMac();
+  snprintf(DEVICE_TAG, sizeof(DEVICE_TAG), "%06X",
+           static_cast<unsigned>(mac & 0xFFFFFF));
+  snprintf(DEVICE_NAME, sizeof(DEVICE_NAME), "ESP32 Phone_Widget %s", DEVICE_TAG);
+
+  identityPrefs.begin("identity", true);
+  if (identityPrefs.getBytesLength("owner") == sizeof(ownerBda) &&
+      identityPrefs.getBytes("owner", ownerBda, sizeof(ownerBda)) == sizeof(ownerBda)) {
+    ownerKnown = true;
+    bdaToText(ownerBda, ownerLabel, sizeof(ownerLabel));
+  }
+  identityPrefs.end();
+
+  Serial.printf("[id] %s  owner %s\n", DEVICE_NAME, ownerKnown ? ownerLabel : "unbound");
+}
+
+// True when this peer may talk to the deck. An unbound board adopts the first
+// phone that arrives, which is what makes a fresh flash answer to its own
+// phone and to nothing else afterwards.
+static bool claimPeer(const uint8_t bda[6]) {
+  if (!ownerKnown) {
+    memcpy(ownerBda, bda, sizeof(ownerBda));
+    ownerKnown = true;
+    bdaToText(ownerBda, ownerLabel, sizeof(ownerLabel));
+    identityPrefs.begin("identity", false);
+    identityPrefs.putBytes("owner", ownerBda, sizeof(ownerBda));
+    identityPrefs.end();
+    Serial.printf("[id] bound to %s\n", ownerLabel);
+    return true;
+  }
+  return memcmp(ownerBda, bda, sizeof(ownerBda)) == 0;
+}
+
+static void releaseOwner() {
+  ownerKnown = false;
+  memset(ownerBda, 0, sizeof(ownerBda));
+  snprintf(ownerLabel, sizeof(ownerLabel), "unbound");
+  identityPrefs.begin("identity", false);
+  identityPrefs.remove("owner");
+  identityPrefs.end();
+  Serial.println("[id] binding cleared - the next phone to connect wins");
+}
 
 // ANCS only exists on iOS. Android has no equivalent service, so the deck gets
 // battery, clock and notifications from the Phone Link GATT service instead,
@@ -973,7 +1049,12 @@ class DeckServerCallbacks : public BLEServerCallbacks {
  public:
   void onConnect(BLEServer *server, esp_ble_gatts_cb_param_t *param) override {
     (void)server;
-    (void)param;
+    peerAllowed = claimPeer(param->connect.remote_bda);
+    if (!peerAllowed) {
+      Serial.println("[ble] refused: this deck is bound to another phone");
+      linkDirty = true;
+      return;
+    }
     serverConnected = true;
     linkDirty = true;
     Serial.println("[ble] phone connected");
@@ -986,6 +1067,7 @@ class DeckServerCallbacks : public BLEServerCallbacks {
 
   void onDisconnect(BLEServer *server, esp_ble_gatts_cb_param_t *param) override {
     (void)param;
+    peerAllowed = false;
     serverConnected = false;
     linkDirty = true;
     ancsReady = false;
@@ -1013,6 +1095,7 @@ class DeckSecurityCallbacks : public BLESecurityCallbacks {
 class LinkTimeCallbacks : public BLECharacteristicCallbacks {
  public:
   void onWrite(BLECharacteristic *characteristic) override {
+    if (!peerAllowed) return;  // a phone that does not own this board
     const auto value = characteristic->getValue();
     if (value.length() < 7) return;
     const unsigned char *b = reinterpret_cast<const unsigned char *>(value.c_str());
@@ -1025,6 +1108,7 @@ class LinkTimeCallbacks : public BLECharacteristicCallbacks {
 class LinkBatteryCallbacks : public BLECharacteristicCallbacks {
  public:
   void onWrite(BLECharacteristic *characteristic) override {
+    if (!peerAllowed) return;
     const auto value = characteristic->getValue();
     if (value.length() < 1) return;
     const int level = static_cast<unsigned char>(value[0]);
@@ -1041,6 +1125,7 @@ static uint32_t linkNoticeSerial = 0;
 class LinkNoticeCallbacks : public BLECharacteristicCallbacks {
  public:
   void onWrite(BLECharacteristic *characteristic) override {
+    if (!peerAllowed) return;
     const auto value = characteristic->getValue();
     if (value.length() == 0) return;
     char buf[160];
@@ -1269,7 +1354,9 @@ static void drawHeader() {
   tft.drawRoundRect(chip.x, chip.y, chip.w, chip.h, 6, C_EDGE);
   drawTextAt(">_", chip.x + 4, chip.y + 6, 1, C_ACCENT, C_BG);
   drawTextAt("Phone_Widget", 38, 5, 2, C_TEXT, C_BG);
-  drawTextAt("esp32 // cyd terminal", 38, 21, 1, C_DIM, C_BG);
+  char subtitle[24];
+  snprintf(subtitle, sizeof(subtitle), "esp32 // #%s", DEVICE_TAG);
+  drawTextAt(subtitle, 38, 21, 1, C_DIM, C_BG);
 
   // Link pill.
   const Rect pill = LINK_PILL;
@@ -1294,7 +1381,7 @@ static void drawSectionHeader() {
   const int unread = countUnread();
   if (unread > 0) snprintf(right, sizeof(right), "%d NEW", unread);
   else snprintf(right, sizeof(right), "DIRECT ACCESS");
-  drawTextRight(right, SCREEN_W - 10, 124, 1, C_DIM, C_BG);
+  drawTextRight(right, SCREEN_W - 10, 124, 1, unread > 0 ? C_YELLOW : C_DIM, C_BG);
 }
 
 // One wide status card: terminal line, big clock, phone battery on the right.
@@ -1305,7 +1392,9 @@ static void drawStatusCard() {
 
   drawTextAt("$ sys.status --", r.x + 12, r.y + 7, 1, C_DIM, C_TILE);
   const bool linked = phoneLinked();
-  const char *state = linked ? "READY // ONLINE" : "STANDBY // OFFLINE";
+  const char *state = linked ? "READY // ONLINE"
+                             : (ownerKnown ? "STANDBY // OFFLINE"
+                                           : "BIND // FIRST PHONE");
   int16_t bx = 0, by = 0;
   uint16_t bw = 0, bh = 0;
   tft.setTextSize(1);
@@ -1353,7 +1442,7 @@ static void drawStatusCard() {
     tft.fillRoundRect(bar.x + 1, bar.y + 1, fill, bar.h - 2, 2,
                       batteryLevel <= 20 ? C_PINK : C_ACCENT);
   }
-  if (batteryCharging) drawTextAt("CHG", battX + 46, r.y + 26, 1, C_ACCENT, C_TILE);
+  if (batteryCharging) drawTextAt("CHG", battX + 46, r.y + 26, 1, C_MINT, C_TILE);
 }
 
 static void formatAge(time_t at, char *out, size_t outLen) {
@@ -1394,7 +1483,7 @@ static void drawNoticeRow(int slot) {
   tft.fillRoundRect(icon.x, icon.y, icon.w, icon.h, 6, C_TILE_HI);
   tft.drawRoundRect(icon.x, icon.y, icon.w, icon.h, 6, n.unread ? C_ACCENT_DIM : C_EDGE);
   const char initial[2] = {n.app[0], '\0'};
-  drawTextCentered(initial, icon, 2, n.unread ? C_ACCENT : C_DIM, C_TILE_HI);
+  drawTextCentered(initial, icon, 2, n.unread ? C_YELLOW : C_DIM, C_TILE_HI);
 
   drawTextAt(n.app, r.x + 36, r.y + 4, 1, n.unread ? C_ACCENT : C_DIM, C_TILE);
 
@@ -1507,8 +1596,8 @@ static void drawSettings() {
   tft.drawRoundRect(BACK_BTN.x, BACK_BTN.y, BACK_BTN.w, BACK_BTN.h, 6, C_EDGE);
   drawTextCentered("<", BACK_BTN, 1, C_TEXT, C_TILE);
   drawTextAt("settings", 40, 8, 2, C_TEXT, C_BG);
-  drawTextRight(ancsReady ? "LINKED" : "OFFLINE", SCREEN_W - 12, 13, 1,
-                ancsReady ? C_ACCENT : C_DIM, C_BG);
+  drawTextRight(phoneLinked() ? "LINKED" : "OFFLINE", SCREEN_W - 12, 13, 1,
+                phoneLinked() ? C_ACCENT : C_DIM, C_BG);
 
   // Brightness.
   tft.fillRoundRect(8, 38, 304, 58, CORNER_CARD, C_TILE);
@@ -1532,7 +1621,9 @@ static void drawSettings() {
 
   drawButton(SET_CAL, "CALIBRATE TOUCH", 1, false);
   drawButton(SET_CLOSE, "CLOSE", 2, true);
-  drawTextAt("hold title 1.5s = calibrate", 12, 226, 1, C_DIM, C_BG);
+  drawTextAt(ownerKnown ? ownerLabel : "no phone bound", 12, 226, 1,
+             ownerKnown ? C_PURPLE : C_DIM, C_BG);
+  drawTextRight("hold gear = forget", SCREEN_W - 12, 226, 1, C_DIM, C_BG);
 }
 
 // --------------------------------------------------------- calibration UI ---
@@ -1933,6 +2024,7 @@ void setup() {
   touch.begin(SPI);
 
   loadMapping();
+  initIdentity();
   startBluetooth();
 
   // Holding the panel while the board boots always opens calibration, even if
@@ -2052,6 +2144,18 @@ void loop() {
   if (down && pressedTarget == TARGET_NONE && y < HEADER_H && x < 200 &&
       now - touchStartMs > 1500) {
     startCalibration();
+    return;
+  }
+
+  // Hold the gear for 1.2 s to forget the bound phone, so the next phone to
+  // connect can claim this board instead.
+  if (down && pressedTarget == TARGET_GEAR && now - touchStartMs > 1200) {
+    pressedTarget = TARGET_NONE;
+    releaseOwner();
+    drawHeader();
+    for (int i = 0; i < 3; ++i) drawNoticeRow(i);
+    ignoreTouchUntilRelease = true;
+    wasTouched = true;
     return;
   }
 

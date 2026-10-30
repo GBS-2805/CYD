@@ -35,17 +35,20 @@ def hex_rgb(value):
     return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
 
 
-# GMK Dracula: base, modifier, warm-white alphas, neon legends.
+# GMK Dracula: base, modifier, warm-white alphas, pastel accent caps.
+TAG = "A1B2C3"                 # the render board's efuse MAC tag
 C_BG = hex_rgb("282a36")          # 0x2946 base
 C_TILE = hex_rgb("44475a")        # 0x422B modifier
 C_TILE_HI = hex_rgb("52566b")     # 0x52AD modifier, lifted
 C_EDGE = hex_rgb("6272a4")        # 0x6394 comment hairline
 C_TEXT = hex_rgb("f8f8f2")        # 0xFFDE alphas
 C_DIM = hex_rgb("adb5cb")         # 0xADB9 comment lifted 50%
-C_ACCENT = hex_rgb("8be9fd")      # 0x8F5F cyan
-C_ACCENT_DIM = (100, 144, 163)    # 0x6494, cyan at ~45% over the modifier
-C_PINK = hex_rgb("ff79c6")        # 0xFBD8 pink
-C_PURPLE = hex_rgb("bd93f9")      # 0xBC9F purple
+C_ACCENT = hex_rgb("9decf5")      # 0x9F7E pastel cyan
+C_ACCENT_DIM = (108, 145, 160)    # 0x6C94, pastel cyan at 45% over the modifier
+C_PINK = hex_rgb("ffa8d5")        # 0xFD5A pastel rose
+C_PURPLE = hex_rgb("c6b6ff")      # 0xC5BF pastel lavender
+C_YELLOW = hex_rgb("f4efa8")      # 0xF775 pastel butter
+C_MINT = hex_rgb("aaead4")        # 0xAF5A pastel mint
 
 # ------------------------------------------------------------ layout rects ---
 
@@ -226,7 +229,7 @@ def draw_header(img, linked):
     draw.rounded_rectangle(chip.box, radius=6, outline=C_EDGE)
     text(img, ">_", chip.x + 4, chip.y + 6, 1, C_ACCENT)
     text(img, "Phone_Widget", 38, 5, 2, C_TEXT)
-    text(img, "esp32 // cyd terminal", 38, 21, 1, C_DIM)
+    text(img, "esp32 // #%s" % TAG, 38, 21, 1, C_DIM)
 
     pill = LINK_PILL
     draw.rounded_rectangle(pill.box, radius=11, fill=C_TILE,
@@ -240,13 +243,16 @@ def draw_header(img, linked):
     gear(img, GEAR_BTN.x + GEAR_BTN.w // 2, GEAR_BTN.y + GEAR_BTN.h // 2, C_TEXT)
 
 
-def draw_status_card(img, linked, clock, battery, date_label):
+def draw_status_card(img, linked, clock, battery, date_label, bound=True):
     r = STATUS_CARD
     card(img, r, C_TILE, C_EDGE)
     draw = ImageDraw.Draw(img)
 
     text(img, "$ sys.status --", r.x + 12, r.y + 7, 1, C_DIM)
-    state = "READY // ONLINE" if linked else "STANDBY // OFFLINE"
+    if linked:
+        state = "READY // ONLINE"
+    else:
+        state = "STANDBY // OFFLINE" if bound else "BIND // FIRST PHONE"
     right = r.x + r.w - 12
     state_x = right - text_width(state, 1)
     text(img, state, state_x, r.y + 7, 1, C_ACCENT if linked else C_DIM)
@@ -283,7 +289,7 @@ def draw_section_header(img, unread):
     draw.ellipse([9, 125, 15, 131], fill=C_PURPLE)
     text(img, "01 // NOTIFICATIONS", 20, 124, 1, C_TEXT)
     label = "%d NEW" % unread if unread else "DIRECT ACCESS"
-    text_right(img, label, W - 10, 124, 1, C_DIM)
+    text_right(img, label, W - 10, 124, 1, C_YELLOW if unread else C_DIM)
 
 
 def draw_notice_row(img, slot, notice, linked):
@@ -301,7 +307,7 @@ def draw_notice_row(img, slot, notice, linked):
     icon = Rect(r.x + 8, r.y + 6, 20, 20)
     draw.rounded_rectangle(icon.box, radius=6, fill=C_TILE_HI,
                            outline=C_ACCENT_DIM if unread else C_EDGE)
-    text_center(img, app[0], icon, 2, C_ACCENT if unread else C_DIM)
+    text_center(img, app[0], icon, 2, C_YELLOW if unread else C_DIM)
     text(img, app, r.x + 36, r.y + 4, 1, C_ACCENT if unread else C_DIM)
     text_right(img, age, r.x + r.w - 10, r.y + 4, 1, C_DIM)
     text(img, title, r.x + 36, r.y + 14, 2, C_TEXT if unread else C_DIM)

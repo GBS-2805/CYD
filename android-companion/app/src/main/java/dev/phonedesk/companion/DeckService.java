@@ -525,11 +525,17 @@ public class DeckService extends Service {
             for (DeckStore.Known known : DeckStore.all(this)) {
                 if (known.mac.equalsIgnoreCase(result.getDevice().getAddress())) return known.name;
             }
-            name = "Phone Deck";
+            name = "ESP32 Phone_Widget";
         }
         return name;
     }
 
+    /**
+     * Every deck advertises "ESP32 Phone_Widget <MAC tag>", so matching on the
+     * firmware name finds all of them; the tag is what keeps two boards apart
+     * in the NEARBY list. "phone deck" is kept for boards flashed before the
+     * rename, which are still in people's hands.
+     */
     private boolean looksLikeDeck(ScanResult result) {
         ScanRecord record = result.getScanRecord();
         if (record != null && record.getServiceUuids() != null) {
@@ -548,7 +554,8 @@ public class DeckService extends Service {
         }
         if (name == null && record != null) name = record.getDeviceName();
         if (name == null) return false;
-        return name.toLowerCase().contains("phone deck");
+        String lower = name.toLowerCase();
+        return lower.contains("phone_widget") || lower.contains("phone deck");
     }
 
     // --------------------------------------------------------------- gatt ---
@@ -599,12 +606,12 @@ public class DeckService extends Service {
     }
 
     private String safeName(BluetoothDevice device) {
-        if (!canConnect()) return "Phone Deck";
+        if (!canConnect()) return "ESP32 Phone_Widget";
         try {
             String name = device.getName();
-            return name == null || name.isEmpty() ? "Phone Deck" : name;
+            return name == null || name.isEmpty() ? "ESP32 Phone_Widget" : name;
         } catch (SecurityException e) {
-            return "Phone Deck";
+            return "ESP32 Phone_Widget";
         }
     }
 

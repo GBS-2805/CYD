@@ -19,8 +19,10 @@ from guesswork: `linked 4m 12s · -62 dBm · 18 packets · 5 notices`.
 
 ## Monitoring your CYDs
 
-- The bridge scans for decks advertising the Phone Link service (or the name
-  "Phone Deck") and lists them under **NEARBY** with signal strength.
+- The bridge scans for decks advertising the Phone Link service (or a name
+  containing `phone_widget`, which is what the firmware calls itself now; older
+  boards that still say "phone deck" are found too) and lists them under
+  **NEARBY** with signal strength.
 - **One deck is linked at a time.** That is a firmware and Android limit, not an
   app choice: each CYD accepts one phone, and the app keeps a single GATT link.
 - Tapping **LINK** on a row pins the bridge to that board. Once pinned, another
@@ -47,7 +49,7 @@ links it needs.
   the older `FirmwareNotes` store is carried over.
 - **TARGET BOARD** is a pull-down that drives the `FILES / <code>` header and the
   RECIPE text; `BoardCatalog` is where further boards get added.
-- The **Phone Deck** card is this repo's firmware, marked `INSIDE APP`. It keeps
+- The **ESP32 Phone_Widget** card is this repo's firmware, marked `INSIDE APP`. It keeps
   **COPY DROID** (whole sketch to the clipboard), **SAVE** (to Downloads) and the
   **DECK LIBRARIES** card, whose **INSTALL** buttons copy a library name and open
   ArduinoDroid's library screen.

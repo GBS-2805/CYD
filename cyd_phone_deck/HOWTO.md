@@ -92,8 +92,9 @@ appears in Android's Bluetooth settings list.
 
 ## Check the deck is alive
 
-- Serial monitor at **115200** right after boot: `[ble] advertising as "ESP32
-  Phone_Widget"`.
+- Serial monitor at **115200** right after boot: `[id] ESP32 Phone_Widget
+  A1B2C3  owner unbound` and `[ble] advertising as "ESP32 Phone_Widget
+  A1B2C3"`. The hex tag is this board's MAC tag, so it differs per board.
 - The deck screen should show the clock card, battery card and notification rows.
 - With the companion linked, the header pill and the deck's own `LINKED` badge
   agree within a second.
@@ -104,6 +105,12 @@ appears in Android's Bluetooth settings list.
 - Serial log missing the advertising line means setup failed before
   `startBluetooth()`; check the boot messages above it.
 - The deck stops advertising while a phone holds the link. Disconnect that phone.
+
+**Another phone cannot drive the deck**
+- That is the binding, not a fault: the first phone to connect owns the board.
+  The serial log says `[ble] refused: this deck is bound to another phone`.
+  Hold the gear for 1.2 s on the board screen to forget it
+  (`[id] binding cleared`), then connect the phone you want it to answer to.
 
 **Phone will not reconnect after one success**
 - Forget the stale **ESP32 Phone_Widget** entry in Bluetooth settings (old HID

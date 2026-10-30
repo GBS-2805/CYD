@@ -248,7 +248,7 @@ final class ProjectStore {
     private static Project deckSeed(Context context) {
         Project deck = new Project();
         deck.id = ID_DECK;
-        deck.name = "Phone Deck";
+        deck.name = "ESP32 Phone_Widget";
         deck.tagline = "INSIDE PROJECT";
         deck.body = "This repo's own firmware: the touch macro deck that shows phone "
                 + "battery, time and notifications, plus the shortcuts on its tiles.";

@@ -47,13 +47,13 @@ The bundled sketch is the one in this repo. Pick whichever route suits you.
 
 **Clipboard route (fastest):**
 
-1. **PROJECTS** → on the Phone Deck card, tap **COPY DROID**.
+1. **PROJECTS** → on the ESP32 Phone_Widget card, tap **COPY DROID**.
 2. Open ArduinoDroid, create or open a sketch, select the whole editor and paste.
 3. Compile and upload.
 
 **File route (keeps a real file):**
 
-1. **PROJECTS** → on the Phone Deck card, tap **SAVE**.
+1. **PROJECTS** → on the ESP32 Phone_Widget card, tap **SAVE**.
 2. The file lands in `Downloads/cyd_phone_deck.ino` (Android 10+).
 3. In ArduinoDroid, open the sketch through its file browser.
 
@@ -96,7 +96,8 @@ exactly three libraries:
 
 ### Install them without retyping the names
 
-**PROJECTS → Phone Deck → DECK LIBRARIES** has an **INSTALL** button for each library.
+**PROJECTS → ESP32 Phone_Widget → DECK LIBRARIES** has an **INSTALL** button for
+each library.
 One tap copies that exact name and opens ArduinoDroid's library list.
 
 1. Tap **INSTALL** next to **Adafruit GFX Library**.
@@ -265,13 +266,16 @@ tell a partial write from a wrong file without flashing again.
 - Confirm the deck is flashed and powered; its screen draws the dashboard.
 - The deck advertises for as long as it is on. If a phone is already linked to it,
   it stops advertising — disconnect that phone first.
-- Watch the serial log at 115200 for `[ble] advertising as "Phone Deck"`.
+- Watch the serial log at 115200 for `[ble] advertising as "ESP32 Phone_Widget
+  <TAG>"`, where the tag is that board's MAC.
 
 **LINK fails or the deck says "Deck service missing"**
 - The deck is running an older sketch without the Phone Link service; reflash the
   bundled sketch.
 - If Bluetooth settings still lists a **Phone Deck** keyboard entry from an older
   build, forget it. That stale bond interferes with GATT connects.
+- If the deck refuses this phone, it is bound to another one: hold the deck's
+  gear 1.2 s to forget that phone, then connect again.
 
 **Notifications never arrive though LINKED shows**
 - Notification access is off or was revoked by an app update; re-grant it in SETUP.

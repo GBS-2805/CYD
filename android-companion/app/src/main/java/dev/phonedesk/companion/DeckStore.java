@@ -39,7 +39,7 @@ final class DeckStore {
 
     static void remember(Context context, String mac, String name) {
         if (mac == null || mac.isEmpty()) return;
-        String label = name == null || name.isEmpty() ? "Phone Deck" : name;
+        String label = name == null || name.isEmpty() ? "ESP32 Phone_Widget" : name;
         prefs(context).edit()
                 .putString("m:" + mac, label + '\u0001' + System.currentTimeMillis())
                 .apply();
@@ -52,7 +52,7 @@ final class DeckStore {
                 String key = entry.getKey();
                 if (!key.startsWith("m:") || !(entry.getValue() instanceof String)) continue;
                 String[] parts = ((String) entry.getValue()).split("\u0001");
-                String name = parts.length > 0 && !parts[0].isEmpty() ? parts[0] : "Phone Deck";
+                String name = parts.length > 0 && !parts[0].isEmpty() ? parts[0] : "ESP32 Phone_Widget";
                 long seen = 0;
                 if (parts.length > 1) {
                     try {

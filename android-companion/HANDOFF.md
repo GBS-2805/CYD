@@ -38,8 +38,9 @@ reason to add a resource pipeline.
 ## Monitoring model
 
 - The service records every scan result that looks like a deck (Phone Link UUID or
-  a name containing "phone deck"), keeps 12 with a 30 s TTL, and exposes them
-  through `DeckService.snapshot()`.
+  a name containing `phone_widget` — or `phone deck`, for boards flashed before
+  the firmware rename), keeps 12 with a 30 s TTL, and exposes them through
+  `DeckService.snapshot()`.
 - **One link at a time.** A second GATT link to another CYD was deliberately not
   built: the firmware accepts one phone, and juggling several links with Android's
   single-operation GATT API is not worth the complexity.
@@ -54,8 +55,8 @@ reason to add a resource pipeline.
 
 ## Firmware files
 
-- **Two surfaces, one store.** The bundled sketch appears on the **Phone Deck**
-  card in PROJECTS; imported `.ino`/`.bin` files appear under **IMAGES** on BOARD,
+- **Two surfaces, one store.** The bundled sketch appears on the **ESP32
+  Phone_Widget** card in PROJECTS; imported `.ino`/`.bin` files appear under **IMAGES** on BOARD,
   which is also the only place with COPY / SAVE / FLASH. `FlashLibrary` backs both.
 - **A text sketch is never flashable.** The APK carries ArduinoDroid source, not a
   compiled `.bin`, so the write path runs on imported images only.

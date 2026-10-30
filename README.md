@@ -11,9 +11,11 @@ records what is verified and what is not.
 | **ESP32_Widgets app** | [`android-companion/`](android-companion) | **Off-site**, the Android app: CYD monitor, BLE bridge, USB flasher and sketch shelf | [README](android-companion/README.md) · [HOWTO](android-companion/HOWTO.md) · [handoff](android-companion/HANDOFF.md) |
 
 **ESP32 Phone_Widget** is a BLE peripheral exposing a small **Phone Link** GATT
-service. The firmware advertises as "ESP32 Phone_Widget" and renders whatever it
-receives; it cannot read a phone on its own. Apple's ANCS is iOS-only, so on
-Android the companion app is not optional.
+service. Each board names itself after its own hardware — `ESP32 Phone_Widget
+<TAG>`, where the tag is the chip's MAC — and the first phone to connect claims
+it, so every board flashed is a distinct widget that answers to one phone. It
+renders whatever it receives; it cannot read a phone on its own. Apple's ANCS is
+iOS-only, so on Android the companion app is not optional.
 
 The companion — **Off-site** — is more than a bridge: its **DECKS** tab monitors
 the link (RSSI, uptime, packets, nearby and saved boards), **PROJECTS** keeps the
