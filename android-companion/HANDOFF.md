@@ -157,8 +157,11 @@ URL and a flashing note. Decisions behind it:
 - **Flow control is disabled explicitly** (`0x2727 = 0`) during CH340 init. Left
   enabled, the bridge withholds traffic because CTS is never asserted — which
   presents as a board that resets into download mode but never answers a sync.
-- **Sync failures report a byte count** (`N byte(s) seen on the port`) so a dead
-  link is distinguishable from a framing mistake without a serial monitor.
+- **The log separates the three ways a probe can fail.** A real run on
+  2026-10-30 showed they look identical in a per-rate byte count: a board that
+  never spoke, a bridge that never took the bytes, and a reset that never
+  happened. Each rate now logs `N B in / M B out` plus the failure reason, and a
+  refused write aborts the sweep instead of being retried four more times.
 - **Baud fallback.** `EspRom.connect()` sweeps `BAUDS = {115200, 57600, 230400,
   460800, 74880}` until the bootloader answers, resetting between rounds. 115200
   gets the full three rounds and 12 syncs; the alternates get two rounds and six
@@ -170,6 +173,19 @@ URL and a flashing note. Decisions behind it:
   that the default divisor garbles the line; a wrong cable still reads zero bytes
   at every rate, and the ROM sends nothing until it accepts a sync, so silence is
   not proof of a dead link.
+- **Proof of life before the protocol.** `detectPolarity()` listens at 115200
+  and 74880 baud, in both DTR/RTS polarities, for boot text after a plain reset.
+  Only *readable ASCII* counts (`textPreview()`): on the first hardware run a
+  byte-count check declared victory on 234 bytes that turned out to be noise, and
+  the wrong polarity it locked in held the chip in reset for the whole sweep.
+  Noise is now reported as noise, and the failure line says what each case leaves.
+  Boot text was unreachable by construction before: `hardReset()` ended the probe
+  and the port closed before anything could read it.
+- **Control polarity alternates between sync rounds**, because an inverted EN/IO0
+  pair holds the chip in reset for the whole handshake: no bytes at any rate,
+  indistinguishable from a dead link. Round 1 uses the polarity the boot text
+  arrived on, round 2 the other, round 3 the first again, and the log names the
+  inverted rounds, so the log alone identifies the wiring.
 - **Theme**: near-black navy, violet selection, monospace for every text and
   button (`Ui.text` / `Ui.action`), matching the deck's terminal look.
 - **Probe always restores the board.** `probeUsb()` calls `hardReset()` in both
@@ -188,11 +204,15 @@ URL and a flashing note. Decisions behind it:
   not a compiled `.bin`, so flashing runs on imported images only.
 - The manifest declares `android.hardware.usb.host` as *not required*, so installs
   on phones without OTG still work; the card then reports that USB host is absent.
-- **Partially verified on hardware.** A real probe reached the board and drove it
-  into download mode, so the CH340 init and the DTR/RTS reset do work; the sync
-  then failed to get an answer. Retries were increased (12 per round, three
-  rounds with a reset between them) and the board is now restored on failure, but
-  a clean `ESP32 answered its bootloader` has not been observed yet.
+- **Partially verified on hardware.** Two probes ran on a real phone (Android
+  17, CH340 `1a86:7523`). The first saw `0 B` at all five rates and could not say
+  whether the board was silent or the bytes never left. The second, with counters,
+  showed **552 B out per round** (46 B × 12 syncs — the send path is proven) with
+  **0 B in**, plus **234 B of non-ASCII at 74880** after a plain reset. Bytes at
+  the wrong rate that are not text mean the chip runs when released but says
+  nothing at 115200 during the sync rounds, which is the signature of a polarity
+  holding it in reset — what the alternating rounds now test. A clean `ESP32
+  answered its bootloader` has still not been observed.
 - **Unverified**: the write path has never run against real flash. Framing and
   block sizes are taken from esptool, but no erase or MD5 check has completed on
   a board.
@@ -278,7 +298,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   by `gradle assembleDebug` instead, which is what produced the shipped APK.
 - Every relative Markdown link across the repo resolves.
 - `gradle assembleDebug` (Gradle 8.7, AGP 8.5.2, SDK 34, JDK 17) builds a debug
-  APK at `dist/PhoneDeckBridge-debug.apk` — 97,757 bytes as measured on the file
+  APK at `dist/PhoneDeckBridge-debug.apk` — 99,533 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build.
   The earlier 128,924-byte APK unpacked to the same six entries with the same
   uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
@@ -293,10 +313,11 @@ Identical to the sketch, checked against its `onWrite` handlers:
   `clean`, and the script's own checks passed: signature, `zipalign -c 4`,
   package `dev.phonedesk.companion`, minSdk 26, targetSdk 34, and a bundled-sketch
   MD5 equal to the repo file.
-- That fresh build produced **97,769 bytes**, 12 more than the committed 97,757.
-  Dex files embed build-time data, so the APK is *not* byte-reproducible; the
-  committed `dist/` copy was restored afterwards and every size in these docs
-  refers to it. Quote the size as ~96 kB, never as a checksum.
+- A fresh-toolchain run of unchanged sources produced **97,769 bytes** against
+  the then-committed 97,757, so the APK is *not* byte-reproducible: dex files embed
+  build-time data. After the probe changes the script shipped **99,533 bytes**, and
+  `dist/` holds that artifact — every size in these docs refers to it. Quote the
+  size as ~96 kB, never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 34, the expected permission set, and
   `MainActivity` as the launchable activity.

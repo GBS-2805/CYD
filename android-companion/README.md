@@ -74,9 +74,14 @@ without a computer.
   That is the way out of download mode (black screen, red LED) after a failed
   attempt, short of unplugging.
 - **PROBE LOG** below the buttons keeps the last 80 lines of every probe and
-  flash: rates tried, bytes received, chip magic, MAC, block progress and the
-  MD5 pair. A silent ROM shows `0 B` per rate; a garbled one shows the hex it
-  actually sent. COPY LOG puts it on the clipboard, CLEAR empties it.
+  flash. It opens with a proof of life: the chip prints boot text on every reset
+  whatever is in flash, so the log listens at 115200 and 74880 baud in both
+  DTR/RTS polarities and only counts *readable text* as proof — random bytes mean
+  the board is talking at some other rate, not that it is reachable. Each rate
+  then runs its reset rounds with alternating polarity and reports `N B in / M B
+  out`, the hex that arrived and the reason the round failed; a bridge that
+  refuses bytes stops the sweep instead of being retried at four more rates. COPY
+  LOG puts it on the clipboard, CLEAR empties it.
 
 `UsbSerialCh340` implements the CH340 register sequence in-tree and `EspRom` the
 ROM protocol: SLIP framing, sync, register reads, `FLASH_BEGIN`/`FLASH_DATA`/
@@ -127,7 +132,7 @@ through Gradle; a raw `javac` build produces an APK-less class check and the
 PROJECTS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
-[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (95.5 kB,
+[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (97.2 kB,
 package `dev.phonedesk.companion`, debug-signed). Install it with
 `adb install -r dist/PhoneDeckBridge-debug.apk`, or copy it to the phone and open
 it with "install unknown apps" allowed.

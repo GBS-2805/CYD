@@ -237,12 +237,21 @@ unplug the cable. The flash is only erased once a write has actually started.
 **No CH340 on the USB bus**: the phone cannot see the bridge — check the adapter,
 try another cable, and confirm the phone supports USB host mode.
 
-**no answer from the bootloader**: the bridge opened but the reset did not take.
-Unplug, replug and probe again; stale boot-log bytes are flushed at the start of
-each probe. **PROBE LOG** on the same card tells you which of the two it was: a
-line per rate with `0 B` means nothing came back at all (cable, reset wiring or
-the adapter), while a line showing hex bytes that are not a sync reply means the
-board did answer and the bridge mangled it — COPY LOG and read the bytes.
+**no answer from the bootloader**: read **PROBE LOG** from the top, in this order.
+
+1. Four `proof of life` lines — `115200 normal`, `115200 inverted`, `74880
+   normal`, `74880 inverted`. If one of them quotes text in quotes, the cable, the
+   adapter and the reset wiring are all fine and the chip runs when it is
+   released; skip to 3.
+2. All four say `nothing` → not a byte reached the phone after a reset: cable, the
+   adapter's receive line, or a board held in reset.
+3. All four say `no text — <hex>` → the board is transmitting at some rate the
+   probe is not listening on. The data path works; the rate is the open question.
+4. `round 1: 0 B in / 0 B out` means the bridge refused the bytes and the sweep
+   stops there. `0 B in / 552 B out` means 12 sync packets left the phone and the
+   ROM stayed silent. Rounds alternate the DTR/RTS polarity and the log marks the
+   inverted ones, so compare rounds before blaming the board: a board whose EN/IO0
+   pair is inverted answers only on the inverted rounds.
 
 **MD5 mismatch after writing**: something interfered with the link (a hub, a
 charge-only cable, an unplugged board). Re-flash; the board boots whatever it

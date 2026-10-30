@@ -63,6 +63,14 @@ final class EspRom {
      */
     private static final int[] BAUDS = {115200, 57600, 230400, 460800, 74880};
 
+    /**
+     * Rates the chip prints readable boot text at. The ESP32 ROM talks at 115200;
+     * 74880 is the 26 MHz suite the ESP8266 uses and some ESP32 boards emit
+     * before their clock is set. Both are probed because guessing one of them is
+     * how a working cable was once reported as dead.
+     */
+    private static final int[] BANNER_BAUDS = {115200, 74880};
+
     interface Progress {
         void update(int percent, String note);
     }
@@ -84,6 +92,12 @@ final class EspRom {
     private final ByteArrayOutputStream preview = new ByteArrayOutputStream();
     /** Line rate the port is currently programmed to. */
     private int baud = 115200;
+    /** Every byte handed to the bridge at the current rate, to prove the send path. */
+    private long bytesOut;
+    /** Whether the board's reset transistors invert DTR/RTS; see detectPolarity(). */
+    private boolean invertControl;
+    /** True once a plain reset produced readable boot text, not just noise. */
+    private boolean bannerSeen;
 
     EspRom(UsbSerialCh340 port) {
         this.port = port;
@@ -132,9 +146,9 @@ final class EspRom {
     /**
      * Get the board into its bootloader and confirm the chip type.
      *
-     * The first round syncs without a reset, because a board already sitting in
-     * download mode answers straight away; later rounds reset first, which is
-     * what a board running its firmware needs.
+     * Every round resets, because detectPolarity() has just left the chip running
+     * its firmware — a board already sitting in download mode is not the case by
+     * the time this loop starts.
      */
     Detected connect() throws IOException {
         final StringBuilder silent = new StringBuilder();
@@ -142,6 +156,10 @@ final class EspRom {
 
         log("sync: " + BAUDS.length + " rates queued, " + CONNECT_ROUNDS
                 + " reset rounds x " + SYNC_ATTEMPTS + " sync packets at the first");
+        detectPolarity();
+        // Whatever polarity the boot text arrived on is the starting point; the
+        // rounds then alternate away from it and back.
+        final boolean base = invertControl;
 
         for (int index = 0; index < BAUDS.length && !synced; ++index) {
             final int rate = BAUDS[index];
@@ -157,26 +175,35 @@ final class EspRom {
             // Counted per rate: a total across five attempts says nothing about
             // which one the board was actually talking at.
             bytesIn = 0;
+            bytesOut = 0;
             preview.reset();
 
             final int rounds = first ? CONNECT_ROUNDS : ALT_CONNECT_ROUNDS;
             final int attempts = first ? SYNC_ATTEMPTS : ALT_SYNC_ATTEMPTS;
             log(rate + " baud: " + rounds + " rounds of " + attempts + " syncs");
             for (int round = 0; round < rounds && !synced; ++round) {
-                if (round > 0) {
-                    enterBootloader();
-                    sleep(120);
-                    log("  round " + (round + 1) + ": reset into download mode");
-                }
+                // Alternate the control polarity round by round. An inverted
+                // EN/IO0 pair holds the chip in reset for the whole handshake,
+                // which reads exactly like a dead link: no bytes, every rate.
+                invertControl = base ^ ((round & 1) == 1);
+                enterBootloader();
+                sleep(120);
+                log("  round " + (round + 1) + ": reset into download mode"
+                        + (invertControl ? ", inverted lines" : ""));
                 try {
                     sync(attempts);
                     synced = true;
-                } catch (IOException ignored) {
+                } catch (WriteFailure e) {
+                    // The bridge is refusing bytes: no other rate will change that.
+                    log("failed: " + e.getMessage());
+                    throw e;
+                } catch (IOException e) {
                     // Try the next reset round, then the next rate.
-                    log("  round " + (round + 1) + ": " + bytesIn + " B arrived, "
-                            + previewHex());
+                    log("  round " + (round + 1) + ": " + bytesIn + " B in / " + bytesOut
+                            + " B out, " + previewHex() + " (" + e.getMessage() + ")");
                 }
             }
+            invertControl = base;
             if (!synced) {
                 log(rate + " baud: no sync reply");
                 if (silent.length() > 0) silent.append(", ");
@@ -189,11 +216,16 @@ final class EspRom {
         if (!synced) {
             final String rates = silent.length() == 0 ? "none" : silent.toString();
             final String message = "no answer from the bootloader at any of "
-                    + BAUDS.length + " baud rates (" + rates + "; the last one saw "
-                    + previewHex() + "). The ROM stays silent until it accepts a"
-                    + " sync packet, so silence points at the cable, the reset"
-                    + " wiring or the adapter rather than the baud rate";
-            log("failed: " + message);
+                    + BAUDS.length + " baud rates (" + rates + ")"
+                    + ", in either reset polarity. " + (bannerSeen
+                    ? "Boot text did arrive after a reset, so the cable, the adapter"
+                            + " and the reset wiring work and the chip runs when it is"
+                            + " released. Every sync round still saw silence, so the"
+                            + " reset is not leaving it in download mode (IO0) or the sync"
+                            + " packets never reach the ROM."
+                    : "Not one readable byte arrived after a plain reset, at 115200 or"
+                            + " 74880, in either polarity. That points at the cable, the"
+                            + " adapter's receive line or a board held in reset.");
             throw new IOException(message);
         }
 
@@ -228,16 +260,38 @@ final class EspRom {
     }
 
     /**
+     * DTR drives IO0 and RTS drives EN through the board's two reset
+     * transistors. Some CYD revisions wire that pair the other way round, which
+     * holds the chip in reset for the whole probe: silence at every rate and no
+     * boot banner either. Trying both polarities costs a second and tells that
+     * apart from a dead cable.
+     */
+    private void lines(boolean io0Low, boolean enLow) throws IOException {
+        port.setDtrRts(invertControl ? !io0Low : io0Low, invertControl ? !enLow : enLow);
+    }
+
+    private void changeBaudQuietly(int rate) {
+        if (rate == baud) return;
+        try {
+            port.changeBaudRate(rate);
+            baud = rate;
+            sleep(40);
+        } catch (IOException e) {
+            log(rate + " baud: bridge refused the rate (" + e.getMessage() + ")");
+        }
+    }
+
+    /**
      * esptool's classic reset: hold EN low, drop IO0 low, release EN, then
      * release IO0 — the ROM samples the strapping pin as it leaves reset.
      */
     private void enterBootloader() throws IOException {
         port.flushInput();
-        port.setDtrRts(false, true);   // IO0 high, EN low (in reset)
+        lines(false, true);   // IO0 high, EN low (held in reset)
         sleep(150);
-        port.setDtrRts(true, false);   // IO0 low, EN released
+        lines(true, false);   // IO0 low, EN released: the ROM samples IO0
         sleep(120);
-        port.setDtrRts(false, false);  // IO0 high again, chip now in download mode
+        lines(false, false);  // IO0 high again, chip now in download mode
         sleep(120);
     }
 
@@ -249,13 +303,96 @@ final class EspRom {
     void hardReset() throws IOException {
         log("reset: IO0 high, EN pulsed (boot from flash)");
         port.flushInput();
-        port.setDtrRts(false, false); // IO0 high, EN released
+        lines(false, false); // IO0 high, EN released
         sleep(60);
-        port.setDtrRts(false, true);  // EN low: reset
+        lines(false, true);  // EN low: reset
         sleep(150);
-        port.setDtrRts(false, false); // EN released, IO0 high: boot from flash
+        lines(false, false); // EN released, IO0 high: boot from flash
         sleep(200);
         connected = false;
+    }
+
+    /**
+     * Listen for readable boot text once per rate and polarity. The chip says
+     * something on every reset whatever is in flash, so *text* here proves the
+     * cable, the adapter and the reset wiring all work — which "0 B at five
+     * rates" cannot tell you on its own.
+     *
+     * Bytes that are not text are recorded as noise rather than success: a board
+     * talking at a rate we are not listening on produces exactly that, and
+     * treating it as proof of life locks in the wrong polarity. That mistake cost
+     * a round trip on hardware.
+     */
+    private void detectPolarity() throws IOException {
+        log("proof of life: listening at 115200 and 74880 for boot text after a reset");
+        boolean noiseOnly = false;
+        for (int candidate : BANNER_BAUDS) {
+            changeBaudQuietly(candidate);
+            for (boolean inverted : new boolean[]{false, true}) {
+                invertControl = inverted;
+                final int seen = listenAfterReset(600);
+                final String text = textPreview();
+                log("  " + candidate + (inverted ? " inverted: " : " normal: ") + seen + " B"
+                        + (seen == 0 ? ", nothing"
+                        : text.isEmpty() ? ", no text — " + previewHex()
+                        : " — \"" + text + "\""));
+                if (!text.isEmpty()) {
+                    bannerSeen = true;
+                    log("  boot text arrived, so the cable, the adapter and the reset"
+                            + " wiring work; keeping "
+                            + (inverted ? "inverted" : "normal") + " lines");
+                    return;
+                }
+                noiseOnly |= seen > 0;
+            }
+        }
+        invertControl = false;
+        log(noiseOnly
+                ? "  bytes arrived, none of them text: the board talked at some other"
+                        + " rate, so the data path works but the rate is unknown"
+                : "  nothing at either rate in either polarity — the failure line says"
+                        + " what that leaves");
+    }
+
+    /** The longest printable-ASCII run in the preview, or "" when it is all noise. */
+    private String textPreview() {
+        final byte[] raw = preview.toByteArray();
+        final StringBuilder best = new StringBuilder();
+        final StringBuilder run = new StringBuilder();
+        for (byte value : raw) {
+            final int c = value & 0xFF;
+            if (c >= 0x20 && c <= 0x7E) {
+                run.append((char) c);
+                if (run.length() > best.length()) {
+                    best.setLength(0);
+                    best.append(run);
+                }
+            } else {
+                run.setLength(0);
+            }
+        }
+        return best.length() >= 6 ? best.toString() : "";
+    }
+
+    /** Bytes the board sent in the window after a reset with IO0 high. */
+    private int listenAfterReset(int windowMs) throws IOException {
+        bytesIn = 0;
+        preview.reset();
+        port.flushInput();
+        lines(false, true);   // EN low: reset, IO0 stays high
+        sleep(120);
+        lines(false, false);  // EN released: the ROM prints its banner now
+        final long deadline = System.currentTimeMillis() + windowMs;
+        final byte[] buffer = new byte[64];
+        while (System.currentTimeMillis() < deadline) {
+            final int read = port.read(buffer, 50);
+            if (read <= 0) continue;
+            bytesIn += read;
+            for (int i = 0; i < read && preview.size() < PREVIEW_BYTES; ++i) {
+                preview.write(buffer[i]);
+            }
+        }
+        return (int) bytesIn;
     }
 
     private void sync(int attempts) throws IOException {
@@ -436,6 +573,13 @@ final class EspRom {
 
     // -------------------------------------------------------------- framing ---
 
+    /** A failure to hand bytes to the bridge, as opposed to a silent board. */
+    private static final class WriteFailure extends IOException {
+        WriteFailure(String message) {
+            super(message);
+        }
+    }
+
     private static final class Response {
         final int op;
         final int value;
@@ -456,7 +600,16 @@ final class EspRom {
         packet[3] = (byte) ((payload.length >> 8) & 0xFF);
         putU32(packet, 4, checksum);
         System.arraycopy(payload, 0, packet, 8, payload.length);
-        port.write(slipEncode(packet));
+        final byte[] framed = slipEncode(packet);
+        try {
+            port.write(framed);
+        } catch (IOException e) {
+            // Counted separately from a silent board: these two look identical in
+            // a per-rate byte count and need opposite fixes.
+            throw new WriteFailure("the bridge would not take a " + framed.length
+                    + " B command: " + e.getMessage());
+        }
+        bytesOut += framed.length;
     }
 
     private void awaitStatus(int op, int timeoutMs) throws IOException {
