@@ -1,0 +1,12 @@
+# Gradle
+.gradle/
+build/
+local.properties
+
+# Android Studio
+.idea/
+*.iml
+captures/
+
+# Build output copied into the app for the Flash tab
+app/src/main/assets/deck/

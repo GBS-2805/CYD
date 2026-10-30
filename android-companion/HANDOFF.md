@@ -1,0 +1,310 @@
+# Handoff — Off-site (Android companion)
+
+State as of the last session. [README.md](README.md) has the product view,
+[HOWTO.md](HOWTO.md) the task steps; this file is the context behind the code.
+
+## What exists
+
+A single-module Android app in Java, **no AndroidX and no third-party
+libraries**, so Gradle resolves only the Android Gradle Plugin. Package
+`dev.phonedesk.companion`, `minSdk` 26, `targetSdk` 34.
+
+Four tabs, hosted by `MainActivity`:
+
+| File | Role |
+| --- | --- |
+| `MainActivity.java` | Header pill, bottom tab bar, 1 s refresh loop, permissions, SAF result |
+| `DecksTab.java` | Live monitor: link telemetry, nearby scan results, saved decks |
+| `ProjectsTab.java` | Notebook: status chips, project cards, deck libraries, recipes |
+| `BoardTab.java` | Target picker, USB probe/restart, imported images, flashing |
+| `SetupTab.java` | Notification access, Bluetooth, battery settings, start/stop |
+| `DeckService.java` | Foreground service: scan, GATT link, write queue, snapshot API |
+| `DeckStore.java` | SharedPreferences: known decks and the preferred MAC |
+| `FlashLibrary.java` | Asset + app-storage files (binary-safe), import, MediaStore save |
+| `FirmwareCatalog.java` | Links to Marauder / Bruce / Launcher installers; no bundled binaries |
+| `UsbSerialCh340.java` | CH340 driver: claim, init writes, baud divisor, flow control, DTR/RTS |
+| `BoardCatalog.java` | Target-board list behind the BOARD tab pull-down |
+| `EspRom.java` | ROM protocol: SLIP, sync, register reads, flash write, MD5 verify, hard reset |
+| `FirmwareNotes.java` | SharedPreferences log per firmware: build label, touch status, notes |
+| `DeckNotificationListener.java` | Forwards posted notifications to the service |
+| `Ui.java` | Palette, rounded cards, buttons, duration/size formatting |
+| `Actions.java` | Shared toast, clipboard, link and save helpers |
+| `CrashLog.java` | Uncaught-exception handler and the LAST CRASH reader |
+
+The UI is built programmatically — no `res/layout`, no `R` class. That is what
+lets `javac` type-check the whole app here; keep it that way unless there is a
+reason to add a resource pipeline.
+
+## Monitoring model
+
+- The service records every scan result that looks like a deck (Phone Link UUID or
+  a name containing "phone deck"), keeps 12 with a 30 s TTL, and exposes them
+  through `DeckService.snapshot()`.
+- **One link at a time.** A second GATT link to another CYD was deliberately not
+  built: the firmware accepts one phone, and juggling several links with Android's
+  single-operation GATT API is not worth the complexity.
+- Tapping LINK calls `connectTo(mac)`, which writes the MAC to `DeckStore` as the
+  preferred deck. When a preference exists the scanner ignores other decks, so a
+  neighbouring board cannot steal the connection.
+- `snapshot()` also carries `writes` (acknowledged GATT writes), `notices`
+  (notifications forwarded), `connectedAtMs`, `lastWriteMs` and `rssi`
+  (`readRemoteRssi()` every 10 s).
+- `DecksTab` rebuilds only when a structural signature changes and updates the
+  live line every second, so scroll position and row identity stay stable.
+
+## Firmware files
+
+- **Two surfaces, one store.** The bundled sketch appears on the **Phone Deck**
+  card in PROJECTS; imported `.ino`/`.bin` files appear under **IMAGES** on BOARD,
+  which is also the only place with COPY / SAVE / FLASH. `FlashLibrary` backs both.
+- **A text sketch is never flashable.** The APK carries ArduinoDroid source, not a
+  compiled `.bin`, so the write path runs on imported images only.
+- Gradle task `syncDeckSketch` copies `../cyd_phone_deck/cyd_phone_deck.ino` into
+  `app/src/main/assets/deck/` before `preBuild`. The repo therefore keeps one copy
+  of the firmware; do not commit a duplicate into assets.
+- `FlashLibrary` reads that asset once and caches the bytes (the tab refreshes
+  every shelf or board rebuild, and the sketch is ~70 kB).
+- Imported sketches are copied into `filesDir/flash` from a SAF URI, so the app
+  owns them; deleting the app deletes them.
+- SAVE writes to `MediaStore.Downloads`, which needs Android 10+; below that the
+  UI tells the user to COPY instead rather than requesting storage permission.
+- COPY puts the entire sketch on the clipboard for ArduinoDroid's editor. That is
+  the path that works regardless of Android version.
+
+## Project notebook
+
+- `ProjectStore` holds one record per project: id, name, tagline, body, libraries,
+  source and installer URLs, notes, build, fileName, kind, status, touch and
+  updatedMs. One JSON array in `SharedPreferences`; `org.json` is a platform
+  class, so the no-dependency build is unchanged.
+- **Keyed by id, not by name.** `FirmwareNotes` keyed its log by display name, so
+  a rename orphaned the history. Seeding migrates any existing `FirmwareNotes`
+  record into the matching project and then stops using that store.
+- **Status and result are separate.** Status is the user's relationship to the
+  project (WANT TO TRY / FLASHED / WORKING / PARKED); touch and build describe
+  what happened when it ran.
+- **`ProjectsTab` rebuilds on a signature** covering the file list, the store
+  version, the selected board and the active filter. The store version is what
+  makes a LOG or STATUS write repaint the card; before it, the shelf kept showing
+  text from two screens ago until a file was imported.
+- The bundled deck is a project of kind INSIDE: its card carries COPY DROID and
+  SAVE, and the DECK LIBRARIES card hangs off it.
+- **Not built yet**: creating, editing and deleting projects, and attaching a
+  file to a card. The catalogue is the four seeded projects plus anything
+  imported into FILES.
+
+## Third-party firmware: catalogue, do not bundle
+
+`FirmwareCatalog` is a hardcoded list of name, tagline, blurb, repo URL, installer
+URL and a flashing note. Decisions behind it:
+
+- **No images in the APK.** Marauder, Bruce and Launcher are GPL releases that
+  change constantly; bundling them would mean shipping their source and licences
+  and going stale within weeks.
+- **No in-app flashing.** The ESP32 is programmed over UART, not BLE. The app can
+  only open installers and store `.bin` files for a PC-side esptool run.
+- **Board support was checked against the 2432S024R specifically**, not the
+  generic "CYD" label, because the 2.8" 2432S028 uses different panel and touch
+  pins. Evidence: Fr4nkFletcher's Marauder fork states "Add support for Guition
+  ESP32-2432S024R 2.4\" Resistive Touch"; Bruce issue #660 tracks the same board
+  and its CYD-2432S024R builds gained a first-boot touch calibration; Launcher's
+  catalogue lists 2432S024R (port tracked in its issue #99). GhostESP was dropped
+  from the catalogue: its CYD builds target the 2.8" 2432S028 and its own board
+  wiki lists the 2.4" 2432S024 as unsupported, so it was a warning with no action.
+- **Copy button is honest about what it can copy.** `ProjectsTab` labels the bundled
+  sketch's button **COPY DROID** (it is real ArduinoDroid source) and the
+  third-party cards' button **COPY RECIPE**, which copies the board, the reason
+  there is no sketch form, links, the saved log and a runnable
+  `python -m esptool … write_flash 0x0 <merged-2432S024R>.bin` line. Rewriting
+  Marauder/Bruce/Launcher as an ArduinoDroid sketch is not possible: they are
+  PlatformIO C++ projects (Bruce pins ~40 libraries), and embedding their code
+  would also bring GPL source-distribution obligations into the APK.
+- **Library requirements are per option, not generic.** Only the deck sketch is
+  an ArduinoDroid build (Adafruit GFX, Adafruit ILI9341, XPT2046_Touchscreen; never
+  ArduinoBLE). The other three are prebuilt PlatformIO images — Bruce alone pins
+  roughly 40 libraries — so their cards say "None" and point at the installer
+  rather than pretending they can be compiled in ArduinoDroid.
+- **One-tap library setup.** `ProjectsTab.DECK_LIBRARIES` holds the three names; each
+  row has **INSTALL** (`installLibrary()`), which copies the name with
+  `copyQuiet()` and then opens ArduinoDroid's library screen, plus **COPY NAME**.
+  **INSTALL ALL** does the same with all three names on the clipboard; **COPY
+  ALL** only copies; **OPEN ARDUINODROID** opens the editor.
+- **Library screen is resolved, not hard-coded.** `openArduinoDroidLibraryManager()`
+  scans the installed package's activities for one whose class name contains
+  "librar" and launches it explicitly, falling back to `openArduinoDroid()`. That
+  avoids guessing a class name that changes between releases; a build with no such
+  activity simply opens the editor with the name already copied.
+- **The manifest `<queries>` block is required.** Without it, Android 11+ hides
+  ArduinoDroid from `getPackageInfo()` / `getLaunchIntentForPackage()`, so both the
+  library lookup and the open-app button silently fall through to the store. Both
+  package names (`...arduinodroid2` and the legacy `...arduinodroid`) are listed.
+- If any of those projects drop or rename a build, the card's note is the thing to
+  update — the app only links, it never bundles an image.
+
+## Direct USB: probe and flash
+
+- `UsbSerialCh340` is a minimal CH340/CH341A driver: claim interfaces, the
+  reference init writes, the baud divisor at registers `0x1312`/`0x0F2C`, and
+  DTR/RTS through vendor request `0xA4`. The sequence is usb-serial-for-android's
+  (Apache-2.0, Copyright 2014 Andreas Butti), kept in-tree to stay dependency-free.
+- `EspRom`: SLIP framing, the `0x08` sync command, `0x0A` register reads. The
+  register value is taken from the reply header's 4-byte value field, not the
+  trailing bytes — that is what esptool's `check_command` does, and reading the
+  tail instead silently yields status bytes.
+  `CHIP_DETECT_MAGIC` is `0x40001000`, expecting `0x00f01d83` on ESP32; the MAC is
+  best effort from eFuse `0x3FF5A004`/`0x3FF5A008` and never fails a detection.
+- Reset is esptool's classic sequence: DTR/RTS hold EN low, drop IO0, release.
+- **Flow control is disabled explicitly** (`0x2727 = 0`) during CH340 init. Left
+  enabled, the bridge withholds traffic because CTS is never asserted — which
+  presents as a board that resets into download mode but never answers a sync.
+- **Sync failures report a byte count** (`N byte(s) seen on the port`) so a dead
+  link is distinguishable from a framing mistake without a serial monitor.
+- **Baud fallback.** `EspRom.connect()` sweeps `BAUDS = {115200, 57600, 230400,
+  460800, 74880}` until the bootloader answers, resetting between rounds. 115200
+  gets the full three rounds and 12 syncs; the alternates get two rounds and six
+  syncs each, so a totally dead link costs ~20 s instead of a minute. The rate
+  that answered is remembered for the rest of the session (`baudRate()`), because
+  the ROM measures the sync packet and then stays on that rate — a handshake at
+  57600 keeps working at 57600. `UsbSerialCh340.changeBaudRate()` reprograms the
+  divisor and flushes. This only helps when the bridge's crystal is far enough off
+  that the default divisor garbles the line; a wrong cable still reads zero bytes
+  at every rate, and the ROM sends nothing until it accepts a sync, so silence is
+  not proof of a dead link.
+- **Theme**: near-black navy, violet selection, monospace for every text and
+  button (`Ui.text` / `Ui.action`), matching the deck's terminal look.
+- **Probe always restores the board.** `probeUsb()` calls `hardReset()` in both
+  paths, success and failure, because leaving the ESP32 in download mode is
+  exactly the black-screen-with-red-LED state a user reads as a brick. The same
+  reset backs the **RESTART BOARD** button.
+- **Write path** is `EspRom.flash(offset, image, progress)`: `FLASH_BEGIN`
+  (erase up front, 4 kB blocks), `FLASH_DATA` per 4096-byte block with a 0xEF
+  seeded XOR checksum and three attempts, then `SPI_FLASH_MD5` compared against
+  a locally computed digest before `FLASH_END` reboots. Anything that fails
+  before `FLASH_BEGIN` is accepted leaves the old firmware untouched.
+- **Offset is 0x0 on purpose**: imports are treated as merged images, which is
+  what every vendor ships for a browser installer. An app-only image at 0x0
+  boots to garbage, so the confirmation dialog says so before erasing.
+- **Still not wired to the bundle**: the APK carries the deck's `.ino` source,
+  not a compiled `.bin`, so flashing runs on imported images only.
+- The manifest declares `android.hardware.usb.host` as *not required*, so installs
+  on phones without OTG still work; the card then reports that USB host is absent.
+- **Partially verified on hardware.** A real probe reached the board and drove it
+  into download mode, so the CH340 init and the DTR/RTS reset do work; the sync
+  then failed to get an answer. Retries were increased (12 per round, three
+  rounds with a reset between them) and the board is now restored on failure, but
+  a clean `ESP32 answered its bootloader` has not been observed yet.
+- **Unverified**: the write path has never run against real flash. Framing and
+  block sizes are taken from esptool, but no erase or MD5 check has completed on
+  a board.
+
+## Crash reporting
+
+- `CrashLog` installs a default uncaught-exception handler from
+  `MainActivity.onCreate` and writes the trace to `filesDir/last-crash.txt`,
+  then hands the exception to the platform handler so the process still dies
+  normally. It never swallows a crash.
+- **SETUP** shows a `LAST CRASH` card (with COPY TRACE and CLEAR) whenever that
+  file exists, because there is no adb on the phone this is developed against.
+- `ProjectsTab.refresh()` also wraps `build()` and renders a `SHELF FAILED TO
+  DRAW` card with the trace instead of taking the app down, so a rendering bug in
+  the shelf stays readable rather than fatal.
+
+## Naming and tabs
+
+- The app is **Off-site** (`android:label`, header title). The package stays
+  `dev.phonedesk.companion` and the APK stays `dist/PhoneDeckBridge-debug.apk`, so
+  an upgrade replaces the installed copy instead of sitting beside it.
+- Four tabs: **DECKS** (live link), **PROJECTS** (the notebook: status chips,
+  cards, deck libraries), **BOARD** (target picker, USB probe/restart, images and
+  flashing) and **SETUP** (permissions, bridge switch, last crash).
+- `BoardTab` owns every call that touches the ESP32: `UsbSerialCh340`, `EspRom`,
+  the USB permission receiver and the flash progress. The project shelf never
+  opens the port, which is what lets each tab keep a single job.
+- `Actions` holds the shared toast/clipboard/link/save helpers so the two shelves
+  do not each carry their own copy.
+- Catalogue and card copy was cut back to one or two lines per field; the details
+  live in the links and the log.
+
+## Wire protocol
+
+Identical to the sketch, checked against its `onWrite` handlers:
+
+- Service `6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10`
+- Time `6f2d0002-…` — 7 bytes: year−2000, month, day, hour, minute, second,
+  weekday. The deck requires seven bytes but ignores the last one; the app sends
+  `Calendar.DAY_OF_WEEK` to fill it.
+- Battery `6f2d0003-…` — percent, then `1` while charging or full
+- Notification `6f2d0004-…` — `App|Title|Text`, UTF-8, clamped to 120 bytes
+  (the sketch buffers 160)
+
+## Design decisions
+
+- **Unfiltered scan, match afterwards**: the deck advertises the UUID, but the scan
+  response can be dropped, so name matching is kept as a fallback.
+- **One write in flight**, `ArrayDeque` plus a 1.5 s watchdog that unsticks the
+  queue when a callback never arrives.
+- **Two write paths**: `writeCharacteristic(ch, value, type)` on Android 13+,
+  `setValue` + `writeCharacteristic(ch)` below.
+- **Foreground service**, type `connectedDevice`, so scanning survives the screen
+  going off. Android 14 needs the matching permission, which is declared.
+- **Notifications**: 5 s duplicate suppression, group summaries and quiet ongoing
+  entries skipped, `CATEGORY_CALL` kept.
+- **Auto-start on `onResume`** once notification access and Bluetooth are granted.
+- **The bootloader handshake narrates itself.** `EspRom` takes an optional
+  `Trace`; `BoardTab` keeps the last 80 lines and renders them as PROBE LOG.
+  Lines come from the code that does the work, not from the UI guessing: the port
+  opening, one line per baud rate with its own byte count, the first 32 bytes as
+  hex when a rate stays quiet, chip magic, MAC, block milestones and both MD5s.
+  Per-rate counters matter — a total across five rates cannot tell you which rate
+  the board was talking at, and that is the whole question when a sync fails.
+  COPY LOG puts it on the clipboard; nothing in it needs a debugger.
+
+## Verified
+
+- The last `javac 17` type check against the Android 14 (API 34) framework
+  classes (`android-all`) covered the pre-split sources: 9 files, 22 classes, only
+  deprecation notes from the pre-Android-13 `setValue`/`setWriteType` path.
+  **That check predates the four-tab split.** The current 18 sources are covered
+  by `gradle assembleDebug` instead, which is what produced the shipped APK.
+- Every relative Markdown link across the repo resolves.
+- `gradle assembleDebug` (Gradle 8.7, AGP 8.5.2, SDK 34, JDK 17) builds a debug
+  APK at `dist/PhoneDeckBridge-debug.apk` — 128,924 bytes as measured on the file
+  in `dist/`, for the Off-site build. `syncDeckSketch` ran:
+  `assets/deck/cyd_phone_deck.ino` is inside the APK and its MD5 matches
+  `../cyd_phone_deck/cyd_phone_deck.ino`.
+- `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
+  minSdk 26, targetSdk 34, the expected permission set, and
+  `MainActivity` as the launchable activity.
+
+## Not verified
+
+- The **release** build type is unrun, and the shipped APK is debug-signed with
+  the throwaway Android debug keystore rather than a key you control.
+- **Nothing has run on a phone**: tabs, SAF import, MediaStore save, clipboard,
+  RSSI polling and the monitor layout are all unproven.
+- No second CYD was available, so pinned-deck behaviour is untested against two
+  boards.
+
+## Open risks
+
+- **Missing bundled sketch**: a non-Gradle build has no asset, and the PROJECTS
+  deck card says so. That is expected, not a bug.
+- **Stale bond** from the old HID build can still block GATT connects; the app does
+  not call `removeBond()`. Forget the entry in Bluetooth settings.
+- **Encryption**: the core defaults characteristics to
+  `ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE`, so writes need no bond. If a write
+  ever fails with insufficient authentication, add a `createBond()` before the
+  first write.
+- **Battery optimisation** can kill the foreground service; Setup links to the
+  exemption screen but does not request it programmatically.
+- **Empty notification text**: apps with fully custom layouts may post no title
+  or text extras, and are skipped.
+
+## Obvious next work
+
+1. Build the APK in Android Studio, confirm tabs and link, then confirm COPY lands
+   a compilable sketch in ArduinoDroid.
+2. Start on boot (`BOOT_COMPLETED`) so the deck links without opening the app.
+3. Remove deck rows when a notification is dismissed on the phone — needs a new
+   characteristic or control byte in the notice payload; the sketch only appends.
+4. Per-deck rename/forget in the saved list; the store already keys by MAC.

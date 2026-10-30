@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phone Deck — downloads</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    background: #12141f; color: #e8ecf6;
+    font: 16px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    padding: 28px;
+  }
+  main { width: min(560px, 100%); }
+  h1 { font-size: 22px; letter-spacing: .12em; margin: 0 0 4px; }
+  p.sub { color: #8b93a9; font-size: 12px; letter-spacing: .1em; margin: 0 0 26px; }
+  a.card {
+    display: block; text-decoration: none; color: inherit;
+    background: #232840; border: 1px solid #39415e; border-radius: 14px;
+    padding: 16px 18px; margin-bottom: 12px; transition: border-color .15s;
+  }
+  a.card:hover { border-color: #4fc8f5; }
+  a.card strong { display: block; font-size: 15px; margin-bottom: 3px; }
+  a.card span { color: #8b93a9; font-size: 12px; }
+  .tag { color: #4fc8f5; font-size: 11px; letter-spacing: .14em; display: block; margin-bottom: 6px; }
+  ol { color: #8b93a9; font-size: 12px; padding-left: 18px; margin-top: 22px; }
+  li { margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PHONE DECK</h1>
+  <p class="sub">downloads  //  cyd companion</p>
+
+  <a class="card" href="PhoneDeckBridge-debug.apk" download>
+    <span class="tag">ANDROID 8+</span>
+    <strong>PhoneDeckBridge-debug.apk</strong>
+    <span>118.3 kB · debug-signed · dev.phonedesk.companion</span>
+  </a>
+
+  <a class="card" href="cyd_phone_deck.ino" download>
+    <span class="tag">ESP32-2432S024R</span>
+    <strong>cyd_phone_deck.ino</strong>
+    <span>70 kB · paste into ArduinoDroid as a single tab</span>
+  </a>
+
+  <ol>
+    <li>Tap a card to download it to this computer/phone.</li>
+    <li>Install the APK with "install unknown apps" allowed, or <code>adb install -r</code>.</li>
+    <li>Grant notification access in SETUP, then power the deck.</li>
+  </ol>
+</main>
+</body>
+</html>
