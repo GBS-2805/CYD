@@ -1,5 +1,5 @@
 /*
- * ESP32 Phone_Widget - ESP32-2432S024R (2.4" resistive touch CYD)
+ * Phone Deck - ESP32-2432S024R (2.4" resistive touch CYD)
  *
  * A desk dashboard for your phone: clock, battery and notifications, drawn in
  * the GMK Dracula keycap palette.
@@ -605,7 +605,7 @@ static void pushTime(time_t epoch) {
 
 Preferences identityPrefs;
 char DEVICE_TAG[7] = "000000";
-char DEVICE_NAME[32] = "ESP32 Phone_Widget";
+char DEVICE_NAME[32] = "Phone Deck";
 bool ownerKnown = false;
 uint8_t ownerBda[6] = {0, 0, 0, 0, 0, 0};
 char ownerLabel[18] = "unbound";
@@ -623,7 +623,7 @@ static void initIdentity() {
   const uint64_t mac = ESP.getEfuseMac();
   snprintf(DEVICE_TAG, sizeof(DEVICE_TAG), "%06X",
            static_cast<unsigned>(mac & 0xFFFFFF));
-  snprintf(DEVICE_NAME, sizeof(DEVICE_NAME), "ESP32 Phone_Widget %s", DEVICE_TAG);
+  snprintf(DEVICE_NAME, sizeof(DEVICE_NAME), "Phone Deck %s", DEVICE_TAG);
 
   identityPrefs.begin("identity", true);
   if (identityPrefs.getBytesLength("owner") == sizeof(ownerBda) &&
@@ -1353,7 +1353,7 @@ static void drawHeader() {
   const Rect chip = {8, 7, 22, 20};
   tft.drawRoundRect(chip.x, chip.y, chip.w, chip.h, 6, C_EDGE);
   drawTextAt(">_", chip.x + 4, chip.y + 6, 1, C_ACCENT, C_BG);
-  drawTextAt("Phone_Widget", 38, 5, 2, C_TEXT, C_BG);
+  drawTextAt("Phone Deck", 38, 5, 2, C_TEXT, C_BG);
   char subtitle[24];
   snprintf(subtitle, sizeof(subtitle), "esp32 // #%s", DEVICE_TAG);
   drawTextAt(subtitle, 38, 21, 1, C_DIM, C_BG);

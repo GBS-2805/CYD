@@ -1,4 +1,4 @@
-# HOWTO — ESP32 Phone_Widget firmware
+# HOWTO — Phone Deck firmware
 
 Task-shaped instructions. Hardware, protocol and controls are in
 [README.md](README.md); current state and open issues are in
@@ -47,7 +47,7 @@ the fallback for an upload that will not sync, not as a step.
 
 ## Edit and compile it on the phone (ArduinoDroid)
 
-1. Copy the sketch from the app: **PROJECTS** → the **ESP32 Phone_Widget** card
+1. Copy the sketch from the app: **PROJECTS** → the **Phone Deck** card
    → **COPY DROID**, then paste into a new ArduinoDroid sketch. **SAVE** writes
    it to Downloads if you would rather open the file.
 2. Keep it as one tab named `cyd_phone_deck.ino`. Do not add extra `.h` files.
@@ -85,16 +85,16 @@ invalidates stored fits and forces a fresh calibration after an update.
 The deck cannot read a phone by itself — it is a GATT peripheral. On Android,
 install the companion app from [`../android-companion`](../android-companion) and
 link it. On a laptop, use the `bleak` snippet in [README.md](README.md) or nRF
-Connect: connect to **ESP32 Phone_Widget** and write the three characteristics.
+Connect: connect to **Phone Deck** and write the three characteristics.
 
 Writes are plain write-with-response; **no pairing is needed** and the deck never
 appears in Android's Bluetooth settings list.
 
 ## Check the deck is alive
 
-- Serial monitor at **115200** right after boot: `[id] ESP32 Phone_Widget
-  A1B2C3  owner unbound` and `[ble] advertising as "ESP32 Phone_Widget
-  A1B2C3"`. The hex tag is this board's MAC tag, so it differs per board.
+- Serial monitor at **115200** right after boot: `[id] Phone Deck A1B2C3
+  owner unbound` and `[ble] advertising as "Phone Deck A1B2C3"`. The hex tag is
+  this board's MAC tag, so it differs per board.
 - The deck screen should show the clock card, battery card and notification rows.
 - With the companion linked, the header pill and the deck's own `LINKED` badge
   agree within a second.

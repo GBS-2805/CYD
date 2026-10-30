@@ -1,4 +1,4 @@
-# Handoff — ESP32 Phone_Widget firmware
+# Handoff — Phone Deck firmware
 
 State as of the last session. Read [README.md](README.md) for the hardware,
 protocol and controls; this file is the context that is not in the code.
@@ -28,14 +28,16 @@ GATT peripheral; nothing needs to be paired for Phone Link to work.
 
 ## Decisions that were expensive to reach
 
-- **Named ESP32 Phone_Widget, folder left alone.** The BLE name, the header
-  wordmark and every doc say that now. `cyd_phone_deck/` and
-  `cyd_phone_deck.ino` keep their names because ArduinoDroid compiles a single
-  `.ino` whose name must match its folder, and the companion app's Gradle copies
-  `../cyd_phone_deck/cyd_phone_deck.ino` into the APK. Renaming either would
-  break that build. **The companion's `DeckService` still matches names
-  containing "phone deck"**, so it will not find the deck until it is updated
-  for the new name in its own chat.
+- **Named Phone Deck, folder left alone.** The BLE name, the header wordmark, the
+  app's project card and every doc say that now. The rename from
+  `ESP32 Phone_Widget` finished after the app had already been rewritten to the
+  new name, which left the card and the scan list disagreeing for one build.
+  `cyd_phone_deck/` and `cyd_phone_deck.ino` keep their names because
+  ArduinoDroid compiles a single `.ino` whose name must match its folder, and the
+  companion app's Gradle copies `../cyd_phone_deck/cyd_phone_deck.ino` into the
+  APK. Renaming either would break that build. Boards flashed before the rename
+  still advertise `ESP32 Phone_Widget <TAG>`; the descriptor's `ble.nameMatch`
+  carries both fragments, so `DeckService` finds either.
 - **GMK Dracula palette and a bigger gear.** Base #282a36, modifiers #44475a,
   alphas #f8f8f2, hairlines #6272a4, and the accent roles are the set's pastel
   caps: #9decf5 cyan for the link and status, #ffa8d5 rose for the one action and

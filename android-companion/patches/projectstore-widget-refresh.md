@@ -119,7 +119,7 @@ It also heals records seeded by an earlier build of the registry change, before
 - `widget.name` is compared with `equals`, not `==`, and tolerates a null record
   field from an older JSON store.
 - Paired with `cyd_phone_deck/widget.json` in this repo, which now says
-  `"name": "Phone Deck"`. The firmware still advertises `ESP32 Phone_Widget <TAG>`,
-  so the scan list shows that name while the card shows `Phone Deck`; the app docs
-  that claim the deck advertises "Phone Deck" are still wrong until the firmware or
-  those lines change.
+  `"name": "Phone Deck"`, and with the firmware rename that makes it advertise
+  `Phone Deck <TAG>`, so the card and the scan list agree. Boards flashed before
+  the rename still advertise `ESP32 Phone_Widget <TAG>`; the descriptor's
+  `ble.nameMatch` carries that fragment, so they are still found.

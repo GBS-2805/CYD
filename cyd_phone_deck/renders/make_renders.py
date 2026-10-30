@@ -228,7 +228,7 @@ def draw_header(img, linked):
     chip = Rect(8, 7, 22, 20)
     draw.rounded_rectangle(chip.box, radius=6, outline=C_EDGE)
     text(img, ">_", chip.x + 4, chip.y + 6, 1, C_ACCENT)
-    text(img, "Phone_Widget", 38, 5, 2, C_TEXT)
+    text(img, "Phone Deck", 38, 5, 2, C_TEXT)
     text(img, "esp32 // #%s" % TAG, 38, 21, 1, C_DIM)
 
     pill = LINK_PILL
