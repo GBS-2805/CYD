@@ -68,6 +68,11 @@ GATT peripheral; nothing needs to be paired for Phone Link to work.
   Link UUID (18) and the shortened name "Phone" (7). In the core, `setFlags`
   emits `[2, 0x01, flag]` and `setCompleteServices` emits `[17, 0x07, uuid…]`,
   so 29 was never right.
+- **The USB bridge and the reset circuit**, measured on the real board in the
+  companion-app chat on 2026-10-30 rather than by this sketch: the bridge is a
+  **CH340** (`1a86:7523`, one interface), it opens over USB-OTG, and the phone
+  driving DTR/RTS resets the ESP32 — bytes arrive once the line is released. So
+  auto-reset works and an `arduino-cli upload` from a computer needs no BOOT press.
 
 ## Not verified
 
@@ -79,6 +84,14 @@ GATT peripheral; nothing needs to be paired for Phone Link to work.
   HIGH; it was not confirmed on hardware after flashing. If it still glows, the
   LED is either hardwired or on different pins.
 - The iOS ANCS path, end to end.
+- **Flashing the deck from a phone.** The ROM bootloader answered no sync at five
+  baud rates in either polarity while 552 B left the phone per round, so the send
+  path is proven and the handshake is the blocker. ArduinoDroid uploads the same
+  way: a phone alone cannot put this sketch on a board yet, and the companion app
+  cannot reflash the deck. Reflashing means a cable to a computer, per
+  [HOWTO.md](HOWTO.md).
+- **Hold BOOT while plugging in.** Untested on this board, so it is a fallback in
+  the docs, not a known-working recovery.
 
 ## Obvious next work
 

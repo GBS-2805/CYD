@@ -21,9 +21,17 @@ arduino-cli upload  --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 cyd_board_check
 ```
 
 `-p` is whatever port the board appeared on: `ls /dev/ttyUSB*` on Linux,
-`ls /dev/cu.*` on macOS, and on Windows the `COM` number in Device Manager. No
-port at all usually means a charge-only cable; hold **BOOT** while plugging in if
-the board is already in a bad state.
+`ls /dev/cu.*` on macOS, and on Windows the `COM` number in Device Manager. The
+bridge on this board is a **CH340** (`1a86:7523`, one interface), so `lsusb`
+separates a dead cable from a dead board. Its DTR/RTS reset works — the ESP32
+reboots when the line is released — so an upload from a computer presses no
+buttons. Holding **BOOT** while plugging in is untested on this board; keep it as
+the fallback for an upload that will not sync.
+
+Flashing from a phone over OTG is blocked on this board: the CH340 opens and the
+reset pulse lands, but the ESP32 ROM never answers esptool's sync at 115200,
+57600, 230400, 460800 or 74880 baud, in either DTR/RTS polarity. Use a computer
+for the flash — `arduino-cli` is the whole requirement.
 
 If the compile dies with `ModuleNotFoundError: No module named 'serial'`, the
 `PYTHONPATH` from `env.sh` is missing — core 2.x shells out to its bundled
@@ -52,7 +60,7 @@ If the compile dies with `ModuleNotFoundError: No module named 'serial'`, the
 | an LED channel stays lit with `led off` | LED wired differently on this revision | the deck's `PIN_LED_*` constants are the place to change it |
 | `panic` or `watchdog` in `reset` on a plain power-on | previous firmware crashed and reset the board | expected after flashing something broken; flash this sketch and it clears |
 | black screen, backlight off | backlight pin or power | check GPIO 27 is driven high; if the LED test also fails, the board is not coming up |
-| no serial output at all | the sketch did not start | re-flash holding **BOOT**, and confirm the upload ended with `Hash of data verified` |
+| no serial output at all | the sketch did not start | re-flash from a computer, confirming the upload ended with `Hash of data verified`; if it will not sync, hold **BOOT** while starting the upload |
 
 ## Pass the board on
 

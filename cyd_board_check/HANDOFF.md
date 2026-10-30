@@ -46,6 +46,10 @@ headers, ~300 lines. It reports, on screen and over serial:
 - Core **2.0.17** was not installed in this workspace when the sketch was written,
   so the 2.x number is unknown rather than equal. The deck's 2.x-vs-3.x figures are
   in [`../cyd_phone_deck/HANDOFF.md`](../cyd_phone_deck/HANDOFF.md).
+- **The port and reset path**, measured on the real board in the companion-app chat
+  on 2026-10-30 rather than by this sketch: the bridge is a **CH340** (`1a86:7523`,
+  one interface), it opens over USB-OTG, and driving DTR/RTS resets the ESP32 — bytes
+  arrive after the release. An upload from a computer therefore needs no BOOT press.
 
 ## Not verified
 
@@ -61,6 +65,11 @@ headers, ~300 lines. It reports, on screen and over serial:
 - **`psram` reads `none found` on a board that has PSRAM** unless the build enables
   it: the default `esp32:esp32:esp32` FQBN leaves PSRAM off in its menu. The line
   only means something under Tools → PSRAM → Enabled.
+- **Flashing from a phone over OTG.** The ROM bootloader answered no sync at
+  115200, 57600, 230400, 460800 or 74880 baud in either polarity while 552 B left
+  the phone per round: the send path is proven, the handshake is the blocker. That
+  matters most for this sketch, because it is what a bare board gets flashed with —
+  a phone alone cannot do it yet; see [HOWTO.md](HOWTO.md).
 
 ## Obvious next work
 

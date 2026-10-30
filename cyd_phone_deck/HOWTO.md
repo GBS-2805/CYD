@@ -37,11 +37,15 @@ the link step with `ModuleNotFoundError: No module named 'serial'`. The script
 installs it; otherwise `python3 -m pip install --target ~/.arduino-pylibs pyserial`
 and `export PYTHONPATH=~/.arduino-pylibs`.
 
-The CYD has no USB-serial chip on some revisions; if no port appears, use the
-board's USB port with a data cable (not a charge-only one) and hold BOOT while
-plugging in.
+On this board the USB bridge is a **CH340** (`1a86:7523`, one interface), so a
+data cable is enough for a port to appear; `lsusb` is the quickest check that the
+cable, the board and the bridge are all alive. Its DTR/RTS lines reset the ESP32 —
+the phone's driver was seen toggling them and bytes arrive once the line is
+released — so `arduino-cli upload` resets the board itself and needs no BOOT
+press. Holding **BOOT** while plugging in is untested on this board: treat it as
+the fallback for an upload that will not sync, not as a step.
 
-## Flash it from the phone (ArduinoDroid)
+## Edit and compile it on the phone (ArduinoDroid)
 
 1. Copy the sketch from the app: **PROJECTS** → the Phone Deck card → **COPY
    DROID**, then paste into a new ArduinoDroid sketch. **SAVE** writes it to
@@ -50,7 +54,16 @@ plugging in.
 3. Board: **ESP32 Dev Module**. Install only Adafruit GFX, Adafruit ILI9341 and
    XPT2046_Touchscreen. **ArduinoBLE must not be installed** — it shadows the
    core's BLE headers and every build fails.
-4. Compile and upload over USB-OTG.
+4. Compile on the phone. **Uploading over USB-OTG does not work on this board
+   yet** — see below.
+
+Uploading from the phone is blocked on this board. The CH340 opens over OTG and
+the phone can drive DTR/RTS, but the ESP32 ROM bootloader never answered a sync
+at **115200, 57600, 230400, 460800 or 74880** baud in either DTR/RTS polarity,
+while 552 B left the phone per attempt — the send path works, the handshake does
+not. ArduinoDroid's upload is that same handshake, so it fails the same way, and
+the companion app cannot reflash the deck either. Editing and compiling on the
+phone still works; the flash itself needs a cable to a computer, as above.
 
 ## Calibrate the touch panel
 
