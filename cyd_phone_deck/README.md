@@ -68,14 +68,16 @@ to `/tmp` at render time, so nothing third-party is vendored here). It draws
 from the sketch's own rects, colours and 5×7 typeface, so it cannot drift from
 the firmware without the script being edited too.
 
-It is hosted at
-<https://site-305e2d6f80d741269ef65fab1e38fdbd.freebuff.page>. That site is the
-static bundle in `site/`: `index.html`, `renders/board.png` and one
-asset-serving Worker, deployed from `site/manifest.json`. The script writes the
-fresh PNG into the bundle as well, so the hosted copy cannot lag the render.
+The image itself is `renders/board.png`, committed here: read that file when you
+need to see the board. `site/` holds an optional static bundle (`index.html`,
+`renders/board.png` and one asset-serving Worker, deployed from
+`site/manifest.json`), and it is **unpublished**: nothing from this repo is
+reachable without your account. Deploy it deliberately if a link is ever wanted
+again, and remember that `make_renders.py` writes the fresh PNG into the bundle
+too, so a deployed copy cannot lag the render.
 
-After any change to what the deck draws, regenerate it, redeploy the bundle and
-hand back that link, rather than describing the screen.
+After any change to what the deck draws, regenerate it and look at
+`renders/board.png` rather than describing the screen.
 
 ## Build
 
@@ -98,6 +100,31 @@ arduino-cli upload  --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 cyd_phone_deck
 On a machine with none of that installed, [`toolchain.sh`](toolchain.sh) does all
 of it — toolchain, core, libraries, the pyserial the core's esptool needs — and
 compiles the sketch, in one idempotent command. See [HOWTO.md](HOWTO.md).
+
+## widget.json: how the app finds this widget
+
+`widget.json` in this folder is the widget's side of the contract with the
+companion app. The app does not hard-code this sketch; it reads this file, so a
+widget is a folder that describes itself.
+
+| Field | Used for |
+| --- | --- |
+| `id` | the project id (`widget:phone_deck`) and the asset folder name |
+| `name`, `tagline`, `body`, `notes` | the project card in the app |
+| `sketch` | the file copied into the APK; must match the folder plus `.ino` |
+| `libraries`, `never` | the LIBRARIES card, including what to refuse to install |
+| `ble.service`, `ble.nameMatch` | what the app looks for while scanning |
+
+The app's Gradle task walks every `*/widget.json` beside `android-companion/`
+and copies the descriptor and the sketch it names into
+`app/src/main/assets/widgets/<id>/` at build time. Editing the sketch here stays
+enough for a rebuild to carry it; there is no second copy in the app's source.
+
+To get a new widget onto the phone without publishing anything: put this folder
+in your own private transfer location (Drive, mail, USB), download
+`cyd_phone_deck.ino` on the phone, and use the app's **IMPORT** button. The
+sketch lands on the flash shelf and opens in ArduinoDroid, exactly like the
+bundled copy.
 
 ## First run and testing the link
 

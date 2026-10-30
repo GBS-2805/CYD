@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "phone_deck",
+  "name": "ESP32 Phone_Widget",
+  "sketch": "cyd_phone_deck.ino",
+  "board": "2432S024R",
+  "tagline": "INSIDE APP",
+  "body": "A desk dashboard for your phone: clock, battery and notifications, drawn in the GMK Dracula keycap palette.",
+  "notes": "Bundled with the app: copy it into ArduinoDroid and compile, there is nothing to download.",
+  "libraries": [
+    "Adafruit GFX Library",
+    "Adafruit ILI9341",
+    "XPT2046_Touchscreen"
+  ],
+  "never": [
+    "ArduinoBLE"
+  ],
+  "ble": {
+    "service": "6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10",
+    "nameMatch": [
+      "phone_widget",
+      "phone deck"
+    ],
+    "shortName": "Phone"
+  }
+}
