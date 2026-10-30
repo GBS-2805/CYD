@@ -247,6 +247,16 @@ Identical to the sketch, checked against its `onWrite` handlers:
   `setValue` + `writeCharacteristic(ch)` below.
 - **Foreground service**, type `connectedDevice`, so scanning survives the screen
   going off. Android 14 needs the matching permission, which is declared.
+- **`toolchain.sh` owns the build.** Reconstructing JDK 17, the SDK and Gradle by
+  hand in a fresh sandbox was the slowest, least repeatable part of every session,
+  and nothing in the repo recorded which versions produced the shipped APK. The
+  script pins JDK 17, Gradle 8.7 and build-tools 34.0.0, installs them under one
+  deletable directory, and treats the build as unfinished until the APK has been
+  checked for signature, alignment, package and bundled sketch.
+- **`clean assembleDebug` is the default there**, because a warm `assembleDebug`
+  reports `BUILD SUCCESSFUL` with every task `UP-TO-DATE` and compiles nothing.
+  The script also fails if `compileDebugJavaWithJavac` is `UP-TO-DATE`, so a
+  green run means javac actually ran.
 - **Notifications**: 5 s duplicate suppression, group summaries and quiet ongoing
   entries skipped, `CATEGORY_CALL` kept.
 - **Auto-start on `onResume`** once notification access and Bluetooth are granted.
@@ -276,6 +286,17 @@ Identical to the sketch, checked against its `onWrite` handlers:
   verify with the same v2 signature. `syncDeckSketch` ran:
   `assets/deck/cyd_phone_deck.ino` is inside the APK and its MD5 matches
   `../cyd_phone_deck/cyd_phone_deck.ino`.
+- `./toolchain.sh` ran end to end from an **empty install root**
+  (`OFFSITE_HOME=/tmp/offsite-fresh`) on 2026-10-30: it downloaded Temurin JDK
+  17.0.21, Gradle 8.7, commandline-tools 11076708, then platform 34 and
+  build-tools 34.0.0, and finished in under a minute. Build ran 33 tasks with
+  `clean`, and the script's own checks passed: signature, `zipalign -c 4`,
+  package `dev.phonedesk.companion`, minSdk 26, targetSdk 34, and a bundled-sketch
+  MD5 equal to the repo file.
+- That fresh build produced **97,769 bytes**, 12 more than the committed 97,757.
+  Dex files embed build-time data, so the APK is *not* byte-reproducible; the
+  committed `dist/` copy was restored afterwards and every size in these docs
+  refers to it. Quote the size as ~96 kB, never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 34, the expected permission set, and
   `MainActivity` as the launchable activity.

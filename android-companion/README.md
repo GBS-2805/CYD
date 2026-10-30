@@ -102,17 +102,25 @@ summaries and quiet ongoing items are skipped.
 No AndroidX and no third-party libraries — only the platform SDK, so the build
 resolves nothing beyond the Android Gradle Plugin.
 
-1. Open the `android-companion` folder in Android Studio (Ladybug or newer).
-2. Let it sync, then run the `app` configuration on the phone.
-
-From a terminal with the Android SDK and JDK 17:
+One script gets a machine that has nothing installed to a verified APK. It puts
+its own JDK 17, Gradle 8.7 and Android SDK under `~/.android-offsite`, so nothing
+global changes and deleting that directory undoes all of it:
 
 ```bash
 cd android-companion
-gradle wrapper            # once, if there is no ./gradlew yet
-./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+./toolchain.sh                      # install, clean build, verify, copy to dist/
+source ~/.android-offsite/env.sh    # adds java, gradle and adb to PATH
+adb install -r dist/PhoneDeckBridge-debug.apk
 ```
+
+`./toolchain.sh --setup-only` stops once the toolchain is ready; `--no-clean`
+reuses Gradle's build directory. The first run downloads about 1 GB and needs
+`curl` and `unzip`. It finishes by checking the signature, the 4-byte alignment,
+the manifest and the bundled sketch, and prints the size and SHA-256 of what it
+copied to `dist/`.
+
+Android Studio still works: open the `android-companion` folder (Ladybug or
+newer), let it sync, and run the `app` configuration.
 
 `minSdk` is 26, `targetSdk` is 34. The sketch is only bundled when the build goes
 through Gradle; a raw `javac` build produces an APK-less class check and the

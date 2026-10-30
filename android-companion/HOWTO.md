@@ -180,6 +180,39 @@ first-boot touch calibration was needed, screen orientation quirks, and whether 
 
 Importing is how you carry sketches between phones without a cable.
 
+## Build the APK on a computer
+
+You only need this when changing the app; the APK committed in `dist/` installs
+as it is.
+
+```bash
+cd android-companion
+./toolchain.sh                 # install, build, verify, copy to dist/
+```
+
+The first run downloads a JDK, Gradle and the Android SDK into
+`~/.android-offsite` (about 1 GB) and needs `curl` and `unzip`. Later runs reuse
+them, so the same command finishes in well under a minute. Set
+`OFFSITE_HOME=/some/path` to install somewhere else.
+
+The script builds with `clean` on purpose and then checks the result: signature,
+4-byte alignment, package name, min/target SDK and the MD5 of the sketch inside
+the APK against `../cyd_phone_deck/cyd_phone_deck.ino`. It prints the APK's size
+and SHA-256 last.
+
+| Message | What it means |
+| --- | --- |
+| `needs unzip on PATH` | install `unzip`; the Gradle and SDK archives need it |
+| `could not download …` | no network, or a proxy that blocks adoptium/gradle/google |
+| `error: gradle build failed` | the last 40 lines of the Gradle log follow the message |
+| `Java compile was UP-TO-DATE` | something restored a build directory; drop `--no-clean` |
+| `the bundled sketch is stale` | `syncDeckSketch` did not run — check `../cyd_phone_deck/cyd_phone_deck.ino` exists |
+| `apksigner rejected the APK` | the `Android Debug` keystore in `~/.android` is missing or unreadable |
+
+The size is not byte-stable: two builds of the same sources differ by a dozen
+bytes because the dex files carry build-time data. Treat the printed number as
+"about 96 kB", not as a checksum.
+
 ## Flash the deck from the phone over USB
 
 1. Connect the CYD with an OTG adapter and a USB **data** cable, with the right
