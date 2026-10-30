@@ -54,9 +54,11 @@ reason to add a resource pipeline.
 
 ## Firmware files
 
-- **Two surfaces, one store.** The bundled sketch appears on the **Phone Deck**
-  card in PROJECTS; imported `.ino`/`.bin` files appear under **IMAGES** on BOARD,
-  which is also the only place with COPY / SAVE / FLASH. `FlashLibrary` backs both.
+- **Two surfaces, one store.** The bundled sketch appears on the **ESP32
+  Phone_Widget** card in PROJECTS — the title is `name` in the project's
+  `widget.json`, not a string in the app; imported `.ino`/`.bin` files appear under
+  **IMAGES** on BOARD, which is also the only place with COPY / SAVE / FLASH.
+  `FlashLibrary` backs both.
 - **A text sketch is never flashable.** The APK carries ArduinoDroid source, not a
   compiled `.bin`, so the write path runs on imported images only.
 - Each project folder carries a `widget.json` descriptor: `id`, `name`, `sketch`,
@@ -98,7 +100,7 @@ reason to add a resource pipeline.
   makes a LOG or STATUS write repaint the card; before it, the shelf kept showing
   text from two screens ago until a file was imported.
 - The bundled deck is a project of kind INSIDE: its card carries COPY DROID and
-  SAVE, and the DECK LIBRARIES card hangs off it.
+  SAVE, and the LIBRARIES card hangs off it.
 - **Not built yet**: creating, editing and deleting projects, and attaching a
   file to a card. The catalogue is the four seeded projects plus anything
   imported into FILES.

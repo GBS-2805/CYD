@@ -47,13 +47,13 @@ The bundled sketch is the one in this repo. Pick whichever route suits you.
 
 **Clipboard route (fastest):**
 
-1. **PROJECTS** → on the Phone Deck card, tap **COPY DROID**.
+1. **PROJECTS** → on the ESP32 Phone_Widget card, tap **COPY DROID**.
 2. Open ArduinoDroid, create or open a sketch, select the whole editor and paste.
 3. Compile and upload.
 
 **File route (keeps a real file):**
 
-1. **PROJECTS** → on the Phone Deck card, tap **SAVE**.
+1. **PROJECTS** → on the ESP32 Phone_Widget card, tap **SAVE**.
 2. The file lands in `Downloads/cyd_phone_deck.ino` (Android 10+).
 3. In ArduinoDroid, open the sketch through its file browser.
 
@@ -96,7 +96,7 @@ exactly three libraries:
 
 ### Install them without retyping the names
 
-**PROJECTS → Phone Deck → DECK LIBRARIES** has an **INSTALL** button for each library.
+**PROJECTS → ESP32 Phone_Widget → LIBRARIES** has an **INSTALL** button for each library.
 One tap copies that exact name and opens ArduinoDroid's library list.
 
 1. Tap **INSTALL** next to **Adafruit GFX Library**.

@@ -47,10 +47,11 @@ links it needs.
   the older `FirmwareNotes` store is carried over.
 - **TARGET BOARD** is a pull-down that drives the `FILES / <code>` header and the
   RECIPE text; `BoardCatalog` is where further boards get added.
-- The **Phone Deck** card is this repo's firmware, marked `INSIDE APP`. It keeps
-  **COPY DROID** (whole sketch to the clipboard), **SAVE** (to Downloads) and the
-  **DECK LIBRARIES** card, whose **INSTALL** buttons copy a library name and open
-  ArduinoDroid's library screen.
+- The **ESP32 Phone_Widget** card is this repo's firmware, marked `INSIDE APP` —
+  the title is `name` in `cyd_phone_deck/widget.json`. It keeps **COPY DROID**
+  (whole sketch to the clipboard), **SAVE** (to Downloads) and the **LIBRARIES**
+  card, whose **INSTALL** buttons copy a library name and open ArduinoDroid's
+  library screen.
 - **INSTALLER** and **SOURCE** open a project's pages. **RECIPE** copies a runnable
   recipe: target board, why there is no ArduinoDroid source, both links, the saved
   log, and the esptool command that writes the image.
