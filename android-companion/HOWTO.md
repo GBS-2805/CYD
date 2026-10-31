@@ -257,7 +257,9 @@ try another cable, and confirm the phone supports USB host mode.
 1. Four `proof of life` lines — `115200 normal`, `115200 inverted`, `74880
    normal`, `74880 inverted`. If one of them quotes text in quotes, the cable, the
    adapter and the reset wiring are all fine and the chip runs when it is
-   released; skip to 3.
+   released; skip to 3. The quote is the whole banner (up to 600 bytes), so the
+   `rst:` and `boot:` lines and the ROM's build date are readable in the log —
+   `boot:0x13` is flash, `boot:0x3` is download mode.
 2. All four say `nothing` → not a byte reached the phone after a reset: cable, the
    adapter's receive line, or a board held in reset.
 3. All four say `no text — <hex>` → the board is transmitting at some rate the
@@ -267,6 +269,12 @@ try another cable, and confirm the phone supports USB host mode.
    ROM stayed silent. Rounds alternate the DTR/RTS polarity and the log marks the
    inverted ones, so compare rounds before blaming the board: a board whose EN/IO0
    pair is inverted answers only on the inverted rounds.
+5. Nothing answers and the board's IO0 may not be wired to the adapter at all:
+   tap **MANUAL RESET** until it reads **MANUAL RESET: ON**, then **PROBE USB**,
+   hold **BOOT** and tap the board's own reset while the sweep listens, and let go
+   of **BOOT** once it answers. That run never touches DTR/RTS and never restarts
+   the board, so the ROM stays in download mode. The same button answers a board
+   whose auto-reset circuit drags EN low for the whole handshake.
 
 **MD5 mismatch after writing**: something interfered with the link (a hub, a
 charge-only cable, an unplugged board). Re-flash; the board boots whatever it

@@ -11,24 +11,29 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
- * Small view factory so every screen shares the deck's slate-and-cyan palette
- * without a resource pipeline. Keeping the UI programmatic is what lets the app
- * build with no AndroidX and lets javac type-check it.
+ * Small view factory so every screen shares the deck's palette without a resource
+ * pipeline. Keeping the UI programmatic is what lets the app build with no
+ * AndroidX and lets javac type-check it.
  */
 final class Ui {
 
-    // Terminal palette: near-black navy, low-contrast panels, one blue accent and
-    // a violet for selection. Colour carries meaning, so nothing else is tinted.
-    static final int BG = 0xFF0A0D16;
-    static final int CARD = 0xFF121826;
-    static final int CARD_HI = 0xFF1A2237;
-    static final int EDGE = 0xFF29344C;
-    static final int TEXT = 0xFFE7ECF6;
-    static final int DIM = 0xFF7E8AA4;
-    static final int ACCENT = 0xFF4EA8FF;
-    static final int VIOLET = 0xFF9C7BFF;
-    static final int PINK = 0xFFFF7BAF;
-    static final int GOOD = 0xFF5BD8A6;
+    // The deck's INK palette (cyd_phone_deck.ino, THEMES[1]) slot for slot: black
+    // ground, #0e0e0e panels, #333333 hairlines, white ink, and a grey ramp where
+    // the coloured build had blue, violet, pink and green. The names keep their
+    // old jobs — ACCENT for the link and a primary button, PINK for the one
+    // destructive action and an error, VIOLET for a section tag, GOOD for success
+    // — so on a monochrome screen they separate by luminance instead of hue, the
+    // same way batteryColor() does on the deck.
+    static final int BG = 0xFF000000;
+    static final int CARD = 0xFF0E0E0E;
+    static final int CARD_HI = 0xFF1C1C1C;
+    static final int EDGE = 0xFF333333;
+    static final int TEXT = 0xFFFFFFFF;
+    static final int DIM = 0xFF8C8C8C;
+    static final int ACCENT = 0xFFFFFFFF;
+    static final int VIOLET = 0xFF707070;
+    static final int PINK = 0xFFD4D4D4;
+    static final int GOOD = 0xFFA0A0A0;
 
     private Ui() {
     }

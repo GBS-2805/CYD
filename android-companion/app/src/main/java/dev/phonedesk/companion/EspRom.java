@@ -44,8 +44,15 @@ final class EspRom {
     private static final byte SLIP_ESC_END = (byte) 0xDC;
     private static final byte SLIP_ESC_ESC = (byte) 0xDD;
 
-    /** How much of a silent/failing line to keep for the log. */
+    /** How much of a silent/failing line to keep for the hex preview. */
     private static final int PREVIEW_BYTES = 32;
+    /**
+     * How much of the proof-of-life window to keep as text. A ROM banner is about
+     * 400 bytes and its boot-mode line is not the first one: 32 bytes kept only
+     * the first line, which is why a 2026-10-30 log showed `ets Jul 29 2019`
+     * and nothing about `boot:0x13` or `boot:0x3`.
+     */
+    private static final int BANNER_BYTES = 600;
 
     private static final int SYNC_ATTEMPTS = 12;
     private static final int CONNECT_ROUNDS = 3;
@@ -90,12 +97,16 @@ final class EspRom {
      * show what actually arrived instead of only that nothing matched.
      */
     private final ByteArrayOutputStream preview = new ByteArrayOutputStream();
+    /** How many bytes {@link #preview} may hold; widened while reading a banner. */
+    private int previewCap = PREVIEW_BYTES;
     /** Line rate the port is currently programmed to. */
     private int baud = 115200;
     /** Every byte handed to the bridge at the current rate, to prove the send path. */
     private long bytesOut;
     /** Whether the board's reset transistors invert DTR/RTS; see detectPolarity(). */
     private boolean invertControl;
+    /** Whether the handshake may touch DTR/RTS at all; see setManualReset(). */
+    private boolean manualReset;
     /** True once a plain reset produced readable boot text, not just noise. */
     private boolean bannerSeen;
 
@@ -108,20 +119,35 @@ final class EspRom {
         this.trace = trace;
     }
 
+    /**
+     * Leave DTR/RTS alone for the whole handshake. For a board whose IO0 leg is
+     * not wired to the adapter, BOOT has to be held by hand while the board is
+     * reset, and anything this code did to the lines would undo that: connect()
+     * then skips the proof of life and the reset rounds, and only sends syncs.
+     */
+    void setManualReset(boolean manual) {
+        manualReset = manual;
+    }
+
     private void log(String text) {
         if (trace != null) trace.line(text);
     }
 
-    /** The bytes seen at this rate as hex, or "nothing" when the line was quiet. */
+    /**
+     * The bytes seen at this rate as hex, or "nothing" when the line was quiet.
+     * Capped at {@link #PREVIEW_BYTES}: a banner window keeps far more than is
+     * readable as hex, and the text is what matters there.
+     */
     private String previewHex() {
         if (preview.size() == 0) return "nothing";
         final byte[] raw = preview.toByteArray();
-        final StringBuilder hex = new StringBuilder(raw.length * 3);
-        for (int i = 0; i < raw.length; ++i) {
+        final int shown = Math.min(raw.length, PREVIEW_BYTES);
+        final StringBuilder hex = new StringBuilder(shown * 3);
+        for (int i = 0; i < shown; ++i) {
             if (i > 0) hex.append(' ');
             hex.append(String.format(Locale.US, "%02x", raw[i] & 0xFF));
         }
-        if (bytesIn > raw.length) hex.append(" …");
+        if (bytesIn > shown) hex.append(" …");
         return hex.toString();
     }
 
@@ -156,7 +182,12 @@ final class EspRom {
 
         log("sync: " + BAUDS.length + " rates queued, " + CONNECT_ROUNDS
                 + " reset rounds x " + SYNC_ATTEMPTS + " sync packets at the first");
-        detectPolarity();
+        if (manualReset) {
+            log("manual mode: the control lines are never touched. Hold BOOT and tap the"
+                    + " board's reset while this sweeps, then let go of BOOT.");
+        } else {
+            detectPolarity();
+        }
         // Whatever polarity the boot text arrived on is the starting point; the
         // rounds then alternate away from it and back.
         final boolean base = invertControl;
@@ -178,7 +209,10 @@ final class EspRom {
             bytesOut = 0;
             preview.reset();
 
-            final int rounds = first ? CONNECT_ROUNDS : ALT_CONNECT_ROUNDS;
+            // Manual mode runs one round per rate: there is no polarity to alternate
+            // when nothing touches the lines, and the sweep should stay listening
+            // long enough for a hand on the BOOT button.
+            final int rounds = manualReset ? 1 : (first ? CONNECT_ROUNDS : ALT_CONNECT_ROUNDS);
             final int attempts = first ? SYNC_ATTEMPTS : ALT_SYNC_ATTEMPTS;
             log(rate + " baud: " + rounds + " rounds of " + attempts + " syncs");
             for (int round = 0; round < rounds && !synced; ++round) {
@@ -186,10 +220,14 @@ final class EspRom {
                 // EN/IO0 pair holds the chip in reset for the whole handshake,
                 // which reads exactly like a dead link: no bytes, every rate.
                 invertControl = base ^ ((round & 1) == 1);
-                enterBootloader();
-                sleep(120);
-                log("  round " + (round + 1) + ": reset into download mode"
-                        + (invertControl ? ", inverted lines" : ""));
+                if (manualReset) {
+                    log("  round " + (round + 1) + ": sync only, control lines left alone");
+                } else {
+                    enterBootloader();
+                    sleep(120);
+                    log("  round " + (round + 1) + ": reset into download mode"
+                            + (invertControl ? ", inverted lines" : ""));
+                }
                 try {
                     sync(attempts);
                     synced = true;
@@ -217,7 +255,11 @@ final class EspRom {
             final String rates = silent.length() == 0 ? "none" : silent.toString();
             final String message = "no answer from the bootloader at any of "
                     + BAUDS.length + " baud rates (" + rates + ")"
-                    + ", in either reset polarity. " + (bannerSeen
+                    + (manualReset
+                    ? ", with the control lines left alone. Nothing in this run reset the"
+                            + " board, so hold BOOT and tap its reset while the sweep"
+                            + " listens, then let go of BOOT."
+                    : ", in either reset polarity. " + (bannerSeen
                     ? "Boot text did arrive after a reset, so the cable, the adapter"
                             + " and the reset wiring work and the chip runs when it is"
                             + " released. Every sync round still saw silence, so the"
@@ -225,7 +267,7 @@ final class EspRom {
                             + " packets never reach the ROM."
                     : "Not one readable byte arrived after a plain reset, at 115200 or"
                             + " 74880, in either polarity. That points at the cable, the"
-                            + " adapter's receive line or a board held in reset.");
+                            + " adapter's receive line or a board held in reset."));
             throw new IOException(message);
         }
 
@@ -335,7 +377,7 @@ final class EspRom {
                 log("  " + candidate + (inverted ? " inverted: " : " normal: ") + seen + " B"
                         + (seen == 0 ? ", nothing"
                         : text.isEmpty() ? ", no text — " + previewHex()
-                        : " — \"" + text + "\""));
+                        : " — \"" + bannerText() + "\""));
                 if (!text.isEmpty()) {
                     bannerSeen = true;
                     log("  boot text arrived, so the cable, the adapter and the reset"
@@ -374,10 +416,35 @@ final class EspRom {
         return best.length() >= 6 ? best.toString() : "";
     }
 
+    /**
+     * The whole captured window as one line: printable text kept, line breaks and
+     * control bytes ending a run. This is what the log quotes, so the boot-mode
+     * line and the ROM's build date are both visible instead of only the first
+     * line.
+     */
+    private String bannerText() {
+        final byte[] raw = preview.toByteArray();
+        final StringBuilder out = new StringBuilder(raw.length);
+        boolean gap = false;
+        for (byte value : raw) {
+            final int c = value & 0xFF;
+            if (c >= 0x20 && c <= 0x7E) {
+                if (gap && out.length() > 0) out.append(' ');
+                gap = false;
+                out.append((char) c);
+            } else {
+                gap = out.length() > 0;
+            }
+        }
+        final String text = out.toString().trim();
+        return bytesIn > raw.length ? text + " …" : text;
+    }
+
     /** Bytes the board sent in the window after a reset with IO0 high. */
     private int listenAfterReset(int windowMs) throws IOException {
         bytesIn = 0;
         preview.reset();
+        previewCap = BANNER_BYTES;
         port.flushInput();
         lines(false, true);   // EN low: reset, IO0 stays high
         sleep(120);
@@ -388,10 +455,11 @@ final class EspRom {
             final int read = port.read(buffer, 50);
             if (read <= 0) continue;
             bytesIn += read;
-            for (int i = 0; i < read && preview.size() < PREVIEW_BYTES; ++i) {
+            for (int i = 0; i < read && preview.size() < previewCap; ++i) {
                 preview.write(buffer[i]);
             }
         }
+        previewCap = PREVIEW_BYTES;
         return (int) bytesIn;
     }
 
@@ -650,7 +718,7 @@ final class EspRom {
             if (port.read(one, 40) <= 0) continue;
             ++bytesIn;
             final int value = one[0] & 0xFF;
-            if (preview.size() < PREVIEW_BYTES) preview.write(value);
+            if (preview.size() < previewCap) preview.write(value);
             if (value == (SLIP_END & 0xFF)) {
                 if (body != null && body.size() > 0) return unescape(body.toByteArray());
                 body = new ByteArrayOutputStream();

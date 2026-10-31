@@ -14,6 +14,7 @@ import android.hardware.usb.UsbManager;
 import android.os.Build;
 import android.text.InputType;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -55,6 +56,8 @@ final class BoardTab extends ScrollView {
     private boolean usbProbing;
     private boolean usbFlashing;
     private int usbPercentShown = -1;
+    /** Leave DTR/RTS alone and let IO0 be held with the board's BOOT button. */
+    private boolean manualReset;
 
     /**
      * Handshake narration from the last probe or flash, newest last. Kept across
@@ -72,6 +75,7 @@ final class BoardTab extends ScrollView {
     private static final String KEY_MONITOR_MODE = "monitor_mode";
     private static final String KEY_MONITOR_BAUD = "monitor_baud";
     private static final String KEY_MONITOR_EOL = "monitor_eol";
+    private static final String KEY_MANUAL_RESET = "manual_reset";
     private static final int PURPOSE_PROBE = 0;
     private static final int PURPOSE_MONITOR = 1;
     /** Transcript ceiling in characters; the oldest complete line is dropped first. */
@@ -144,6 +148,7 @@ final class BoardTab extends ScrollView {
         monitorMode = prefs().getBoolean(KEY_MONITOR_MODE, false);
         monitorBaud = prefs().getInt(KEY_MONITOR_BAUD, 115200);
         monitorLineEnding = prefs().getString(KEY_MONITOR_EOL, "\r\n");
+        manualReset = prefs().getBoolean(KEY_MANUAL_RESET, false);
 
         // Built once and re-added on each rebuild, so a half-typed line survives
         // the tab refreshing underneath it.
@@ -200,6 +205,12 @@ final class BoardTab extends ScrollView {
     }
 
     private void build(List<FlashLibrary.Entry> entries) {
+        // monitorInput outlives the view tree so a half-typed line survives a
+        // refresh. Its old row is detached from body but still holds it, so it has
+        // to be orphaned explicitly before the new row can adopt it.
+        if (monitorInput.getParent() instanceof ViewGroup) {
+            ((ViewGroup) monitorInput.getParent()).removeView(monitorInput);
+        }
         body.removeAllViews();
         monitorView = null;
         monitorBox = null;
@@ -242,6 +253,13 @@ final class BoardTab extends ScrollView {
         row.addView(monitor, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         return row;
+    }
+
+    private void setManualReset(boolean manual) {
+        manualReset = manual;
+        prefs().edit().putBoolean(KEY_MANUAL_RESET, manual).apply();
+        signature = "";
+        refresh();
     }
 
     private void setMode(boolean monitor) {
@@ -829,6 +847,21 @@ final class BoardTab extends ScrollView {
         Ui.space(activity, restart, 8);
         card.addView(restart);
 
+        Button manual = Ui.action(activity, "MANUAL RESET: " + (manualReset ? "ON" : "OFF"),
+                manualReset);
+        manual.setOnClickListener(v -> setManualReset(!manualReset));
+        Ui.space(activity, manual, 8);
+        card.addView(manual);
+
+        if (manualReset) {
+            TextView manualNote = Ui.text(activity,
+                    "The probe leaves DTR/RTS alone. Hold BOOT and tap the board's reset"
+                            + " while it sweeps, then let go of BOOT.", 11, Ui.ACCENT);
+            manualNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
+            manualNote.setLineSpacing(Ui.dp(activity, 2), 1f);
+            card.addView(manualNote);
+        }
+
         card.addView(Ui.section(activity, "PROBE LOG"));
 
         final String log = logText();
@@ -952,13 +985,17 @@ final class BoardTab extends ScrollView {
             final UsbSerialCh340 port = new UsbSerialCh340(manager, device);
             final EspRom rom = new EspRom(port);
             rom.setTrace(BoardTab.this::trace);
+            rom.setManualReset(manualReset);
             trace("== PROBE " + label + " · Android " + Build.VERSION.RELEASE
                     + " · " + device.getInterfaceCount() + " interface(s) ==");
             boolean opened = false;
             try {
                 port.open();
                 opened = true;
-                trace("port opened, line coding and control lines set");
+                trace(manualReset
+                        ? "port opened, line coding set, control lines released for the"
+                                + " whole run"
+                        : "port opened, line coding and control lines set");
                 final EspRom.Detected detected = rom.connect();
                 message = detected.chip + " bootloader found · MAC " + detected.mac
                         + "\n" + label;
@@ -973,7 +1010,11 @@ final class BoardTab extends ScrollView {
                 trace("failed: " + reason);
             }
             // The bootloader is a step of the probe, not a state to leave the board in.
-            if (opened) {
+            // Manual mode released the lines for the whole run, so the board is booted
+            // by hand there instead of being reset from here.
+            if (opened && manualReset) {
+                message += "\nControl lines left alone; press the board's reset to boot it.";
+            } else if (opened) {
                 try {
                     rom.hardReset();
                     message += "\nBoard restarted into its firmware.";

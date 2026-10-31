@@ -208,8 +208,24 @@ URL and a flashing note. Decisions behind it:
   indistinguishable from a dead link. Round 1 uses the polarity the boot text
   arrived on, round 2 the other, round 3 the first again, and the log names the
   inverted rounds, so the log alone identifies the wiring.
-- **Theme**: near-black navy, violet selection, monospace for every text and
-  button (`Ui.text` / `Ui.action`), matching the deck's terminal look.
+- **Manual reset** (`EspRom.setManualReset`) is the way out when IO0 is not wired
+  to the adapter: `connect()` skips `detectPolarity()`, runs one round per rate
+  with no `enterBootloader()`, and `probeUsb()` skips `hardReset()`, so DTR/RTS are
+  never asserted after the port opens. The user holds BOOT and taps the board's
+  reset while the sweep listens; the log says that instead of blaming polarity,
+  and the failure line states that nothing in the run reset the board.
+- **The banner is kept whole.** `PREVIEW_BYTES` (32) still caps the hex preview,
+  but `listenAfterReset()` raises `previewCap` to `BANNER_BYTES` (600) and
+  `bannerText()` logs the window as one line. The 30 October run quoted only
+  `ets Jul 29 2019 12:21:46` because the boot-mode line sat past the 32nd byte;
+  the ROM's date and `boot:0x13` versus `boot:0x3` are what identify the chip and
+  whether IO0 took effect.
+- **Theme**: the deck's INK palette, copied into `Ui` slot for slot — `#000000`
+  ground, `#0e0e0e` panels, `#1c1c1c` lifted panels, `#333333` hairlines, white
+  ink, and a grey ramp where the coloured build had blue, violet, pink and green.
+  `Ui.PINK` for an error and `Ui.GOOD` for success now differ by luminance, not
+  hue, exactly as `batteryColor()` separates the three battery states on the deck.
+  Monospace for every text and button (`Ui.text` / `Ui.action`).
 - **Probe always restores the board.** `probeUsb()` calls `hardReset()` in both
   paths, success and failure, because leaving the ESP32 in download mode is
   exactly the black-screen-with-red-LED state a user reads as a brick. The same

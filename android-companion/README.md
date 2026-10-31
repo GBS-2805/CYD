@@ -81,6 +81,11 @@ them owns the cable at a time; the choice is remembered across restarts.
 - **RESTART BOARD** boots whatever is in flash without entering the bootloader.
   That is the way out of download mode (black screen, red LED) after a failed
   attempt, short of unplugging.
+- **MANUAL RESET** turns the control lines off for the whole probe, for a board
+  whose IO0 leg is not wired to the adapter's DTR line: hold **BOOT** and tap the
+  board's own reset while the sweep listens, then let go. That run sends syncs
+  only — no reset rounds, no polarity changes — and does not restart the board
+  afterwards, so the ROM is left in download mode for you to handle.
 - **MONITOR** reads what the board prints, and can answer it. **START MONITOR**
   opens the port at the **BAUD** rate in the pull-down (115200, 9600, 57600,
   230400, 460800, 921600); the rate can be changed while the stream runs, as
@@ -101,7 +106,9 @@ them owns the cable at a time; the choice is remembered across restarts.
   flash. It opens with a proof of life: the chip prints boot text on every reset
   whatever is in flash, so the log listens at 115200 and 74880 baud in both
   DTR/RTS polarities and only counts *readable text* as proof — random bytes mean
-  the board is talking at some other rate, not that it is reachable. Each rate
+  the board is talking at some other rate, not that it is reachable. The quoted
+  text is the whole banner, up to 600 bytes, so the ROM's `rst:` and `boot:` lines
+  and its build date are in the log instead of only the first line. Each rate
   then runs its reset rounds with alternating polarity and reports `N B in / M B
   out`, the hex that arrived and the reason the round failed; a bridge that
   refuses bytes stops the sweep instead of being retried at four more rates. COPY
