@@ -8,7 +8,9 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -35,6 +37,10 @@ final class ProjectsTab extends ScrollView {
     private String signature = "";
     /** Status chip selection; -1 shows every project. */
     private int activeFilter = -1;
+    /** Search text, lower-cased; empty shows every project. */
+    private String query = "";
+    /** One field instance, re-added on each rebuild so typing survives a refresh. */
+    private final EditText search;
     /** Files handed to {@link #build}, so the deck card can reach its sketch. */
     private List<FlashLibrary.Entry> currentEntries = new ArrayList<>();
 
@@ -46,6 +52,35 @@ final class ProjectsTab extends ScrollView {
         body.setPadding(Ui.dp(activity, 16), Ui.dp(activity, 8),
                 Ui.dp(activity, 16), Ui.dp(activity, 24));
         addView(body, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
+        search = new EditText(activity);
+        search.setHint("Search widgets");
+        search.setSingleLine(true);
+        search.setInputType(InputType.TYPE_CLASS_TEXT);
+        search.setTextSize(13);
+        search.setTextColor(Ui.TEXT);
+        search.setHintTextColor(Ui.DIM);
+        search.setBackground(Ui.rounded(activity, Ui.CARD_HI, Ui.EDGE, 8));
+        search.setPadding(Ui.dp(activity, 12), Ui.dp(activity, 8),
+                Ui.dp(activity, 12), Ui.dp(activity, 8));
+        search.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                String next = s.toString().trim().toLowerCase(Locale.US);
+                if (next.equals(query)) return;
+                query = next;
+                signature = "";
+                refresh();
+            }
+        });
     }
 
     void refresh() {
@@ -57,7 +92,8 @@ final class ProjectsTab extends ScrollView {
         // Everything that changes what a card says, so a LOG or STATUS tap shows up.
         sig.append('v').append(ProjectStore.version(activity))
                 .append('b').append(BoardCatalog.selectedIndex(activity))
-                .append('f').append(activeFilter);
+                .append('f').append(activeFilter)
+                .append('q').append(query);
         if (!sig.toString().equals(signature)) {
             signature = sig.toString();
             int keepScroll = getScrollY();
@@ -114,11 +150,27 @@ final class ProjectsTab extends ScrollView {
         subtitle.setPadding(0, Ui.dp(activity, 4), 0, 0);
         body.addView(subtitle);
 
+        // The field outlives a rebuild: it is detached and re-added, so its text
+        // and cursor survive the status chips and the search itself re-filtering.
+        final boolean hadFocus = search.hasFocus();
+        LinearLayout.LayoutParams fieldParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        fieldParams.topMargin = Ui.dp(activity, 12);
+        body.addView(search, fieldParams);
+        if (hadFocus) {
+            search.post(() -> {
+                search.requestFocus();
+                search.setSelection(search.getText().length());
+            });
+        }
+
         body.addView(filterRow(projects));
 
         int shown = 0;
         for (ProjectStore.Project project : projects) {
             if (activeFilter >= 0 && project.status != activeFilter) continue;
+            if (!matches(project)) continue;
             body.addView(projectCard(project));
             ++shown;
             if (project.inside()) {
@@ -127,8 +179,25 @@ final class ProjectsTab extends ScrollView {
             }
         }
         if (shown == 0) {
-            body.addView(Ui.text(activity, "Nothing in that status yet.", 12, Ui.DIM));
+            String typed = search.getText().toString().trim();
+            body.addView(Ui.text(activity, typed.isEmpty()
+                    ? "Nothing in that status yet."
+                    : "No widget matches \"" + typed + "\".", 12, Ui.DIM));
         }
+    }
+
+    /**
+     * Name search: the project's own name first, then the bundled descriptor's
+     * name, id and tagline, so a query finds a card by what it says it is.
+     */
+    private boolean matches(ProjectStore.Project project) {
+        if (query.isEmpty()) return true;
+        if (project.name.toLowerCase(Locale.US).contains(query)) return true;
+        WidgetCatalog.Widget widget = WidgetCatalog.forProject(activity, project.id);
+        if (widget == null) return false;
+        return widget.name.toLowerCase(Locale.US).contains(query)
+                || widget.id.toLowerCase(Locale.US).contains(query)
+                || widget.tagline.toLowerCase(Locale.US).contains(query);
     }
 
     /** ALL plus one chip per status, each with its count. */
