@@ -43,6 +43,15 @@ def widgetFiles = fileTree(rootDir.parentFile) {
 tasks.register("syncWidgets") {
     def out = layout.projectDirectory.dir("src/main/assets/widgets").asFile
     inputs.files(widgetFiles)
+    // A descriptor only names its sketch, so the sketch is not covered by the
+    // line above. Declared explicitly, because the output lives in
+    // src/main/assets, which `clean` does not delete: without the .ino as an
+    // input, editing the sketch alone left this task UP-TO-DATE and a full
+    // rebuild shipped the previous copy while toolchain.sh caught the drift.
+    inputs.files(widgetFiles.files.collect { descriptor ->
+        def meta = new groovy.json.JsonSlurper().parse(descriptor)
+        new File(descriptor.parentFile, meta.sketch ?: "${descriptor.parentFile.name}.ino")
+    })
     outputs.dir(out)
     doLast {
         // assets/widgets is generated output. Copy alone never deletes, so a

@@ -5,14 +5,17 @@
  * the fixed colour codes in the palette block below.
  *
  * Where the data comes from:
- *   - Notifications: Apple Notification Center Service (ANCS). The deck
- *     advertises the ANCS service, the iPhone pairs and pushes notifications,
- *     and the deck asks for the app / title / message / date of each one.
- *   - Time: the date that comes with every ANCS notification, or the phone's
- *     Current Time Service when it has one.
- *   - Battery: the phone's Battery Service when it exposes one. iOS does not,
- *     so a phone-side helper can push it through the "Phone Link" service
- *     instead (see README.md for the three-characteristic protocol).
+ *   - Notifications, time and battery: the "Phone Link" service below, which
+ *     the companion app writes. Android has no equivalent of Apple's
+ *     Notification Center Service, and a BLE peripheral cannot read a phone's
+ *     clock, battery or notifications by itself, so the phone pushes all three
+ *     and the deck draws what it receives.
+ *   - ANCS is the iOS path and it is off: ENABLE_ANCS = false. With it true,
+ *     the deck advertises Apple's ANCS solicitation instead, the iPhone pairs
+ *     and pushes notifications, and the deck asks for the app / title / message
+ *     / date of each one; battery then comes from the phone's Battery Service
+ *     when it exposes one (iOS does not), and time from the Current Time
+ *     Service or the notification's own date. Android ignores the solicitation.
  *
  * Libraries needed (only these three):
  *   - Adafruit GFX Library

@@ -67,7 +67,11 @@ reason to add a resource pipeline.
   descriptor and the sketch it names into `app/src/main/assets/widgets/<id>/`
   before `preBuild`, so the repo keeps one copy of each sketch; do not commit a
   duplicate into assets. The destination is wiped first, because a copy alone
-  would leave a removed widget in the APK forever. `toolchain.sh` reads the
+  would leave a removed widget in the APK forever. The descriptor **and** the
+  sketch it names are both declared inputs; declaring only the descriptor was a
+  real bug, because the output lives in `src/main/assets`, which `clean` does not
+  delete, so editing a sketch alone left the task UP-TO-DATE and a full rebuild
+  shipped the previous copy silently. `toolchain.sh` reads the
   descriptors beside this folder, pulls `assets/widgets/<id>/<sketch>` back out of
   the APK and compares it with the repo file, so a bundled sketch cannot skip the
   check.
@@ -360,7 +364,9 @@ Identical to the sketch, checked against its `onWrite` handlers:
 - Every relative Markdown link across the repo resolves.
 - `gradle assembleDebug` (Gradle 8.7, AGP 8.5.2, SDK 34, JDK 17) builds a debug
   APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
-  in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build.
+  in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
+  the artifact in `dist/` now is the one rebuilt on 2026-10-31 after the sketch
+  header change, **119,042 bytes**.
   The earlier 128,924-byte APK unpacked to the same six entries with the same
   uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
   the archive was written, not in the code: both are `zipalign -c 4` clean and
@@ -383,9 +389,9 @@ Identical to the sketch, checked against its `onWrite` handlers:
 - A fresh-toolchain run of unchanged sources produced **97,769 bytes** against
   the then-committed 97,757, so the APK is *not* byte-reproducible: dex files embed
   build-time data. The probe changes shipped **99,533 bytes**, the flash-shelf
-  changes **99,757 bytes**, and the widget-descriptor change **102,590 bytes**;
-  `dist/` holds that last artifact — every size in these docs refers to it. Quote
-  the size as ~100 kB, never as a checksum.
+  changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
+  merged firmware plus the sketch header fix **119,042 bytes**; `dist/` holds that
+  last artifact. Quote the size to the nearest kB (~116 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 34, the expected permission set, and
   `MainActivity` as the launchable activity.
