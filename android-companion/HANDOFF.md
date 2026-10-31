@@ -320,6 +320,22 @@ URL and a flashing note. Decisions behind it:
   block sizes are taken from esptool, but no erase or MD5 check has completed on
   a board.
 
+- **One PROBE press now covers all four wirings.** Trying a crosswired adapter
+  used to mean flipping **LINES**, pressing PROBE, waiting out a silent sweep and
+  flipping it back; `EspRom.connectAll()` runs `connect()` four times — normal and
+  swapped lines, each with the reset driven from the app and with EN pulsed while
+  BOOT is held — and stops at the first that syncs. Each phase resets the per-round
+  counters and `bannerSeen` so one wiring's rounds cannot be counted as another's,
+  and a `WriteFailure` is rethrown rather than retried, because a bridge that
+  refuses bytes fails every wiring. The tab then persists the combination that
+  answered, which also stops a toggle left `SWAPPED` from sabotaging the next
+  probe, and the closing `hardReset()` runs on the manual paths too so the board
+  always comes back out of download mode.
+- The manual phases log `hold BOOT down now` and pause 2.5 s first: no software
+  can press that button, and phases 3–4 only answer while it is held. The sweep is
+  **untested on hardware**; what is tested is that it stops at wiring 1 when the
+  stub answers and that a silent stub reports all 4 wirings tried (26 host checks).
+
 ## Crash reporting
 
 - `CrashLog` installs a default uncaught-exception handler from
@@ -405,8 +421,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
   APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-10-31 after the sketch
-  header change and the probe work, **108,657 bytes** after the icon, the app
-  allowlist and the edge-to-edge padding.
+  header change and the probe work **110,009 bytes** after the icon, the app
+  allowlist, the edge-to-edge padding and the four-wiring sweep.
   The earlier 128,924-byte APK unpacked to the same six entries with the same
   uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
   the archive was written, not in the code: both are `zipalign -c 4` clean and
@@ -431,8 +447,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
   build-time data. The probe changes shipped **99,533 bytes**, the flash-shelf
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
-  and edge-to-edge work **108,657 bytes**; `dist/` holds that last artifact. Quote
-  the size to the nearest kB (~106 kB), never as a checksum.
+  and edge-to-edge work **110,009 bytes**; `dist/` holds that last artifact. Quote
+  the size to the nearest kB (~107 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set,
   `application-icon: 'res/BW.xml'` (resource names are shortened) and

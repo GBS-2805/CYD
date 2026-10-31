@@ -75,6 +75,13 @@ them owns the cable at a time; the choice is remembered across restarts.
 
 - **PROBE USB** reads the chip magic and MAC, then restarts the board into its
   firmware — it never leaves the deck sitting in its bootloader.
+- **One PROBE press tries four wirings**, because a silent board can hide behind
+  any of them: normal and swapped control lines, each with the reset driven from
+  here and with EN pulsed while you hold **BOOT**. It stops at the first that
+  answers, says `found on wiring 2 of 4`, and sets **LINES** / **MANUAL BOOT** to
+  match so FLASH and RESTART reuse it. Hold BOOT from the moment the log reaches
+  wiring 3; the last two phases never touch IO0, and no software can press that
+  button.
 - **FLASH** on an imported `.bin` erases and writes it at `0x0`, verifies it by
   MD5 and reboots into it. `0x0` is the merged-image offset; an app-only image
   belongs at `0x10000` and will not boot from `0x0`.
@@ -89,7 +96,8 @@ them owns the cable at a time; the choice is remembered across restarts.
   attempt, short of unplugging.
 - **MANUAL BOOT** leaves IO0 alone and pulses EN from here, once per round, for a
   board whose IO0 leg is not driven by the adapter's DTR line: hold **BOOT** down
-  for the whole sweep, then let go. Each round's header says what its own pulse
+  for the manual phases, then let go. The toggle is what FLASH and RESTART use;
+  PROBE tries this mode by itself. Each round's header says what its own pulse
   produced, so a round that reads nothing says the EN pulse is not arriving
   either. That run sends no proof of life, because a polarity sweep would move
   DTR, and does not restart the board afterwards, so the ROM is left in download
@@ -194,7 +202,7 @@ through Gradle; a raw `javac` build produces an APK-less class check and the
 PROJECTS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
-[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (106 kB,
+[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (107 kB,
 package `dev.phonedesk.companion`, debug-signed). Install it with
 `adb install -r dist/PhoneDeckBridge-debug.apk`, or copy it to the phone and open
 it with "install unknown apps" allowed.

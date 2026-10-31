@@ -40,6 +40,8 @@ public final class HostTests {
         refusedWrite();
         silentBoard();
         flashWithoutHandshake();
+        sweepStopsAtFirstAnswer();
+        sweepTriesEveryWiring();
 
         System.out.println();
         if (failures.isEmpty()) {
@@ -144,6 +146,40 @@ public final class HostTests {
         } catch (IOException e) {
             check("a board that never answers fails the probe",
                     e.getMessage().contains("no answer from the bootloader"));
+        }
+    }
+
+    /** The first wiring is the one most adapters need, so it must win immediately. */
+    private static void sweepStopsAtFirstAnswer() throws Exception {
+        final UsbSerialCh340 port = new UsbSerialCh340();
+        port.answer(chip(false));
+        final EspRom rom = new EspRom(port);
+        rom.setBootHoldLeadIn(0);
+        final List<String> trace = new ArrayList<>();
+        rom.setTrace(trace::add);
+
+        final EspRom.Sweep sweep = rom.connectAll();
+
+        check("a sweep ends on the wiring that answers", "ESP32".equals(sweep.detected.chip));
+        check("the first wiring is the one that answered", !sweep.swapped && !sweep.manual);
+        check("the sweep stops at wiring 1", sweep.phases == 1);
+        check("later wirings are never tried", !joined(trace).contains("wiring 2/4"));
+    }
+
+    /** A board that never answers must say all four were tried, not one. */
+    private static void sweepTriesEveryWiring() throws Exception {
+        final UsbSerialCh340 port = new UsbSerialCh340();
+        port.refuseRates = true;
+        final EspRom rom = new EspRom(port);
+        rom.setBootHoldLeadIn(0);
+        final List<String> trace = new ArrayList<>();
+        rom.setTrace(trace::add);
+        try {
+            rom.connectAll();
+            check("a silent board fails every wiring", false);
+        } catch (IOException e) {
+            check("a silent board fails every wiring", e.getMessage().contains("4 wirings"));
+            check("the sweep reached the last wiring", joined(trace).contains("wiring 4/4"));
         }
     }
 

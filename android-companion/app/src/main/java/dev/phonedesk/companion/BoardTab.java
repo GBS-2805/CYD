@@ -945,11 +945,20 @@ final class BoardTab extends ScrollView {
         Ui.space(activity, swapped, 8);
         card.addView(swapped);
 
+        TextView sweepNote = Ui.text(activity,
+                "PROBE sweeps four wirings by itself — normal and swapped lines, each"
+                        + " with the reset driven here and with EN pulsed while BOOT is"
+                        + " held — and stops at the first that answers.", 11, Ui.DIM);
+        sweepNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
+        sweepNote.setLineSpacing(Ui.dp(activity, 2), 1f);
+        card.addView(sweepNote);
+
         if (swappedLines) {
             TextView swapNote = Ui.text(activity,
-                    "DTR drives EN and RTS drives IO0 instead of the other way round. Only"
-                            + " for an adapter wired that way; if the probe still says nothing,"
-                            + " set it back to NORMAL.", 11, Ui.ACCENT);
+                    "DTR drives EN and RTS drives IO0 instead of the other way round. PROBE"
+                            + " tries this by itself and sets the button to whichever wiring"
+                            + " answered; set it by hand only to force FLASH or RESTART onto"
+                            + " swapped lines.", 11, Ui.ACCENT);
             swapNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
             swapNote.setLineSpacing(Ui.dp(activity, 2), 1f);
             card.addView(swapNote);
@@ -957,8 +966,9 @@ final class BoardTab extends ScrollView {
 
         if (manualReset) {
             TextView manualNote = Ui.text(activity,
-                    "The probe pulses EN only and never touches IO0. Hold BOOT down"
-                            + " while it sweeps, then let go of BOOT.", 11, Ui.ACCENT);
+                    "EN only, IO0 left alone: FLASH and RESTART leave the strap to the"
+                            + " BOOT button, so hold it while they run. PROBE tries this"
+                            + " mode by itself as its last two wirings.", 11, Ui.ACCENT);
             manualNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
             manualNote.setLineSpacing(Ui.dp(activity, 2), 1f);
             card.addView(manualNote);
@@ -1079,7 +1089,7 @@ final class BoardTab extends ScrollView {
         if (!claimPortOrSay("probe")) return;
         usbProbing = true;
         final String label = describe(device);
-        setUsbStatus("Probing " + label + "…", Ui.ACCENT);
+        setUsbStatus("Probing " + label + " · 4 wirings…", Ui.ACCENT);
 
         final UsbManager manager = (UsbManager) activity.getSystemService(Context.USB_SERVICE);
         new Thread(() -> {
@@ -1088,20 +1098,18 @@ final class BoardTab extends ScrollView {
             final UsbSerialCh340 port = new UsbSerialCh340(manager, device);
             final EspRom rom = new EspRom(port);
             rom.setTrace(BoardTab.this::trace);
-            rom.setManualReset(manualReset);
-            rom.setSwappedLines(swappedLines);
             trace("== PROBE " + label + " · Android " + Build.VERSION.RELEASE
                     + " · " + device.getInterfaceCount() + " interface(s) ==");
             boolean opened = false;
+            EspRom.Sweep sweep = null;
             try {
                 port.open();
                 opened = true;
-                trace(manualReset
-                        ? "port opened, line coding set, IO0 left alone; EN pulsed per round"
-                        : "port opened, line coding and control lines set");
-                final EspRom.Detected detected = rom.connect();
+                trace("port opened, line coding set; four wirings queued");
+                sweep = rom.connectAll();
+                final EspRom.Detected detected = sweep.detected;
                 message = detected.chip + " bootloader found · MAC " + detected.mac
-                        + "\n" + label;
+                        + "\n" + label + "\n" + describeWiring(sweep);
                 if (detected.baud != 115200) {
                     message += "\nHandshake needed " + detected.baud + " baud.";
                 }
@@ -1113,11 +1121,9 @@ final class BoardTab extends ScrollView {
                 trace("failed: " + reason);
             }
             // The bootloader is a step of the probe, not a state to leave the board in.
-            // Manual mode never drove IO0, and its last pulse released EN, so the board
-            // is running whatever the BOOT button chose.
-            if (opened && manualReset) {
-                message += "\nIO0 left alone; press the board's reset to reboot it.";
-            } else if (opened) {
+            // This reset drives both lines, so it works whichever wiring answered: EN
+            // pulses, IO0 stays high and the firmware in flash runs again.
+            if (opened) {
                 try {
                     rom.hardReset();
                     message += "\nBoard restarted into its firmware.";
@@ -1135,12 +1141,36 @@ final class BoardTab extends ScrollView {
             trace("port closed");
             final String result = message;
             final int resultColor = color;
+            final boolean found = sweep != null;
+            final boolean foundSwapped = found && sweep.swapped;
+            final boolean foundManual = found && sweep.manual;
             activity.runOnUiThread(() -> {
                 if (activity.isDestroyed()) return;
                 usbProbing = false;
+                if (found) applyWiring(foundSwapped, foundManual);
                 setUsbStatus(result, resultColor);
             });
         }, "usb-probe").start();
+    }
+
+    /** Names the wiring that answered, so the status line is the whole result. */
+    private static String describeWiring(EspRom.Sweep sweep) {
+        return (sweep.swapped ? "Lines swapped" : "Lines normal")
+                + " · " + (sweep.manual
+                ? "EN pulsed with BOOT held" : "reset driven by the app")
+                + " · wiring " + sweep.phases + " of 4";
+    }
+
+    /**
+     * Adopts the wiring the probe found, so FLASH and RESTART reuse it instead of
+     * inheriting a toggle set by hand for an adapter that is no longer plugged in.
+     */
+    private void applyWiring(boolean swapped, boolean manual) {
+        if (swapped == swappedLines && manual == manualReset) return;
+        setManualReset(manual);
+        setSwappedLines(swapped);
+        Actions.toast(activity, "Probe found " + (swapped ? "swapped lines" : "normal lines")
+                + ", " + (manual ? "BOOT held" : "app reset"));
     }
 
     /** Boots what is in flash without entering the bootloader. */

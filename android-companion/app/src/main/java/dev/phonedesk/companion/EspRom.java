@@ -117,6 +117,8 @@ final class EspRom {
     /** Reset rounds that ran, and how many of those read any byte at all. */
     private int roundsSeen;
     private int roundsWithBytes;
+    /** How long a hand gets to reach BOOT during a sweep's manual phases. */
+    private int bootHoldLeadMs = 2500;
 
     EspRom(UsbSerialCh340 port) {
         this.port = port;
@@ -148,6 +150,83 @@ final class EspRom {
      */
     void setSwappedLines(boolean swapped) {
         swapControl = swapped;
+    }
+
+    /**
+     * The whole probe in one press: the four wirings a silent board can hide behind.
+     *
+     * Each phase is exactly the one-shot handshake this class already ran — normal
+     * or swapped control lines, each with the reset driven from here or with EN
+     * pulsed while BOOT is held by hand — because {@link #connect()} reads
+     * swapControl and manualReset rather than being told which one to use. Trying a
+     * crosswired adapter used to mean flipping a toggle, pressing PROBE, waiting out
+     * a silent sweep and flipping it back; the sweep does that four times and stops
+     * at the first phase that syncs.
+     *
+     * A bridge that refuses to take bytes is fatal to every phase, so WriteFailure
+     * is rethrown instead of being retried three more times.
+     */
+    Sweep connectAll() throws IOException {
+        IOException last = null;
+        int phase = 0;
+        log("sweep: 4 wirings in one press, stopping at the first that answers."
+                + " Hold BOOT down from the moment this log reaches wiring 3.");
+        for (boolean swap : new boolean[]{false, true}) {
+            for (boolean manual : new boolean[]{false, true}) {
+                swapControl = swap;
+                manualReset = manual;
+                ++phase;
+                // Per phase, so one wiring's rounds cannot be counted as another's.
+                roundsSeen = 0;
+                roundsWithBytes = 0;
+                bannerSeen = false;
+                connected = false;
+                log("-- wiring " + phase + "/4: " + wiringName(swap, manual) + " --");
+                if (manual) {
+                    log("   hold BOOT down now: this phase pulses EN and never touches IO0,"
+                            + " so the strap is the button's");
+                    sleep(bootHoldLeadMs);
+                }
+                try {
+                    return new Sweep(connect(), swap, manual, phase);
+                } catch (WriteFailure e) {
+                    // No wiring makes a bridge accept bytes it is refusing.
+                    throw e;
+                } catch (IOException e) {
+                    last = e;
+                    log("   wiring " + phase + " gave no answer");
+                }
+            }
+        }
+        throw new IOException("no answer from the bootloader on any of the 4 wirings"
+                + " (normal and swapped lines, app reset and BOOT held by hand); last: "
+                + (last == null ? "no attempt ran" : last.getMessage()));
+    }
+
+    private static String wiringName(boolean swap, boolean manual) {
+        return (swap ? "lines swapped" : "lines normal")
+                + (manual ? ", EN pulsed with BOOT held" : ", reset driven by the app");
+    }
+
+    /** How long the manual phases wait for a finger on BOOT; the tests zero it. */
+    void setBootHoldLeadIn(int millis) {
+        bootHoldLeadMs = millis;
+    }
+
+    /** Which of the four wirings answered, so the tab can persist it. */
+    static final class Sweep {
+        final Detected detected;
+        final boolean swapped;
+        final boolean manual;
+        /** 1 means the first wiring worked; 4 means only the last one did. */
+        final int phases;
+
+        Sweep(Detected detected, boolean swapped, boolean manual, int phases) {
+            this.detected = detected;
+            this.swapped = swapped;
+            this.manual = manual;
+            this.phases = phases;
+        }
     }
 
     private void log(String text) {
