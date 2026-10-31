@@ -279,11 +279,13 @@ try another cable, and confirm the phone supports USB host mode.
    compare rounds before blaming the board: a board whose EN/IO0 pair is inverted
    answers only on the inverted rounds.
 5. Nothing answers and the board's IO0 may not be wired to the adapter at all:
-   tap **MANUAL RESET** until it reads **MANUAL RESET: ON**, then **PROBE USB**,
-   hold **BOOT** and tap the board's own reset while the sweep listens, and let go
-   of **BOOT** once it answers. That run never touches DTR/RTS and never restarts
-   the   board, so the ROM stays in download mode. The same button answers a board
-   whose auto-reset circuit drags EN low for the whole handshake.
+   tap **MANUAL BOOT** until it reads **MANUAL BOOT: ON**, hold **BOOT** down, then
+   press **PROBE USB**. The sweep never touches IO0 and pulses EN once per rate, so
+   the button decides flash or download mode and each round's header says whether
+   that pulse produced a banner. If every round reads no bytes, the EN pulse is not
+   arriving either — then tap the board's own reset by hand while the sweep
+   listens, and let go of **BOOT** once it answers. The ROM stays in download mode
+   in that case, so press **RESTART BOARD** to boot the firmware back.
 6. Still nothing? Set **LINES: SWAPPED** and probe again. That drives EN on DTR
    and IO0 on RTS, which is what an adapter with a reversed pair needs; without
    it the reset is released with IO0 high and the ROM never runs, at any rate.

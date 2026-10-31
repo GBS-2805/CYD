@@ -81,11 +81,13 @@ them owns the cable at a time; the choice is remembered across restarts.
 - **RESTART BOARD** boots whatever is in flash without entering the bootloader.
   That is the way out of download mode (black screen, red LED) after a failed
   attempt, short of unplugging.
-- **MANUAL RESET** turns the control lines off for the whole probe, for a board
-  whose IO0 leg is not wired to the adapter's DTR line: hold **BOOT** and tap the
-  board's own reset while the sweep listens, then let go. That run sends syncs
-  only — no reset rounds, no polarity changes — and does not restart the board
-  afterwards, so the ROM is left in download mode for you to handle.
+- **MANUAL BOOT** leaves IO0 alone and pulses EN from here, once per round, for a
+  board whose IO0 leg is not driven by the adapter's DTR line: hold **BOOT** down
+  for the whole sweep, then let go. Each round's header says what its own pulse
+  produced, so a round that reads nothing says the EN pulse is not arriving
+  either. That run sends no proof of life, because a polarity sweep would move
+  DTR, and does not restart the board afterwards, so the ROM is left in download
+  mode for you to handle.
 - **LINES** swaps which control line carries which signal: **NORMAL** is DTR to
   IO0 and RTS to EN, **SWAPPED** is the reverse, for an adapter wired that way.
   The two look identical in the log — silence at every rate in both polarities —

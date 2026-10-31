@@ -105,7 +105,10 @@ final class EspRom {
     private long bytesOut;
     /** Whether the board's reset transistors invert DTR/RTS; see detectPolarity(). */
     private boolean invertControl;
-    /** Whether the handshake may touch DTR/RTS at all; see setManualReset(). */
+    /**
+     * Whether IO0 is left to the board's BOOT button while the app pulses EN
+     * itself; see setManualReset().
+     */
     private boolean manualReset;
     /** DTR drives EN and RTS drives IO0 instead of the other way round. */
     private boolean swapControl;
@@ -125,10 +128,11 @@ final class EspRom {
     }
 
     /**
-     * Leave DTR/RTS alone for the whole handshake. For a board whose IO0 leg is
-     * not wired to the adapter, BOOT has to be held by hand while the board is
-     * reset, and anything this code did to the lines would undo that: connect()
-     * then skips the proof of life and the reset rounds, and only sends syncs.
+     * Leave IO0 alone for the whole handshake and pulse EN from here instead, once
+     * per round. For a board whose IO0 leg is not driven by the adapter, BOOT has
+     * to be held by hand while something resets the chip; pulsing EN is that
+     * something, and touching IO0 is what would fight the button. connect() skips
+     * the proof of life in this mode, since a polarity sweep would move DTR.
      */
     void setManualReset(boolean manual) {
         manualReset = manual;
@@ -203,8 +207,8 @@ final class EspRom {
             log("control lines swapped: DTR drives EN, RTS drives IO0");
         }
         if (manualReset) {
-            log("manual mode: the control lines are never touched. Hold BOOT and tap the"
-                    + " board's reset while this sweeps, then let go of BOOT.");
+            log("manual mode: IO0 is left alone and EN is pulsed once per round. Hold"
+                    + " BOOT down while this sweeps, then let go of BOOT.");
         } else {
             detectPolarity();
         }
@@ -229,9 +233,8 @@ final class EspRom {
             bytesOut = 0;
             preview.reset();
 
-            // Manual mode runs one round per rate: there is no polarity to alternate
-            // when nothing touches the lines, and the sweep should stay listening
-            // long enough for a hand on the BOOT button.
+            // Manual mode runs one round per rate: each round pulses EN once, so five
+            // rates give five chances to catch the chip with BOOT held down.
             final int rounds = manualReset ? 1 : (first ? CONNECT_ROUNDS : ALT_CONNECT_ROUNDS);
             final int attempts = first ? SYNC_ATTEMPTS : ALT_SYNC_ATTEMPTS;
             log(rate + " baud: " + rounds + " rounds of " + attempts + " syncs");
@@ -244,7 +247,12 @@ final class EspRom {
                 final long roundStartIn = bytesIn;
                 invertControl = base ^ ((round & 1) == 1);
                 if (manualReset) {
-                    log("  round " + (round + 1) + ": sync only, control lines left alone");
+                    resetOnly();
+                    final int afterPulse = listenWindow(300);
+                    log("  round " + (round + 1) + ": EN pulsed, IO0 left alone"
+                            + (afterPulse == 0
+                            ? " — the pulse produced no bytes; is BOOT held down?"
+                            : " — " + afterPulse + " B of boot text after the pulse"));
                 } else {
                     enterBootloader();
                     // Read the pulse's own output before any sync packet goes out, so
@@ -266,17 +274,15 @@ final class EspRom {
                     throw e;
                 } catch (IOException e) {
                     // Try the next reset round, then the next rate.
-                    if (!manualReset) {
-                        ++roundsSeen;
-                        if (bytesIn > roundStartIn) ++roundsWithBytes;
-                    }
+                    ++roundsSeen;
+                    if (bytesIn > roundStartIn) ++roundsWithBytes;
                     // A reset is never silent: the ROM prints its banner on the way up,
                     // and download mode's banner ends with "waiting for download". A
                     // round with nothing in at all therefore means the chip did not
                     // restart, which is a different fault from a refused packet.
                     log("  round " + (round + 1) + ": " + bytesIn + " B in / " + bytesOut
                             + " B out, " + previewHex() + " (" + e.getMessage() + ")"
-                            + (!manualReset && bytesIn == 0
+                            + (bytesIn == roundStartIn
                             ? " — no ROM banner, so the chip never restarted" : ""));
                 }
             }
@@ -294,9 +300,10 @@ final class EspRom {
             final String rates = silent.length() == 0 ? "none" : silent.toString();
             final String tail;
             if (manualReset) {
-                tail = ", with the control lines left alone. Nothing in this run reset the"
-                        + " board, so hold BOOT and tap its reset while the sweep"
-                        + " listens, then let go of BOOT.";
+                tail = ", with IO0 left alone and EN pulsed once per round. If the rounds"
+                        + " read no bytes at all, that EN pulse is not reaching the board"
+                        + " either: hold BOOT down and tap the board's own reset while the"
+                        + " sweep listens, then let go of BOOT.";
             } else if (!bannerSeen) {
                 tail = ", in either reset polarity. Not one readable byte arrived after a"
                         + " plain reset, at 115200 or 74880, in either polarity. That"
@@ -398,6 +405,22 @@ final class EspRom {
      * esptool's classic reset: hold EN low, drop IO0 low, release EN, then
      * release IO0 — the ROM samples the strapping pin as it leaves reset.
      */
+    /**
+     * Manual-BOOT entry: pulse EN and never touch IO0, so the strap is whatever the
+     * board's BOOT button holds. A hand on BOOT is the one way into download mode
+     * that does not depend on this app driving DTR at all — and the 31 October
+     * rounds are consistent with DTR being exactly what does not work here.
+     */
+    private void resetOnly() throws IOException {
+        port.flushInput();
+        en(false);            // EN released, IO0 untouched
+        sleep(60);
+        en(true);             // EN low: reset
+        sleep(120);
+        en(false);            // EN high: BOOT decides flash or download mode
+        sleep(120);
+    }
+
     private void enterBootloader() throws IOException {
         port.flushInput();
         // esptool's hard_reset() drives the two lines with separate calls, in this

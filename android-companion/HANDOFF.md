@@ -225,6 +225,12 @@ URL and a flashing note. Decisions behind it:
   any sync packet is sent. The same phone, cable and board flash successfully from
   ArduinoDroid, so the adapter and the board's reset circuit are known good and
   the difference is in this app, not in the hardware.
+- **Manual mode resets the chip; standing back was the wrong idea.** The first
+  version left DTR/RTS untouched and told the user to tap the board's reset, so
+  the app's own handshake contained no reset at all and every round ran against
+  whatever state the board happened to be in. It now pulses EN once per round and
+  never drives IO0, so the BOOT button alone chooses the strap, each round reports
+  what its own pulse produced, and the button and its note read MANUAL BOOT.
 - **Control polarity alternates between sync rounds**, because an inverted EN/IO0
   pair holds the chip in reset for the whole handshake: no bytes at any rate,
   indistinguishable from a dead link. Round 1 uses the polarity the boot text
@@ -393,7 +399,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-10-31 after the sketch
-  header change and the probe work, **120,886 bytes**.
+  header change and the probe work, **120,958 bytes**.
   The earlier 128,924-byte APK unpacked to the same six entries with the same
   uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
   the archive was written, not in the code: both are `zipalign -c 4` clean and
@@ -417,7 +423,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the then-committed 97,757, so the APK is *not* byte-reproducible: dex files embed
   build-time data. The probe changes shipped **99,533 bytes**, the flash-shelf
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
-  merged firmware plus the probe work **120,886 bytes**; `dist/` holds that last
+  merged firmware plus the probe work **120,958 bytes**; `dist/` holds that last
   artifact. Quote the size to the nearest kB (~118 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 34, the expected permission set, and

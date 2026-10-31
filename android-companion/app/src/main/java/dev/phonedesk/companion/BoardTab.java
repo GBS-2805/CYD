@@ -56,7 +56,7 @@ final class BoardTab extends ScrollView {
     private boolean usbProbing;
     private boolean usbFlashing;
     private int usbPercentShown = -1;
-    /** Leave DTR/RTS alone and let IO0 be held with the board's BOOT button. */
+    /** Leave IO0 alone and pulse EN from here; BOOT is held by hand. */
     private boolean manualReset;
     /** DTR drives EN and RTS drives IO0; see EspRom.setSwappedLines(). */
     private boolean swappedLines;
@@ -860,7 +860,7 @@ final class BoardTab extends ScrollView {
         Ui.space(activity, restart, 8);
         card.addView(restart);
 
-        Button manual = Ui.action(activity, "MANUAL RESET: " + (manualReset ? "ON" : "OFF"),
+        Button manual = Ui.action(activity, "MANUAL BOOT: " + (manualReset ? "ON" : "OFF"),
                 manualReset);
         manual.setOnClickListener(v -> setManualReset(!manualReset));
         Ui.space(activity, manual, 8);
@@ -884,7 +884,7 @@ final class BoardTab extends ScrollView {
 
         if (manualReset) {
             TextView manualNote = Ui.text(activity,
-                    "The probe leaves DTR/RTS alone. Hold BOOT and tap the board's reset"
+                    "The probe pulses EN only and never touches IO0. Hold BOOT down"
                             + " while it sweeps, then let go of BOOT.", 11, Ui.ACCENT);
             manualNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
             manualNote.setLineSpacing(Ui.dp(activity, 2), 1f);
@@ -1023,8 +1023,7 @@ final class BoardTab extends ScrollView {
                 port.open();
                 opened = true;
                 trace(manualReset
-                        ? "port opened, line coding set, control lines released for the"
-                                + " whole run"
+                        ? "port opened, line coding set, IO0 left alone; EN pulsed per round"
                         : "port opened, line coding and control lines set");
                 final EspRom.Detected detected = rom.connect();
                 message = detected.chip + " bootloader found · MAC " + detected.mac
@@ -1040,10 +1039,10 @@ final class BoardTab extends ScrollView {
                 trace("failed: " + reason);
             }
             // The bootloader is a step of the probe, not a state to leave the board in.
-            // Manual mode released the lines for the whole run, so the board is booted
-            // by hand there instead of being reset from here.
+            // Manual mode never drove IO0, and its last pulse released EN, so the board
+            // is running whatever the BOOT button chose.
             if (opened && manualReset) {
-                message += "\nControl lines left alone; press the board's reset to boot it.";
+                message += "\nIO0 left alone; press the board's reset to reboot it.";
             } else if (opened) {
                 try {
                     rom.hardReset();
