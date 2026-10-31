@@ -273,8 +273,11 @@ try another cable, and confirm the phone supports USB host mode.
    tap **MANUAL RESET** until it reads **MANUAL RESET: ON**, then **PROBE USB**,
    hold **BOOT** and tap the board's own reset while the sweep listens, and let go
    of **BOOT** once it answers. That run never touches DTR/RTS and never restarts
-   the board, so the ROM stays in download mode. The same button answers a board
+   the   board, so the ROM stays in download mode. The same button answers a board
    whose auto-reset circuit drags EN low for the whole handshake.
+6. Still nothing? Set **LINES: SWAPPED** and probe again. That drives EN on DTR
+   and IO0 on RTS, which is what an adapter with a reversed pair needs; without
+   it the reset is released with IO0 high and the ROM never runs, at any rate.
 
 **MD5 mismatch after writing**: something interfered with the link (a hub, a
 charge-only cable, an unplugged board). Re-flash; the board boots whatever it

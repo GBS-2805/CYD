@@ -107,6 +107,8 @@ final class EspRom {
     private boolean invertControl;
     /** Whether the handshake may touch DTR/RTS at all; see setManualReset(). */
     private boolean manualReset;
+    /** DTR drives EN and RTS drives IO0 instead of the other way round. */
+    private boolean swapControl;
     /** True once a plain reset produced readable boot text, not just noise. */
     private boolean bannerSeen;
 
@@ -127,6 +129,18 @@ final class EspRom {
      */
     void setManualReset(boolean manual) {
         manualReset = manual;
+    }
+
+    /**
+     * Drive EN and IO0 on the opposite lines. A CH340 adapter whose DTR/RTS pair
+     * is crosswired looks exactly like a dead link: the sequence releases reset
+     * with the chip's IO0 still high, so the ROM never runs and every rate stays
+     * silent while the bytes leave the phone. The polarity rounds in
+     * detectPolarity() cannot fix that, because inverting both lines swaps
+     * nothing — it only turns each one into its opposite.
+     */
+    void setSwappedLines(boolean swapped) {
+        swapControl = swapped;
     }
 
     private void log(String text) {
@@ -182,6 +196,9 @@ final class EspRom {
 
         log("sync: " + BAUDS.length + " rates queued, " + CONNECT_ROUNDS
                 + " reset rounds x " + SYNC_ATTEMPTS + " sync packets at the first");
+        if (swapControl) {
+            log("control lines swapped: DTR drives EN, RTS drives IO0");
+        }
         if (manualReset) {
             log("manual mode: the control lines are never touched. Hold BOOT and tap the"
                     + " board's reset while this sweeps, then let go of BOOT.");
@@ -309,7 +326,11 @@ final class EspRom {
      * apart from a dead cable.
      */
     private void lines(boolean io0Low, boolean enLow) throws IOException {
-        port.setDtrRts(invertControl ? !io0Low : io0Low, invertControl ? !enLow : enLow);
+        // DTR is assumed to drive IO0 and RTS EN; swapControl covers an adapter
+        // wired the other way round.
+        final boolean dtrLow = swapControl ? enLow : io0Low;
+        final boolean rtsLow = swapControl ? io0Low : enLow;
+        port.setDtrRts(invertControl ? !dtrLow : dtrLow, invertControl ? !rtsLow : rtsLow);
     }
 
     private void changeBaudQuietly(int rate) {
@@ -471,8 +492,14 @@ final class EspRom {
         payload[3] = 0x20;
         Arrays.fill(payload, 4, payload.length, (byte) 0x55);
 
+        // esptool sends this packet with its checksum, not zero: 0xEF XOR every
+        // payload byte, which is 0xDD here because the 32 0x55s cancel out. The
+        // ROM accepts the sync before any handshake, so a zero matched nothing and
+        // broke nothing — but the point of this probe is to send what esptool
+        // 4.5.1 sends, so one more difference is gone from the comparison.
+        final int payloadChecksum = checksum(payload);
         for (int attempt = 0; attempt < attempts; ++attempt) {
-            sendCommand(OP_SYNC, payload, 0);
+            sendCommand(OP_SYNC, payload, payloadChecksum);
             if (awaitResponse(OP_SYNC, 200) != null) return;
             sleep(50);
         }

@@ -58,6 +58,8 @@ final class BoardTab extends ScrollView {
     private int usbPercentShown = -1;
     /** Leave DTR/RTS alone and let IO0 be held with the board's BOOT button. */
     private boolean manualReset;
+    /** DTR drives EN and RTS drives IO0; see EspRom.setSwappedLines(). */
+    private boolean swappedLines;
 
     /**
      * Handshake narration from the last probe or flash, newest last. Kept across
@@ -76,6 +78,7 @@ final class BoardTab extends ScrollView {
     private static final String KEY_MONITOR_BAUD = "monitor_baud";
     private static final String KEY_MONITOR_EOL = "monitor_eol";
     private static final String KEY_MANUAL_RESET = "manual_reset";
+    private static final String KEY_SWAPPED_LINES = "swapped_lines";
     private static final int PURPOSE_PROBE = 0;
     private static final int PURPOSE_MONITOR = 1;
     /** Transcript ceiling in characters; the oldest complete line is dropped first. */
@@ -149,6 +152,7 @@ final class BoardTab extends ScrollView {
         monitorBaud = prefs().getInt(KEY_MONITOR_BAUD, 115200);
         monitorLineEnding = prefs().getString(KEY_MONITOR_EOL, "\r\n");
         manualReset = prefs().getBoolean(KEY_MANUAL_RESET, false);
+        swappedLines = prefs().getBoolean(KEY_SWAPPED_LINES, false);
 
         // Built once and re-added on each rebuild, so a half-typed line survives
         // the tab refreshing underneath it.
@@ -258,6 +262,13 @@ final class BoardTab extends ScrollView {
     private void setManualReset(boolean manual) {
         manualReset = manual;
         prefs().edit().putBoolean(KEY_MANUAL_RESET, manual).apply();
+        signature = "";
+        refresh();
+    }
+
+    private void setSwappedLines(boolean swapped) {
+        swappedLines = swapped;
+        prefs().edit().putBoolean(KEY_SWAPPED_LINES, swapped).apply();
         signature = "";
         refresh();
     }
@@ -534,7 +545,9 @@ final class BoardTab extends ScrollView {
                     monitorResetRequested = false;
                     appendMonitor("\n== reset: IO0 high, EN pulsed ==\n");
                     try {
-                        new EspRom(port).hardReset();
+                        final EspRom resetRom = new EspRom(port);
+                        resetRom.setSwappedLines(swappedLines);
+                        resetRom.hardReset();
                     } catch (Exception e) {
                         appendMonitor("reset failed: "
                                 + (e.getMessage() == null ? e.toString() : e.getMessage()) + "\n");
@@ -853,6 +866,22 @@ final class BoardTab extends ScrollView {
         Ui.space(activity, manual, 8);
         card.addView(manual);
 
+        Button swapped = Ui.action(activity, "LINES: " + (swappedLines ? "SWAPPED" : "NORMAL"),
+                swappedLines);
+        swapped.setOnClickListener(v -> setSwappedLines(!swappedLines));
+        Ui.space(activity, swapped, 8);
+        card.addView(swapped);
+
+        if (swappedLines) {
+            TextView swapNote = Ui.text(activity,
+                    "DTR drives EN and RTS drives IO0 instead of the other way round. Only"
+                            + " for an adapter wired that way; if the probe still says nothing,"
+                            + " set it back to NORMAL.", 11, Ui.ACCENT);
+            swapNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
+            swapNote.setLineSpacing(Ui.dp(activity, 2), 1f);
+            card.addView(swapNote);
+        }
+
         if (manualReset) {
             TextView manualNote = Ui.text(activity,
                     "The probe leaves DTR/RTS alone. Hold BOOT and tap the board's reset"
@@ -986,6 +1015,7 @@ final class BoardTab extends ScrollView {
             final EspRom rom = new EspRom(port);
             rom.setTrace(BoardTab.this::trace);
             rom.setManualReset(manualReset);
+            rom.setSwappedLines(swappedLines);
             trace("== PROBE " + label + " · Android " + Build.VERSION.RELEASE
                     + " · " + device.getInterfaceCount() + " interface(s) ==");
             boolean opened = false;
@@ -1051,6 +1081,7 @@ final class BoardTab extends ScrollView {
             final UsbSerialCh340 port = new UsbSerialCh340(manager, device);
             final EspRom rom = new EspRom(port);
             rom.setTrace(BoardTab.this::trace);
+            rom.setSwappedLines(swappedLines);
             trace("== RESTART " + describe(device) + " ==");
             try {
                 port.open();
@@ -1112,6 +1143,7 @@ final class BoardTab extends ScrollView {
             final UsbSerialCh340 port = new UsbSerialCh340(manager, device);
             final EspRom rom = new EspRom(port);
             rom.setTrace(BoardTab.this::trace);
+            rom.setSwappedLines(swappedLines);
             trace("== FLASH " + name + " · " + Ui.size(image.length) + " ==");
             try {
                 port.open();

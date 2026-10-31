@@ -86,6 +86,11 @@ them owns the cable at a time; the choice is remembered across restarts.
   board's own reset while the sweep listens, then let go. That run sends syncs
   only — no reset rounds, no polarity changes — and does not restart the board
   afterwards, so the ROM is left in download mode for you to handle.
+- **LINES** swaps which control line carries which signal: **NORMAL** is DTR to
+  IO0 and RTS to EN, **SWAPPED** is the reverse, for an adapter wired that way.
+  The two look identical in the log — silence at every rate in both polarities —
+  because a reversed pair releases reset with IO0 still high, so the ROM never
+  starts. Inverting both lines does not help: each one just becomes its opposite.
 - **MONITOR** reads what the board prints, and can answer it. **START MONITOR**
   opens the port at the **BAUD** rate in the pull-down (115200, 9600, 57600,
   230400, 460800, 921600); the rate can be changed while the stream runs, as
