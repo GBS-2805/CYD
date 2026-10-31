@@ -189,6 +189,21 @@ final class UsbSerialCh340 {
         setControlLines();
     }
 
+    /**
+     * One line at a time. esptool changes DTR and RTS with separate calls and this
+     * board only ever answered a pulse that moved RTS alone, so the app now writes
+     * them the same way instead of moving both bits in one transfer.
+     */
+    void setDtr(boolean on) throws IOException {
+        dtr = on;
+        setControlLines();
+    }
+
+    void setRts(boolean on) throws IOException {
+        rts = on;
+        setControlLines();
+    }
+
     private void setControlLines() throws IOException {
         final int mask = ~((dtr ? SCL_DTR : 0) | (rts ? SCL_RTS : 0));
         if (controlOut(0xA4, mask, 0) < 0) {

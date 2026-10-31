@@ -239,14 +239,23 @@ final class EspRom {
                 // Alternate the control polarity round by round. An inverted
                 // EN/IO0 pair holds the chip in reset for the whole handshake,
                 // which reads exactly like a dead link: no bytes, every rate.
+                // Per round, not per rate: bytes round 1 read must not be counted
+                // again when round 2 comes up empty.
+                final long roundStartIn = bytesIn;
                 invertControl = base ^ ((round & 1) == 1);
                 if (manualReset) {
                     log("  round " + (round + 1) + ": sync only, control lines left alone");
                 } else {
                     enterBootloader();
-                    sleep(120);
+                    // Read the pulse's own output before any sync packet goes out, so
+                    // the log says whether the chip printed its banner at all rather
+                    // than inferring it from a total.
+                    final int afterPulse = listenWindow(250);
                     log("  round " + (round + 1) + ": reset into download mode"
-                            + (invertControl ? ", inverted lines" : ""));
+                            + (invertControl ? ", inverted lines" : "")
+                            + (afterPulse == 0
+                            ? " — the pulse produced no bytes at all"
+                            : " — " + afterPulse + " B of boot text after the pulse"));
                 }
                 try {
                     sync(attempts);
@@ -259,7 +268,7 @@ final class EspRom {
                     // Try the next reset round, then the next rate.
                     if (!manualReset) {
                         ++roundsSeen;
-                        if (bytesIn > 0) ++roundsWithBytes;
+                        if (bytesIn > roundStartIn) ++roundsWithBytes;
                     }
                     // A reset is never silent: the ROM prints its banner on the way up,
                     // and download mode's banner ends with "waiting for download". A
@@ -357,6 +366,23 @@ final class EspRom {
         port.setDtrRts(invertControl ? !dtrLow : dtrLow, invertControl ? !rtsLow : rtsLow);
     }
 
+    /**
+     * One line at a time, in the same mapping lines() uses. esptool changes DTR
+     * and RTS with separate calls, and that difference turned out to matter: the
+     * only pulse this board ever answered was one that moved RTS alone.
+     */
+    private void io0(boolean low) throws IOException {
+        final boolean value = invertControl ? !low : low;
+        if (swapControl) port.setRts(value);
+        else port.setDtr(value);
+    }
+
+    private void en(boolean low) throws IOException {
+        final boolean value = invertControl ? !low : low;
+        if (swapControl) port.setDtr(value);
+        else port.setRts(value);
+    }
+
     private void changeBaudQuietly(int rate) {
         if (rate == baud) return;
         try {
@@ -374,11 +400,19 @@ final class EspRom {
      */
     private void enterBootloader() throws IOException {
         port.flushInput();
-        lines(false, true);   // IO0 high, EN low (held in reset)
-        sleep(150);
-        lines(true, false);   // IO0 low, EN released: the ROM samples IO0
-        sleep(120);
-        lines(false, false);  // IO0 high again, chip now in download mode
+        // esptool's hard_reset() drives the two lines with separate calls, in this
+        // order, 100 ms and 50 ms apart. Driving both bits in one control transfer
+        // is not the same thing to the bridge, and the 2026-10-31 log showed the
+        // difference: a pulse that moved RTS alone printed a 396 B ROM banner,
+        // while these rounds — which moved DTR and RTS together — read nothing at
+        // all across eleven attempts.
+        io0(false);           // IO0 high
+        en(true);             // EN low: chip held in reset
+        sleep(100);
+        io0(true);            // IO0 low: the strap the ROM samples
+        en(false);            // EN high: chip leaves reset into download mode
+        sleep(50);
+        io0(false);           // IO0 high again, strap already sampled
         sleep(120);
     }
 
@@ -542,6 +576,30 @@ final class EspRom {
         previewCap = PREVIEW_BYTES;
         final int seen = (int) bytesIn;
         bytesIn = 0;
+        return seen;
+    }
+
+    /**
+     * Read a window and add it to the round's byte count, without flushing and
+     * without touching the lines: this is the chip's answer to the pulse that just
+     * happened, not a separate test.
+     */
+    private int listenWindow(int windowMs) throws IOException {
+        preview.reset();
+        previewCap = BANNER_BYTES;
+        int seen = 0;
+        final long deadline = System.currentTimeMillis() + windowMs;
+        final byte[] buffer = new byte[64];
+        while (System.currentTimeMillis() < deadline) {
+            final int read = port.read(buffer, 50);
+            if (read <= 0) continue;
+            seen += read;
+            for (int i = 0; i < read && preview.size() < previewCap; ++i) {
+                preview.write(buffer[i]);
+            }
+        }
+        previewCap = PREVIEW_BYTES;
+        bytesIn += seen;
         return seen;
     }
 

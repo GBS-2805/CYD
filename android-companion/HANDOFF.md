@@ -216,6 +216,15 @@ URL and a flashing note. Decisions behind it:
   `waiting for download`), so a sync round that reads **0 B** means the chip never
   restarted. Each such round now says so, and the failure line blames the reset
   line instead of the packet.
+- **One line change per control transfer.** esptool calls `_setDTR` and `_setRTS`
+  separately, 100 ms then 50 ms apart; this app wrote both bits in a single
+  transfer. On 31 October the only pulse the board ever answered (396 B,
+  `rst:0x1 (POWERON_RESET)`, `boot:0x13`) moved RTS alone, while all eleven rounds
+  — which moved DTR and RTS together — read zero bytes at every rate. The app now
+  drives the lines esptool's way and logs what each pulse itself produced, before
+  any sync packet is sent. The same phone, cable and board flash successfully from
+  ArduinoDroid, so the adapter and the board's reset circuit are known good and
+  the difference is in this app, not in the hardware.
 - **Control polarity alternates between sync rounds**, because an inverted EN/IO0
   pair holds the chip in reset for the whole handshake: no bytes at any rate,
   indistinguishable from a dead link. Round 1 uses the polarity the boot text
@@ -384,7 +393,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-10-31 after the sketch
-  header change and the probe work, **120,482 bytes**.
+  header change and the probe work, **120,886 bytes**.
   The earlier 128,924-byte APK unpacked to the same six entries with the same
   uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
   the archive was written, not in the code: both are `zipalign -c 4` clean and
@@ -408,8 +417,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the then-committed 97,757, so the APK is *not* byte-reproducible: dex files embed
   build-time data. The probe changes shipped **99,533 bytes**, the flash-shelf
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
-  merged firmware plus the probe work **120,482 bytes**; `dist/` holds that last
-  artifact. Quote the size to the nearest kB (~117 kB), never as a checksum.
+  merged firmware plus the probe work **120,886 bytes**; `dist/` holds that last
+  artifact. Quote the size to the nearest kB (~118 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 34, the expected permission set, and
   `MainActivity` as the launchable activity.

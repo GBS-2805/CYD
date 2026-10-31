@@ -268,12 +268,13 @@ try another cable, and confirm the phone supports USB host mode.
 3. All four say `no text — <hex>` → the board is transmitting at some rate the
    probe is not listening on. The data path works; the rate is the open question.
 4. `round 1: 0 B in / 0 B out` means the bridge refused the bytes and the sweep
-   stops there. `0 B in / 552 B out — no ROM banner, so the chip never restarted`
-   means 12 sync packets left the phone and no reset happened at all: a chip that
-   restarts prints its banner, and download mode's ends with `waiting for
-   download`, so silence here points at the reset line (EN) rather than at the
-   packet. Bytes in but no sync reply is the opposite case — the chip restarted
-   and ignored what arrived, so the packet or the rate is the open question.
+   stops there. Then read the round's header line. `the pulse produced no bytes
+   at all` means the reset itself did nothing: the chip prints a banner on every
+   reset, and download mode's ends with `waiting for download`, so that points at
+   the reset line (EN), not at the packet. `N B of boot text after the pulse` on a
+   round that still reports `0 B in / 552 B out` is the opposite case — the chip
+   restarted and ignored what arrived, so the packet or the rate is the open
+   question.
    Rounds alternate the DTR/RTS polarity and the log marks the inverted ones, so
    compare rounds before blaming the board: a board whose EN/IO0 pair is inverted
    answers only on the inverted rounds.
