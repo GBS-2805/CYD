@@ -83,6 +83,13 @@ reason to add a resource pipeline.
 - COPY puts the entire sketch on the clipboard for ArduinoDroid's editor. That is
   the path that works regardless of Android version.
 
+**Open:** [`patches/sync-widgets-drift-and-dist-refresh.md`](patches/sync-widgets-drift-and-dist-refresh.md)
+lists four app-side fixes not yet applied here - a release check that verifies the
+retired `assets/deck/` path, the stale fallback card body, an old sketch under
+`dist/`, and the card name in these docs. It also carries the evidence for each,
+and the reason to wait for the firmware chat's newer widget commit before
+rebuilding.
+
 ## Project notebook
 
 - `ProjectStore` holds one record per project: id, name, tagline, body, libraries,

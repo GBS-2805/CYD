@@ -1,8 +1,25 @@
-# CYD Phone Deck
+# Phone Deck
 
 A phone dashboard for the **ESP32-2432S024R** (2.4" resistive-touch CYD): clock,
-battery and notifications in a slate-and-cyan control-surface UI, with the same
-touch calibration flow as the macro pad sketch.
+battery and notifications, set like a woodblock print — flat panels, heavy rules,
+one ink, nothing shaded. It ships **two monochrome themes** of twelve slots each:
+
+* **0 PAPER** — black on white: ground #ffffff, panels #f4f4f4, hairlines
+  #c8c8c8, ink #000000, dim ink #6f6f6f, the one action #2b2b2b.
+* **1 INK** — white on black: ground #000000, panels #0e0e0e, hairlines #333333,
+  ink #ffffff, dim ink #8c8c8c, the one action #d4d4d4.
+
+`THEME_INDEX = 1` selects INK. The six accent slots are a grey ramp rather than
+hues, so link state, the one action and the battery warning separate by
+luminance instead of colour, which is what keeps both themes readable on a panel
+this size. The full table is `THEMES[]` at the top of the sketch.
+
+The folder and the sketch file keep the name `cyd_phone_deck`: ArduinoDroid
+compiles one `.ino` whose name must match its folder, and the companion app's
+Gradle task copies that exact path into the APK. Everything a person reads — the
+BLE name, the header wordmark, the app's project card, these docs — says
+**Phone Deck**. Boards flashed before the rename still advertise
+`ESP32 Phone_Widget <TAG>`, and the app matches that fragment too.
 
 The deck is a Bluetooth LE peripheral exposing a small GATT service called
 **Phone Link**. Something on the phone writes the time, battery level and
@@ -44,6 +61,72 @@ The RGB LED is three discrete LEDs between the GPIOs and 3.3 V, so each channel
 lights when its pin is LOW. `disableOnboardLed()` drives red, green and blue
 HIGH at boot, which keeps the LED dark; a floating channel glows cyan.
 
+The board carries three buttons: **BOOT** and **RESET** on the back, and a
+**battery switch** next to the battery connector. The backlight has its own
+switch at the side edge, not a button. The sketch reads none of them — BOOT and
+RESET matter only for flashing.
+
+Also on the back and unused by the firmware: a **TF** card slot, a speaker
+header, the battery JST, a 4P-1.25 connector, extended IO, and a
+temperature/humidity header. The module is an **ESP-WROOM-32** stamped `N4XX` -
+4 MB of flash, no PSRAM - so nothing here can use PSRAM even though the ESP32 Dev
+Module board menu offers the option (there is nothing to map).
+
+## Front page
+
+The deck boots into a front page: a status line across the top (clock left,
+battery and gear right), a `PHONE DECK` wordmark with the link state beside it, an
+outlined pill with the unread count, a solid pill naming the palette this build is
+baked with, and four numbered tabs. The gear opens settings from here and from
+the messages board; holding it for a second forgets the bound phone.
+
+* **01 MESSAGES** opens the notification board. Its `<` chip, and every settings
+  path, come back here.
+* **02 SETTINGS** is brightness (two buttons, one half of the card each), clear
+  and calibration.
+* **03 THEME** is a read-only contact sheet: both palettes on their own
+  grounds with the live one outlined. The palette is compile-time, so the page
+  points at `THEME_INDEX` instead of pretending to have a switch.
+* **04 CALIBRATE** starts the three-tap calibration; saving or cancelling returns
+  to the front page.
+
+The front page carries no graphic: the four tabs measure 300x30 at y 84, 118,
+152 and 186 under a hairline at 78, and a closing rule runs at 224. The clock and
+battery began in a strip along the bottom at 222; they now sit at y 6, above the
+wordmark, so a glance does not have to travel past the tabs to find them. An
+earlier version drew a lens-shaped heat band under the tabs; it was removed
+because a tinted strip there competed with the wordmark and read as decoration.
+
+## Renders
+
+Two kinds of image come out of `renders/`: `board.png`, the board with the deck
+on it and numbered markers for the facts above, and nine clean 2x screens
+beside it (`screen-home.png` and friends), one per state the deck can be in.
+The screens are what the Drive folder mirrors; `board.png` is the one that
+carries the board's context. Both are written by
+`python3 renders/make_renders.py` (Pillow; it downloads Adafruit's `glcdfont.c`
+to `/tmp` at render time, so nothing third-party is vendored here). It draws
+from the sketch's own rects, colours and 5×7 typeface, and it reads the palette
+straight out of `cyd_phone_deck.ino` rather than keeping a copy. The sketch holds
+two monochrome palettes in one `THEMES[]` table - 0 PAPER (black on white)
+and 1 INK (white on black) - each
+entry pairing an RGB565 value with the hex in the comment beside it. The renderer
+checks every theme, then draws the one `THEME_INDEX` selects, and stops with the
+offending entry named if a hex and its value disagree, a theme is not a whole
+twelve colours, or the index points past the end. So a palette change only has to
+be made in the sketch. The layout rects and draw calls are still transcribed by
+hand, which is what to re-check after a UI change. Pass `--check` to validate the palette and confirm the committed PNGs still
+match the sketch: it renders in memory, writes nothing, and names any file that
+has gone stale.
+
+The image itself is `renders/board.png`, committed here: read that file when you
+need to see the board.
+
+After any change to what the deck draws, regenerate it and look at
+`renders/board.png` rather than describing the screen. Replacing the copies in
+the Drive `RENDERS` folder is a task in
+[HOWTO.md](HOWTO.md#publish-the-renders-to-drive).
+
 ## Build
 
 Flashing, calibration and link testing step by step: [HOWTO.md](HOWTO.md).
@@ -66,18 +149,44 @@ On a machine with none of that installed, [`toolchain.sh`](toolchain.sh) does al
 of it — toolchain, core, libraries, the pyserial the core's esptool needs — and
 compiles the sketch, in one idempotent command. See [HOWTO.md](HOWTO.md).
 
+## widget.json: how the app finds this widget
+
+`widget.json` in this folder is the widget's side of the contract with the
+companion app. The app does not hard-code this sketch; it reads this file, so a
+widget is a folder that describes itself.
+
+| Field | Used for |
+| --- | --- |
+| `id` | the project id (`widget:phone_deck`) and the asset folder name |
+| `name`, `tagline`, `body`, `notes` | the project card in the app |
+| `sketch` | the file copied into the APK; must match the folder plus `.ino` |
+| `libraries`, `never` | the LIBRARIES card, including what to refuse to install |
+| `ble.service`, `ble.nameMatch` | what the app looks for while scanning |
+
+The app's Gradle task walks every `*/widget.json` beside `android-companion/`
+and copies the descriptor and the sketch it names into
+`app/src/main/assets/widgets/<id>/` at build time. Editing the sketch here stays
+enough for a rebuild to carry it; there is no second copy in the app's source.
+
+To get a new widget onto the phone without publishing anything: put this folder
+in your own private transfer location (Drive, mail, USB), download
+`cyd_phone_deck.ino` on the phone, and use the app's **IMPORT** button. The
+sketch lands on the flash shelf and opens in ArduinoDroid, exactly like the
+bundled copy.
+
 ## First run and testing the link
 
 1. Flash and let the deck boot. The first boot opens touch calibration: tap the
-   four corner dots, then the three check dots.
-2. **Forget any old "Phone Deck" entry** in the phone's Bluetooth settings if you
-   paired the earlier HID build; that stale bond points at a keyboard service the
-   deck no longer has.
+   three dots — top-left, top-right, bottom-left — and the fit saves itself.
+2. **Forget any old "ESP32 Phone_Widget" entry** in the phone's Bluetooth
+   settings if you paired the earlier HID build; that stale bond points at a
+   keyboard service the deck no longer has.
 3. Install the companion app from [`android-companion`](../android-companion),
    grant notification access, and let it link. The deck should jump to
    `LINKED`, show the clock, battery and notification rows.
-4. If it stays empty, install **nRF Connect for Mobile**, scan for **Phone Deck**,
-   connect, and write the Phone Link characteristics (UUIDs below). If that
+4. If it stays empty, install **nRF Connect for Mobile**, scan for
+   **Phone Deck**, connect, and write the Phone Link characteristics
+   (UUIDs below). If that
    works, the deck and its display are fine and the problem is on the phone
    side.
 
@@ -148,9 +257,32 @@ asyncio.run(main())
 
 * Packet (28/31 bytes): flags `0x06` (3), the Phone Link 128-bit service UUID
   (18), and the shortened name "Phone" (7).
-* Scan response: the complete name "Phone Deck".
+* Scan response: the complete name `Phone Deck <TAG>`, where `TAG` is the low 24
+  bits of the chip's MAC in uppercase hex, e.g. `Phone Deck A1B2C3`. No two
+  boards advertise the same name. A board flashed before the rename still says
+  `ESP32 Phone_Widget <TAG>`, which the app matches as well.
 * `startBluetooth()` waits 200 ms after configuring the payloads before starting
   advertising, because Bluedroid applies them asynchronously.
+
+## One board, one phone
+
+Every board is its own widget and answers to one phone, so a shelf of decks is a
+list of distinct devices rather than a row of identical entries.
+
+* `DEVICE_TAG` is the low 24 bits of the ESP32's efuse MAC, read once at boot
+  with `ESP.getEfuseMac()` and printed as six uppercase hex digits.
+* The BLE name is `Phone Deck <TAG>`; the header wordmark is `Phone Deck` and
+  the subtitle shows `esp32 // #<TAG>`, so the screen and the scan list match.
+* The first phone to connect is written to NVS (`identity` / `owner`) and
+  becomes the only phone the deck listens to. Another phone can still connect,
+  but its writes are dropped in the Phone Link callbacks and the link is not
+  counted, so the deck keeps showing `OFFLINE`.
+* Hold the gear for 1.2 s on the board screen to forget the bound phone. The
+  serial log prints `[id] binding cleared`, and the next phone to connect claims
+  the board.
+* The binding is in NVS, so re-flashing does not clear it — only the gear hold
+  (or an erase-flash) does. Because the tag comes from the MAC, re-flashing also
+  keeps the same name; two different boards differ in both.
 
 ## Limits worth knowing
 

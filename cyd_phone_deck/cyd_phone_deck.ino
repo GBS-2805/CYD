@@ -1,8 +1,8 @@
 /*
- * CYD Phone Deck - ESP32-2432S024R (2.4" resistive touch CYD)
+ * Phone Deck - ESP32-2432S024R (2.4" resistive touch CYD)
  *
- * A desk dashboard for your phone: clock, battery and notifications, drawn in
- * the same burnt-orange-on-charcoal style as the macro pad sketch.
+ * A desk dashboard for your phone: clock, battery and notifications, drawn from
+ * the fixed colour codes in the palette block below.
  *
  * Where the data comes from:
  *   - Notifications: Apple Notification Center Service (ANCS). The deck
@@ -28,7 +28,12 @@
  *   - Tap a notification for the full text, then DISMISS or BACK.
  *   - Hold a notification to dismiss it on the phone.
  *   - Tap the gear (top right) for brightness and calibration.
+ *   - Hold the gear for 1.2 s to forget the phone this board is bound to.
  *   - Hold the title for 1.5 s, or touch the screen at boot, to calibrate.
+ *
+ * Every board is its own widget: the advertised name carries a tag read from
+ * the chip's efuse MAC, and the first phone to connect claims the board. Other
+ * phones are refused until the gear is held, so one deck answers to one phone.
  */
 
 #include <Arduino.h>
@@ -92,20 +97,64 @@ static constexpr int SCREEN_W = 320;
 static constexpr int SCREEN_H = 240;
 
 // ---------------------------------------------------------------- palette ---
-// Burnt-orange phosphor over warm charcoal: dark rounded cards, hairline
-// borders, one accent hue, generous gaps. Terminal colour, panel proportions.
+// Two palettes, both monochrome: 0 PAPER is black on white, 1 INK is white on
+// black. One ink, one ground, and the six accent slots become a grey ramp so the
+// same draw calls still say "this one, not that one" without hue. New widgets
+// start from these two instead of inventing another colour scheme; add a theme
+// only when a screen genuinely cannot be read in mono.
+//
+// The first six are ground, panel, lifted panel, hairline, ink and dim ink. The
+// last six keep their jobs and lose their colours: accent for the link, the
+// status line and a charging battery, accentDim for that colour in shadow, pink
+// for the one action and a battery under 30%, purple for the section dot, yellow
+// for the unread count, green for a battery at 30% or more. With no hue to spend,
+// the three battery states separate by luminance instead: charging at the
+// strongest contrast against the ground, a battery under 30% next, 30% and up
+// quieter. batteryColor() therefore still reads as three states in greyscale.
+//
+// Each entry is written 0x5655 /* #rrggbb */: the panel gets the RGB565 value
+// and renders/make_renders.py paints from the hex, so the images keep the 8-bit
+// tone the panel can only approximate. The renderer checks that every hex packs
+// back to the value beside it, and draws whichever theme THEME_INDEX selects.
 
-static constexpr uint16_t C_BG = 0x10A3;         // #12141f slate black
-static constexpr uint16_t C_PANEL = 0x2148;      // #232840 card
-static constexpr uint16_t C_TILE = 0x2148;       // card
-static constexpr uint16_t C_TILE_HI = 0x298A;    // #2c3252 raised card
-static constexpr uint16_t C_EDGE = 0x3A0C;       // #3a4166 hairline
-static constexpr uint16_t C_TEXT = 0xEF5E;       // #e9eaf6 cool white
-static constexpr uint16_t C_DIM = 0x8C96;        // #8d93b0 blue grey
-static constexpr uint16_t C_ACCENT = 0x4E6E;     // #4fc8f5 cyan
-static constexpr uint16_t C_ACCENT_DIM = 0x22CD; // cyan at ~45%
-static constexpr uint16_t C_PINK = 0xFB75;       // #ff6ea9 action pink
-static constexpr uint16_t C_PURPLE = 0x8BDF;     // #8b7bff section violet
+struct Palette {
+  uint16_t bg, tile, tileHi, edge, text, dim;
+  uint16_t accent, accentDim, pink, purple, yellow, green;
+};
+
+static constexpr Palette THEMES[] = {
+  // 0 PAPER - black on white: paper ground, black ink, greys in between
+  { 0xFFFF /* #ffffff */, 0xF7BE /* #f4f4f4 */, 0xEF5D /* #e8e8e8 */,
+    0xCE59 /* #c8c8c8 */, 0x0000 /* #000000 */, 0x6B6D /* #6f6f6f */,
+    0x0000 /* #000000 */, 0xB596 /* #b0b0b0 */, 0x2945 /* #2b2b2b */,
+    0x8C51 /* #8a8a8a */, 0x0000 /* #000000 */, 0x52AA /* #555555 */ },
+  // 1 INK - white on black: the same ramp inverted, for a dark room
+  { 0x0000 /* #000000 */, 0x0861 /* #0e0e0e */, 0x18E3 /* #1c1c1c */,
+    0x3186 /* #333333 */, 0xFFFF /* #ffffff */, 0x8C71 /* #8c8c8c */,
+    0xFFFF /* #ffffff */, 0x4A69 /* #4d4d4d */, 0xD6BA /* #d4d4d4 */,
+    0x738E /* #707070 */, 0xFFFF /* #ffffff */, 0xA514 /* #a0a0a0 */ },
+};
+
+static constexpr uint8_t THEME_COUNT = sizeof(THEMES) / sizeof(THEMES[0]);
+// Pick a palette here; a settings row can change it at runtime later.
+static constexpr uint8_t THEME_INDEX = 1;  // INK
+static_assert(THEME_INDEX < THEME_COUNT,
+              "THEME_INDEX is past the end of THEMES");
+
+// The twelve names the drawing code already uses, loaded from the chosen theme.
+// Plain variables rather than constexpr, so a picker can reassign them later.
+static uint16_t C_BG         = THEMES[THEME_INDEX].bg;
+static uint16_t C_TILE       = THEMES[THEME_INDEX].tile;
+static uint16_t C_TILE_HI    = THEMES[THEME_INDEX].tileHi;
+static uint16_t C_EDGE       = THEMES[THEME_INDEX].edge;
+static uint16_t C_TEXT       = THEMES[THEME_INDEX].text;
+static uint16_t C_DIM        = THEMES[THEME_INDEX].dim;
+static uint16_t C_ACCENT     = THEMES[THEME_INDEX].accent;
+static uint16_t C_ACCENT_DIM = THEMES[THEME_INDEX].accentDim;
+static uint16_t C_PINK       = THEMES[THEME_INDEX].pink;
+static uint16_t C_PURPLE     = THEMES[THEME_INDEX].purple;
+static uint16_t C_YELLOW     = THEMES[THEME_INDEX].yellow;
+static uint16_t C_GREEN      = THEMES[THEME_INDEX].green;
 
 static constexpr uint8_t CORNER_CARD = 10;
 static constexpr uint8_t CORNER_BUTTON = 8;
@@ -134,7 +183,9 @@ struct TouchMapping {
   float d, e, f;
 };
 
-enum Screen : uint8_t { SCR_BOARD, SCR_DETAIL, SCR_SETTINGS, SCR_CAL, SCR_VERIFY };
+// The front page comes first: everything else is opened from it.
+enum Screen : uint8_t { SCR_HOME, SCR_BOARD, SCR_DETAIL, SCR_SETTINGS, SCR_THEME,
+                       SCR_CAL };
 
 // Where the wall clock came from. A phone-supplied time beats a notification
 // date, because the date is only as fresh as the last notification.
@@ -186,34 +237,18 @@ bool mappingStored = false;
 
 Screen screen = SCR_BOARD;
 uint8_t calIndex = 0;
-TouchPoint calRaw[4];
+TouchPoint calRaw[3];
 uint32_t calTapMs = 0;
-
-uint8_t verifyIndex = 0;
-bool verifyFailed = false;
-int verifyWorst2 = 0;  // squared pixel error of the worst check tap
 uint32_t rawUiMs = 0;
 
+// Three taps, in this order: top-left, top-right, bottom-left. The first pair
+// gives the raw direction of screen +x, the third gives +y, and that is all an
+// affine map needs.
 static constexpr int CAL_INSET = 26;
-static const int CAL_TARGET_X[4] = {CAL_INSET, SCREEN_W - 1 - CAL_INSET,
-                                    SCREEN_W - 1 - CAL_INSET, CAL_INSET};
-static const int CAL_TARGET_Y[4] = {CAL_INSET, CAL_INSET,
-                                    SCREEN_H - 1 - CAL_INSET,
+static const int CAL_TARGET_X[3] = {CAL_INSET, SCREEN_W - 1 - CAL_INSET,
+                                    CAL_INSET};
+static const int CAL_TARGET_Y[3] = {CAL_INSET, CAL_INSET,
                                     SCREEN_H - 1 - CAL_INSET};
-
-// Check taps: after the corners are fitted these three points must land where
-// they are drawn before the mapping is allowed into flash. They are spread far
-// apart so a mirror or an axis swap cannot slip through.
-static const int VERIFY_X[3] = {64, 256, 160};
-static const int VERIFY_Y[3] = {68, 172, 118};
-static constexpr int VERIFY_TOLERANCE = 55;
-
-// Recovery buttons, only shown when a check tap misses.
-static const Rect ADJ_SWAP = {8, 96, 148, 36};
-static const Rect ADJ_FLIP_X = {164, 96, 148, 36};
-static const Rect ADJ_FLIP_Y = {8, 138, 148, 36};
-static const Rect ADJ_REDO = {164, 138, 148, 36};
-static const Rect ADJ_SAVE = {8, 188, 304, 40};
 
 // Mapping assumed before the panel is calibrated: raw axes rotated 90 degrees
 // against the landscape display, which is how most 2.4-inch CYDs behave.
@@ -256,74 +291,24 @@ static void saveMapping(const TouchMapping &m) {
   calPrefs.end();
 }
 
-// Gaussian elimination with partial pivoting on a 3x4 augmented matrix.
-static bool solve3(double mat[3][4], double out[3]) {
-  for (int col = 0; col < 3; ++col) {
-    int pivot = col;
-    for (int r = col + 1; r < 3; ++r) {
-      if (fabs(mat[r][col]) > fabs(mat[pivot][col])) pivot = r;
-    }
-    if (fabs(mat[pivot][col]) < 1e-6) return false;
-    if (pivot != col) {
-      for (int k = 0; k < 4; ++k) {
-        const double tmp = mat[col][k];
-        mat[col][k] = mat[pivot][k];
-        mat[pivot][k] = tmp;
-      }
-    }
-    for (int r = 0; r < 3; ++r) {
-      if (r == col) continue;
-      const double factor = mat[r][col] / mat[col][col];
-      for (int k = col; k < 4; ++k) mat[r][k] -= factor * mat[col][k];
-    }
-  }
-  for (int i = 0; i < 3; ++i) out[i] = mat[i][3] / mat[i][i];
-  return true;
-}
+// Three taps fix the affine map exactly: the top-left tap is the origin and the
+// other two are the raw vectors for screen +x and +y. Inverting that 2x2 is the
+// whole fit, and it handles a rotated, mirrored or axis-swapped panel without a
+// case for each.
+static bool fitMapping(const TouchPoint raw[3], TouchMapping &m) {
+  const float ex = raw[1].x - raw[0].x;
+  const float ey = raw[1].y - raw[0].y;
+  const float fx = raw[2].x - raw[0].x;
+  const float fy = raw[2].y - raw[0].y;
+  const float det = ex * fy - fx * ey;
+  if (fabsf(det) < 250000.0f) return false;  // two taps landed on one spot
 
-// Least-squares fit of the four tapped corners to the screen corners.
-static bool fitMapping(const TouchPoint raw[4], TouchMapping &m) {
-  const double targetX[4] = {0.0, SCREEN_W - 1.0, SCREEN_W - 1.0, 0.0};
-  const double targetY[4] = {0.0, 0.0, SCREEN_H - 1.0, SCREEN_H - 1.0};
-
-  double normal[3][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-  double rhsX[3] = {0, 0, 0};
-  double rhsY[3] = {0, 0, 0};
-
-  for (int i = 0; i < 4; ++i) {
-    const double p[3] = {static_cast<double>(raw[i].x),
-                         static_cast<double>(raw[i].y), 1.0};
-    for (int r = 0; r < 3; ++r) {
-      for (int c = 0; c < 3; ++c) normal[r][c] += p[r] * p[c];
-      rhsX[r] += p[r] * targetX[i];
-      rhsY[r] += p[r] * targetY[i];
-    }
-  }
-
-  double mx[3][4], my[3][4];
-  for (int r = 0; r < 3; ++r) {
-    for (int c = 0; c < 3; ++c) {
-      mx[r][c] = normal[r][c];
-      my[r][c] = normal[r][c];
-    }
-    mx[r][3] = rhsX[r];
-    my[r][3] = rhsY[r];
-  }
-
-  double cx[3], cy[3];
-  if (!solve3(mx, cx) || !solve3(my, cy)) return false;
-
-  m.a = cx[0]; m.b = cx[1]; m.c = cx[2];
-  m.d = cy[0]; m.e = cy[1]; m.f = cy[2];
-
-  // Reject a fit that maps the tapped corners far from the screen corners.
-  for (int i = 0; i < 4; ++i) {
-    const double px = m.a * raw[i].x + m.b * raw[i].y + m.c;
-    const double py = m.d * raw[i].x + m.e * raw[i].y + m.f;
-    if (fabs(px - targetX[i]) > 60.0 || fabs(py - targetY[i]) > 60.0) {
-      return false;
-    }
-  }
+  m.a = (SCREEN_W - 1) * fy / det;
+  m.b = -(SCREEN_W - 1) * fx / det;
+  m.d = -(SCREEN_H - 1) * ey / det;
+  m.e = (SCREEN_H - 1) * ex / det;
+  m.c = -(m.a * raw[0].x + m.b * raw[0].y);
+  m.f = -(m.d * raw[0].x + m.e * raw[0].y);
   return true;
 }
 
@@ -353,13 +338,38 @@ static void writeBacklightDuty(uint32_t duty) {
 #endif
 }
 
+// The only place a duty value is computed. "The number moves but the panel does
+// not" is either a write that never reached the channel or a value that never
+// moved, so both the duty and the channel's read-back are logged.
+static uint32_t brightnessDuty() {
+  return static_cast<uint32_t>(brightness) * 255 / 100;
+}
+
 static void applyBrightness() {
-  writeBacklightDuty(static_cast<uint32_t>(brightness) * 255 / 100);
+  const uint32_t duty = brightnessDuty();
+  writeBacklightDuty(duty);
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+  Serial.printf("[bl] %u%% -> duty %u, channel reads %u\n",
+                static_cast<unsigned>(brightness), static_cast<unsigned>(duty),
+                static_cast<unsigned>(ledcRead(PIN_TFT_BL)));
+#else
+  Serial.printf("[bl] %u%% -> duty %u\n", static_cast<unsigned>(brightness),
+                static_cast<unsigned>(duty));
+#endif
 }
 
 static void initBacklight() {
 #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
-  ledcAttach(PIN_TFT_BL, 5000, 8);
+  // A silent failure here leaves the pin wherever the last boot put it, and the
+  // panel then answers the setting with nothing at all.
+  bool attached = ledcAttach(PIN_TFT_BL, 5000, 8);
+  if (!attached) {
+    ledcDetach(PIN_TFT_BL);
+    attached = ledcAttach(PIN_TFT_BL, 5000, 8);
+    Serial.printf("[bl] re-attached PWM on gpio %d: %s\n", PIN_TFT_BL,
+                  attached ? "ok" : "FAILED");
+  }
+  if (!attached) Serial.println("[bl] PWM attach failed: backlight cannot dim");
 #else
   ledcSetup(BL_CHANNEL, 5000, 8);
   ledcAttachPin(PIN_TFT_BL, BL_CHANNEL);
@@ -584,7 +594,72 @@ static void pushTime(time_t epoch) {
 
 // -------------------------------------------------------------- BLE state ---
 
-static const char *DEVICE_NAME = "Phone Deck";
+// --------------------------------------------------------------- identity ---
+// Each board is a distinct widget. The tag is the low 24 bits of the chip's
+// efuse MAC, which is unique per module and cannot be cloned by re-flashing, so
+// two decks running this sketch never advertise the same name.
+//
+// The first phone to connect claims the board: its address is written to NVS
+// and the gear, held for 1.2 s on the board screen, clears that record. It is a
+// record, not a gate - see rememberPeer().
+
+Preferences identityPrefs;
+char DEVICE_TAG[7] = "000000";
+char DEVICE_NAME[32] = "Phone Deck";
+bool ownerKnown = false;
+uint8_t ownerBda[6] = {0, 0, 0, 0, 0, 0};
+char ownerLabel[18] = "unbound";
+
+// True while a phone holds the link and may write. One central connects at a
+// time, so this follows the connection rather than a stored address.
+static volatile bool peerAllowed = false;
+
+static void bdaToText(const uint8_t bda[6], char *out, size_t outLen) {
+  snprintf(out, outLen, "%02X:%02X:%02X:%02X:%02X:%02X", bda[5], bda[4], bda[3],
+           bda[2], bda[1], bda[0]);
+}
+
+static void initIdentity() {
+  const uint64_t mac = ESP.getEfuseMac();
+  snprintf(DEVICE_TAG, sizeof(DEVICE_TAG), "%06X",
+           static_cast<unsigned>(mac & 0xFFFFFF));
+  snprintf(DEVICE_NAME, sizeof(DEVICE_NAME), "Phone Deck %s", DEVICE_TAG);
+
+  identityPrefs.begin("identity", true);
+  if (identityPrefs.getBytesLength("owner") == sizeof(ownerBda) &&
+      identityPrefs.getBytes("owner", ownerBda, sizeof(ownerBda)) == sizeof(ownerBda)) {
+    ownerKnown = true;
+    bdaToText(ownerBda, ownerLabel, sizeof(ownerLabel));
+  }
+  identityPrefs.end();
+
+  Serial.printf("[id] %s  owner %s\n", DEVICE_NAME, ownerKnown ? ownerLabel : "unbound");
+}
+
+// Records who is driving the deck. Deliberately not a gate: one central can hold
+// the link at a time, and an Android central's resolvable private address rotates,
+// so a stored address must never be able to lock the owner's own phone out. That
+// is what left a real board saying OFFLINE while a phone was connected.
+static void rememberPeer(const uint8_t bda[6]) {
+  if (ownerKnown && memcmp(ownerBda, bda, sizeof(ownerBda)) == 0) return;
+  memcpy(ownerBda, bda, sizeof(ownerBda));
+  ownerKnown = true;
+  bdaToText(ownerBda, ownerLabel, sizeof(ownerLabel));
+  identityPrefs.begin("identity", false);
+  identityPrefs.putBytes("owner", ownerBda, sizeof(ownerBda));
+  identityPrefs.end();
+  Serial.printf("[ble] link held by %s\n", ownerLabel);
+}
+
+static void releaseOwner() {
+  ownerKnown = false;
+  memset(ownerBda, 0, sizeof(ownerBda));
+  snprintf(ownerLabel, sizeof(ownerLabel), "unbound");
+  identityPrefs.begin("identity", false);
+  identityPrefs.remove("owner");
+  identityPrefs.end();
+  Serial.println("[id] binding cleared - the next phone to connect wins");
+}
 
 // ANCS only exists on iOS. Android has no equivalent service, so the deck gets
 // battery, clock and notifications from the Phone Link GATT service instead,
@@ -972,8 +1047,9 @@ class DeckServerCallbacks : public BLEServerCallbacks {
  public:
   void onConnect(BLEServer *server, esp_ble_gatts_cb_param_t *param) override {
     (void)server;
-    (void)param;
     serverConnected = true;
+    peerAllowed = true;
+    rememberPeer(param->connect.remote_bda);
     linkDirty = true;
     Serial.println("[ble] phone connected");
     if (!ENABLE_ANCS) return;  // Android companions write Phone Link directly
@@ -985,6 +1061,7 @@ class DeckServerCallbacks : public BLEServerCallbacks {
 
   void onDisconnect(BLEServer *server, esp_ble_gatts_cb_param_t *param) override {
     (void)param;
+    peerAllowed = false;
     serverConnected = false;
     linkDirty = true;
     ancsReady = false;
@@ -1012,6 +1089,7 @@ class DeckSecurityCallbacks : public BLESecurityCallbacks {
 class LinkTimeCallbacks : public BLECharacteristicCallbacks {
  public:
   void onWrite(BLECharacteristic *characteristic) override {
+    if (!peerAllowed) return;  // a phone that does not own this board
     const auto value = characteristic->getValue();
     if (value.length() < 7) return;
     const unsigned char *b = reinterpret_cast<const unsigned char *>(value.c_str());
@@ -1024,6 +1102,7 @@ class LinkTimeCallbacks : public BLECharacteristicCallbacks {
 class LinkBatteryCallbacks : public BLECharacteristicCallbacks {
  public:
   void onWrite(BLECharacteristic *characteristic) override {
+    if (!peerAllowed) return;
     const auto value = characteristic->getValue();
     if (value.length() < 1) return;
     const int level = static_cast<unsigned char>(value[0]);
@@ -1040,6 +1119,7 @@ static uint32_t linkNoticeSerial = 0;
 class LinkNoticeCallbacks : public BLECharacteristicCallbacks {
  public:
   void onWrite(BLECharacteristic *characteristic) override {
+    if (!peerAllowed) return;
     const auto value = characteristic->getValue();
     if (value.length() == 0) return;
     char buf[160];
@@ -1163,9 +1243,12 @@ static void startBluetooth() {
 // section marker, then equal-width notification rows.
 static constexpr int HEADER_H = 34;
 
-static const Rect GEAR_BTN = {286, 6, 26, 22};
+// 24x24 was under a fingertip on a resistive panel; 34x28 plus slop clears it.
+static const Rect GEAR_BTN = {284, 5, 32, 24};
 static const Rect LINK_PILL = {204, 6, 76, 22};
-static const Rect BACK_BTN = {8, 6, 24, 24};
+// The same pill, right-aligned in a header that has no gear.
+static const Rect SET_LINK_PILL = {234, 6, 76, 22};
+static const Rect BACK_BTN = {6, 3, 34, 28};
 
 static const Rect STATUS_CARD = {8, 40, 304, 76};
 static const Rect NOTIF_ROW[3] = {{8, 134, 304, 32}, {8, 168, 304, 32},
@@ -1174,11 +1257,22 @@ static const Rect NOTIF_ROW[3] = {{8, 134, 304, 32}, {8, 168, 304, 32},
 static const Rect DETAIL_DISMISS = {12, 202, 148, 30};
 static const Rect DETAIL_BACK = {168, 202, 140, 30};
 
-static const Rect SET_BRI_DOWN = {16, 58, 54, 30};
-static const Rect SET_BRI_UP = {250, 58, 54, 30};
+// Half the brightness card each. Two 54px chips were pushed to the card's outer
+// edges, where the panel's x mapping is least linear: "-" landed, "+" did not.
+static const Rect SET_BRI_DOWN = {12, 64, 146, 28};
+static const Rect SET_BRI_UP = {162, 64, 146, 28};
 static const Rect SET_CLEAR = {232, 106, 72, 26};
 static const Rect SET_CAL = {8, 146, 304, 32};
 static const Rect SET_CLOSE = {8, 186, 304, 34};
+
+// Front page: a status line, the wordmark, two pills, four numbered tabs. The
+// clock and battery moved up out of the bottom strip, so the page now ends in a
+// closing rule. A tab is 300x30, the widest target the panel can give.
+static const Rect HEADER_BACK = {6, 3, 34, 28};
+static const Rect HOME_TAB[4] = {{10, 84, 300, 30}, {10, 118, 300, 30},
+                                 {10, 152, 300, 30}, {10, 186, 300, 30}};
+static const Rect HOME_PILL_A = {10, 52, 96, 18};
+static const Rect HOME_PILL_B = {114, 52, 96, 18};
 
 // -------------------------------------------------------------- draw utils ---
 
@@ -1236,6 +1330,18 @@ static bool inside(int x, int y, Rect r) {
   return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
 }
 
+// A resistive panel reports a tap a few pixels from where the finger landed. Six
+// pixels of slop on the way back costs nothing: nothing else lives that close.
+static bool insideBack(int x, int y) {
+  const Rect r = BACK_BTN;
+  return x >= r.x - 6 && x < r.x + r.w + 6 && y >= r.y - 6 && y < r.y + r.h + 6;
+}
+
+static bool insideHeaderBack(int x, int y) {
+  const Rect r = HEADER_BACK;
+  return x >= r.x - 6 && x < r.x + r.w + 6 && y >= r.y - 6 && y < r.y + r.h + 6;
+}
+
 // --------------------------------------------------------------- drawing ---
 
 int batteryLevel = -1;  // -1 until the phone reports one
@@ -1250,33 +1356,41 @@ static const char *clockSourceLabel() {
 }
 
 static void drawGear(int cx, int cy, uint16_t color) {
-  tft.drawCircle(cx, cy, 4, color);
+  tft.drawCircle(cx, cy, 5, color);
   static const int8_t DX[8] = {0, 1, 1, 1, 0, -1, -1, -1};
   static const int8_t DY[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
   for (int i = 0; i < 8; ++i) {
-    tft.drawLine(cx + DX[i] * 4, cy + DY[i] * 4, cx + DX[i] * 6, cy + DY[i] * 6, color);
+    tft.drawLine(cx + DX[i] * 5, cy + DY[i] * 5, cx + DX[i] * 7, cy + DY[i] * 7, color);
   }
+}
+
+// One link pill wherever link state is shown: a ring when nothing is on the
+// link, a filled dot when a phone is, and the accent outline only when linked.
+static void drawLinkPill(const Rect &pill) {
+  const bool linked = phoneLinked();
+  tft.fillRoundRect(pill.x, pill.y, pill.w, pill.h, 11, C_TILE);
+  tft.drawRoundRect(pill.x, pill.y, pill.w, pill.h, 11, linked ? C_ACCENT : C_EDGE);
+  if (linked) tft.fillCircle(pill.x + 12, pill.y + 11, 3, C_ACCENT);
+  else tft.drawCircle(pill.x + 12, pill.y + 11, 3, C_DIM);
+  drawTextAt(linked ? "LINKED" : "OFFLINE", pill.x + 20, pill.y + 8, 1,
+             linked ? C_ACCENT : C_DIM, C_TILE);
 }
 
 static void drawHeader() {
   tft.fillRect(0, 0, SCREEN_W, HEADER_H, C_BG);
   tft.drawFastHLine(0, HEADER_H - 1, SCREEN_W, C_EDGE);
 
-  // Terminal chip, then a two-line wordmark.
-  const Rect chip = {8, 7, 22, 20};
-  tft.drawRoundRect(chip.x, chip.y, chip.w, chip.h, 6, C_EDGE);
-  drawTextAt(">_", chip.x + 4, chip.y + 6, 1, C_ACCENT, C_BG);
-  drawTextAt("phone deck", 38, 5, 2, C_TEXT, C_BG);
-  drawTextAt("cyd terminal", 38, 21, 1, C_DIM, C_BG);
+  // Back chip, then a two-line wordmark: the front page is the way home.
+  tft.drawRoundRect(HEADER_BACK.x, HEADER_BACK.y, HEADER_BACK.w, HEADER_BACK.h,
+                    7, C_EDGE);
+  drawTextCentered("<", HEADER_BACK, 2, C_TEXT, C_BG);
+  drawTextAt("PHONE DECK", 48, 5, 2, C_TEXT, C_BG);
+  char subtitle[24];
+  snprintf(subtitle, sizeof(subtitle), "esp32 // #%s", DEVICE_TAG);
+  drawTextAt(subtitle, 48, 21, 1, C_DIM, C_BG);
 
-  // Link pill.
-  const Rect pill = LINK_PILL;
-  tft.fillRoundRect(pill.x, pill.y, pill.w, pill.h, 11, C_TILE);
-  const bool linked = phoneLinked();
-  tft.drawRoundRect(pill.x, pill.y, pill.w, pill.h, 11, linked ? C_ACCENT : C_EDGE);
-  tft.fillCircle(pill.x + 12, pill.y + 11, 3, linked ? C_ACCENT : C_DIM);
-  drawTextAt(linked ? "LINKED" : "OFFLINE",
-             pill.x + 20, pill.y + 8, 1, linked ? C_ACCENT : C_DIM, C_TILE);
+  // Link pill, the same one settings carries.
+  drawLinkPill(LINK_PILL);
 
   // Gear opens settings.
   tft.fillRoundRect(GEAR_BTN.x, GEAR_BTN.y, GEAR_BTN.w, GEAR_BTN.h, 6, C_TILE);
@@ -1285,14 +1399,22 @@ static void drawHeader() {
 }
 
 static void drawSectionHeader() {
-  tft.fillCircle(12, 128, 3, C_PURPLE);
-  drawTextAt("01 // NOTIFICATIONS", 20, 124, 1, C_TEXT, C_BG);
+  tft.fillCircle(12, 125, 3, C_PURPLE);
+  drawTextAt("01 // NOTIFICATIONS", 20, 121, 1, C_TEXT, C_BG);
 
   char right[16];
   const int unread = countUnread();
   if (unread > 0) snprintf(right, sizeof(right), "%d NEW", unread);
   else snprintf(right, sizeof(right), "DIRECT ACCESS");
-  drawTextRight(right, SCREEN_W - 10, 124, 1, C_DIM, C_BG);
+  drawTextRight(right, SCREEN_W - 8, 121, 1, unread > 0 ? C_YELLOW : C_DIM, C_BG);
+}
+
+// Battery reads at a glance: blue while charging, pink under 30%, green at or
+// above it, dim until the phone reports a level.
+static uint16_t batteryColor(int level, bool charging) {
+  if (level < 0) return C_DIM;
+  if (charging) return C_ACCENT;
+  return level < 30 ? C_PINK : C_GREEN;
 }
 
 // One wide status card: terminal line, big clock, phone battery on the right.
@@ -1303,7 +1425,9 @@ static void drawStatusCard() {
 
   drawTextAt("$ sys.status --", r.x + 12, r.y + 7, 1, C_DIM, C_TILE);
   const bool linked = phoneLinked();
-  const char *state = linked ? "READY // ONLINE" : "STANDBY // OFFLINE";
+  const char *state = linked ? "READY // ONLINE"
+                             : (ownerKnown ? "STANDBY // OFFLINE"
+                                           : "BIND // FIRST PHONE");
   int16_t bx = 0, by = 0;
   uint16_t bw = 0, bh = 0;
   tft.setTextSize(1);
@@ -1341,7 +1465,7 @@ static void drawStatusCard() {
   char percent[8];
   if (batteryLevel >= 0) snprintf(percent, sizeof(percent), "%d%%", batteryLevel);
   else snprintf(percent, sizeof(percent), "--");
-  drawTextAt(percent, battX, r.y + 36, 2, batteryLevel < 0 ? C_DIM : C_TEXT, C_TILE);
+  drawTextAt(percent, battX, r.y + 36, 2, batteryColor(batteryLevel, batteryCharging), C_TILE);
 
   const Rect bar = {static_cast<int16_t>(battX), static_cast<int16_t>(r.y + 56), 58, 6};
   tft.drawRoundRect(bar.x, bar.y, bar.w, bar.h, 3, C_EDGE);
@@ -1349,9 +1473,138 @@ static void drawStatusCard() {
     int fill = (bar.w - 2) * batteryLevel / 100;
     if (fill < 2) fill = 2;
     tft.fillRoundRect(bar.x + 1, bar.y + 1, fill, bar.h - 2, 2,
-                      batteryLevel <= 20 ? C_PINK : C_ACCENT);
+                      batteryColor(batteryLevel, batteryCharging));
   }
-  if (batteryCharging) drawTextAt("CHG", battX + 46, r.y + 26, 1, C_ACCENT, C_TILE);
+  if (batteryCharging) drawTextAt("CHG", battX, r.y + 66, 1, batteryColor(batteryLevel, batteryCharging), C_TILE);
+}
+
+// ------------------------------------------------------------- front page ---
+// The sheet's front page on 320x240: a wordmark, the two pills it uses for
+// state, and a numbered tab list where only the pressed row goes solid. No
+// graphic: a lens-shaped heat band sat under the tabs and was removed, because a
+// tinted strip there read as decoration competing with the wordmark.
+static const char *const TAB_LABELS[4] = {"MESSAGES", "SETTINGS", "THEME",
+                                          "CALIBRATE"};
+static const char *const THEME_NAMES[] = {"PAPER", "INK"};
+static_assert(sizeof(THEME_NAMES) / sizeof(THEME_NAMES[0]) == THEME_COUNT,
+              "THEME_NAMES and THEMES[] have drifted apart");
+
+// Unlit rows are ink on black; the pressed row inverts, which is the page's
+// only state.
+static void drawHomeTab(int index, bool lit) {
+  const Rect r = HOME_TAB[index];
+  const uint16_t bg = lit ? C_TEXT : C_BG;
+  if (lit) tft.fillRoundRect(r.x, r.y, r.w, r.h, 6, C_TEXT);
+  char number[4];
+  snprintf(number, sizeof(number), "%02d", index + 1);
+  drawTextAt(number, r.x + 4, r.y + 11, 1, lit ? C_BG : C_ACCENT_DIM, bg);
+  drawTextAt(TAB_LABELS[index], r.x + 26, r.y + 8, 2, lit ? C_BG : C_TEXT, bg);
+}
+
+static void drawHome() {
+  screen = SCR_HOME;
+  tft.fillScreen(C_BG);
+
+  // Status line at the very top: the clock and the battery used to sit under the
+  // tabs, a full page away from the wordmark they belong to.
+  char left[40];
+  if (clockValid) {
+    const time_t now = clockNow();
+    struct tm parts;
+    gmtime_r(&now, &parts);
+    snprintf(left, sizeof(left), "SYNC %02d:%02d // PHONE TIME", parts.tm_hour,
+             parts.tm_min);
+  } else {
+    snprintf(left, sizeof(left), "NO TIME YET // WAITING");
+  }
+  drawTextAt(left, 10, 6, 1, C_DIM, C_BG);
+
+  char batt[16];
+  if (batteryLevel >= 0) snprintf(batt, sizeof(batt), "BATTERY %d%%", batteryLevel);
+  else snprintf(batt, sizeof(batt), "BATTERY --");
+  drawTextRight(batt, GEAR_BTN.x - 6, 6, 1,
+                batteryColor(batteryLevel, batteryCharging), C_BG);
+
+  // The gear sits in the same corner here as on the messages board. The status
+  // line moving up put the battery where it used to be, and it went missing.
+  tft.fillRoundRect(GEAR_BTN.x, GEAR_BTN.y, GEAR_BTN.w, GEAR_BTN.h, 6, C_TILE);
+  tft.drawRoundRect(GEAR_BTN.x, GEAR_BTN.y, GEAR_BTN.w, GEAR_BTN.h, 6, C_EDGE);
+  drawGear(GEAR_BTN.x + GEAR_BTN.w / 2, GEAR_BTN.y + GEAR_BTN.h / 2, C_TEXT);
+
+  drawTextAt("PHONE DECK", 10, 20, 3, C_TEXT, C_BG);
+
+  // Link state on the wordmark's row: an empty ring when nothing is on the link,
+  // a filled dot when a phone is. Fill reads at a glance; a caret did not.
+  const bool linked = phoneLinked();
+  const char *state = linked ? "LINKED" : "OFFLINE";
+  const int badgeRight = SCREEN_W - 10;
+  const int badgeW = 6 * static_cast<int>(strlen(state)) - 1;
+  const int dotX = badgeRight - badgeW - 12;
+  if (linked) tft.fillCircle(dotX, 36, 4, C_ACCENT);
+  else tft.drawCircle(dotX, 36, 4, C_DIM);
+  drawTextRight(state, badgeRight, 32, 1, linked ? C_ACCENT : C_DIM, C_BG);
+
+  // Pill one: the unread count, outlined. Pill two: the palette this build is
+  // baked with, solid, the way the sheet fills one pill and outlines the other.
+  tft.fillRoundRect(HOME_PILL_A.x, HOME_PILL_A.y, HOME_PILL_A.w, HOME_PILL_A.h,
+                    9, C_BG);
+  tft.drawRoundRect(HOME_PILL_A.x, HOME_PILL_A.y, HOME_PILL_A.w, HOME_PILL_A.h,
+                    9, C_EDGE);
+  const int unread = countUnread();
+  char label[16];
+  if (unread > 0) snprintf(label, sizeof(label), "%d NEW", unread);
+  else snprintf(label, sizeof(label), "INBOX CLEAR");
+  tft.fillCircle(HOME_PILL_A.x + 11, HOME_PILL_A.y + 9, 2,
+                 unread > 0 ? C_YELLOW : C_ACCENT);
+  drawTextAt(label, HOME_PILL_A.x + 20, HOME_PILL_A.y + 5, 1, C_TEXT, C_BG);
+
+  tft.fillRoundRect(HOME_PILL_B.x, HOME_PILL_B.y, HOME_PILL_B.w, HOME_PILL_B.h,
+                    9, C_TEXT);
+  char theme[16];
+  snprintf(theme, sizeof(theme), "THEME %02d", THEME_INDEX);
+  drawTextCentered(theme, HOME_PILL_B, 1, C_BG, C_TEXT);
+
+  tft.drawFastHLine(10, 78, SCREEN_W - 20, C_EDGE);
+
+  for (int i = 0; i < 4; ++i) drawHomeTab(i, false);
+
+  // Closing rule where the status strip used to sit; the page ends in air now.
+  tft.drawFastHLine(10, 224, SCREEN_W - 20, C_EDGE);
+
+}
+
+// Every palette on its own ground: a contact sheet, not a picker. The palette is
+// compile-time, so the page says where to change it instead of pretending to
+// have a switch.
+static void drawThemeSheet() {
+  screen = SCR_THEME;
+  tft.fillScreen(C_BG);
+  tft.drawFastHLine(0, HEADER_H - 1, SCREEN_W, C_EDGE);
+  tft.fillRoundRect(BACK_BTN.x, BACK_BTN.y, BACK_BTN.w, BACK_BTN.h, 6, C_TILE);
+  tft.drawRoundRect(BACK_BTN.x, BACK_BTN.y, BACK_BTN.w, BACK_BTN.h, 7, C_EDGE);
+  drawTextCentered("<", BACK_BTN, 2, C_TEXT, C_TILE);
+  drawTextAt("THEMES", 48, 8, 2, C_TEXT, C_BG);
+
+  char count[16];
+  snprintf(count, sizeof(count), "%02d BAKED IN", THEME_COUNT);
+  drawTextRight(count, SCREEN_W - 12, 13, 1, C_DIM, C_BG);
+
+  for (int i = 0; i < THEME_COUNT; ++i) {
+    const Palette &theme = THEMES[i];
+    const Rect r = {8, static_cast<int16_t>(56 + i * 30), 304, 26};
+    tft.fillRect(r.x, r.y, r.w, r.h, theme.bg);
+    tft.drawRect(r.x, r.y, r.w, r.h, i == THEME_INDEX ? theme.accent : theme.edge);
+    char number[4];
+    snprintf(number, sizeof(number), "%02d", i);
+    drawTextAt(number, r.x + 8, r.y + 9, 1,
+               i == THEME_INDEX ? theme.accent : theme.dim, theme.bg);
+    drawTextAt(THEME_NAMES[i], r.x + 30, r.y + 5, 2, theme.text, theme.bg);
+    tft.fillCircle(r.x + r.w - 16, r.y + 13, 4, theme.pink);
+  }
+
+  drawTextAt("READ ONLY: SET THEME_INDEX, THEN REFLASH", 10, 212, 1, C_DIM, C_BG);
+  drawTextAt("12 SLOTS A THEME, ONE GREY RAMP", 10, 224, 1,
+             C_ACCENT_DIM, C_BG);
 }
 
 static void formatAge(time_t at, char *out, size_t outLen) {
@@ -1375,12 +1628,13 @@ static void drawNoticeRow(int slot) {
 
   tft.fillRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD, has ? C_TILE : C_BG);
   if (!has) {
+    // The fill above already cleared any stale row, so only the first empty
+    // slot earns an outline; the rest stay quiet background.
+    if (slot > 0) return;
     tft.drawRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD, C_EDGE);
-    if (slot == 0) {
-      const char *empty = phoneLinked() ? "no notifications"
-                                        : "waiting for companion";
-      drawTextCentered(empty, r, 1, C_DIM, C_BG);
-    }
+    const char *empty = phoneLinked() ? "no notifications"
+                                      : "waiting for companion";
+    drawTextCentered(empty, r, 1, C_DIM, C_BG);
     return;
   }
 
@@ -1392,13 +1646,13 @@ static void drawNoticeRow(int slot) {
   tft.fillRoundRect(icon.x, icon.y, icon.w, icon.h, 6, C_TILE_HI);
   tft.drawRoundRect(icon.x, icon.y, icon.w, icon.h, 6, n.unread ? C_ACCENT_DIM : C_EDGE);
   const char initial[2] = {n.app[0], '\0'};
-  drawTextCentered(initial, icon, 2, n.unread ? C_ACCENT : C_DIM, C_TILE_HI);
+  drawTextCentered(initial, icon, 2, n.unread ? C_YELLOW : C_DIM, C_TILE_HI);
 
   drawTextAt(n.app, r.x + 36, r.y + 4, 1, n.unread ? C_ACCENT : C_DIM, C_TILE);
 
   char age[8];
   formatAge(n.at, age, sizeof(age));
-  drawTextRight(age, r.x + r.w - 10, r.y + 4, 1, C_DIM, C_TILE);
+  drawTextRight(age, r.x + r.w - 8, r.y + 4, 1, C_DIM, C_TILE);
 
   char title[28];
   int16_t bx = 0, by = 0;
@@ -1480,13 +1734,15 @@ static void drawDetail() {
   const Notice &n = notices[index];
 
   tft.fillRoundRect(BACK_BTN.x, BACK_BTN.y, BACK_BTN.w, BACK_BTN.h, 6, C_TILE);
-  tft.drawRoundRect(BACK_BTN.x, BACK_BTN.y, BACK_BTN.w, BACK_BTN.h, 6, C_EDGE);
-  drawTextCentered("<", BACK_BTN, 1, C_TEXT, C_TILE);
-  drawTextAt(n.app, 40, 11, 1, C_ACCENT, C_BG);
+  tft.drawRoundRect(BACK_BTN.x, BACK_BTN.y, BACK_BTN.w, BACK_BTN.h, 7, C_EDGE);
+  drawTextCentered("<", BACK_BTN, 2, C_TEXT, C_TILE);
+  // The app names this page, so it takes the title slot every sub-page uses,
+  // and the age takes the right-hand slot at the same baseline.
+  drawTextAt(n.app, 48, 8, 2, C_TEXT, C_BG);
 
   char when[16];
   formatAge(n.at, when, sizeof(when));
-  drawTextRight(when, SCREEN_W - 12, 11, 1, C_DIM, C_BG);
+  drawTextRight(when, SCREEN_W - 12, 13, 1, C_DIM, C_BG);
 
   drawWrappedText(n.title, 12, 44, SCREEN_W - 24, 2, C_TEXT, C_BG, 2);
   tft.drawFastHLine(12, 88, SCREEN_W - 24, C_EDGE);
@@ -1502,22 +1758,20 @@ static void drawSettings() {
   tft.drawFastHLine(0, HEADER_H - 1, SCREEN_W, C_EDGE);
 
   tft.fillRoundRect(BACK_BTN.x, BACK_BTN.y, BACK_BTN.w, BACK_BTN.h, 6, C_TILE);
-  tft.drawRoundRect(BACK_BTN.x, BACK_BTN.y, BACK_BTN.w, BACK_BTN.h, 6, C_EDGE);
-  drawTextCentered("<", BACK_BTN, 1, C_TEXT, C_TILE);
-  drawTextAt("settings", 40, 8, 2, C_TEXT, C_BG);
-  drawTextRight(ancsReady ? "LINKED" : "OFFLINE", SCREEN_W - 12, 13, 1,
-                ancsReady ? C_ACCENT : C_DIM, C_BG);
+  tft.drawRoundRect(BACK_BTN.x, BACK_BTN.y, BACK_BTN.w, BACK_BTN.h, 7, C_EDGE);
+  drawTextCentered("<", BACK_BTN, 2, C_TEXT, C_TILE);
+  drawTextAt("SETTINGS", 48, 8, 2, C_TEXT, C_BG);
+  drawLinkPill(SET_LINK_PILL);
 
   // Brightness.
   tft.fillRoundRect(8, 38, 304, 58, CORNER_CARD, C_TILE);
   tft.drawRoundRect(8, 38, 304, 58, CORNER_CARD, C_EDGE);
   drawTextAt("BRIGHTNESS", 18, 44, 1, C_DIM, C_TILE);
-  drawButton(SET_BRI_DOWN, "-", 3, false);
-  drawButton(SET_BRI_UP, "+", 3, false);
   char value[8];
   snprintf(value, sizeof(value), "%u%%", static_cast<unsigned>(brightness));
-  const Rect valueRect = {78, 62, 164, 24};
-  drawTextCentered(value, valueRect, 2, C_ACCENT, C_TILE);
+  drawTextRight(value, 300, 46, 2, C_ACCENT, C_TILE);
+  drawButton(SET_BRI_DOWN, "-", 3, false);
+  drawButton(SET_BRI_UP, "+", 3, false);
 
   // Notifications.
   tft.fillRoundRect(8, 102, 304, 38, CORNER_CARD, C_TILE);
@@ -1530,7 +1784,9 @@ static void drawSettings() {
 
   drawButton(SET_CAL, "CALIBRATE TOUCH", 1, false);
   drawButton(SET_CLOSE, "CLOSE", 2, true);
-  drawTextAt("hold title 1.5s = calibrate", 12, 226, 1, C_DIM, C_BG);
+  drawTextAt(ownerKnown ? ownerLabel : "no phone bound", 12, 226, 1,
+             ownerKnown ? C_PURPLE : C_DIM, C_BG);
+  drawTextRight("hold gear = forget", SCREEN_W - 12, 226, 1, C_DIM, C_BG);
 }
 
 // --------------------------------------------------------- calibration UI ---
@@ -1543,7 +1799,7 @@ static void drawCrosshair(int x, int y) {
 }
 
 static void drawCalProgress() {
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < 3; ++i) {
     const int x = 250 + i * 18;
     if (i < calIndex) tft.fillCircle(x, 22, 5, C_ACCENT);
     else tft.drawCircle(x, 22, 5, C_EDGE);
@@ -1555,60 +1811,59 @@ static void drawCalibrationScreen() {
   drawCrosshair(CAL_TARGET_X[calIndex], CAL_TARGET_Y[calIndex]);
 
   char title[24];
-  snprintf(title, sizeof(title), "CALIBRATE %u/4",
+  snprintf(title, sizeof(title), "CALIBRATE %u/3",
            static_cast<unsigned>(calIndex) + 1);
   drawTextAt(title, 10, 10, 2, C_ACCENT, C_BG);
   drawTextAt("Tap the dot in this corner", 10, 36, 1, C_TEXT, C_BG);
-  drawTextAt("order: TL TR BR BL", 10, 48, 1, C_DIM, C_BG);
+  drawTextAt("order: TL TR BL, then done", 10, 48, 1, C_DIM, C_BG);
   drawTextAt("hold 2s anywhere = cancel", 10, 226, 1, C_DIM, C_BG);
   drawTextAt("raw", 10, 212, 1, C_DIM, C_BG);
   drawCalProgress();
 }
 
-static void drawVerifyScreen() {
-  tft.fillScreen(C_BG);
-  drawCrosshair(VERIFY_X[verifyIndex], VERIFY_Y[verifyIndex]);
-
-  char title[24];
-  snprintf(title, sizeof(title), "CHECK %u/3",
-           static_cast<unsigned>(verifyIndex) + 1);
-  drawTextAt(title, 10, 10, 2, C_ACCENT, C_BG);
-  drawTextAt("Tap the dot to confirm", 10, 36, 1, C_TEXT, C_BG);
-  drawTextAt("all three must land on target", 10, 48, 1, C_DIM, C_BG);
-  drawTextAt("hold 2s anywhere = cancel", 10, 226, 1, C_DIM, C_BG);
-}
-
-static void drawVerifyFailed(int worst) {
-  tft.fillScreen(C_BG);
-  drawTextAt("TOUCH MAP IS OFF", 10, 14, 2, C_ACCENT, C_BG);
-
-  char line[44];
-  snprintf(line, sizeof(line), "a check tap missed by %d px", worst);
-  drawTextAt(line, 10, 42, 1, C_TEXT, C_BG);
-  drawTextAt("apply one correction, then re-check", 10, 56, 1, C_DIM, C_BG);
-
-  drawButton(ADJ_SWAP, "SWAP AXES", 1, false);
-  drawButton(ADJ_FLIP_X, "FLIP X", 1, false);
-  drawButton(ADJ_FLIP_Y, "FLIP Y", 1, false);
-  drawButton(ADJ_REDO, "REDO CORNERS", 1, false);
-  drawButton(ADJ_SAVE, "SAVE AS IS", 2, true);
-  drawTextAt("hold 2s anywhere = cancel", 10, 232, 1, C_DIM, C_BG);
-}
-
-static void showCalibrationFailed() {
-  tft.fillScreen(C_BG);
-  drawTextAt("Corners did not fit", 10, 100, 2, C_ACCENT, C_BG);
-  drawTextAt("tap squarely on each dot", 10, 128, 1, C_DIM, C_BG);
-  delay(1500);
-}
-
 // ------------------------------------------------------------------ touch ---
+
+// Four conversions per poll, median per axis. The XPT2046 answers a wild sample
+// often enough that a single read lands a tap on the neighbouring row, and the
+// first conversions after touch-down are the worst. Pressure is used only to drop
+// samples that did not convert at all: its scale differs per panel, and a
+// threshold picked blind would kill touch outright.
+static constexpr int TOUCH_SAMPLES = 4;
+static constexpr int TOUCH_SPREAD_MAX = 300;  // raw units; beyond this a drag, not a tap
 
 static bool readRawTouch(int &rawX, int &rawY) {
   if (!touch.touched()) return false;
-  const TS_Point p = touch.getPoint();
-  rawX = p.x;
-  rawY = p.y;
+
+  int xs[TOUCH_SAMPLES];
+  int ys[TOUCH_SAMPLES];
+  int n = 0;
+  for (int i = 0; i < TOUCH_SAMPLES; ++i) {
+    uint16_t x = 0, y = 0;
+    uint8_t z = 0;
+    touch.readData(&x, &y, &z);
+    if (z == 0) continue;
+    xs[n] = static_cast<int>(x);
+    ys[n] = static_cast<int>(y);
+    ++n;
+  }
+  if (n < 2) return false;
+
+  for (int i = 1; i < n; ++i) {  // insertion sort, n is at most four
+    const int vx = xs[i];
+    const int vy = ys[i];
+    int j = i - 1;
+    while (j >= 0 && xs[j] > vx) { xs[j + 1] = xs[j]; --j; }
+    xs[j + 1] = vx;
+    j = i - 1;
+    while (j >= 0 && ys[j] > vy) { ys[j + 1] = ys[j]; --j; }
+    ys[j + 1] = vy;
+  }
+
+  if (xs[n - 1] - xs[0] > TOUCH_SPREAD_MAX) return false;
+  if (ys[n - 1] - ys[0] > TOUCH_SPREAD_MAX) return false;
+
+  rawX = xs[n / 2];
+  rawY = ys[n / 2];
   return true;
 }
 
@@ -1624,9 +1879,6 @@ static bool readTouch(int &x, int &y) {
 static void startCalibration() {
   screen = SCR_CAL;
   calIndex = 0;
-  verifyIndex = 0;
-  verifyFailed = false;
-  verifyWorst2 = 0;
   calTapMs = 0;
   drawCalibrationScreen();
 }
@@ -1635,13 +1887,13 @@ static void startCalibration() {
 // stored before, so a failed attempt can never leave the deck unusable.
 static void cancelCalibration() {
   loadMapping();
-  drawBoard();
+  drawHome();
 }
 
 static void saveTouchMapping() {
   saveMapping(mapping);
   mappingStored = true;
-  drawBoard();
+  drawHome();
 }
 
 static void updateRawReadout(int rawX, int rawY) {
@@ -1650,14 +1902,6 @@ static void updateRawReadout(int rawX, int rawY) {
   char line[28];
   snprintf(line, sizeof(line), "raw %4d %4d", rawX, rawY);
   drawTextAt(line, 34, 212, 1, C_DIM, C_BG);
-}
-
-static void startVerify() {
-  screen = SCR_VERIFY;
-  verifyIndex = 0;
-  verifyFailed = false;
-  verifyWorst2 = 0;
-  drawVerifyScreen();
 }
 
 static void handleCalibrationTap(int rawX, int rawY) {
@@ -1673,73 +1917,20 @@ static void handleCalibrationTap(int rawX, int rawY) {
   calRaw[calIndex].y = rawY;
   ++calIndex;
 
-  if (calIndex < 4) {
+  if (calIndex < 3) {
     drawCalibrationScreen();
     return;
   }
 
   TouchMapping candidate;
   if (!fitMapping(calRaw, candidate)) {
-    showCalibrationFailed();
     calIndex = 0;
     drawCalibrationScreen();
+    drawTextAt("taps too close - try again", 10, 60, 1, C_PINK, C_BG);
     return;
   }
-  mapping = candidate;  // RAM only until the checks pass
-  startVerify();
-}
-
-static void handleVerifyTap(int x, int y) {
-  const int dx = x - VERIFY_X[verifyIndex];
-  const int dy = y - VERIFY_Y[verifyIndex];
-  const int err2 = dx * dx + dy * dy;
-  if (err2 > verifyWorst2) verifyWorst2 = err2;
-
-  ++verifyIndex;
-  if (verifyIndex < 3) {
-    drawVerifyScreen();
-    return;
-  }
-
-  if (verifyWorst2 <= VERIFY_TOLERANCE * VERIFY_TOLERANCE) {
-    saveTouchMapping();
-    return;
-  }
-  verifyFailed = true;
-  drawVerifyFailed(static_cast<int>(sqrtf(static_cast<float>(verifyWorst2))));
-}
-
-// One-button fixes for the two failures an axis-insensitive fit can produce.
-static void handleVerifyFixTap(int x, int y) {
-  if (inside(x, y, ADJ_SWAP)) {
-    const float a = mapping.a, b = mapping.b;
-    const float d = mapping.d, e = mapping.e;
-    mapping.a = b;
-    mapping.b = a;
-    mapping.d = e;
-    mapping.e = d;
-    startVerify();
-    return;
-  }
-  if (inside(x, y, ADJ_FLIP_X)) {
-    mapping.a = -mapping.a;
-    mapping.b = -mapping.b;
-    mapping.c = (SCREEN_W - 1) - mapping.c;
-    startVerify();
-    return;
-  }
-  if (inside(x, y, ADJ_FLIP_Y)) {
-    mapping.d = -mapping.d;
-    mapping.e = -mapping.e;
-    mapping.f = (SCREEN_H - 1) - mapping.f;
-    startVerify();
-    return;
-  }
-  if (inside(x, y, ADJ_REDO)) {
-    startCalibration();
-    return;
-  }
-  if (inside(x, y, ADJ_SAVE)) saveTouchMapping();
+  mapping = candidate;
+  saveTouchMapping();
 }
 
 static void openSettings() {
@@ -1748,19 +1939,21 @@ static void openSettings() {
 }
 
 static void handleSettingsTap(int x, int y) {
-  if (inside(x, y, BACK_BTN) || inside(x, y, SET_CLOSE)) {
-    drawBoard();
+  if (insideBack(x, y) || inside(x, y, SET_CLOSE)) {
+    drawHome();
     return;
   }
   if (inside(x, y, SET_BRI_DOWN)) {
-    brightness = brightness > BRI_MIN + BRI_STEP - 1 ? brightness - BRI_STEP : BRI_MIN;
+    const int next = static_cast<int>(brightness) - BRI_STEP;
+    brightness = static_cast<uint8_t>(next < BRI_MIN ? BRI_MIN : next);
     applyBrightness();
     saveSettings();
     drawSettings();
     return;
   }
   if (inside(x, y, SET_BRI_UP)) {
-    brightness = brightness < BRI_MAX ? brightness + BRI_STEP : BRI_MAX;
+    const int next = static_cast<int>(brightness) + BRI_STEP;
+    brightness = static_cast<uint8_t>(next > BRI_MAX ? BRI_MAX : next);
     applyBrightness();
     saveSettings();
     drawSettings();
@@ -1776,9 +1969,29 @@ static void handleSettingsTap(int x, int y) {
     return;
   }
   if (inside(x, y, SET_CLOSE)) {
-    drawBoard();
+    drawHome();
     return;
   }
+}
+
+// The tab inverts under the finger, holds long enough to read, then opens.
+static void handleHomeTap(int x, int y) {
+  for (int i = 0; i < 4; ++i) {
+    if (!inside(x, y, HOME_TAB[i])) continue;
+    drawHomeTab(i, true);
+    delay(90);
+    switch (i) {
+      case 0: drawBoard(); break;
+      case 1: openSettings(); break;
+      case 2: drawThemeSheet(); break;
+      default: startCalibration(); break;
+    }
+    return;
+  }
+}
+
+static void handleThemeTap(int x, int y) {
+  if (insideBack(x, y)) drawHome();
 }
 
 // Opened by uid, not by row: a notification arriving between the press and the
@@ -1801,7 +2014,7 @@ static void dismissOnPhone(uint32_t uid) {
 }
 
 static void handleDetailTap(int x, int y) {
-  if (inside(x, y, BACK_BTN)) {
+  if (insideBack(x, y)) {
     detailUid = 0;
     drawBoard();
     return;
@@ -1822,6 +2035,7 @@ static void handleDetailTap(int x, int y) {
 // ------------------------------------------------------------------ events ---
 
 static void applyUiEvent(const UiEvent &ev) {
+  const bool onHome = (screen == SCR_HOME);
   switch (ev.type) {
     case EVT_LINK_ON:
     case EVT_LINK_OFF:
@@ -1868,6 +2082,10 @@ static void applyUiEvent(const UiEvent &ev) {
     default:
       break;
   }
+
+  // The front page carries the clock, the link state, the unread count and the
+  // battery, so any event at all repaints it whole.
+  if (onHome) drawHome();
 }
 
 static void processUiEvents() {
@@ -1878,6 +2096,7 @@ static void processUiEvents() {
   if (linkDirty) {
     linkDirty = false;
     if (screen == SCR_BOARD) drawHeader();
+    else if (screen == SCR_HOME) drawHome();
   }
 
   // A control point write that never answered must not block the queue.
@@ -1895,6 +2114,7 @@ static void processUiEvents() {
 // event.
 static constexpr int TARGET_NONE = -1;
 static constexpr int TARGET_GEAR = -2;
+static constexpr int TARGET_BACK = -3;
 
 bool wasTouched = false;
 bool ignoreTouchUntilRelease = false;
@@ -1904,6 +2124,7 @@ uint32_t pressedUid = 0;
 int pressedTarget = TARGET_NONE;
 
 static int targetAt(int x, int y) {
+  if (insideHeaderBack(x, y)) return TARGET_BACK;
   if (inside(x, y, GEAR_BTN)) return TARGET_GEAR;
   for (int i = 0; i < 3 && i < noticeCount; ++i) {
     if (inside(x, y, NOTIF_ROW[i])) return i;
@@ -1931,6 +2152,7 @@ void setup() {
   touch.begin(SPI);
 
   loadMapping();
+  initIdentity();
   startBluetooth();
 
   // Holding the panel while the board boots always opens calibration, even if
@@ -1939,7 +2161,7 @@ void setup() {
   if (!mappingStored || touch.touched()) {
     startCalibration();
   } else {
-    drawBoard();
+    drawHome();
   }
 }
 
@@ -1958,29 +2180,65 @@ void loop() {
   }
 
   // ------------------------------------------------------------- calibrate --
-  if (screen == SCR_CAL || screen == SCR_VERIFY) {
-    if (screen == SCR_CAL) {
-      int rawX = 0, rawY = 0;
-      if (readRawTouch(rawX, rawY)) updateRawReadout(rawX, rawY);
-    }
+  if (screen == SCR_CAL) {
+    int rawX = 0, rawY = 0;
+    if (readRawTouch(rawX, rawY)) updateRawReadout(rawX, rawY);
     if (down && !wasTouched) {
       touchStartMs = now;
       if (now - calTapMs > 250) {
         calTapMs = now;
-        if (screen == SCR_CAL) {
-          int rawX = 0, rawY = 0;
-          readRawTouch(rawX, rawY);
-          handleCalibrationTap(rawX, rawY);
-        } else if (verifyFailed) {
-          handleVerifyFixTap(x, y);
-        } else {
-          handleVerifyTap(x, y);
-        }
+        if (readRawTouch(rawX, rawY)) handleCalibrationTap(rawX, rawY);
       }
     }
     if (down && wasTouched && now - touchStartMs > 2000) {
       cancelCalibration();
       return;
+    }
+    wasTouched = down;
+    delay(10);
+    return;
+  }
+
+  // ------------------------------------------------------------------ home --
+  if (screen == SCR_HOME) {
+    if (down && !wasTouched) {
+      touchStartMs = now;
+      // The gear takes the same two gestures it takes on the board: a tap opens
+      // settings, a hold forgets the bound phone. Tabs still fire on press.
+      pressedTarget = inside(x, y, GEAR_BTN) ? TARGET_GEAR : TARGET_NONE;
+      if (pressedTarget == TARGET_NONE && now - lastActionMs > 150) {
+        lastActionMs = now;
+        handleHomeTap(x, y);
+      }
+    }
+    if (down && pressedTarget == TARGET_GEAR && now - touchStartMs > 1200) {
+      pressedTarget = TARGET_NONE;
+      releaseOwner();
+      drawHome();
+      ignoreTouchUntilRelease = true;
+      wasTouched = true;
+      return;
+    }
+    if (!down && wasTouched && pressedTarget == TARGET_GEAR) {
+      pressedTarget = TARGET_NONE;
+      if (now - lastActionMs > 150) {
+        lastActionMs = now;
+        openSettings();
+      }
+    }
+    wasTouched = down;
+    delay(10);
+    return;
+  }
+
+  // ----------------------------------------------------------------- theme --
+  if (screen == SCR_THEME) {
+    if (down && !wasTouched) {
+      touchStartMs = now;
+      if (now - lastActionMs > 150) {
+        lastActionMs = now;
+        handleThemeTap(x, y);
+      }
     }
     wasTouched = down;
     delay(10);
@@ -2047,9 +2305,21 @@ void loop() {
   }
 
   // Hold the title bar for 1.5 s to calibrate.
-  if (down && pressedTarget == TARGET_NONE && y < HEADER_H && x < 200 &&
+  if (down && pressedTarget == TARGET_NONE && y < HEADER_H && x > 40 && x < 200 &&
       now - touchStartMs > 1500) {
     startCalibration();
+    return;
+  }
+
+  // Hold the gear for 1.2 s to forget the bound phone, so the next phone to
+  // connect can claim this board instead.
+  if (down && pressedTarget == TARGET_GEAR && now - touchStartMs > 1200) {
+    pressedTarget = TARGET_NONE;
+    releaseOwner();
+    drawHeader();
+    for (int i = 0; i < 3; ++i) drawNoticeRow(i);
+    ignoreTouchUntilRelease = true;
+    wasTouched = true;
     return;
   }
 
@@ -2075,6 +2345,8 @@ void loop() {
       lastActionMs = now;
       if (pressedTarget == TARGET_GEAR) {
         openSettings();
+      } else if (pressedTarget == TARGET_BACK) {
+        drawHome();
       } else if (pressedTarget >= 0 && pressedUid != 0) {
         openDetail(pressedUid);
       }
