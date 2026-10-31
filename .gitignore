@@ -1,0 +1,5 @@
+# Python bytecode, written by py_compile or by importing a script: a build check
+# must never be able to stage one of these. Ignore rules live here rather than in
+# a widget folder, because the tooling is shared by every widget.
+__pycache__/
+*.pyc

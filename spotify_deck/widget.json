@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "id": "spotify_deck",
+  "name": "Spotify Deck",
+  "sketch": "spotify_deck.ino",
+  "board": "2432S024R",
+  "tagline": "NEEDS WIFI",
+  "body": "The network deck: it signs in to Spotify with a refresh token, draws what is playing and sends previous, play/pause and next from the screen's three chips. Mono ink on paper, same as its sibling.",
+  "notes": "First boot opens a WiFi access point called Spotify Deck and serves a setup page at http://192.168.4.1: join it from the phone, type the WiFi password and a Spotify client id, sign in to Spotify there and paste the address it lands on back into the page. No laptop. Hold the SETUP chip in the footer, or type setup + Enter at 115200, to run it again; hold the screen four seconds at boot to forget the stored credentials.",
+  "libraries": [
+    "Adafruit GFX Library",
+    "Adafruit ILI9341",
+    "XPT2046_Touchscreen"
+  ],
+  "never": [
+    "ArduinoBLE"
+  ]
+}
