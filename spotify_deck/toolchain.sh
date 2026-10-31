@@ -20,9 +20,10 @@
 #   source ~/.arduino-cyd/env.sh
 #
 # The default partition scheme is used, and it fits: WiFi, the setup web server,
-# mbedTLS, HTTPClient and the two pinned roots come to 1,114,485 bytes of the
-# 1,310,720 the default scheme gives the app (85%), 47 kB less than the phone
-# deck's Bluetooth build. huge_app also compiles (35% of 3 MB) if you want the
+# mbedTLS, HTTPClient and the two pinned roots come to 967,413 bytes of the
+# 1,310,720 the default scheme gives the app (73%), 197 kB less than the phone
+# deck's Bluetooth build (1,164,489 bytes measured on the same machine).
+# huge_app also compiles (30% of 3 MB) if you want the
 # headroom; if you change the scheme, flash the phone deck with the same one,
 # because uploading a different scheme re-partitions the board under both
 # sketches.

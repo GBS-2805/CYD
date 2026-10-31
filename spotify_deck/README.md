@@ -182,16 +182,23 @@ A clean build in this repo on **2026-10-31** with `arduino-cli` 1.5.2-rc.1, core
 **2.0.17** and `--warnings all`:
 
 ```
-Sketch uses 1114485 bytes (85%) of program storage space. Maximum is 1310720 bytes.
-Global variables use 53156 bytes (16%) of dynamic memory, leaving 274524 bytes for local variables. Maximum is 327680 bytes.
+Sketch uses 967413 bytes (73%) of program storage space. Maximum is 1310720 bytes.
+Global variables use 50324 bytes (15%) of dynamic memory, leaving 277356 bytes for local variables. Maximum is 327680 bytes.
 ```
 
 That includes the setup web server, the PKCE exchange, the redrawn setup card and
-both pinned roots (about 2.7 kB of PEM), and leaves **191 kB** of the default
-scheme free — 47 kB under the phone deck's Bluetooth build (~1,162,800 bytes), so
-dropping Bluedroid still pays for mbedTLS and a certificate chain per host. Under
-`PartitionScheme=huge_app` it is 1,114,501 bytes, **35 %** of 3,145,728: a bigger
-room, not smaller code.
+both pinned roots (about 2.7 kB of PEM), and leaves **343 kB** of the default
+scheme free — 197 kB under the phone deck's Bluetooth build, 1,164,489 bytes
+measured the same way on the same machine, so dropping Bluedroid still pays for
+mbedTLS and a certificate chain per host. Under `PartitionScheme=huge_app` it is
+967,413 bytes, **30 %** of 3,145,728: a bigger room, not smaller code.
+
+An earlier version of this note recorded 1,114,485 bytes (85 %), 191 kB free and
+a 47 kB gap to the phone deck for the same sketch. That figure does not
+reproduce: the committed file links at 967,413 bytes with the same core, the same
+`arduino-cli` and `--warnings all`, on a clean build path, twice over, so the
+smaller number is the one that belongs here. The seven warnings below still
+match, warning for warning.
 
 Seven warnings under `--warnings all`, all accounted for: five are palette slots
 (`C_ACCENT`, `C_ACCENT_DIM`, `C_PURPLE`, `C_YELLOW`, `C_GREEN`) that this widget
