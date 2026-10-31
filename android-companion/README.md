@@ -10,7 +10,7 @@ Four tabs:
 | Tab | What it is for |
 | --- | --- |
 | **DECKS** | Live link: what is connected, signal, uptime, packets, nearby decks |
-| **PROJECTS** | Every project with status, build/touch log and links, plus the deck libraries |
+| **PROJECTS** | Every project with status, build/touch log and links, plus a name search and the deck libraries |
 | **BOARD** | Target board, OTG connection, bootloader probe, image flashing, serial monitor |
 | **SETUP** | Permissions, battery, bridge switch, last crash |
 
@@ -38,6 +38,12 @@ links it needs.
 - Four states, filterable with chips at the top: **WANT TO TRY**, **FLASHED**,
   **WORKING**, **PARKED**, plus **ALL** with the total. A card's **STATUS**
   button moves it between them and the counts follow immediately.
+- A **search field** under the title narrows the shelf as you type. It matches a
+  project's own name and, for a bundled widget, the descriptor's name, id and
+  tagline — not log notes or imported file names. It stacks with the status
+  chips instead of replacing them, and a search that finds nothing says
+  `No widget matches "<typed>".`, as opposed to `Nothing in that status yet.`
+  when only the chip is empty.
 - **LOG** records the build string you flashed, whether the touch panel worked,
   free-text notes and the time. A first log also promotes a project out of WANT TO
   TRY, because logging means it actually reached the board.

@@ -171,6 +171,20 @@ Useful things to note: which installer/version produced a working image, whether
 first-boot touch calibration was needed, screen orientation quirks, and whether a
 2.8" build was flashed by mistake.
 
+## Find a project on the shelf
+
+1. **PROJECTS** → the field under the title. Type part of a name and the shelf
+   redraws as you type.
+2. It matches the project's own name and, when a bundled widget backs the card,
+   the descriptor's name, id and tagline. Log notes and imported file names are
+   not searched.
+3. The status chips still apply on top, so **WORKING** plus `launcher` shows the
+   working launcher cards only. Clear the field to see everything again.
+
+`No widget matches "<what you typed>".` means the text found nothing, not that
+projects were lost. `Nothing in that status yet.` means the chip alone is empty
+and the search field is blank.
+
 ## Keep your own sketches on the phone
 
 1. **BOARD → IMPORT A FILE**, pick any `.ino`.

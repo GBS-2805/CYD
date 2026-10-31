@@ -96,9 +96,18 @@ reason to add a resource pipeline.
   project (WANT TO TRY / FLASHED / WORKING / PARKED); touch and build describe
   what happened when it ran.
 - **`ProjectsTab` rebuilds on a signature** covering the file list, the store
-  version, the selected board and the active filter. The store version is what
-  makes a LOG or STATUS write repaint the card; before it, the shelf kept showing
-  text from two screens ago until a file was imported.
+  version, the selected board, the active filter and the search query. The store
+  version is what makes a LOG or STATUS write repaint the card; before it, the
+  shelf kept showing text from two screens ago until a file was imported.
+- **Search is a name filter, not a full-text one.** `matches()` trims and
+  lower-cases each keystroke once, then tests the project's own name and, when the
+  project has a descriptor, the widget's name, id and tagline — so a card is
+  findable by what its widget calls itself, not only the title it shows. Notes,
+  build strings and imported file names are deliberately not searched: a log-line
+  hit would surface a card with no visible reason for being there. The field is
+  detached and re-added inside `build()` so its text and cursor survive the
+  rebuild its own filtering triggers, and it combines with the status chips rather
+  than resetting them.
 - The bundled deck is a project of kind INSIDE: its card carries COPY DROID and
   SAVE, and the LIBRARIES card hangs off it.
 - **Not built yet**: creating, editing and deleting projects, and attaching a
