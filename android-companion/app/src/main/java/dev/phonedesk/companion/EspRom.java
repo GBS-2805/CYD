@@ -111,6 +111,9 @@ final class EspRom {
     private boolean swapControl;
     /** True once a plain reset produced readable boot text, not just noise. */
     private boolean bannerSeen;
+    /** Reset rounds that ran, and how many of those read any byte at all. */
+    private int roundsSeen;
+    private int roundsWithBytes;
 
     EspRom(UsbSerialCh340 port) {
         this.port = port;
@@ -254,8 +257,18 @@ final class EspRom {
                     throw e;
                 } catch (IOException e) {
                     // Try the next reset round, then the next rate.
+                    if (!manualReset) {
+                        ++roundsSeen;
+                        if (bytesIn > 0) ++roundsWithBytes;
+                    }
+                    // A reset is never silent: the ROM prints its banner on the way up,
+                    // and download mode's banner ends with "waiting for download". A
+                    // round with nothing in at all therefore means the chip did not
+                    // restart, which is a different fault from a refused packet.
                     log("  round " + (round + 1) + ": " + bytesIn + " B in / " + bytesOut
-                            + " B out, " + previewHex() + " (" + e.getMessage() + ")");
+                            + " B out, " + previewHex() + " (" + e.getMessage() + ")"
+                            + (!manualReset && bytesIn == 0
+                            ? " — no ROM banner, so the chip never restarted" : ""));
                 }
             }
             invertControl = base;
@@ -270,21 +283,32 @@ final class EspRom {
 
         if (!synced) {
             final String rates = silent.length() == 0 ? "none" : silent.toString();
+            final String tail;
+            if (manualReset) {
+                tail = ", with the control lines left alone. Nothing in this run reset the"
+                        + " board, so hold BOOT and tap its reset while the sweep"
+                        + " listens, then let go of BOOT.";
+            } else if (!bannerSeen) {
+                tail = ", in either reset polarity. Not one readable byte arrived after a"
+                        + " plain reset, at 115200 or 74880, in either polarity. That"
+                        + " points at the cable, the adapter's receive line or a board"
+                        + " held in reset.";
+            } else if (roundsWithBytes == 0) {
+                tail = ", in either reset polarity. Boot text did arrive once, so the"
+                        + " cable and the receive path work, but none of the "
+                        + roundsSeen + " reset rounds produced a ROM banner. A reset"
+                        + " always prints one, and download mode's ends with \"waiting"
+                        + " for download\", so the chip never restarted in those rounds:"
+                        + " the reset line is the suspect, not the sync packet.";
+            } else {
+                tail = ", in either reset polarity. Boot text did arrive and "
+                        + roundsWithBytes + " of " + roundsSeen + " reset rounds read"
+                        + " bytes without answering a sync, so the chip restarted and"
+                        + " ignored the packets: the packet or the rate is the open"
+                        + " question.";
+            }
             final String message = "no answer from the bootloader at any of "
-                    + BAUDS.length + " baud rates (" + rates + ")"
-                    + (manualReset
-                    ? ", with the control lines left alone. Nothing in this run reset the"
-                            + " board, so hold BOOT and tap its reset while the sweep"
-                            + " listens, then let go of BOOT."
-                    : ", in either reset polarity. " + (bannerSeen
-                    ? "Boot text did arrive after a reset, so the cable, the adapter"
-                            + " and the reset wiring work and the chip runs when it is"
-                            + " released. Every sync round still saw silence, so the"
-                            + " reset is not leaving it in download mode (IO0) or the sync"
-                            + " packets never reach the ROM."
-                    : "Not one readable byte arrived after a plain reset, at 115200 or"
-                            + " 74880, in either polarity. That points at the cable, the"
-                            + " adapter's receive line or a board held in reset."));
+                    + BAUDS.length + " baud rates (" + rates + ")" + tail;
             throw new IOException(message);
         }
 
@@ -388,6 +412,16 @@ final class EspRom {
      */
     private void detectPolarity() throws IOException {
         log("proof of life: listening at 115200 and 74880 for boot text after a reset");
+        // Listen once without touching the lines first. The board prints its banner
+        // when it powers up, and those bytes can still be queued when the port opens;
+        // crediting them to the pulse that follows would call a dead reset circuit
+        // healthy and send the next test in the wrong direction.
+        final int queued = listenQuiet(400);
+        if (queued > 0) {
+            log("  " + queued + " B arrived with no line change: the board was still"
+                    + " booting from the plug-in, so those bytes say nothing about the"
+                    + " reset. Draining them before the sweep.");
+        }
         boolean noiseOnly = false;
         for (int candidate : BANNER_BAUDS) {
             changeBaudQuietly(candidate);
@@ -401,8 +435,8 @@ final class EspRom {
                         : " — \"" + bannerText() + "\""));
                 if (!text.isEmpty()) {
                     bannerSeen = true;
-                    log("  boot text arrived, so the cable, the adapter and the reset"
-                            + " wiring work; keeping "
+                    log("  boot text arrived after a reset, so the cable, the adapter"
+                            + " and the reset wiring work; keeping "
                             + (inverted ? "inverted" : "normal") + " lines");
                     return;
                 }
@@ -413,8 +447,9 @@ final class EspRom {
         log(noiseOnly
                 ? "  bytes arrived, none of them text: the board talked at some other"
                         + " rate, so the data path works but the rate is unknown"
-                : "  nothing at either rate in either polarity — the failure line says"
-                        + " what that leaves");
+                : "  nothing at either rate in either polarity — and no ROM banner from"
+                        + " any pulse, which a reset always prints, so the reset lines are"
+                        + " the first thing to suspect");
     }
 
     /** The longest printable-ASCII run in the preview, or "" when it is all noise. */
@@ -482,6 +517,32 @@ final class EspRom {
         }
         previewCap = PREVIEW_BYTES;
         return (int) bytesIn;
+    }
+
+    /**
+     * Read for a window without touching DTR/RTS. Anything here came from a boot
+     * that had already happened, so it cannot be evidence that a line change
+     * worked.
+     */
+    private int listenQuiet(int windowMs) throws IOException {
+        bytesIn = 0;
+        preview.reset();
+        previewCap = BANNER_BYTES;
+        port.flushInput();
+        final long deadline = System.currentTimeMillis() + windowMs;
+        final byte[] buffer = new byte[64];
+        while (System.currentTimeMillis() < deadline) {
+            final int read = port.read(buffer, 50);
+            if (read <= 0) continue;
+            bytesIn += read;
+            for (int i = 0; i < read && preview.size() < previewCap; ++i) {
+                preview.write(buffer[i]);
+            }
+        }
+        previewCap = PREVIEW_BYTES;
+        final int seen = (int) bytesIn;
+        bytesIn = 0;
+        return seen;
     }
 
     private void sync(int attempts) throws IOException {

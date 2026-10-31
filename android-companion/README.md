@@ -109,14 +109,19 @@ them owns the cable at a time; the choice is remembered across restarts.
   the stream with `Board unplugged.`
 - **PROBE LOG** below the buttons keeps the last 80 lines of every probe and
   flash. It opens with a proof of life: the chip prints boot text on every reset
-  whatever is in flash, so the log listens at 115200 and 74880 baud in both
-  DTR/RTS polarities and only counts *readable text* as proof — random bytes mean
-  the board is talking at some other rate, not that it is reachable. The quoted
-  text is the whole banner, up to 600 bytes, so the ROM's `rst:` and `boot:` lines
-  and its build date are in the log instead of only the first line. Each rate
-  then runs its reset rounds with alternating polarity and reports `N B in / M B
-  out`, the hex that arrived and the reason the round failed; a bridge that
-  refuses bytes stops the sweep instead of being retried at four more rates. COPY
+  whatever is in flash. Before pulsing anything it drains 400 ms of traffic
+  *without touching the lines* — bytes there are the board still booting from the
+  plug-in, and crediting them to a reset would call a dead reset circuit healthy —
+  then listens at 115200 and 74880 baud in both DTR/RTS polarities and only
+  counts *readable text after a pulse* as proof; random bytes mean the board is
+  talking at some other rate, not that it is reachable. The quoted text is the
+  whole banner, up to 600 bytes, so the ROM's `rst:` and `boot:` lines and its
+  build date are in the log instead of only the first line. Each rate then runs
+  its reset rounds with alternating polarity and reports `N B in / M B out`, the
+  hex that arrived and the reason the round failed; a round that reads nothing is
+  marked `no ROM banner, so the chip never restarted`, because every reset prints
+  one, and a bridge that refuses bytes stops the sweep instead of being retried at
+  four more rates. COPY
   LOG puts it on the clipboard, CLEAR empties it.
 
 `UsbSerialCh340` implements the CH340 register sequence in-tree and `EspRom` the
@@ -168,7 +173,7 @@ through Gradle; a raw `javac` build produces an APK-less class check and the
 PROJECTS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
-[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (116 kB,
+[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (117 kB,
 package `dev.phonedesk.companion`, debug-signed). Install it with
 `adb install -r dist/PhoneDeckBridge-debug.apk`, or copy it to the phone and open
 it with "install unknown apps" allowed.

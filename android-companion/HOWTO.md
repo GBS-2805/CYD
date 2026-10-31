@@ -254,10 +254,13 @@ try another cable, and confirm the phone supports USB host mode.
 
 **no answer from the bootloader**: read **PROBE LOG** from the top, in this order.
 
-1. Four `proof of life` lines — `115200 normal`, `115200 inverted`, `74880
-   normal`, `74880 inverted`. If one of them quotes text in quotes, the cable, the
-   adapter and the reset wiring are all fine and the chip runs when it is
-   released; skip to 3. The quote is the whole banner (up to 600 bytes), so the
+1. Optionally one `N B arrived with no line change` line. That is the board still
+   booting from the plug-in; the log drains those bytes first so they cannot be
+   mistaken for proof that a reset happened. Then four `proof of life` lines —
+   `115200 normal`, `115200 inverted`, `74880 normal`, `74880 inverted`. If one of
+   them quotes text, a pulse produced a banner: the cable, the adapter and the
+   reset wiring are all fine and the chip runs when it is released — but keep
+   reading, because that is one pulse, not the rounds below. The quote is the whole banner (up to 600 bytes), so the
    `rst:` and `boot:` lines and the ROM's build date are readable in the log —
    `boot:0x13` is flash, `boot:0x3` is download mode.
 2. All four say `nothing` → not a byte reached the phone after a reset: cable, the
@@ -265,10 +268,15 @@ try another cable, and confirm the phone supports USB host mode.
 3. All four say `no text — <hex>` → the board is transmitting at some rate the
    probe is not listening on. The data path works; the rate is the open question.
 4. `round 1: 0 B in / 0 B out` means the bridge refused the bytes and the sweep
-   stops there. `0 B in / 552 B out` means 12 sync packets left the phone and the
-   ROM stayed silent. Rounds alternate the DTR/RTS polarity and the log marks the
-   inverted ones, so compare rounds before blaming the board: a board whose EN/IO0
-   pair is inverted answers only on the inverted rounds.
+   stops there. `0 B in / 552 B out — no ROM banner, so the chip never restarted`
+   means 12 sync packets left the phone and no reset happened at all: a chip that
+   restarts prints its banner, and download mode's ends with `waiting for
+   download`, so silence here points at the reset line (EN) rather than at the
+   packet. Bytes in but no sync reply is the opposite case — the chip restarted
+   and ignored what arrived, so the packet or the rate is the open question.
+   Rounds alternate the DTR/RTS polarity and the log marks the inverted ones, so
+   compare rounds before blaming the board: a board whose EN/IO0 pair is inverted
+   answers only on the inverted rounds.
 5. Nothing answers and the board's IO0 may not be wired to the adapter at all:
    tap **MANUAL RESET** until it reads **MANUAL RESET: ON**, then **PROBE USB**,
    hold **BOOT** and tap the board's own reset while the sweep listens, and let go
