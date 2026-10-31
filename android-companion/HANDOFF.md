@@ -16,7 +16,7 @@ Four tabs, hosted by `MainActivity`:
 | `MainActivity.java` | Header pill, bottom tab bar, 1 s refresh loop, permissions, SAF result |
 | `DecksTab.java` | Live monitor: link telemetry, nearby scan results, saved decks |
 | `ProjectsTab.java` | Notebook: status chips, project cards, deck libraries, recipes |
-| `BoardTab.java` | Target picker, USB probe/restart, imported images, flashing |
+| `BoardTab.java` | Target picker, USB probe/restart, imported images, flashing, serial monitor |
 | `SetupTab.java` | Notification access, Bluetooth, battery settings, start/stop |
 | `DeckService.java` | Foreground service: scan, GATT link, write queue, snapshot API |
 | `DeckStore.java` | SharedPreferences: known decks and the preferred MAC |
@@ -215,6 +215,28 @@ URL and a flashing note. Decisions behind it:
   boots to garbage, so the confirmation dialog says so before erasing.
 - **Still not wired to the bundle**: the APK carries the deck's `.ino` source,
   not a compiled `.bin`, so flashing runs on imported images only.
+- **The monitor and the flasher share one port.** A `FLASH` / `MONITOR` mode row
+  at the top of the tab persists its choice (`monitor_mode`), and the flash paths
+  call `monitorBusy()` and refuse while the reader holds the CH340 open instead
+  of racing it. Choosing FLASH calls `stopMonitor()`, which clears
+  `monitorRunning` so the reader closes the port within one 200 ms read.
+- **The reader owns the connection.** `runMonitor()` runs on a `usb-monitor`
+  thread; a baud change from the spinner and **RESTART + WATCH** set flags the
+  loop acts on between reads, so the UI thread never calls into a connection that
+  is mid-transfer. A rate change reprograms the divisor through
+  `UsbSerialCh340.changeBaudRate()` and logs `== <rate> baud ==`; a rate the
+  bridge refuses is written into the transcript instead of ending the session.
+  `stillAttached()` checks the device list every 15 quiet reads, so unplugging
+  says `Board unplugged.` rather than looking like silence.
+- **The transcript is decoded, capped and coalesced.** `decodeInto()` holds back
+  a UTF-8 lead byte when a glyph is split across reads; `clean()` keeps printable
+  text, tabs and newlines (a lone `\r` becomes one) and drops other control
+  bytes, because a ROM dump is not a terminal. `appendMonitor()` keeps the last
+  `MONITOR_CHARS_MAX` (24,000) characters, trimmed at a line break, and
+  `scheduleMonitorUpdate()` repaints at most every 120 ms — a chatty sketch would
+  otherwise rebuild the view dozens of times a second.
+- **Unverified**: the monitor has never opened a real CH340. Baud switching while
+  streaming, the decode holdback and the unplug check are untested on a phone.
 - The manifest declares `android.hardware.usb.host` as *not required*, so installs
   on phones without OTG still work; the card then reports that USB host is absent.
 - **Partially verified on hardware.** Two probes ran on a real phone (Android
@@ -248,8 +270,9 @@ URL and a flashing note. Decisions behind it:
   `dev.phonedesk.companion` and the APK stays `dist/PhoneDeckBridge-debug.apk`, so
   an upgrade replaces the installed copy instead of sitting beside it.
 - Four tabs: **DECKS** (live link), **PROJECTS** (the notebook: status chips,
-  cards, deck libraries), **BOARD** (target picker, USB probe/restart, images and
-  flashing) and **SETUP** (permissions, bridge switch, last crash).
+  cards, deck libraries), **BOARD** (target picker, USB probe/restart, images,
+  flashing and the serial monitor) and **SETUP** (permissions, bridge switch,
+  last crash).
 - `BoardTab` owns every call that touches the ESP32: `UsbSerialCh340`, `EspRom`,
   the USB permission receiver and the flash progress. The project shelf never
   opens the port, which is what lets each tab keep a single job.

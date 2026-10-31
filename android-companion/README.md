@@ -11,7 +11,7 @@ Four tabs:
 | --- | --- |
 | **DECKS** | Live link: what is connected, signal, uptime, packets, nearby decks |
 | **PROJECTS** | Every project with status, build/touch log and links, plus the deck libraries |
-| **BOARD** | Target board, OTG connection, bootloader probe, image flashing |
+| **BOARD** | Target board, OTG connection, bootloader probe, image flashing, serial monitor |
 | **SETUP** | Permissions, battery, bridge switch, last crash |
 
 Ask it anything about the deck's state and it answers from the link itself, not
@@ -64,7 +64,8 @@ links it needs.
 ## Direct USB
 
 **BOARD** talks to the board's CH340 bridge over an OTG cable,
-without a computer.
+without a computer. It has two modes, **FLASH** and **MONITOR**, and only one of
+them owns the cable at a time; the choice is remembered across restarts.
 
 - **PROBE USB** reads the chip magic and MAC, then restarts the board into its
   firmware — it never leaves the deck sitting in its bootloader.
@@ -74,6 +75,22 @@ without a computer.
 - **RESTART BOARD** boots whatever is in flash without entering the bootloader.
   That is the way out of download mode (black screen, red LED) after a failed
   attempt, short of unplugging.
+- **MONITOR** reads what the board prints, and can answer it. **START MONITOR**
+  opens the port at the **BAUD** rate in the pull-down (115200, 9600, 57600,
+  230400, 460800, 921600); the rate can be changed while the stream runs, as
+  long as the sketch is set to the same one. **RESTART + WATCH** pulses the
+  board's reset with IO0 high, so the firmware already in flash reports from its
+  first line. **SEND** writes the typed line plus the **EOL** ending — **CRLF**
+  for a terminal, **LF** for a sketch that splits on the newline alone — and the
+  transcript echoes it as `→ line`. COPY takes the transcript, CLEAR empties it.
+- **The transcript is text, not a byte dump.** UTF-8 is decoded a read at a time,
+  holding back a lead byte when a glyph is split so an accent does not arrive as
+  a replacement box; carriage returns become newlines, tabs are kept, and other
+  control bytes are dropped. It keeps the last 24,000 characters, trimmed at a
+  line break, and repaints at most every 120 ms instead of once per read.
+- Tapping **FLASH** stops the stream and frees the port within one read (200 ms),
+  so the flasher never shares the cable with the reader. Unplugging the board ends
+  the stream with `Board unplugged.`
 - **PROBE LOG** below the buttons keeps the last 80 lines of every probe and
   flash. It opens with a proof of life: the chip prints boot text on every reset
   whatever is in flash, so the log listens at 115200 and 74880 baud in both

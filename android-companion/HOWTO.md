@@ -260,6 +260,29 @@ holds, so a failed verify means the image on it is suspect, not that the board i
 lost. The two digests are in **PROBE LOG** as `MD5 board …, file …`, so you can
 tell a partial write from a wrong file without flashing again.
 
+## Watch what the board prints over USB
+
+1. Connect the CYD with the OTG adapter and a USB **data** cable.
+2. **BOARD → MONITOR**.
+3. Set **BAUD** to the rate the sketch prints at — 115200 is the deck's log. To
+   see the ROM's own boot messages instead, use 74880.
+4. **START MONITOR** and accept Android's permission prompt. **OUTPUT** fills as
+   bytes arrive and keeps the newest 24,000 characters.
+5. **RESTART + WATCH** resets the board while the stream is open, so a sketch
+   that prints once at boot is still caught from its first line.
+6. **SEND** answers a sketch that is waiting on `Serial`: it writes the typed line
+   plus the ending on the **EOL** button. **CRLF** is a terminal's Enter; **LF** is
+   for a sketch that splits on the newline alone.
+7. Tap **FLASH** to stop the stream before flashing: the monitor holds the port
+   open, and it closes within a fraction of a second of leaving the mode.
+
+**Output stays empty** — most sketches print nothing until something happens, so
+silence is not a fault by itself. Confirm the rate matches the sketch, then tap
+**RESTART + WATCH**: a board that says anything at all says it at boot. Nothing
+at 115200 or 74880 points at the cable, the adapter, or the sketch's baud rather
+than at the app. Nothing here has run on a phone yet, so treat the counters as
+unmeasured rather than as expected values.
+
 ## Troubleshooting
 
 **Deck never appears under NEARBY**

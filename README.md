@@ -20,7 +20,7 @@ The companion — **Off-site** — is more than a bridge: its **DECKS** tab moni
 the link (RSSI, uptime, packets, nearby and saved boards), **PROJECTS** keeps the
 sketches, including this repo's deck sketch copied into the APK at build time and
 ready to paste into ArduinoDroid, and **BOARD** drives the ESP32 over an OTG
-cable.
+cable and reads back what it prints.
 
 A built debug APK is at [`android-companion/dist/PhoneDeckBridge-debug.apk`](android-companion/dist/PhoneDeckBridge-debug.apk).
 
