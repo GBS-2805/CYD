@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "id": "phone_deck",
-  "name": "ESP32 Phone_Widget",
+  "name": "Phone Deck",
   "sketch": "cyd_phone_deck.ino",
   "board": "2432S024R",
   "tagline": "INSIDE APP",
-  "body": "A desk dashboard for your phone: clock, battery and notifications, drawn in the GMK Dracula keycap palette.",
+  "body": "A desk dashboard for your phone: clock, battery and notifications, set like a woodblock print in two monochrome themes \u2014 black ink on paper, or white ink on black.",
   "notes": "Bundled with the app: copy it into ArduinoDroid and compile, there is nothing to download.",
   "libraries": [
     "Adafruit GFX Library",
