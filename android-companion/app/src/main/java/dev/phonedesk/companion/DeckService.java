@@ -41,6 +41,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
 import java.util.UUID;
@@ -525,22 +526,22 @@ public class DeckService extends Service {
             for (DeckStore.Known known : DeckStore.all(this)) {
                 if (known.mac.equalsIgnoreCase(result.getDevice().getAddress())) return known.name;
             }
-            name = "ESP32 Phone_Widget";
+            name = "Phone Deck";
         }
         return name;
     }
 
     /**
-     * Every deck advertises "ESP32 Phone_Widget <MAC tag>", so matching on the
-     * firmware name finds all of them; the tag is what keeps two boards apart
-     * in the NEARBY list. "phone deck" is kept for boards flashed before the
-     * rename, which are still in people's hands.
+     * A deck is any widget its descriptor claims: the Phone Link service UUID (kept
+     * as the legacy fallback) or one of the name fragments it advertises.
      */
     private boolean looksLikeDeck(ScanResult result) {
         ScanRecord record = result.getScanRecord();
         if (record != null && record.getServiceUuids() != null) {
+            List<UUID> advertised = WidgetCatalog.services(this);
             for (ParcelUuid uuid : record.getServiceUuids()) {
                 if (SERVICE_UUID.equals(uuid.getUuid())) return true;
+                if (advertised.contains(uuid.getUuid())) return true;
             }
         }
 
@@ -554,8 +555,12 @@ public class DeckService extends Service {
         }
         if (name == null && record != null) name = record.getDeviceName();
         if (name == null) return false;
-        String lower = name.toLowerCase();
-        return lower.contains("phone_widget") || lower.contains("phone deck");
+        String lower = name.toLowerCase(Locale.US);
+        if (lower.contains("phone deck")) return true;
+        for (String fragment : WidgetCatalog.nameMatches(this)) {
+            if (lower.contains(fragment)) return true;
+        }
+        return false;
     }
 
     // --------------------------------------------------------------- gatt ---
@@ -606,12 +611,12 @@ public class DeckService extends Service {
     }
 
     private String safeName(BluetoothDevice device) {
-        if (!canConnect()) return "ESP32 Phone_Widget";
+        if (!canConnect()) return "Phone Deck";
         try {
             String name = device.getName();
-            return name == null || name.isEmpty() ? "ESP32 Phone_Widget" : name;
+            return name == null || name.isEmpty() ? "Phone Deck" : name;
         } catch (SecurityException e) {
-            return "ESP32 Phone_Widget";
+            return "Phone Deck";
         }
     }
 

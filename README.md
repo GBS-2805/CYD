@@ -1,13 +1,16 @@
 # ESP32_Widgets
 
 Small ESP32 gadgets that share one naming scheme and one companion app. Each
-project is a folder with a `README.md`, a `HOWTO.md` and a `HANDOFF.md` that
-records what is verified and what is not.
+project is a folder with one `README.md` that says what it is, how to flash it,
+the traps already hit, and what is verified and what is not.
+
+The rules that shape those folders — hardware, build, palette, NVS, BLE identity,
+docs — are in [CONVENTIONS.md](CONVENTIONS.md). Read it before adding a widget.
 
 | Project | Folder | What it is | Read |
 | --- | --- | --- | --- |
-| **Phone Deck** | [`cyd_phone_deck/`](cyd_phone_deck) | ESP32-2432S024R (2.4" CYD) phone dashboard: clock, battery and notifications | [README](cyd_phone_deck/README.md) · [HOWTO](cyd_phone_deck/HOWTO.md) · [handoff](cyd_phone_deck/HANDOFF.md) |
-| **Board check** | [`cyd_board_check/`](cyd_board_check) | Self-check for the same board: display, touch, RGB LED and flash in one screen plus a serial report | [README](cyd_board_check/README.md) · [HOWTO](cyd_board_check/HOWTO.md) · [handoff](cyd_board_check/HANDOFF.md) |
+| **Phone Deck** | [`cyd_phone_deck/`](cyd_phone_deck) | ESP32-2432S024R (2.4" CYD) phone dashboard: clock, battery and notifications | [README](cyd_phone_deck/README.md) |
+| **Board check** | [`cyd_board_check/`](cyd_board_check) | Self-check for the same board: display, touch, RGB LED and flash in one screen plus a serial report | [README](cyd_board_check/README.md) |
 | **ESP32_Widgets app** | [`android-companion/`](android-companion) | **Off-site**, the Android app: CYD monitor, BLE bridge, USB flasher and sketch shelf | [README](android-companion/README.md) · [HOWTO](android-companion/HOWTO.md) · [handoff](android-companion/HANDOFF.md) |
 
 **Phone Deck** is a BLE peripheral exposing a small **Phone Link** GATT

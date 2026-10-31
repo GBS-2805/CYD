@@ -27,18 +27,43 @@ android {
     }
 }
 
-// The Flash tab ships the deck sketch inside the APK. Copying it at build time
-// keeps cyd_phone_deck/cyd_phone_deck.ino the single source of truth instead of
-// duplicating 2,000 lines into assets.
-tasks.register("syncDeckSketch", Copy) {
-    from("${rootDir}/../cyd_phone_deck") {
-        include "cyd_phone_deck.ino"
+// Each project folder carries a widget.json descriptor naming its sketch. This
+// task copies the descriptor and the sketch it names into
+// app/src/main/assets/widgets/<id>/, which is what WidgetCatalog reads at runtime
+// and what toolchain.sh reads back out of the built APK.
+//
+// Adding a project: drop a folder beside this one holding its .ino and a
+// widget.json naming both. Nothing in this file needs to change.
+def widgetFiles = fileTree(rootDir.parentFile) {
+    include "*/widget.json"
+    exclude "android-companion/**"
+    exclude "**/build/**"
+}
+
+tasks.register("syncWidgets") {
+    def out = layout.projectDirectory.dir("src/main/assets/widgets").asFile
+    inputs.files(widgetFiles)
+    outputs.dir(out)
+    doLast {
+        // assets/widgets is generated output. Copy alone never deletes, so a
+        // widget removed from the repo would keep shipping forever.
+        delete out
+        def parsed = new groovy.json.JsonSlurper()
+        widgetFiles.files.sort { it.path }.each { descriptor ->
+            def meta = parsed.parse(descriptor)
+            def id = meta.id
+            if (!id) throw new GradleException("${descriptor}: widget.json needs an id")
+            def sketchName = meta.sketch ?: "${descriptor.parentFile.name}.ino"
+            def sketch = new File(descriptor.parentFile, sketchName)
+            if (!sketch.isFile()) throw new GradleException("${descriptor}: ${sketchName} not found")
+            def dest = new File(out, id)
+            dest.mkdirs()
+            new File(dest, "widget.json").bytes = descriptor.bytes
+            new File(dest, sketchName).bytes = sketch.bytes
+        }
     }
-    into("${projectDir}/src/main/assets/deck")
 }
 
 afterEvaluate {
-    tasks.named("preBuild").configure {
-        dependsOn("syncDeckSketch")
-    }
+    tasks.named("preBuild").configure { dependsOn("syncWidgets") }
 }

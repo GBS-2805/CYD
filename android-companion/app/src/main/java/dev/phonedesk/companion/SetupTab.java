@@ -115,7 +115,7 @@ final class SetupTab extends ScrollView {
 
         TextView note = Ui.text(activity,
                 "The deck never appears in the system Bluetooth list: one service, no pairing. "
-                        + "A stale \"ESP32 Phone_Widget\" entry from an older build can be forgotten.",
+                        + "A stale \"Phone Deck\" entry from an older build can be forgotten.",
                 12, Ui.DIM);
         note.setPadding(0, Ui.dp(activity, 18), 0, 0);
         body.addView(note);

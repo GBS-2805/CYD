@@ -44,7 +44,10 @@ final class ProjectStore {
     static final int KIND_IMAGE = 1;
     static final int KIND_INSIDE = 2;
 
-    static final String ID_DECK = "deck";
+    /** Project ids for widgets that ship inside the APK, e.g. `widget:phone_deck`. */
+    static final String WIDGET_PREFIX = "widget:";
+    /** What that id looked like before the descriptors; renamed in place on read. */
+    private static final String LEGACY_DECK_ID = "deck";
 
     private static final String PREFS = "projects";
     private static final String KEY_LIST = "list";
@@ -110,7 +113,7 @@ final class ProjectStore {
 
     static List<Project> all(Context context) {
         String raw = prefs(context).getString(KEY_LIST, null);
-        if (raw == null) return seed(context);
+        if (raw == null) return withWidgets(context, seed(context));
         List<Project> out = new ArrayList<>();
         try {
             JSONArray array = new JSONArray(raw);
@@ -120,10 +123,65 @@ final class ProjectStore {
             }
         } catch (JSONException e) {
             // Unreadable store: fall back to the seeds rather than showing nothing.
-            return seed(context);
+            return withWidgets(context, seed(context));
         }
-        if (out.isEmpty()) return seed(context);
-        return out;
+        if (out.isEmpty()) return withWidgets(context, seed(context));
+        return withWidgets(context, out);
+    }
+
+    /**
+     * Keeps the notebook in step with the widgets the APK carries: the old `deck`
+     * record is renamed in place so an upgrade keeps its log, any widget with no
+     * record yet gets its seed, and a record whose card text no longer matches its
+     * descriptor is refreshed. Writes only when something actually changed.
+     */
+    private static List<Project> withWidgets(Context context, List<Project> projects) {
+        boolean changed = false;
+        for (Project project : projects) {
+            if (LEGACY_DECK_ID.equals(project.id)) {
+                project.id = WIDGET_PREFIX + "phone_deck";
+                changed = true;
+            }
+        }
+        for (WidgetCatalog.Widget widget : WidgetCatalog.all(context)) {
+            String id = WIDGET_PREFIX + widget.id;
+            Project record = null;
+            for (Project project : projects) {
+                if (id.equals(project.id)) {
+                    record = project;
+                    break;
+                }
+            }
+            if (record == null) {
+                projects.add(widgetSeed(widget));
+                changed = true;
+            } else if (refreshFromWidget(record, widget)) {
+                changed = true;
+            }
+        }
+        if (changed) save(context, projects);
+        return projects;
+    }
+
+    /**
+     * Card text belongs to the descriptor; the log fields — status, build, touch,
+     * notes and the timestamp — stay on the record, because that is what the user
+     * typed. Notes are left alone: they can carry text merged from FirmwareNotes.
+     */
+    private static boolean refreshFromWidget(Project project, WidgetCatalog.Widget widget) {
+        String libraries = String.join(", ", widget.libraries);
+        boolean stale = !widget.name.equals(project.name)
+                || !widget.tagline.equals(project.tagline)
+                || !widget.body.equals(project.body)
+                || !libraries.equals(project.libraries)
+                || project.kind != KIND_INSIDE;
+        if (!stale) return false;
+        project.name = widget.name;
+        project.tagline = widget.tagline;
+        project.body = widget.body;
+        project.libraries = libraries;
+        project.kind = KIND_INSIDE;
+        return true;
     }
 
     static Project byId(Context context, String id) {
@@ -195,17 +253,13 @@ final class ProjectStore {
         }
     }
 
-    /** The deck project ships inside the APK, so it is never deletable. */
-    static Project deck(Context context) {
-        Project deck = byId(context, ID_DECK);
-        return deck != null ? deck : deckSeed(context);
-    }
-
     // ---------------------------------------------------------------- seeds ---
 
     private static List<Project> seed(Context context) {
         List<Project> out = new ArrayList<>();
-        out.add(deckSeed(context));
+        for (WidgetCatalog.Widget widget : WidgetCatalog.all(context)) {
+            out.add(widgetSeed(widget));
+        }
         int index = 0;
         for (FirmwareCatalog.Item item : FirmwareCatalog.all()) {
             Project project = new Project();
@@ -245,23 +299,21 @@ final class ProjectStore {
         return out;
     }
 
-    private static Project deckSeed(Context context) {
-        Project deck = new Project();
-        deck.id = ID_DECK;
-        deck.name = "ESP32 Phone_Widget";
-        deck.tagline = "INSIDE PROJECT";
-        deck.body = "This repo's own firmware: the touch macro deck that shows phone "
-                + "battery, time and notifications, plus the shortcuts on its tiles.";
-        deck.libraries = "Adafruit GFX Library, Adafruit ILI9341, XPT2046_Touchscreen";
-        deck.sourceUrl = "";
-        deck.installerUrl = "";
-        deck.notes = "Bundled with the app: copy it into ArduinoDroid and compile, there is "
-                + "nothing to download.";
-        deck.kind = KIND_INSIDE;
-        deck.status = STATUS_WORKING;
-        deck.touch = FirmwareNotes.TOUCH_WORKS;
-        deck.updatedMs = System.currentTimeMillis();
-        return deck;
+    private static Project widgetSeed(WidgetCatalog.Widget widget) {
+        Project project = new Project();
+        project.id = WIDGET_PREFIX + widget.id;
+        project.name = widget.name;
+        project.tagline = widget.tagline;
+        project.body = widget.body;
+        project.libraries = String.join(", ", widget.libraries);
+        project.notes = widget.notes;
+        project.sourceUrl = "";
+        project.installerUrl = "";
+        project.kind = KIND_INSIDE;
+        project.status = STATUS_WORKING;
+        project.touch = FirmwareNotes.TOUCH_WORKS;
+        project.updatedMs = System.currentTimeMillis();
+        return project;
     }
 
     // ------------------------------------------------------------- json glue ---

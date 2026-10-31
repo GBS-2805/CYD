@@ -8,7 +8,9 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -35,6 +37,10 @@ final class ProjectsTab extends ScrollView {
     private String signature = "";
     /** Status chip selection; -1 shows every project. */
     private int activeFilter = -1;
+    /** Search text, lower-cased; empty shows every project. */
+    private String query = "";
+    /** One field instance, re-added on each rebuild so typing survives a refresh. */
+    private final EditText search;
     /** Files handed to {@link #build}, so the deck card can reach its sketch. */
     private List<FlashLibrary.Entry> currentEntries = new ArrayList<>();
 
@@ -46,6 +52,35 @@ final class ProjectsTab extends ScrollView {
         body.setPadding(Ui.dp(activity, 16), Ui.dp(activity, 8),
                 Ui.dp(activity, 16), Ui.dp(activity, 24));
         addView(body, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
+        search = new EditText(activity);
+        search.setHint("Search widgets");
+        search.setSingleLine(true);
+        search.setInputType(InputType.TYPE_CLASS_TEXT);
+        search.setTextSize(13);
+        search.setTextColor(Ui.TEXT);
+        search.setHintTextColor(Ui.DIM);
+        search.setBackground(Ui.rounded(activity, Ui.CARD_HI, Ui.EDGE, 8));
+        search.setPadding(Ui.dp(activity, 12), Ui.dp(activity, 8),
+                Ui.dp(activity, 12), Ui.dp(activity, 8));
+        search.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                String next = s.toString().trim().toLowerCase(Locale.US);
+                if (next.equals(query)) return;
+                query = next;
+                signature = "";
+                refresh();
+            }
+        });
     }
 
     void refresh() {
@@ -57,7 +92,8 @@ final class ProjectsTab extends ScrollView {
         // Everything that changes what a card says, so a LOG or STATUS tap shows up.
         sig.append('v').append(ProjectStore.version(activity))
                 .append('b').append(BoardCatalog.selectedIndex(activity))
-                .append('f').append(activeFilter);
+                .append('f').append(activeFilter)
+                .append('q').append(query);
         if (!sig.toString().equals(signature)) {
             signature = sig.toString();
             int keepScroll = getScrollY();
@@ -114,18 +150,54 @@ final class ProjectsTab extends ScrollView {
         subtitle.setPadding(0, Ui.dp(activity, 4), 0, 0);
         body.addView(subtitle);
 
+        // The field outlives a rebuild: it is detached and re-added, so its text
+        // and cursor survive the status chips and the search itself re-filtering.
+        final boolean hadFocus = search.hasFocus();
+        LinearLayout.LayoutParams fieldParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        fieldParams.topMargin = Ui.dp(activity, 12);
+        body.addView(search, fieldParams);
+        if (hadFocus) {
+            search.post(() -> {
+                search.requestFocus();
+                search.setSelection(search.getText().length());
+            });
+        }
+
         body.addView(filterRow(projects));
 
         int shown = 0;
         for (ProjectStore.Project project : projects) {
             if (activeFilter >= 0 && project.status != activeFilter) continue;
+            if (!matches(project)) continue;
             body.addView(projectCard(project));
             ++shown;
-            if (project.inside() && bundledEntry() != null) body.addView(deckLibraryCard());
+            if (project.inside()) {
+                WidgetCatalog.Widget widget = WidgetCatalog.forProject(activity, project.id);
+                if (widget != null) body.addView(libraryCard(widget));
+            }
         }
         if (shown == 0) {
-            body.addView(Ui.text(activity, "Nothing in that status yet.", 12, Ui.DIM));
+            String typed = search.getText().toString().trim();
+            body.addView(Ui.text(activity, typed.isEmpty()
+                    ? "Nothing in that status yet."
+                    : "No widget matches \"" + typed + "\".", 12, Ui.DIM));
         }
+    }
+
+    /**
+     * Name search: the project's own name first, then the bundled descriptor's
+     * name, id and tagline, so a query finds a card by what it says it is.
+     */
+    private boolean matches(ProjectStore.Project project) {
+        if (query.isEmpty()) return true;
+        if (project.name.toLowerCase(Locale.US).contains(query)) return true;
+        WidgetCatalog.Widget widget = WidgetCatalog.forProject(activity, project.id);
+        if (widget == null) return false;
+        return widget.name.toLowerCase(Locale.US).contains(query)
+                || widget.id.toLowerCase(Locale.US).contains(query)
+                || widget.tagline.toLowerCase(Locale.US).contains(query);
     }
 
     /** ALL plus one chip per status, each with its count. */
@@ -218,7 +290,8 @@ final class ProjectsTab extends ScrollView {
         primary.setPadding(0, Ui.dp(activity, 10), 0, 0);
 
         if (project.inside()) {
-            FlashLibrary.Entry bundled = bundledEntry();
+            WidgetCatalog.Widget widget = WidgetCatalog.forProject(activity, project.id);
+            FlashLibrary.Entry bundled = widget == null ? null : bundledEntry(widget.sketch);
             if (bundled != null) {
                 Button copy = Ui.action(activity, "COPY DROID", true);
                 copy.setOnClickListener(v -> Actions.copyOrSay(activity, bundled.name,
@@ -385,40 +458,44 @@ final class ProjectsTab extends ScrollView {
         Actions.copyOrSay(activity, project.name + " recipe", text.toString());
     }
 
-    /** The deck sketch Gradle copied into the APK, or null when it is absent. */
-    private FlashLibrary.Entry bundledEntry() {
+    /**
+     * The sketch this widget's descriptor names, or null when the APK does not
+     * carry it. Matched by name because the shelf holds every bundled widget:
+     * taking the first bundled entry would hand the card whichever sorts first.
+     */
+    private FlashLibrary.Entry bundledEntry(String sketch) {
         for (FlashLibrary.Entry entry : currentEntries) {
-            if (entry.bundled) return entry;
+            if (entry.bundled && entry.name.equalsIgnoreCase(sketch)) return entry;
         }
         return null;
     }
-
-    private static final String[] DECK_LIBRARIES = {
-            "Adafruit GFX Library",
-            "Adafruit ILI9341",
-            "XPT2046_Touchscreen"
-    };
 
     private static final String[] ARDUINODROID_PACKAGES = {
             "name.antonsmirnov.android.arduinodroid2",
             "name.antonsmirnov.android.arduinodroid"
     };
 
-    private LinearLayout deckLibraryCard() {
+    /** Libraries this widget needs, read from its descriptor rather than a list here. */
+    private LinearLayout libraryCard(WidgetCatalog.Widget widget) {
         LinearLayout card = Ui.card(activity);
 
-        TextView title = Ui.text(activity, "DECK LIBRARIES", 16, Ui.TEXT);
+        TextView title = Ui.text(activity, "LIBRARIES", 16, Ui.TEXT);
         card.addView(title);
 
-        TextView hint = Ui.text(activity,
-                "INSTALL copies the name and opens ArduinoDroid's library list. Never install "
-                        + "ArduinoBLE: it shadows the ESP32 BLE headers and every build fails.",
+        String warning = "";
+        if (!widget.never.isEmpty()) {
+            warning = " Never install " + String.join(" or ", widget.never)
+                    + ": it shadows the ESP32 BLE headers and every build fails.";
+        }
+        TextView hint = Ui.text(activity, widget.libraries.isEmpty()
+                ? "Nothing extra to install for " + widget.name + "."
+                : "INSTALL copies the name and opens ArduinoDroid's library list." + warning,
                 11, Ui.DIM);
         hint.setPadding(0, Ui.dp(activity, 6), 0, 0);
         hint.setLineSpacing(Ui.dp(activity, 2), 1f);
         card.addView(hint);
 
-        for (String library : DECK_LIBRARIES) {
+        for (String library : widget.libraries) {
             TextView name = Ui.text(activity, library, 13, Ui.TEXT);
             name.setPadding(0, Ui.dp(activity, 10), 0, 0);
             card.addView(name);
@@ -436,19 +513,20 @@ final class ProjectsTab extends ScrollView {
             card.addView(row);
         }
 
-        LinearLayout actions = Ui.row(activity);
-        actions.setPadding(0, Ui.dp(activity, 12), 0, 0);
+        if (!widget.libraries.isEmpty()) {
+            final String joined = String.join("\n", widget.libraries);
+            LinearLayout actions = Ui.row(activity);
+            actions.setPadding(0, Ui.dp(activity, 12), 0, 0);
 
-        Button all = Ui.action(activity, "INSTALL ALL", true);
-        all.setOnClickListener(v -> installLibrary("deck libraries",
-                String.join("\n", DECK_LIBRARIES)));
-        actions.addView(all);
+            Button all = Ui.action(activity, "INSTALL ALL", true);
+            all.setOnClickListener(v -> installLibrary(widget.name, joined));
+            actions.addView(all);
 
-        Button copyAll = Ui.action(activity, "COPY ALL", false);
-        copyAll.setOnClickListener(v -> Actions.copyOrSay(activity, "deck libraries",
-                String.join("\n", DECK_LIBRARIES)));
-        actions.addView(copyAll, spaced(8));
-        card.addView(actions);
+            Button copyAll = Ui.action(activity, "COPY ALL", false);
+            copyAll.setOnClickListener(v -> Actions.copyOrSay(activity, widget.name, joined));
+            actions.addView(copyAll, spaced(8));
+            card.addView(actions);
+        }
 
         Button open = Ui.action(activity, "OPEN ARDUINODROID", false);
         open.setOnClickListener(v -> openArduinoDroid());

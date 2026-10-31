@@ -20,8 +20,10 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * The flash shelf: the deck sketch bundled in the APK plus any `.ino` / `.bin`
@@ -32,19 +34,20 @@ import java.util.Locale;
  */
 final class FlashLibrary {
 
-    private static final String ASSET_DIR = "deck";
-    private static final String ASSET_SKETCH = "cyd_phone_deck.ino";
     private static final String DIR = "flash";
 
     static final class Entry {
         final String name;
         final long size;
+        /** Where the sketch sits inside the APK, or null for an imported file. */
+        final String assetPath;
         final boolean bundled;
 
-        Entry(String name, long size, boolean bundled) {
+        Entry(String name, long size, String assetPath) {
             this.name = name;
             this.size = size;
-            this.bundled = bundled;
+            this.assetPath = assetPath;
+            this.bundled = assetPath != null;
         }
 
         boolean textual() {
@@ -67,16 +70,19 @@ final class FlashLibrary {
     static List<Entry> list(Context context) {
         List<Entry> out = new ArrayList<>();
 
-        byte[] bundled = readAsset(context);
-        if (bundled != null) {
-            out.add(new Entry(ASSET_SKETCH, bundled.length, true));
+        for (WidgetCatalog.Widget widget : WidgetCatalog.all(context)) {
+            byte[] bytes = readAsset(context, widget.assetPath);
+            // No syncWidgets run, or a descriptor naming a sketch that was not
+            // packaged: leave it off the shelf rather than offer an empty copy.
+            if (bytes == null) continue;
+            out.add(new Entry(widget.sketch, bytes.length, widget.assetPath));
         }
 
         File[] files = folder(context).listFiles();
         if (files != null) {
             List<Entry> imported = new ArrayList<>();
             for (File file : files) {
-                if (file.isFile()) imported.add(new Entry(file.getName(), file.length(), false));
+                if (file.isFile()) imported.add(new Entry(file.getName(), file.length(), null));
             }
             Collections.sort(imported, new java.util.Comparator<Entry>() {
                 @Override
@@ -97,7 +103,7 @@ final class FlashLibrary {
     }
 
     static byte[] readBytes(Context context, Entry entry) {
-        if (entry.bundled) return readAsset(context);
+        if (entry.assetPath != null) return readAsset(context, entry.assetPath);
         try {
             return readAll(new FileInputStream(new File(folder(context), entry.name)));
         } catch (IOException e) {
@@ -106,7 +112,7 @@ final class FlashLibrary {
     }
 
     static boolean delete(Context context, Entry entry) {
-        if (entry.bundled) return false;  // the deck sketch is part of the app
+        if (entry.assetPath != null) return false;  // bundled sketches are part of the app
         File file = new File(folder(context), entry.name);
         return file.delete();
     }
@@ -172,20 +178,24 @@ final class FlashLibrary {
         return "text/plain";
     }
 
-    // Read once: the Flash tab refreshes every second and the sketch is ~70 kB.
-    private static byte[] cachedAsset;
-    private static boolean assetLoaded;
+    // Bundled sketches by asset path, read once: the Flash tab refreshes every
+    // second and each sketch is ~70 kB. A miss is cached as null so an absent
+    // asset is not reopened on every refresh.
+    private static final Map<String, byte[]> cachedAssets = new HashMap<>();
 
-    private static byte[] readAsset(Context context) {
-        if (assetLoaded) return cachedAsset;
-        assetLoaded = true;
-        try {
-            cachedAsset = readAll(context.getAssets().open(ASSET_DIR + "/" + ASSET_SKETCH));
-        } catch (IOException e) {
-            // Build without Gradle: the asset sync task never ran.
-            cachedAsset = null;
+    private static byte[] readAsset(Context context, String path) {
+        if (path == null) return null;
+        synchronized (cachedAssets) {
+            if (cachedAssets.containsKey(path)) return cachedAssets.get(path);
+            byte[] bytes = null;
+            try {
+                bytes = readAll(context.getAssets().open(path));
+            } catch (IOException ignored) {
+                // Build without Gradle: the asset sync task never ran.
+            }
+            cachedAssets.put(path, bytes);
+            return bytes;
         }
-        return cachedAsset;
     }
 
     private static byte[] readAll(InputStream in) throws IOException {
