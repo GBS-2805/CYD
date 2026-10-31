@@ -100,6 +100,7 @@ final class BoardTab extends ScrollView {
     private static final String KEY_SWAPPED_LINES = "swapped_lines";
     private static final int PURPOSE_PROBE = 0;
     private static final int PURPOSE_MONITOR = 1;
+    private static final int PURPOSE_PING = 2;
     /** Transcript ceiling in characters; the oldest complete line is dropped first. */
     private static final int MONITOR_CHARS_MAX = 24000;
     private static final int[] MONITOR_BAUDS = {115200, 9600, 57600, 230400, 460800, 921600};
@@ -141,6 +142,17 @@ final class BoardTab extends ScrollView {
                     intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false);
             if (!granted || device == null) {
                 setUsbStatus("Android denied access to the CH340.", Ui.PINK);
+                return;
+            }
+            if (permissionPurpose == PURPOSE_PING) {
+                permissionPurpose = PURPOSE_PROBE;
+                final UsbManager manager =
+                        (UsbManager) activity.getSystemService(Context.USB_SERVICE);
+                if (manager == null) {
+                    setUsbStatus("This phone has no USB host support.", Ui.PINK);
+                    return;
+                }
+                pingLoader(device);
                 return;
             }
             if (permissionPurpose == PURPOSE_MONITOR) {
@@ -911,7 +923,9 @@ final class BoardTab extends ScrollView {
 
         TextView hint = Ui.text(activity,
                 "PROBE reads the chip ID and MAC, then restarts the board into its firmware. "
-                        + "RESTART BOARD boots the firmware that is already there.", 11, Ui.DIM);
+                        + "RESTART BOARD boots the firmware that is already there. SYNC ONLY "
+                        + "sends one packet with no reset, for a chip already in its loader.",
+                11, Ui.DIM);
         hint.setPadding(0, Ui.dp(activity, 6), 0, 0);
         hint.setLineSpacing(Ui.dp(activity, 2), 1f);
         card.addView(hint);
@@ -926,6 +940,12 @@ final class BoardTab extends ScrollView {
         probe.setOnClickListener(v -> detectUsb());
         Ui.space(activity, probe, 10);
         card.addView(probe);
+
+        Button sync = Ui.action(activity, "SYNC ONLY", false);
+        sync.setEnabled(!usbProbing && !usbFlashing);
+        sync.setOnClickListener(v -> detectPing());
+        Ui.space(activity, sync, 8);
+        card.addView(sync);
 
         Button restart = Ui.action(activity, "RESTART BOARD", false);
         restart.setEnabled(!usbProbing && !usbFlashing);
@@ -1054,6 +1074,81 @@ final class BoardTab extends ScrollView {
             return;
         }
         probeUsb(device);
+    }
+
+    /** SYNC ONLY: asks for the port the way PROBE does, then sends one packet. */
+    private void detectPing() {
+        final UsbManager manager = (UsbManager) activity.getSystemService(Context.USB_SERVICE);
+        if (manager == null) {
+            setUsbStatus("This phone has no USB host support.", Ui.PINK);
+            return;
+        }
+        final UsbDevice device = UsbSerialCh340.find(manager);
+        if (device == null) {
+            setUsbStatus("No CH340 on the USB bus. Check the OTG adapter and the cable.", Ui.PINK);
+            return;
+        }
+        if (!manager.hasPermission(device)) {
+            permissionPurpose = PURPOSE_PING;
+            setUsbStatus("Asking Android for the CH340…", Ui.ACCENT);
+            requestUsbPermission(manager, device);
+            return;
+        }
+        pingLoader(device);
+    }
+
+    /**
+     * One sync packet, no reset, and nothing reset on the way out either: leaving
+     * the chip in its loader is the reason to run this. A board that answers needs
+     * no EN pulse and no BOOT held, so this is the one action that says "the chip
+     * heard the packets" without a reset anywhere in the path — and it is the
+     * cheapest way to re-check a board an earlier run left in download mode.
+     */
+    private void pingLoader(UsbDevice device) {
+        if (usbProbing || usbFlashing) return;
+        if (!claimPortOrSay("sync")) return;
+        usbProbing = true;
+        final String label = describe(device);
+        setUsbStatus("Sending one sync packet to " + label + " — no reset…", Ui.ACCENT);
+        final UsbManager manager = (UsbManager) activity.getSystemService(Context.USB_SERVICE);
+        new Thread(() -> {
+            String message;
+            int color;
+            final UsbSerialCh340 port = new UsbSerialCh340(manager, device);
+            final EspRom rom = new EspRom(port);
+            rom.setTrace(BoardTab.this::trace);
+            trace("== SYNC ONLY " + label + " ==");
+            try {
+                port.open();
+                trace("port opened; one packet, no control line, no reset");
+                final boolean awake = rom.pingLoader();
+                message = awake
+                        ? "Loader answered with no reset · " + label
+                                + "\nThe chip is already in download mode: EN, IO0 and BOOT"
+                                + " were never used. FLASH needs a PROBE first."
+                        : "No answer to a bare sync packet · " + label
+                                + "\nOn its own that proves nothing: firmware does not"
+                                + " answer packets either. It separates the cases only when"
+                                + " the chip is known to sit in its loader.";
+                color = awake ? Ui.GOOD : Ui.ACCENT;
+            } catch (Exception e) {
+                final String reason = e.getMessage() == null ? e.toString() : e.getMessage();
+                message = "Sync failed: " + reason;
+                color = Ui.PINK;
+                trace("failed: " + reason);
+            } finally {
+                port.close();
+                trace("port closed");
+                releasePort("sync");
+            }
+            final String result = message;
+            final int resultColor = color;
+            activity.runOnUiThread(() -> {
+                if (activity.isDestroyed()) return;
+                usbProbing = false;
+                setUsbStatus(result, resultColor);
+            });
+        }, "usb-sync").start();
     }
 
     private void requestUsbPermission(UsbManager manager, UsbDevice device) {

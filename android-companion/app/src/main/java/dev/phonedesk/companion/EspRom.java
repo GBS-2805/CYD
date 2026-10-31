@@ -57,6 +57,8 @@ final class EspRom {
     private static final int SYNC_ATTEMPTS = 12;
     private static final int CONNECT_ROUNDS = 3;
     private static final int ALT_SYNC_ATTEMPTS = 6;
+    /** An awake loader answers the first packet, so the quiet phase needs few. */
+    private static final int QUIET_SYNC_ATTEMPTS = 3;
     private static final int ALT_CONNECT_ROUNDS = 2;
 
     /**
@@ -121,6 +123,13 @@ final class EspRom {
      * no sync packet can change, so the verdict is kept for the closing message.
      */
     private String flashBootMode = "";
+    /**
+     * True once a banner showed the ROM's download mode, "boot:0x3
+     * (DOWNLOAD_BOOT…) waiting for download". That is the opposite evidence: the
+     * strap took, the loader is running and listening, so a packet it ignores says
+     * nothing about EN, IO0 or the rate.
+     */
+    private boolean downloadBoot;
     /** Reset rounds that ran, and how many of those read any byte at all. */
     private int roundsSeen;
     private int roundsWithBytes;
@@ -187,6 +196,7 @@ final class EspRom {
                 roundsWithBytes = 0;
                 bannerSeen = false;
                 flashBootMode = "";
+                downloadBoot = false;
                 connected = false;
                 log("-- wiring " + phase + "/4: " + wiringName(swap, manual) + " --");
                 if (manual) {
@@ -296,10 +306,21 @@ final class EspRom {
             log("manual mode: IO0 is held high and EN is pulsed once per round. Hold"
                     + " BOOT down while this sweeps, then let go of BOOT.");
         }
+        // A loader that is already awake answers packets with no reset of ours, and
+        // this is the only phase that cannot fail for a reset-wiring reason: it never
+        // calls lines(), io0() or en(). It has to run before detectPolarity(), whose
+        // pulse is the first thing that changes the chip's state.
+        log("quiet sync: " + QUIET_SYNC_ATTEMPTS + " packets at " + baud
+                + " baud with the control lines untouched");
+        if (quietSync(QUIET_SYNC_ATTEMPTS)) {
+            synced = true;
+            log("synced at " + baud + " baud with no reset: the loader was already"
+                    + " waiting for a packet, so EN and IO0 played no part");
+        }
         // Measured in both modes. The boot text is what says which control polarity
         // resets this board, and manual mode needs that answer as much as the other
         // three: it used to inherit whatever the phase before it happened to leave.
-        detectPolarity();
+        if (!synced) detectPolarity();
         // Whatever polarity the boot text arrived on is the starting point; the
         // rounds then alternate away from it and back.
         final boolean base = invertControl;
@@ -342,7 +363,7 @@ final class EspRom {
                             + (afterPulse == 0
                             ? " — the pulse produced no bytes: EN did not reset the chip"
                             : " — " + afterPulse + " B of boot text after the pulse"
-                                    + flashNote()));
+                                    + strapNote()));
                 } else {
                     enterBootloader();
                     // Read the pulse's own output before any sync packet goes out, so
@@ -354,7 +375,7 @@ final class EspRom {
                             + (afterPulse == 0
                             ? " — the pulse produced no bytes at all"
                             : " — " + afterPulse + " B of boot text after the pulse"
-                                    + flashNote()));
+                                    + strapNote()));
                 }
                 try {
                     sync(attempts);
@@ -390,7 +411,28 @@ final class EspRom {
         if (!synced) {
             final String rates = silent.length() == 0 ? "none" : silent.toString();
             final String tail;
-            if (manualReset) {
+            if (downloadBoot) {
+                tail = ", in either reset polarity. The chip does reach its ROM loader: the"
+                        + " banner it prints ends with \"waiting for download\", so EN, the"
+                        + " strap, the cable and the receive path all work, and it ignored"
+                        + " the packets of " + roundsWithBytes + " of " + roundsSeen
+                        + " reset rounds. Nothing comes back while the chip sits in that"
+                        + " loader with its reset released, and no rate and no polarity"
+                        + " change that. Where the cable reaches the board's own bridge,"
+                        + " as it does on the CYD, both data directions are the board's"
+                        + " traces and there is no wire to inspect: the next test needs a"
+                        + " second host. Flash the board over this same cable from a PC with"
+                        + " esptool.py — a sync reply there puts the fault in this app, and"
+                        + " silence there points at the bridge's transmit side.";
+            } else if (!flashBootMode.isEmpty()) {
+                tail = ", in either reset polarity. The chip does restart, and the banner"
+                        + " it prints says " + flashBootMode + ": that is the firmware"
+                        + " booting, not download mode, so EN, the cable and the receive"
+                        + " path all work and IO0 stayed high at the moment of reset. No"
+                        + " packet or rate can undo that — hold BOOT by hand (MANUAL"
+                        + " BOOT) or look at where the adapter's IO0 leg stops reaching"
+                        + " the board.";
+            } else if (manualReset && roundsWithBytes == 0) {
                 tail = ", with IO0 held high and EN pulsed once per round. If the rounds"
                         + " read no bytes at all, EN is not resetting the chip at all: hold"
                         + " BOOT down and tap the board's own reset while the sweep"
@@ -400,14 +442,6 @@ final class EspRom {
                         + " plain reset, at 115200 or 74880, in either polarity. That"
                         + " points at the cable, the adapter's receive line or a board"
                         + " held in reset.";
-            } else if (!flashBootMode.isEmpty()) {
-                tail = ", in either reset polarity. The chip does restart, and the banner"
-                        + " it prints says " + flashBootMode + ": that is the firmware"
-                        + " booting, not download mode, so EN, the cable and the receive"
-                        + " path all work and IO0 stayed high at the moment of reset. No"
-                        + " packet or rate can undo that — hold BOOT by hand (MANUAL"
-                        + " BOOT) or look at where the adapter's IO0 leg stops reaching"
-                        + " the board.";
             } else if (roundsWithBytes == 0) {
                 tail = ", in either reset polarity. Boot text did arrive once, so the"
                         + " cable and the receive path work, but none of the "
@@ -565,6 +599,55 @@ final class EspRom {
      * treating it as proof of life locks in the wrong polarity. That mistake cost
      * a round trip on hardware.
      */
+    /**
+     * Send sync packets without moving DTR or RTS at all.
+     *
+     * The ROM stays in its loader until something resets it, so a chip that is
+     * already there answers packets alone: one left by an interrupted run, by
+     * another tool, or by an earlier probe of this app. Every other phase resets
+     * first, so a board whose EN or IO0 leg is not wired to the bridge can never
+     * show an awake loader that way — here the reset plays no part, and a success
+     * says the chip heard the packets.
+     */
+    private boolean quietSync(int attempts) throws IOException {
+        // A board still booting its firmware is loud; drain that before counting
+        // anything as a reply.
+        final int chatter = listenQuiet(120);
+        if (chatter > 0) {
+            log("  " + chatter + " B arrived with the lines untouched: the firmware"
+                    + " talking, not the loader");
+        }
+        try {
+            sync(attempts);
+            return true;
+        } catch (WriteFailure e) {
+            throw e;   // the bridge refusing bytes is not the board staying silent
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /**
+     * One sync packet with no reset, for the BOARD tab's SYNC ONLY button.
+     *
+     * The phase connect() starts with, exposed on its own: the ROM answers packets
+     * while it sits in its loader, so an already-awake chip can be checked without
+     * pulsing EN or IO0 — and without destroying the state that makes the check
+     * possible. Silence here means little on its own: a chip running its firmware
+     * does not answer packets either.
+     */
+    boolean pingLoader() throws IOException {
+        log("sync only: one packet at " + baud + " baud, control lines untouched");
+        final boolean awake = quietSync(1);
+        log(awake
+                ? "the loader answered, so it is already in download mode and EN and"
+                        + " IO0 played no part"
+                : "no answer. On its own that proves nothing: a chip running its"
+                        + " firmware does not answer packets either, and this test never"
+                        + " resets it.");
+        return awake;
+    }
+
     private void detectPolarity() throws IOException {
         log("proof of life: listening at 115200 and 74880 for boot text after a reset");
         // Listen once without touching the lines first. The board prints its banner
@@ -599,6 +682,10 @@ final class EspRom {
                         log("  that banner is a flash boot (" + mode + "), not download"
                                 + " mode: EN resets the chip and IO0 was high while it"
                                 + " did, so the strap never took");
+                    } else if (isDownloadBoot(mode)) {
+                        downloadBoot = true;
+                        log("  that banner is download mode (" + mode + "), so the strap"
+                                + " took and the ROM is listening for a packet");
                     }
                     return;
                 }
@@ -676,12 +763,27 @@ final class EspRom {
         return mode.contains("SPI_FAST_FLASH_BOOT");
     }
 
-    /** A round-line clause when its banner shows a flash boot, else "". */
-    private String flashNote() {
+    /**
+     * A round-line clause naming the boot mode its banner showed, or "" when the
+     * window held neither. Both modes are kept for the closing message, which has
+     * one advice for a flash boot and a different one for a loader waiting on
+     * packets that never arrive.
+     */
+    private String strapNote() {
         final String mode = bootMode();
-        if (!isFlashBoot(mode)) return "";
-        flashBootMode = mode;
-        return " — " + mode + ": flash boot, so IO0 was high at reset";
+        if (isFlashBoot(mode)) {
+            flashBootMode = mode;
+            return " — " + mode + ": flash boot, so IO0 was high at reset";
+        }
+        if (isDownloadBoot(mode)) {
+            downloadBoot = true;
+            return " — " + mode + ": in the ROM loader, waiting for a packet";
+        }
+        return "";
+    }
+
+    private static boolean isDownloadBoot(String mode) {
+        return mode.contains("DOWNLOAD_BOOT");
     }
 
     /** Bytes the board sent in the window after a reset with IO0 high. */

@@ -81,7 +81,19 @@ them owns the cable at a time; the choice is remembered across restarts.
   answers, says `found on wiring 2 of 4`, and sets **LINES** / **MANUAL BOOT** to
   match so FLASH and RESTART reuse it. Hold BOOT from the moment the log reaches
   wiring 3; the last two phases never drive IO0 low, and no software can press
-  that button.
+  that button. Before any of those four, one phase sends sync packets without
+  touching DTR or RTS at all: the ROM stays in its loader until something resets
+  it, so a board already sitting in download mode answers that phase — the only
+  case a wrong reset wiring cannot hide.
+  A round whose banner reads `boot:0x3 (DOWNLOAD_BOOT…) waiting for
+  download` has the chip in its loader and ignoring packets, so the closing line
+  asks for a second host — a PC flashing over the same cable — instead of blaming
+  the rate: the CH340 is on the board, so there is no data wire to check.
+- **SYNC ONLY** sends one sync packet and nothing else — no reset, no baud change,
+  no control line. A chip already sitting in its loader answers it, which is the
+  one result that needs no EN pulse and no BOOT held; silence proves nothing on its
+  own, because firmware does not answer packets either. It also never resets the
+  board on the way out, so the state it tested is still there afterwards.
 - **FLASH** on an imported `.bin` erases and writes it at `0x0`, verifies it by
   MD5 and reboots into it. `0x0` is the merged-image offset; an app-only image
   belongs at `0x10000` and will not boot from `0x0`.
@@ -205,7 +217,7 @@ through Gradle; a raw `javac` build produces an APK-less class check and the
 PROJECTS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
-[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (108 kB,
+[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (110 kB,
 package `dev.phonedesk.companion`, debug-signed). Install it with
 `adb install -r dist/PhoneDeckBridge-debug.apk`, or copy it to the phone and open
 it with "install unknown apps" allowed.

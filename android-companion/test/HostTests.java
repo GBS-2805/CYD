@@ -36,6 +36,9 @@ public final class HostTests {
         framingRoundTrip();
         syncChecksum();
         handshakeIntoDownloadMode();
+        quietSyncUsesNoControlLines();
+        pingLoaderSendsOnePacketWithoutReset();
+        pingLoaderSaysSilenceProvesLittle();
         decoyReplyIsSkipped();
         refusedWrite();
         silentBoard();
@@ -43,6 +46,7 @@ public final class HostTests {
         sweepStopsAtFirstAnswer();
         sweepTriesEveryWiring();
         flashBootNamesTheStrap();
+        downloadBootAsksForASecondHost();
 
         System.out.println();
         if (failures.isEmpty()) {
@@ -85,6 +89,7 @@ public final class HostTests {
     private static void handshakeIntoDownloadMode() throws Exception {
         final UsbSerialCh340 port = new UsbSerialCh340();
         port.answer(chip(false));
+        port.answerOnlyAfterPulse = true;   // keep this test on the reset path
         final EspRom rom = new EspRom(port);
         rom.setManualReset(true);
         final List<String> trace = new ArrayList<>();
@@ -112,9 +117,64 @@ public final class HostTests {
                 !lines.contains("dtr ") && !lines.contains("rts "));
     }
 
+    /**
+     * A loader that is already awake answers packets with no reset of ours. This is
+     * the case no other phase can reach: each of them resets first, which is also
+     * why a board with a broken EN or IO0 leg could never show an awake loader.
+     */
+    private static void quietSyncUsesNoControlLines() throws Exception {
+        final UsbSerialCh340 port = new UsbSerialCh340();
+        port.answer(chip(false));
+        final EspRom rom = new EspRom(port);
+        final List<String> trace = new ArrayList<>();
+        rom.setTrace(trace::add);
+
+        final EspRom.Detected detected = rom.connect();
+
+        check("an awake loader is found without a reset", "ESP32".equals(detected.chip));
+        check("the quiet phase reads the MAC too", "24:0a:c4:12:34:56".equals(detected.mac));
+        check("the probe finishes having written no control line", port.control.isEmpty());
+        check("the log says the loader needed no reset",
+                joined(trace).contains("the loader was already"));
+        check("the log says the lines were untouched",
+                joined(trace).contains("control lines untouched"));
+    }
+
+    /** SYNC ONLY: one packet, no control line, and the answer is the whole result. */
+    private static void pingLoaderSendsOnePacketWithoutReset() throws Exception {
+        final UsbSerialCh340 port = new UsbSerialCh340();
+        port.answer(chip(false));
+        final EspRom rom = new EspRom(port);
+        final List<String> trace = new ArrayList<>();
+        rom.setTrace(trace::add);
+
+        check("a bare sync finds an awake loader", rom.pingLoader());
+        check("the ping wrote no control line", port.control.isEmpty());
+        check("the ping sent exactly one packet",
+                port.commands.size() == 1 && port.commands.get(0)[0] == OP_SYNC);
+        check("the ping counts as no reset at all",
+                joined(trace).contains("control lines untouched"));
+    }
+
+    /**
+     * Silence to a bare packet must not read as a fault: firmware does not answer
+     * sync either, so the button only means something when the chip is known to be
+     * in its loader.
+     */
+    private static void pingLoaderSaysSilenceProvesLittle() throws Exception {
+        final EspRom rom = new EspRom(new UsbSerialCh340());
+        final List<String> trace = new ArrayList<>();
+        rom.setTrace(trace::add);
+
+        check("a silent chip is not called broken by a bare sync", !rom.pingLoader());
+        check("the log says silence alone proves nothing",
+                joined(trace).contains("proves nothing"));
+    }
+
     private static void decoyReplyIsSkipped() throws Exception {
         final UsbSerialCh340 port = new UsbSerialCh340();
         port.answer(chip(true));
+        port.answerOnlyAfterPulse = true;
         final EspRom rom = new EspRom(port);
         rom.setManualReset(true);
 
@@ -209,6 +269,41 @@ public final class HostTests {
                     e.getMessage().contains("IO0 stayed high"));
             check("a flash boot points at BOOT by hand",
                     e.getMessage().contains("MANUAL BOOT"));
+        }
+    }
+
+    /**
+     * The 13:49 banner: \"boot:0x3 (DOWNLOAD_BOOT…) waiting for download\" and then
+     * not one byte back from 552 B of sync packets. The chip was in its loader, so
+     * the old advice — hold BOOT, tap reset — would send a hand to the wrong place.
+     * With the CYD's bridge on the board there is no TX leg to check either, so the
+     * only test that separates the app from the bridge is another host on the cable.
+     */
+    private static void downloadBootAsksForASecondHost() throws Exception {
+        final UsbSerialCh340 port = new UsbSerialCh340();
+        port.refuseRates = true;   // one round at 115200, the rest refused instantly
+        port.printOnPulse = "ets Jul 29 2019 12:21:46\r\n\r\n"
+                + "rst:0x1 (POWERON_RESET),boot:0x3 (DOWNLOAD_BOOT(UART0/UART1/SDIO_REI_REO_V2))"
+                + " waiting for download\r\n";
+        final EspRom rom = new EspRom(port);
+        final List<String> trace = new ArrayList<>();
+        rom.setTrace(trace::add);
+        try {
+            rom.connect();
+            check("a download-mode banner still fails without a sync reply", false);
+        } catch (IOException e) {
+            check("a download-mode banner is called download mode",
+                    joined(trace).contains("download mode"));
+            check("a round line says the loader is waiting for a packet",
+                    joined(trace).contains("in the ROM loader"));
+            check("the failure asks for a second host, not a rate",
+                    e.getMessage().contains("second host"));
+            check("the failure names esptool on the same cable",
+                    e.getMessage().contains("esptool.py"));
+            check("the failure says the bridge is on the board",
+                    e.getMessage().contains("no wire to inspect"));
+            check("download mode stops the BOOT-holding advice",
+                    !e.getMessage().contains("hold BOOT down and tap"));
         }
     }
 

@@ -42,6 +42,11 @@ final class UsbSerialCh340 {
     boolean failWrites;
     /** Text the chip prints on every pulse, the way the ROM prints its banner. */
     String printOnPulse;
+    /**
+     * Answer only once a control line has moved. The reset-path tests need this:
+     * else the quiet phase's packets are answered and no reset ever happens.
+     */
+    boolean answerOnlyAfterPulse;
     int baud = 115200;
 
     void answer(Responder responder) {
@@ -103,7 +108,9 @@ final class UsbSerialCh340 {
         final byte[] payload = Arrays.copyOfRange(frame, 8, end);
         commands.add(new int[]{ op, checksum });
         payloads.add(payload);
-        if (responder != null) responder.onCommand(this, op, checksum, payload);
+        if (responder != null && (!answerOnlyAfterPulse || !control.isEmpty())) {
+            responder.onCommand(this, op, checksum, payload);
+        }
     }
 
     // ------------------------------------------------------------- traffic ---
@@ -144,14 +151,27 @@ final class UsbSerialCh340 {
 
     void setDtrRts(boolean dtr, boolean rts) {
         control.add("both dtr=" + dtr + " rts=" + rts);
-        if (printOnPulse != null) inject(printOnPulse.getBytes(StandardCharsets.UTF_8));
+        printBanner();
     }
 
+    /**
+     * The ROM prints its banner whenever EN is released, whichever line carried
+     * that edge: a wiring the protocol drives one line at a time gets the same
+     * answer as one it drives both at once. Injecting only from setDtrRts() made a
+     * one-line pulse look silent in the tests while the real chip answered it,
+     * which is how the round that reached download mode read as "no bytes".
+     */
     void setDtr(boolean on) {
         control.add("dtr " + on);
+        if (!on) printBanner();   // false is the line released high, i.e. out of reset
     }
 
     void setRts(boolean on) {
         control.add("rts " + on);
+        if (!on) printBanner();
+    }
+
+    private void printBanner() {
+        if (printOnPulse != null) inject(printOnPulse.getBytes(StandardCharsets.UTF_8));
     }
 }

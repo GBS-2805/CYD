@@ -275,8 +275,10 @@ try another cable, and confirm the phone supports USB host mode.
    reset, and download mode's ends with `waiting for download`, so that points at
    the reset line (EN), not at the packet. `N B of boot text after the pulse` on a
    round that still reports `0 B in / 552 B out` is the opposite case — the chip
-   restarted and ignored what arrived, so the packet or the rate is the open
-   question.
+   restarted and ignored what arrived. Its banner says which case it is: a
+   `boot:0x3 (DOWNLOAD_BOOT…)` banner means the loader was up and heard nothing,
+   and the closing line then asks for a second host instead of blaming the packet
+   or the rate.
    Rounds alternate the DTR/RTS polarity and the log marks the inverted ones, so
    compare rounds before blaming the board: a board whose EN/IO0 pair is inverted
    answers only on the inverted rounds.
@@ -289,7 +291,22 @@ try another cable, and confirm the phone supports USB host mode.
    the EN pulse is not arriving either — then tap the board's own reset by hand
    while the sweep listens, and let go of **BOOT** once it answers. A round whose
    banner reads `boot:0x13 (SPI_FAST_FLASH_BOOT)` is the opposite: the chip did
-   restart, EN is fine, and IO0 was high, so only BOOT can change the strap.
+   restart, EN is fine, and IO0 was high, so only BOOT can change the strap. If the
+   banner instead says `boot:0x3 (DOWNLOAD_BOOT…) waiting for download`, the strap
+   took and the ROM is listening: BOOT is fine. The CH340 is on the board, so the
+   TX and RX legs are the board's own traces and there is nothing to measure —
+   flash the board from a PC with esptool.py over this same cable. If that answers,
+   this app's transmit path is the fault; if it never answers, the bridge's
+   transmit side is.
+   Every probe starts with a quiet sync phase that sends packets without moving DTR
+   or RTS, so a board left in download mode by an earlier attempt answers before
+   anything resets it. A log line reading `synced at 115200 baud with no reset`
+   means the loader was already awake and EN and IO0 were never used at all.
+   **SYNC ONLY** sends that single packet on its own, with no reset before or
+   after it, so a board a previous run left in download mode can be re-checked in
+   about a second. An answer there is the cleanest evidence this app can produce
+   that the chip hears it; no answer means little unless the chip was in its
+   loader, since firmware does not answer packets either.
 6. Still nothing? Set **LINES: SWAPPED** and probe again. That drives EN on DTR
    and IO0 on RTS, which is what an adapter with a reversed pair needs; without
    it the reset is released with IO0 high and the ROM never runs, at any rate.

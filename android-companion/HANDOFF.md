@@ -256,6 +256,38 @@ URL and a flashing note. Decisions behind it:
   inheritance was not the fault, but the blind spot was real. `probeUsb()`
   hard-resets on this path too, so a failed attempt does not leave the ROM in
   download mode.
+- **A download-mode banner is its own verdict.** The 13:49 run on 31 October
+  printed `boot:0x3 (DOWNLOAD_BOOT(UART0/UART1/SDIO_REI_REO_V2)) waiting for
+  download` and still got nothing back from 552 B of sync packets at 115200, then
+  nothing at any other rate. `downloadBoot` is now recorded the way `flashBootMode`
+  is, and the closing message consults it before every other branch: the loader is
+  running, so EN, the strap, the cable and the receive path all work and the packets
+  are not arriving. The message does not send anyone after a wire: the deck's CH340
+  is on the board (HOWTO step 1 is an OTG adapter and a data cable into the CYD's
+  own port), so both data directions are the board's own traces. It asks for a
+  second host — a PC flashing over the same cable — because that is the only test
+  left that separates this app from the bridge. It also no longer sends the next
+  bench session to press BOOT again, which the previous wording would have.
+- **A quiet sync phase runs before the first reset.** `connect()` sends
+  `QUIET_SYNC_ATTEMPTS` (3) sync packets with no `lines()`, `io0()` or `en()` call
+  at all, because the ROM stays in its loader until something resets it: a chip
+  left there by an interrupted run, by another tool, or by an earlier probe of this
+  app answers packets alone. Every other phase resets first, so a board whose EN or
+  IO0 leg is not wired to the bridge could never show an awake loader that way. A
+  success is logged as `synced at … baud with no reset`, and it means the packets
+  arrived — which is the fact the 13:49 log could not establish.
+- **SYNC ONLY on the BOARD tab is the same packet, alone.** `EspRom.pingLoader()`
+  sends one sync through the quiet phase and returns whether anything came back; the
+  tab opens the port, traces the attempt and closes it without resetting, so the
+  loader state it tests survives the test. `RESTART BOARD` is how that chip gets
+  back to its firmware. The failure wording refuses to call silence a fault: on its
+  own it is not one, because firmware does not answer sync. The status line also
+  says FLASH still needs a PROBE, since `flash()` requires a session that synced
+  and read the chip ID.
+- **The stub prints a banner when EN is released on either line.** It used to
+  inject only from `setDtrRts()`, so the one-line `enterBootloader()` pulse read as
+  silence in the tests while the chip answered it on hardware. The download-mode
+  check surfaced that: its round line had no banner to quote.
 - **Swapped control lines** (`EspRom.setSwappedLines`, the **LINES** button) put EN
   on DTR and IO0 on RTS. Inverting both lines, which the polarity rounds do,
   cannot fix a crosswired pair: each line only becomes its opposite, so reset is
@@ -439,7 +471,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-10-31 after the sketch
-  header change and the probe work **110,509 bytes** after the icon, the app
+  header change and the probe work **112,473 bytes** after the icon, the app
   allowlist, the edge-to-edge padding and the four-wiring sweep.
   The earlier 128,924-byte APK unpacked to the same six entries with the same
   uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
@@ -465,8 +497,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
   build-time data. The probe changes shipped **99,533 bytes**, the flash-shelf
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
-  and edge-to-edge work **110,509 bytes**; `dist/` holds that last artifact. Quote
-  the size to the nearest kB (~108 kB), never as a checksum.
+  and edge-to-edge work **112,473 bytes**; `dist/` holds that last artifact. Quote
+  the size to the nearest kB (~110 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set,
   `application-icon: 'res/BW.xml'` (resource names are shortened) and
