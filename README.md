@@ -10,7 +10,6 @@ docs — are in [CONVENTIONS.md](CONVENTIONS.md). Read it before adding a widget
 | Project | Folder | What it is | Read |
 | --- | --- | --- | --- |
 | **Phone Deck** | [`cyd_phone_deck/`](cyd_phone_deck) | ESP32-2432S024R (2.4" CYD) phone dashboard: clock, battery and notifications | [README](cyd_phone_deck/README.md) |
-| **Board check** | [`cyd_board_check/`](cyd_board_check) | Self-check for the same board: display, touch, RGB LED and flash in one screen plus a serial report | [README](cyd_board_check/README.md) |
 | **ESP32_Widgets app** | [`android-companion/`](android-companion) | **Off-site**, the Android app: CYD monitor, BLE bridge, USB flasher and sketch shelf | [README](android-companion/README.md) · [HOWTO](android-companion/HOWTO.md) · [handoff](android-companion/HANDOFF.md) |
 
 **Phone Deck** is a BLE peripheral exposing a small **Phone Link** GATT

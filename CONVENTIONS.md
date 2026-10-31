@@ -142,8 +142,6 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
 * Never document a step as working because it should. The OTG upload is recorded
   as broken with the baud rates and byte counts tried; that record is what stops
   the next attempt from repeating it.
-* [`cyd_board_check`](cyd_board_check/README.md) is the reference diagnostic for
-  this board — flash it before blaming a new sketch.
 
 ## Adding a widget
 
