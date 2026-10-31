@@ -28,6 +28,7 @@ cable. It files its projects under **ESP32_Widgets**, with this one as
 **Phone Deck**.
 
 A built debug APK is at [`android-companion/dist/PhoneDeckBridge-debug.apk`](android-companion/dist/PhoneDeckBridge-debug.apk).
+A deck change reaches that APK by commit rather than by editing the app; the exact commands are in [DECK_HANDOFF.md](DECK_HANDOFF.md).
 
 Nothing here needs Bluetooth pairing. The deck is a GATT peripheral, not a
 keyboard, so it does not appear in the phone's Bluetooth settings list.
