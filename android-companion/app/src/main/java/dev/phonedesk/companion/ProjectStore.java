@@ -131,8 +131,9 @@ final class ProjectStore {
 
     /**
      * Keeps the notebook in step with the widgets the APK carries: the old `deck`
-     * record is renamed in place so an upgrade keeps its log, and any widget with
-     * no record yet gets its seed. Writes only when something actually changed.
+     * record is renamed in place so an upgrade keeps its log, any widget with no
+     * record yet gets its seed, and a record whose card text no longer matches its
+     * descriptor is refreshed. Writes only when something actually changed.
      */
     private static List<Project> withWidgets(Context context, List<Project> projects) {
         boolean changed = false;
@@ -144,20 +145,43 @@ final class ProjectStore {
         }
         for (WidgetCatalog.Widget widget : WidgetCatalog.all(context)) {
             String id = WIDGET_PREFIX + widget.id;
-            boolean present = false;
+            Project record = null;
             for (Project project : projects) {
                 if (id.equals(project.id)) {
-                    present = true;
+                    record = project;
                     break;
                 }
             }
-            if (!present) {
+            if (record == null) {
                 projects.add(widgetSeed(widget));
+                changed = true;
+            } else if (refreshFromWidget(record, widget)) {
                 changed = true;
             }
         }
         if (changed) save(context, projects);
         return projects;
+    }
+
+    /**
+     * Card text belongs to the descriptor; the log fields — status, build, touch,
+     * notes and the timestamp — stay on the record, because that is what the user
+     * typed. Notes are left alone: they can carry text merged from FirmwareNotes.
+     */
+    private static boolean refreshFromWidget(Project project, WidgetCatalog.Widget widget) {
+        String libraries = String.join(", ", widget.libraries);
+        boolean stale = !widget.name.equals(project.name)
+                || !widget.tagline.equals(project.tagline)
+                || !widget.body.equals(project.body)
+                || !libraries.equals(project.libraries)
+                || project.kind != KIND_INSIDE;
+        if (!stale) return false;
+        project.name = widget.name;
+        project.tagline = widget.tagline;
+        project.body = widget.body;
+        project.libraries = libraries;
+        project.kind = KIND_INSIDE;
+        return true;
     }
 
     static Project byId(Context context, String id) {

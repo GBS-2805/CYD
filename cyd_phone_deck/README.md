@@ -1,8 +1,25 @@
-# CYD Phone Deck
+# Phone Deck
 
 A phone dashboard for the **ESP32-2432S024R** (2.4" resistive-touch CYD): clock,
-battery and notifications in a slate-and-cyan control-surface UI, with the same
-touch calibration flow as the macro pad sketch.
+battery and notifications, set like a woodblock print — flat panels, heavy rules,
+one ink, nothing shaded. It ships **two monochrome themes** of twelve slots each:
+
+* **0 PAPER** — black on white: ground #ffffff, panels #f4f4f4, hairlines
+  #c8c8c8, ink #000000, dim ink #6f6f6f, the one action #2b2b2b.
+* **1 INK** — white on black: ground #000000, panels #0e0e0e, hairlines #333333,
+  ink #ffffff, dim ink #8c8c8c, the one action #d4d4d4.
+
+`THEME_INDEX = 1` selects INK. The six accent slots are a grey ramp rather than
+hues, so link state, the one action and the battery warning separate by
+luminance instead of colour, which is what keeps both themes readable on a panel
+this size. The full table is `THEMES[]` at the top of the sketch.
+
+The folder and the sketch file keep the name `cyd_phone_deck`: ArduinoDroid
+compiles one `.ino` whose name must match its folder, and the companion app's
+Gradle task copies that exact path into the APK. Everything a person reads — the
+BLE name, the header wordmark, the app's project card, these docs — says
+**Phone Deck**. Boards flashed before the rename still advertise
+`ESP32 Phone_Widget <TAG>`, and the app matches that fragment too.
 
 The deck is a Bluetooth LE peripheral exposing a small GATT service called
 **Phone Link**. Something on the phone writes the time, battery level and
@@ -44,9 +61,50 @@ The RGB LED is three discrete LEDs between the GPIOs and 3.3 V, so each channel
 lights when its pin is LOW. `disableOnboardLed()` drives red, green and blue
 HIGH at boot, which keeps the LED dark; a floating channel glows cyan.
 
-## Build
+The board carries three buttons: **BOOT** and **RESET** on the back, and a
+**battery switch** next to the battery connector. The backlight has its own
+switch at the side edge, not a button. The sketch reads none of them — BOOT and
+RESET matter only for flashing.
 
-Flashing, calibration and link testing step by step: [HOWTO.md](HOWTO.md).
+Also on the back and unused by the firmware: a **TF** card slot, a speaker
+header, the battery JST, a 4P-1.25 connector, extended IO, and a
+temperature/humidity header. The module is an **ESP-WROOM-32** stamped `N4XX` -
+4 MB of flash, no PSRAM - so nothing here can use PSRAM even though the ESP32 Dev
+Module board menu offers the option (there is nothing to map).
+
+## Front page
+
+The deck boots into a front page: a status line across the top (clock left,
+battery and gear right), a `PHONE DECK` wordmark with the link state beside it, an
+outlined pill with the unread count, a solid pill naming the palette this build is
+baked with, and four numbered tabs. The gear opens settings from here and from
+the messages board; holding it for a second forgets the bound phone.
+
+* **01 MESSAGES** opens the notification board. Its `<` chip, and every settings
+  path, come back here.
+* **02 SETTINGS** is brightness (two buttons, one half of the card each), clear
+  and calibration.
+* **03 THEME** is a read-only contact sheet: both palettes on their own
+  grounds with the live one outlined. The palette is compile-time, so the page
+  points at `THEME_INDEX` instead of pretending to have a switch.
+* **04 CALIBRATE** starts the three-tap calibration; saving or cancelling returns
+  to the front page.
+
+The front page carries no graphic: the four tabs measure 300x30 at y 84, 118,
+152 and 186 under a hairline at 78, and a closing rule runs at 224. The clock and
+battery began in a strip along the bottom at 222; they now sit at y 6, above the
+wordmark, so a glance does not have to travel past the tabs to find them. An
+earlier version drew a lens-shaped heat band under the tabs; it was removed
+because a tinted strip there competed with the wordmark and read as decoration.
+
+## Picture
+
+`renders/board.png` is the one image in this folder: the board with the deck on
+it, marked up with the facts above. It is kept by hand — there is no renderer to
+run and nothing to check — so read it as an illustration and read the sketch for
+what the screen actually draws.
+
+## Build
 
 * ESP32 Arduino core **2.x or 3.x** (compiled against 2.0.17 and 3.3.12). The
   sketch uses the core's own Bluedroid library (`BLEDevice`, `BLEServer`).
@@ -63,23 +121,100 @@ arduino-cli upload  --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 cyd_phone_deck
 ```
 
 On a machine with none of that installed, [`toolchain.sh`](toolchain.sh) does all
-of it — toolchain, core, libraries, the pyserial the core's esptool needs — and
-compiles the sketch, in one idempotent command. See [HOWTO.md](HOWTO.md).
+of it — arduino-cli, the core, the three libraries, the pyserial the core's
+esptool imports — and compiles the sketch, in one idempotent command:
+
+```bash
+cd cyd_phone_deck
+./toolchain.sh                        # into ~/.arduino-cyd, then compile
+ARDUINO_HOME=/opt/cyd ./toolchain.sh  # or somewhere else
+./toolchain.sh --setup-only           # install without compiling
+source ~/.arduino-cyd/env.sh          # puts arduino-cli and pyserial on PATH
+```
+
+It is also the recovery command after a wiped machine, which is why the numbers
+below are a compile in this repo rather than a remembered figure. Core 2.0.17's
+build shells out to its bundled `esptool.py`, which imports `pyserial`: if the
+`python3` on `PATH` lacks it the compile dies **after** the link step with
+`ModuleNotFoundError: No module named 'serial'`. The script installs it, or
+`python3 -m pip install --target ~/.arduino-pylibs pyserial` and
+`export PYTHONPATH=~/.arduino-pylibs`.
+
+The USB bridge is a **CH340** (`1a86:7523`, one interface), so a data cable is
+enough for a port to appear and `lsusb` separates a dead cable from a dead board.
+Its DTR/RTS lines reset the ESP32, so `arduino-cli upload` needs no BOOT press.
+Holding **BOOT** while plugging in is untested on this board: the fallback for an
+upload that will not sync, not a step.
+
+## Edit it on the phone (ArduinoDroid)
+
+1. **PROJECTS** → the **Phone Deck** card → **COPY DROID**, then paste into a new
+   ArduinoDroid sketch. **SAVE** writes it to Downloads instead.
+2. Keep it one tab named `cyd_phone_deck.ino`, and do not add `.h` files: an
+   earlier split into `deck_types.h` failed on the phone with
+   `fatal error: deck_types.h: No such file or directory`, because only the
+   `.ino` is compiled.
+3. Board **ESP32 Dev Module**; install only Adafruit GFX, Adafruit ILI9341 and
+   XPT2046_Touchscreen. **ArduinoBLE must not be installed.**
+4. Compiling on the phone works; **uploading over USB-OTG does not**. The CH340
+   opens and the phone can drive DTR/RTS, but the ESP32 ROM bootloader never
+   answered a sync at **115200, 57600, 230400, 460800 or 74880** baud in either
+   polarity, while 552 B left the phone per attempt — the send path works, the
+   handshake does not. ArduinoDroid's upload is that same handshake, so it fails
+   the same way, and the companion app cannot reflash the deck either. The flash
+   needs a cable to a computer.
+
+## widget.json: how the app finds this widget
+
+`widget.json` in this folder is the widget's side of the contract with the
+companion app. The app does not hard-code this sketch; it reads this file, so a
+widget is a folder that describes itself.
+
+| Field | Used for |
+| --- | --- |
+| `id` | the project id (`widget:phone_deck`) and the asset folder name |
+| `name`, `tagline`, `body`, `notes` | the project card in the app |
+| `sketch` | the file copied into the APK; must match the folder plus `.ino` |
+| `libraries`, `never` | the LIBRARIES card, including what to refuse to install |
+| `ble.service`, `ble.nameMatch` | what the app looks for while scanning |
+
+The app's Gradle task walks every `*/widget.json` beside `android-companion/`
+and copies the descriptor and the sketch it names into
+`app/src/main/assets/widgets/<id>/` at build time. Editing the sketch here stays
+enough for a rebuild to carry it; there is no second copy in the app's source.
+Run [`../check_widget_assets.py`](../check_widget_assets.py) before committing to
+confirm the two copies still match byte for byte.
+
+To get a new widget onto the phone without publishing anything: put this folder
+in your own private transfer location (Drive, mail, USB), download
+`cyd_phone_deck.ino` on the phone, and use the app's **IMPORT** button. The
+sketch lands on the flash shelf and opens in ArduinoDroid, exactly like the
+bundled copy.
 
 ## First run and testing the link
 
 1. Flash and let the deck boot. The first boot opens touch calibration: tap the
-   four corner dots, then the three check dots.
-2. **Forget any old "Phone Deck" entry** in the phone's Bluetooth settings if you
-   paired the earlier HID build; that stale bond points at a keyboard service the
-   deck no longer has.
+   three dots — top-left, top-right, bottom-left — and the fit saves itself.
+   Each tap is the median of four panel reads and is dismissed if the samples
+   disagree by more than 300 raw units, so one noisy conversion cannot misplace a
+   corner; three taps fix the affine map exactly. Hold anywhere for 2 s to
+   abandon without saving, and bump `CAL_MAP_VERSION` in the sketch to invalidate
+   stored fits after a mapping change.
+2. **Forget any old "ESP32 Phone_Widget" entry** in the phone's Bluetooth
+   settings if you paired the earlier HID build; that stale bond points at a
+   keyboard service the deck no longer has.
 3. Install the companion app from [`android-companion`](../android-companion),
    grant notification access, and let it link. The deck should jump to
    `LINKED`, show the clock, battery and notification rows.
-4. If it stays empty, install **nRF Connect for Mobile**, scan for **Phone Deck**,
-   connect, and write the Phone Link characteristics (UUIDs below). If that
+4. If it stays empty, install **nRF Connect for Mobile**, scan for
+   **Phone Deck**, connect, and write the Phone Link characteristics
+   (UUIDs below). If that
    works, the deck and its display are fine and the problem is on the phone
    side.
+
+A serial monitor at **115200** right after boot prints `[id] Phone Deck A1B2C3
+owner unbound` and `[ble] advertising as "Phone Deck A1B2C3"`; the tag is that
+board's MAC, so it differs per board.
 
 ### Companion options
 
@@ -106,8 +241,9 @@ Service `6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10`, three write characteristics:
 
 Writes are normal GATT write-with-response; no subscription is needed and no
 pairing is required. Time is local wall-clock time, so the deck needs no timezone
-handling. The weekday byte is required only to reach the 7-byte minimum: the
-sketch reads the first six bytes and derives the weekday from the date. Notification
+handling. The seventh, weekday byte is required only to reach the 7-byte minimum
+(`value.length() < 7` returns early): `LinkTimeCallbacks` passes `b[0]`–`b[5]` to
+`epochFromParts` and the sketch derives the weekday from the date. Notification
 writes are appended; the oldest of six slots is dropped.
 
 Example with `bleak` from a laptop:
@@ -148,9 +284,87 @@ asyncio.run(main())
 
 * Packet (28/31 bytes): flags `0x06` (3), the Phone Link 128-bit service UUID
   (18), and the shortened name "Phone" (7).
-* Scan response: the complete name "Phone Deck".
+* Scan response: the complete name `Phone Deck <TAG>`, where `TAG` is the low 24
+  bits of the chip's MAC in uppercase hex, e.g. `Phone Deck A1B2C3`. No two
+  boards advertise the same name. A board flashed before the rename still says
+  `ESP32 Phone_Widget <TAG>`, which the app matches as well.
 * `startBluetooth()` waits 200 ms after configuring the payloads before starting
-  advertising, because Bluedroid applies them asynchronously.
+  advertising, because Bluedroid applies them asynchronously. Without that delay
+  the deck advertised empty and never appeared in any scan.
+
+## One board, one phone
+
+Every board is its own widget and answers to one phone, so a shelf of decks is a
+list of distinct devices rather than a row of identical entries.
+
+* `DEVICE_TAG` is the low 24 bits of the ESP32's efuse MAC, read once at boot
+  with `ESP.getEfuseMac()` and printed as six uppercase hex digits.
+* The BLE name is `Phone Deck <TAG>`; the header wordmark is `Phone Deck` and
+  the subtitle shows `esp32 // #<TAG>`, so the screen and the scan list match.
+* The first phone to connect is written to NVS (`identity` / `owner`) and
+  becomes the only phone the deck listens to. Another phone can still connect,
+  but its writes are dropped in the Phone Link callbacks and the link is not
+  counted, so the deck keeps showing `OFFLINE`.
+* Hold the gear for 1.2 s on the board screen to forget the bound phone. The
+  serial log prints `[id] binding cleared`, and the next phone to connect claims
+  the board.
+* The binding is in NVS, so re-flashing does not clear it — only the gear hold
+  (or an erase-flash) does. Because the tag comes from the MAC, re-flashing also
+  keeps the same name; two different boards differ in both.
+
+## Traps already hit
+
+* **One file, no extra headers.** Everything the sketch needs lives above the
+  first function that uses it; a header beside the `.ino` does not exist for the
+  phone.
+* **An address is not an identity.** An Android central uses a resolvable private
+  address that rotates, so the binding is a record, not a gate: gating
+  `serverConnected` on the stored address left a phone attached while the deck
+  read OFFLINE. `rememberPeer()` stores and logs who holds the link, and
+  `peerAllowed` follows the connection.
+* **Do not re-add HID for Android.** Advertising a HID keyboard made iOS list the
+  deck, but on Android the phone tried to use it as a keyboard, failed, left a
+  stale bond and then refused to reconnect.
+* **Touch is sampled, not read once.** `readRawTouch()` takes four conversions,
+  drops any that convert zero pressure, medians each axis and rejects the tap if
+  the spread exceeds 300 raw units. The pressure floor is deliberately not a
+  gate: the scale differs per panel and a blind threshold could disable touch.
+* **"Brightness only goes down" was calibration drift, not the button.** Taps
+  mapped tens of pixels off, landed beside the chip and were dropped. The chips
+  were widened to half the card anyway, and `applyBrightness()` logs the percent,
+  the duty and `ledcRead()` because a silent `ledcAttach()` failure looks exactly
+  like a setting that does nothing.
+* **Bonding is available, not required.** `startBluetooth()` sets
+  `ESP_LE_AUTH_REQ_SC_BOND` with `ESP_IO_CAP_NONE`, while the characteristics keep
+  the core's default `READ|WRITE` permissions, so an unpaired companion can write
+  and a phone that asks to bond still completes. Nothing has to be paired, and
+  the link carries no encryption until a phone does.
+* **The RGB LED is active-low**: three discrete LEDs between GPIO 4/16/17 and
+  3.3 V. There is no WS2812 on this board — `neopixelWrite` was wrong and is gone.
+
+## Verified, and not
+
+A compile in this repo, on 2026-10-30, with `arduino-cli` 1.5.2-rc.1:
+**core 2.0.17** 1,162,797–1,162,813 B (**88 %** flash) and 41,436 B (12 % RAM);
+**core 3.3.12** 1,163,930 B (88 %) and 45,004 B (13 %). The 2.x figure moves by
+~16 bytes with the build root, so read it as 1,162.8 kB rather than a fixed count.
+Core 3.x costs ~1 kB of flash and 3.6 kB of RAM for this sketch.
+
+Not verified: **nothing has run on a phone since the HID removal and the new
+advertising packet**; the binding has never been exercised end to end (phone A
+binds, phone B is refused, the gear hold releases); the touch mapping has not met
+a real panel; and the status LED has not been confirmed dark after flashing. The
+first flash of a new board is the test of those, not a formality.
+
+## When it misbehaves
+
+| Symptom | Cause | What to do |
+| --- | --- | --- |
+| nothing in a Bluetooth scan | setup failed before `startBluetooth()`, or a phone holds the link | check the boot log for the advertising line; disconnect that phone |
+| a second phone changes nothing | that is the binding: `[ble] refused: this deck is bound to another phone` | hold the gear 1.2 s (`[id] binding cleared`), then connect the phone you want |
+| will not reconnect after one success | a stale HID bond from an old build | forget `ESP32 Phone_Widget` in Bluetooth settings, power-cycle the deck |
+| white or blank screen | backlight at minimum, or the pin is not driven | SET has − and +; the backlight is GPIO 27 |
+| status LED still glows | a channel wired differently on this revision | adjust `PIN_LED_*` |
 
 ## Limits worth knowing
 

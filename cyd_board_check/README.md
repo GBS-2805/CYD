@@ -81,16 +81,60 @@ values are recoverable from a log even if the screen is the thing that is broken
 Same core and the same three libraries as the deck — **Adafruit GFX Library**,
 **Adafruit ILI9341**, **XPT2046_Touchscreen** — and no BLE library at all. The
 deck's [`../cyd_phone_deck/toolchain.sh`](../cyd_phone_deck/toolchain.sh) installs
-exactly that set, so there is no second copy of it here. Step by step:
-[HOWTO.md](HOWTO.md).
+exactly that set, so there is no second copy of it here.
+
+```bash
+cd ../cyd_phone_deck && ./toolchain.sh --setup-only   # idempotent, skips what is there
+source ~/.arduino-cyd/env.sh                         # arduino-cli and pyserial on PATH
+
+cd ../cyd_board_check
+arduino-cli compile --fqbn esp32:esp32:esp32 cyd_board_check
+arduino-cli upload  --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 cyd_board_check
+```
+
+`-p` is whatever port appeared: `/dev/ttyUSB*`, `/dev/cu.*`, or a `COM` number.
+The ROM bootloader does not answer over USB-OTG from a phone at any baud tried,
+so the flash needs a computer; and if the compile dies with
+`ModuleNotFoundError: No module named 'serial'`, the `env.sh` `PYTHONPATH` is
+missing. Unplug and replug after the upload so the `reset` line reads `power-on`
+rather than `software`.
 
 ## Limits worth knowing
 
 * Nothing is calibrated and nothing is written to flash: this sketch never touches
   NVS, so it cannot corrupt a board you already trust.
-* The LED test is timed rather than button-driven — the CYD has one BOOT button and
-  watching four seconds per channel beats holding it.
+* The LED test is timed rather than button-driven. The board has three buttons —
+  **BOOT** and **RESET** on the back, the backlight on its own switch at the side
+  edge — so the test runs itself instead of asking you to reach behind the board.
 * No SD card, no speaker, no WiFi or BLE radio test. It proves the parts the deck
   needs and stops there.
 * The touch mapping constants are guesses until a real panel has reported its own
   corners; treat the dot as a hint about axis order, not as an accurate pointer.
+
+## Reading the result
+
+| What you see | What it means |
+| --- | --- |
+| everything fills in, dot follows the finger | board is good — flash the deck |
+| dot moves diagonally, raw x and y swap as you move | touch axes are rotated; the deck's own calibration handles it |
+| dot runs off an edge before the finger reaches it | the mapping box is too wide; record the `raw` span |
+| `touch` never counts, serial shows nothing on tap | touch not responding: reseat the display ribbon, then suspect the panel |
+| one LED channel never lights | that channel's LED or GPIO; cosmetic on the deck |
+| a channel stays lit under `led off` | wired differently on this revision; change `PIN_LED_*` |
+| `panic` or `watchdog` in `reset` on a plain power-on | earlier firmware crashed; flashing this clears it |
+| no serial output at all | the sketch did not start — re-flash; if it will not sync, hold **BOOT** while starting the upload |
+
+Recovery: hold **BOOT**, tap **RESET**, release **BOOT**, upload again. A port
+that disappears mid-upload is usually a hub between board and computer.
+
+## Verified, and not
+
+Verified by a compile: `arduino-cli` 1.5.2-rc.1 against ESP32 core **3.3.12**,
+320,372 B (24 %) flash and 24,420 B (7 %) RAM, `--warnings all` clean, measured
+2026-10-30. Core **2.0.17** was not installed when the sketch was written, so the
+2.x number is unknown rather than equal.
+
+Not verified: **nothing here has run on hardware** — every reading above is a
+reading of the code. The touch constants (`TOUCH_MIN_X` … `TOUCH_MAX_Y`, around
+±300–3800) and the `z < 200` pressure floor are guesses the first real panel
+should replace, and `psram` reads `none found` unless the build enables PSRAM.
