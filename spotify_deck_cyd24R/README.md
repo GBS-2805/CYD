@@ -224,6 +224,42 @@ all of that. What *is* measured is the chain: `api.spotify.com` and
 `accounts.spotify.com` were each verified against the root compiled into the
 sketch from a desktop on 2026-10-31.
 
+### At a glance
+
+**Verified here** — none of this needs hardware:
+
+* The committed sketch links under the documented core **2.0.17** at 967,413
+  bytes (73 %), the measurement above. Re-measured on 2026-10-31 with
+  `arduino-cli` 1.5.2-rc.1, core **3.3.12** links the committed file at
+  1,122,249 bytes (85 %) with 53,572 bytes of globals (16 %), `EXIT=0` under
+  `--warnings all`; a comment-only edit links to exactly the same size, so the
+  figure is a stable build rather than a stale build path. The two cores differ
+  by ~155 kB, which is the WiFi stack as IDF 5 links it rather than mbedTLS (see
+  [the build note](../CONVENTIONS.md#build)); 2.0.17 is the one `toolchain.sh`
+  pins, so that is where the release numbers come from.
+* Seven warnings, all accounted for above.
+* The bundled copy in `app/src/main/assets/widgets/spotify_deck_cyd24R/` matches
+  this folder byte for byte after `:app:syncWidgets`, and
+  `check_widget_assets.py` prints `2 widgets bundled, every copy matches`.
+* Both pinned roots, each checked from a desktop against its host on
+  2026-10-31.
+
+**Unverified — only the board can settle these.** No sketch in this repo has
+been flashed, so all of the following are still assumptions:
+
+* The access point, the setup page on a real phone, and whether that phone keeps
+  mobile data for the Spotify tab while it is joined to the deck.
+* The S256 challenge as Spotify receives it, the code exchange, and the pinned
+  handshake to `accounts.spotify.com`.
+* SNTP setting the clock before the first request, the WiFi join and the 5 s
+  reconnect, and the token refresh.
+* Every touch path, on a panel whose mapping has never been read: the 1.5 s
+  `SETUP` hold, the 1.5 s wordmark hold, the four-second boot hold, the
+  calibration fit and every tap target.
+* The CRLF fix against a monitor that really sends `\r\n`, and the depth-aware
+  JSON reader against a real payload — the album-first trap is reasoned from
+  Spotify's documented shape, not seen on the wire.
+
 ## Traps worth keeping
 
 * **An album's name comes before the track's.** Spotify's `item` object starts

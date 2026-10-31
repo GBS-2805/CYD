@@ -95,6 +95,22 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   2.0.17; `phone_deck_cyd24R/toolchain.sh` defaults to 2.0.17, so pass
   `ARDUINO_CORE=esp32:esp32@3.3.12` when you need 3.x. One core per install root —
   the compiler picks the newest installed platform.
+* **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
+  Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
+  same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
+  1,162,8xx → 1,165,174 B (about **2.4 kB**), while the WiFi/TLS Spotify deck
+  grows 967,493 → 1,122,249 B (**+154,756 B**, 73 % → **85 %** of the default
+  app partition; the documented 2.0.17 build reads 967,413 on its own path,
+  because the build root moves the last digits). It is not mbedTLS getting
+  fatter: named `mbedtls_*` symbols
+  only go 83,854 → 91,309 B and `wifi`/`lwip` symbols 83,470 → 87,007 B. It is
+  how IDF 5 assembles the network stack — the 3.3.12 image links
+  `network_provisioning`, `esp_driver_uart`/`gpio`/`i2c`, `esp_mm` and `espnow`
+  that the 2.0.17 image never referenced, its `libnet80211`, `liblwip` and
+  `libwpa_supplicant` are each larger, and more of the core's WiFi code is inline
+  in headers, so the sketch's own object grows with it. So never scale one
+  deck's core delta onto another: recompile and quote `Sketch uses …`, and check
+  the partition before assuming a sketch still fits.
 * Libraries, and only these unless the widget genuinely needs more: `Adafruit GFX
   Library`, `Adafruit ILI9341`, `XPT2046_Touchscreen`.
 * **Never install ArduinoBLE.** Its `BLEDevice.h` shadows the core's header and
