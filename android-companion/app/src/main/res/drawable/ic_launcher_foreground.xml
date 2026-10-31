@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The deck's own face, in the INK palette the app and the sketch share: a
+     screen with three lines of output and the stand under it. 108dp canvas with
+     everything inside the 72dp safe zone, so no launcher mask can clip it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:pathData="M32,32 h44 a5,5 0 0 1 5,5 v24 a5,5 0 0 1 -5,5 h-44 a5,5 0 0 1 -5,-5 v-24 a5,5 0 0 1 5,-5 z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5" />
+
+    <path
+        android:pathData="M36,41 h32"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M36,49 h24"
+        android:strokeColor="#8C8C8C"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M36,57 h16"
+        android:strokeColor="#5A5A5A"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
+
+    <path
+        android:pathData="M50,68 h8 v5 h-8 z"
+        android:fillColor="#8C8C8C" />
+    <path
+        android:pathData="M39,75 h30"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round" />
+</vector>

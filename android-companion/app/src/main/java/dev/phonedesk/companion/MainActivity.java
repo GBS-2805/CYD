@@ -13,6 +13,7 @@ import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -144,11 +145,39 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         // Tab bar at the bottom, inside thumb reach.
-        root.addView(buildTabBar(), new LinearLayout.LayoutParams(
+        View tabBar = buildTabBar();
+        root.addView(tabBar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        applySystemBarInsets(root, header, tabBar);
 
         selectTab(0);
         return root;
+    }
+
+    /**
+     * Android 15 draws every window edge to edge for apps targeting 35, so the
+     * header would sit under the clock and the tab bar under the gesture handle.
+     * Pad the two ends by the system bar height and leave the middle alone. Below
+     * 15 the window still fits the bars itself, and adding this padding there
+     * would push the header down by a status bar for no reason.
+     */
+    private void applySystemBarInsets(View root, View header, View tabBar) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return;
+        final int side = Ui.dp(this, 18);
+        final int top = Ui.dp(this, 18);
+        final int under = Ui.dp(this, 10);
+        final int tabsSide = Ui.dp(this, 10);
+        final int tabsTop = Ui.dp(this, 6);
+        final int tabsBottom = Ui.dp(this, 12);
+
+        root.setOnApplyWindowInsetsListener((view, insets) -> {
+            android.graphics.Insets bars = insets.getInsets(
+                    WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+            header.setPadding(side, top + bars.top, side, under);
+            tabBar.setPadding(tabsSide, tabsTop, tabsSide, tabsBottom + bars.bottom);
+            return insets;
+        });
+        root.requestApplyInsets();
     }
 
     private FrameLayout.LayoutParams frameParams() {

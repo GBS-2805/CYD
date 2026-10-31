@@ -1,6 +1,7 @@
 package dev.phonedesk.companion;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Build;
 import android.provider.Settings;
@@ -8,6 +9,10 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Setup tab: the two permissions that matter, background survival, and the
@@ -19,6 +24,8 @@ final class SetupTab extends ScrollView {
     private final TextView statusText;
     private final TextView accessText;
     private final TextView bluetoothText;
+    /** What the per-app allowlist currently lets through. */
+    private final TextView noticeText;
     private final Button toggle;
     /** Only shown when the previous run left a trace in {@link CrashLog}. */
     private final LinearLayout crashCard;
@@ -73,6 +80,42 @@ final class SetupTab extends ScrollView {
         bluetoothCard.addView(bluetoothButton);
         Ui.space(activity, bluetoothCard, 10);
         body.addView(bluetoothCard);
+
+        body.addView(Ui.section(activity, "NOTIFICATIONS"));
+
+        LinearLayout noticeCard = Ui.card(activity);
+        noticeText = Ui.text(activity, "", 13, Ui.DIM);
+        noticeCard.addView(noticeText);
+
+        TextView noticeHint = Ui.text(activity,
+                "The deck sits where other people can read it. Pick the apps it may show, "
+                        + "and a one-time code or a private message stays on the phone.",
+                11, Ui.DIM);
+        noticeHint.setPadding(0, Ui.dp(activity, 6), 0, 0);
+        noticeHint.setLineSpacing(Ui.dp(activity, 2), 1f);
+        noticeCard.addView(noticeHint);
+
+        LinearLayout noticeActions = Ui.row(activity);
+        noticeActions.setPadding(0, Ui.dp(activity, 10), 0, 0);
+        Button chooseApps = Ui.action(activity, "CHOOSE APPS", false);
+        chooseApps.setOnClickListener(v -> chooseApps());
+        noticeActions.addView(chooseApps, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        Button allowAll = Ui.action(activity, "ALL APPS", false);
+        allowAll.setTextColor(Ui.DIM);
+        allowAll.setOnClickListener(v -> {
+            NoticeFilter.allowAll(activity);
+            refresh();
+        });
+        LinearLayout.LayoutParams allowParams = new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        allowParams.leftMargin = Ui.dp(activity, 8);
+        noticeActions.addView(allowAll, allowParams);
+        noticeCard.addView(noticeActions);
+
+        Ui.space(activity, noticeCard, 10);
+        body.addView(noticeCard);
 
         body.addView(Ui.section(activity, "BACKGROUND"));
 
@@ -143,6 +186,17 @@ final class SetupTab extends ScrollView {
                 : "Bluetooth: not granted — the bridge cannot scan");
         bluetoothText.setTextColor(bluetooth ? Ui.GOOD : Ui.PINK);
 
+        if (!NoticeFilter.customised(activity)) {
+            noticeText.setText("Apps allowed: all of them");
+            noticeText.setTextColor(Ui.DIM);
+        } else {
+            int count = NoticeFilter.allowed(activity).size();
+            noticeText.setText(count == 0
+                    ? "Apps allowed: none — nothing reaches the deck"
+                    : "Apps allowed: " + count + (count == 1 ? " app" : " apps"));
+            noticeText.setTextColor(count == 0 ? Ui.PINK : Ui.GOOD);
+        }
+
         toggle.setText(running ? "STOP BRIDGE" : "START BRIDGE");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !bluetooth) {
             toggle.setText("START BRIDGE");
@@ -208,6 +262,47 @@ final class SetupTab extends ScrollView {
         });
         Ui.space(activity, clear, 8);
         crashCard.addView(clear);
+    }
+
+    /**
+     * The allowlist picker. A checked row means "this app may reach the deck";
+     * the first SAVE is what turns filtering on, so a fresh install still works
+     * the way it did before the filter existed.
+     */
+    private void chooseApps() {
+        final List<NoticeFilter.App> apps = NoticeFilter.launchable(activity);
+        if (apps.isEmpty()) {
+            Actions.toast(activity, "No apps to list");
+            return;
+        }
+
+        final String[] labels = new String[apps.size()];
+        final boolean[] checked = new boolean[apps.size()];
+        final Set<String> allowed = NoticeFilter.allowed(activity);
+        final boolean custom = NoticeFilter.customised(activity);
+        for (int i = 0; i < apps.size(); ++i) {
+            labels[i] = apps.get(i).label;
+            checked[i] = !custom || allowed.contains(apps.get(i).packageName);
+        }
+
+        new AlertDialog.Builder(activity)
+                .setTitle("Apps the deck may show")
+                .setMultiChoiceItems(labels, checked,
+                        (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton("SAVE", (dialog, which) -> {
+                    Set<String> chosen = new HashSet<>();
+                    for (int i = 0; i < apps.size(); ++i) {
+                        if (checked[i]) chosen.add(apps.get(i).packageName);
+                    }
+                    NoticeFilter.allow(activity, chosen);
+                    refresh();
+                })
+                .setNeutralButton("ALL APPS", (dialog, which) -> {
+                    NoticeFilter.allowAll(activity);
+                    refresh();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     @Override

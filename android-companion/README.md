@@ -78,6 +78,12 @@ them owns the cable at a time; the choice is remembered across restarts.
 - **FLASH** on an imported `.bin` erases and writes it at `0x0`, verifies it by
   MD5 and reboots into it. `0x0` is the merged-image offset; an app-only image
   belongs at `0x10000` and will not boot from `0x0`.
+- **A flash owns the cable until it ends.** Rotation is handled in place rather
+  than by rebuilding the screen, and ownership of the port is recorded outside
+  the screen, so backing out mid-flash and coming back cannot start a second
+  writer over the first: the fresh tab says `The port is busy (flash)`. The
+  screen stays awake while it writes, and the percentage survives a rebuild of
+  the tab, as does the sentence that says whether it worked.
 - **RESTART BOARD** boots whatever is in flash without entering the bootloader.
   That is the way out of download mode (black screen, red LED) after a failed
   attempt, short of unplugging.
@@ -145,6 +151,13 @@ Time and battery are pushed on connect and then every 30 seconds. Notifications
 are pushed as they arrive; duplicates within 5 seconds are dropped, and group
 summaries and quiet ongoing items are skipped.
 
+**Which apps get through is the user's choice.** SETUP lists every launchable app
+with a checkbox, and the first **SAVE** turns filtering on: after that only the
+ticked apps reach the deck, and **ALL APPS** returns to the unfiltered default.
+Nothing is filtered until someone chooses, so a fresh install behaves like the
+unfiltered build — but the point of the list is that a one-time code or a private
+message stays on the phone instead of lighting up a board other people can read.
+
 ## Build
 
 No AndroidX and no third-party libraries — only the platform SDK, so the build
@@ -164,19 +177,24 @@ adb install -r dist/PhoneDeckBridge-debug.apk
 `./toolchain.sh --setup-only` stops once the toolchain is ready; `--no-clean`
 reuses Gradle's build directory. The first run downloads about 1 GB and needs
 `curl` and `unzip`. It runs the host tests below before Gradle, then checks the
-signature, the 4-byte alignment, the manifest and the bundled sketch, refuses an
-APK that asks for `INTERNET` or is `debuggable`, and prints the size and SHA-256
-of what it copied to `dist/`.
+signature, the 4-byte alignment, the manifest, the bundled sketch and the launcher
+icon, refuses an APK that asks for `INTERNET`, is `debuggable`, targets anything
+but 35 or ships without an icon, and prints the size and SHA-256 of what it copied
+to `dist/`.
 
 Android Studio still works: open the `android-companion` folder (Ladybug or
 newer), let it sync, and run the `app` configuration.
 
-`minSdk` is 26, `targetSdk` is 34. The sketch is only bundled when the build goes
+`minSdk` is 26, `targetSdk` is 35 — what a new store listing requires. Targeting
+35 puts the app edge to edge on Android 15, so `MainActivity` pads the header and
+the tab bar by the system bar height there, and leaves older releases alone: below
+15 the window still fits the bars itself and that padding would double it. The
+sketch is only bundled when the build goes
 through Gradle; a raw `javac` build produces an APK-less class check and the
 PROJECTS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
-[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (98 kB,
+[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (106 kB,
 package `dev.phonedesk.companion`, debug-signed). Install it with
 `adb install -r dist/PhoneDeckBridge-debug.apk`, or copy it to the phone and open
 it with "install unknown apps" allowed.
@@ -196,18 +214,15 @@ is its scratch directory.
 It cannot test the board. Nothing on a JVM can: the reset pulse, the adapter's
 line coding and the ROM's willingness to answer are hardware facts.
 
-## Private distribution
+## Distribution
 
-This build has no store listing and no hosted copy, and the app contains no
-network code. The artifact lives in `dist/` inside this private repository — do
-not enable Pages, attach it to a release, or upload it anywhere public.
-
-Two properties are checked by `toolchain.sh` on every build, and fail it rather
-than warn: the APK must not request `android.permission.INTERNET`, and it must not
-be `debuggable`. The second matters most here, because notification access plus a
-debuggable process means any machine with adb can attach to the code that reads
-message text; `build.gradle` sets `debuggable false` on the debug type for exactly
-that reason.
+The APK is meant to be installable by other people, so the build checks what a
+listing checks and fails rather than warns: `targetSdk` must be 35, the APK must
+carry a launcher icon, it must not request `android.permission.INTERNET`, and it
+must not be `debuggable`. The last one is not paperwork — notification access plus
+a debuggable process means any machine with adb can attach to the code that reads
+message text, so `build.gradle` sets `debuggable false` on the debug type for
+exactly that reason.
 
 The APK is still signed with the debug certificate, which only affects updates: a
 build made on a different machine carries a different key, so it will not install
@@ -218,7 +233,9 @@ over the previous one. Uninstall first, or build on the machine that made it.
 1. Open the app and accept the Bluetooth prompt (Android 12+ asks for *Nearby
    devices*).
 2. **SETUP → NOTIFICATION ACCESS** and enable **Off-site**. Without it,
-   time and battery still flow but notifications never arrive.
+   time and battery still flow but notifications never arrive. **CHOOSE APPS**
+   under **NOTIFICATIONS** then decides which apps are allowed to reach the deck;
+   until something is chosen, all of them are.
 3. Exempt the app from battery optimisation from the same tab if the deck stops
    updating overnight.
 4. The bridge starts by itself once both permissions are granted.

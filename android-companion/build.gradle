@@ -1,3 +1,5 @@
 plugins {
-    id 'com.android.application' version '8.5.2' apply false
+    // AGP 8.6 is the first that supports compileSdk 35, which targetSdk 35 needs.
+    // It still runs on Gradle 8.7, so the pinned toolchain does not move.
+    id 'com.android.application' version '8.6.1' apply false
 }

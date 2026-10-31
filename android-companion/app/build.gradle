@@ -4,12 +4,15 @@ plugins {
 
 android {
     namespace 'dev.phonedesk.companion'
-    compileSdk 34
+    // 35 is what a store listing requires for a new app, and it is also the
+    // release that forces edge-to-edge windows; MainActivity.applySystemBarInsets
+    // is what keeps the header out from under the status bar on Android 15.
+    compileSdk 35
 
     defaultConfig {
         applicationId 'dev.phonedesk.companion'
         minSdk 26
-        targetSdk 34
+        targetSdk 35
         versionCode 1
         versionName '1.0'
     }

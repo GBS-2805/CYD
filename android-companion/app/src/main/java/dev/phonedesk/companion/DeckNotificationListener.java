@@ -9,14 +9,19 @@ import android.service.notification.StatusBarNotification;
  * Turns posted notifications into Phone Link writes.
  *
  * Only the visible title and text are read; nothing is stored. Group summaries
- * and quiet ongoing entries are skipped because they duplicate real posts.
+ * and quiet ongoing entries are skipped because they duplicate real posts, and
+ * {@link NoticeFilter} decides which apps are allowed through at all.
  */
 public class DeckNotificationListener extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         if (sbn == null || sbn.getNotification() == null) return;
-        if (getPackageName().equals(sbn.getPackageName())) return;
+        String packageName = sbn.getPackageName();
+        if (getPackageName().equals(packageName)) return;
+        // The deck is readable by whoever is in the room; the allowlist is what
+        // keeps one-time codes and private messages on the phone.
+        if (!NoticeFilter.allows(this, packageName)) return;
 
         Notification notification = sbn.getNotification();
         if ((notification.flags & Notification.FLAG_GROUP_SUMMARY) != 0) return;
@@ -31,7 +36,7 @@ public class DeckNotificationListener extends NotificationListenerService {
         if (title == null && body == null) return;
 
         DeckService.forwardNotification(
-                label(sbn.getPackageName()),
+                label(packageName),
                 title == null ? "" : title.toString(),
                 body == null ? "" : body.toString());
     }

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed icons (Android 13+) tint one shape, so the grey ramp of the regular
+     foreground would collapse anyway: everything is white, and the outline plus
+     the bars carry it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:pathData="M32,32 h44 a5,5 0 0 1 5,5 v24 a5,5 0 0 1 -5,5 h-44 a5,5 0 0 1 -5,-5 v-24 a5,5 0 0 1 5,-5 z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5" />
+
+    <path
+        android:pathData="M36,41 h32"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M36,49 h24"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M36,57 h16"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
+
+    <path
+        android:pathData="M50,68 h8 v5 h-8 z"
+        android:fillColor="#FFFFFF" />
+    <path
+        android:pathData="M39,75 h30"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round" />
+</vector>

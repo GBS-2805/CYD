@@ -7,7 +7,7 @@ State as of the last session. [README.md](README.md) has the product view,
 
 A single-module Android app in Java, **no AndroidX and no third-party
 libraries**, so Gradle resolves only the Android Gradle Plugin. Package
-`dev.phonedesk.companion`, `minSdk` 26, `targetSdk` 34.
+`dev.phonedesk.companion`, `minSdk` 26, `targetSdk` 35.
 
 Four tabs, hosted by `MainActivity`:
 
@@ -401,11 +401,12 @@ Identical to the sketch, checked against its `onWrite` handlers:
   **That check predates the four-tab split.** The current 19 sources are covered
   by `gradle assembleDebug` instead, which is what produced the shipped APK.
 - Every relative Markdown link across the repo resolves.
-- `gradle assembleDebug` (Gradle 8.7, AGP 8.5.2, SDK 34, JDK 17) builds a debug
+- `gradle assembleDebug` (Gradle 8.7, AGP 8.6.1, SDK 35, JDK 17) builds a debug
   APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-10-31 after the sketch
-  header change and the probe work, **101,029 bytes**.
+  header change and the probe work, **108,657 bytes** after the icon, the app
+  allowlist and the edge-to-edge padding.
   The earlier 128,924-byte APK unpacked to the same six entries with the same
   uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
   the archive was written, not in the code: both are `zipalign -c 4` clean and
@@ -417,7 +418,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   17.0.21, Gradle 8.7, commandline-tools 11076708, then platform 34 and
   build-tools 34.0.0, and finished in under a minute. Build ran 35 tasks with
   `clean`, and the script's own checks passed: signature, `zipalign -c 4`,
-  package `dev.phonedesk.companion`, minSdk 26, targetSdk 34, and the
+  package `dev.phonedesk.companion`, minSdk 26, targetSdk 34 (35 now), and the
   `phone_deck/cyd_phone_deck.ino` MD5 equal to the repo file.
 - **Bundled content is now a property of the descriptors, not of a list in the
   build.** The shipped APK carries one widget, `assets/widgets/phone_deck/`
@@ -429,11 +430,40 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the then-committed 97,757, so the APK is *not* byte-reproducible: dex files embed
   build-time data. The probe changes shipped **99,533 bytes**, the flash-shelf
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
-  merged firmware plus the probe work **101,029 bytes**; `dist/` holds that last
-  artifact. Quote the size to the nearest kB (~98 kB), never as a checksum.
+  merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
+  and edge-to-edge work **108,657 bytes**; `dist/` holds that last artifact. Quote
+  the size to the nearest kB (~106 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
-  minSdk 26, targetSdk 34, the expected permission set, and
+  minSdk 26, targetSdk 35, the expected permission set,
+  `application-icon: 'res/BW.xml'` (resource names are shortened) and
   `MainActivity` as the launchable activity.
+- **The build now assumes someone else may install it.** It ships an icon, a
+  per-app notification allowlist and a `targetSdk 35` target. `toolchain.sh`
+  installs platform 35 and build-tools 35.0.0 and asserts the two things a listing
+  checks first: `targetSdkVersion:'35'`, and a non-empty `application-icon`.
+  AGP moved 8.5.2 → 8.6.1 for it, which still runs on Gradle 8.7.
+- The icon is one adaptive vector: background `#000000`, foreground drawing the
+  deck as a screen with three lines of log, plus a monochrome variant for themed
+  icons. There is no bitmap density bucket, which is safe here only because
+  `minSdk` is 26 — every device this installs on supports adaptive icons.
+- `NoticeFilter` answers the oldest objection to this app: notification access
+  exposes everything. It stores one boolean per package and filters in
+  `onNotificationPosted`, and the manifest declares the LAUNCHER intent in
+  `<queries>` because Android 11 would otherwise show an empty picker. Filtering
+  starts only after the first SAVE, so an upgrade does not silently stop
+  forwarding.
+- Rotation is declared handled
+  (`orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden`) rather
+  than reloaded, and USB ownership moved out of the tab into a static claim:
+  flash, probe, restart and monitor all claim `portOwner` before touching the port
+  and release it in a `finally`. That is what makes BACK-out-and-return during a
+  flash safe — the new tab reads `The port is busy (flash)` instead of writing a
+  second image over the first. Flash progress is mirrored in statics and the
+  finished sentence is handed to whichever tab renders next.
+- `targetSdk 35` makes Android 15 draw every window edge to edge, so
+  `MainActivity.applySystemBarInsets` pads the header and tab bar by the system
+  bar insets **on 35 and above only**; below that the window still fits the bars
+  and the padding would be doubled.
 
 ## Not verified
 

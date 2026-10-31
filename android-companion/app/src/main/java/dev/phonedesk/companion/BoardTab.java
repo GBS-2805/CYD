@@ -15,6 +15,7 @@ import android.os.Build;
 import android.text.InputType;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -60,6 +61,24 @@ final class BoardTab extends ScrollView {
     private boolean manualReset;
     /** DTR drives EN and RTS drives IO0; see EspRom.setSwappedLines(). */
     private boolean swappedLines;
+
+    /**
+     * The CH340 is one resource for the whole process, not one per Activity.
+     * Rotating is handled, but leaving with BACK mid-flash and coming back builds
+     * a new BoardTab while the old thread is still writing — and that tab would
+     * see a free-looking port and put a second image on top of the first. So
+     * "who owns the cable" lives here, and every path that opens the port claims
+     * it first.
+     */
+    private static volatile String portOwner = "";
+    /** Live flash progress, so a tab built mid-flash paints the real percentage. */
+    private static volatile int flashPercent = -1;
+    private static volatile String flashNote = "";
+    /** Outcome of a flash whose tab is gone, collected by the next one to render. */
+    private static volatile String pendingOutcome;
+    private static volatile int pendingOutcomeColor = Ui.DIM;
+    /** A reader started by a tab that no longer exists watches this instead. */
+    private static volatile boolean monitorStopWanted;
 
     /**
      * Handshake narration from the last probe or flash, newest last. Kept across
@@ -171,6 +190,7 @@ final class BoardTab extends ScrollView {
     }
 
     void refresh() {
+        showCarriedFlashState();
         List<FlashLibrary.Entry> entries = FlashLibrary.list(activity);
         StringBuilder sig = new StringBuilder();
         for (FlashLibrary.Entry entry : entries) {
@@ -180,7 +200,8 @@ final class BoardTab extends ScrollView {
                 .append('s').append(usbStatus)
                 .append(usbProbing).append(usbFlashing)
                 .append('l').append(logVersion)
-                .append('m').append(monitorMode).append(monitorOpen).append(monitorBaud);
+                .append('m').append(monitorMode).append(monitorOpen).append(monitorBaud)
+                .append('p').append(portOwner);
         if (!sig.toString().equals(signature)) {
             signature = sig.toString();
             int keepScroll = getScrollY();
@@ -470,6 +491,14 @@ final class BoardTab extends ScrollView {
 
     /** START/STOP. Asks for the CH340 first; the permission callback lands in openMonitor. */
     private void toggleMonitor() {
+        if (!monitorOpen && monitorThread == null && "monitor".equals(portOwner)) {
+            // A reader started before a rotation still holds the cable and this tab
+            // has no handle on it, so its loop watches this flag instead.
+            monitorStopWanted = true;
+            setUsbStatus("Stopping the monitor from before; the cable frees in a moment.",
+                    Ui.ACCENT);
+            return;
+        }
         if (monitorOpen) {
             stopMonitor("Monitor stopped. The cable is free to flash.");
             return;
@@ -509,8 +538,14 @@ final class BoardTab extends ScrollView {
 
     private void openMonitor(UsbManager manager, UsbDevice device) {
         if (monitorOpen || monitorThread != null) return;
+        if (!claimPort("monitor")) {
+            setUsbStatus("The port is busy (" + portOwner + "); wait for it to finish.",
+                    Ui.ACCENT);
+            return;
+        }
         monitorOpen = true;
         monitorRunning = true;
+        monitorStopWanted = false;
         monitorResetRequested = false;
         synchronized (monitorOutbox) {
             monitorOutbox.clear();
@@ -540,7 +575,7 @@ final class BoardTab extends ScrollView {
             final byte[] hold = new byte[4];
             int held = 0;
             int quiet = 0;
-            while (monitorRunning) {
+            while (monitorRunning && !monitorStopWanted) {
                 if (monitorResetRequested) {
                     monitorResetRequested = false;
                     appendMonitor("\n== reset: IO0 high, EN pulsed ==\n");
@@ -580,10 +615,12 @@ final class BoardTab extends ScrollView {
         } finally {
             port.close();
             appendMonitor("port closed\n");
+            releasePort("monitor");
         }
         final String reason = ending;
         monitorThread = null;
         activity.runOnUiThread(() -> {
+            if (activity.isDestroyed()) return;
             monitorOpen = false;
             if (reason != null) {
                 setUsbStatus(reason, Ui.PINK);
@@ -775,11 +812,47 @@ final class BoardTab extends ScrollView {
         return activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    /** The flash paths own the same port; refuse rather than race the reader. */
-    private boolean monitorBusy() {
-        if (monitorThread == null) return false;
-        setUsbStatus("Waiting for the monitor to release the port…", Ui.ACCENT);
+    /**
+     * Paint what a tab that no longer exists left behind: a flash still running,
+     * its finish line, or a monitor still holding the cable.
+     */
+    private void showCarriedFlashState() {
+        String outcome = pendingOutcome;
+        if (outcome != null) {
+            pendingOutcome = null;
+            usbStatus = outcome;
+            usbStatusColor = pendingOutcomeColor;
+        }
+        if ("flash".equals(portOwner)) {
+            usbStatus = Math.max(0, flashPercent) + "%  ·  " + flashNote;
+            usbStatusColor = Ui.ACCENT;
+        } else if ("monitor".equals(portOwner) && monitorThread == null) {
+            usbStatus = "The monitor from before is still running; STOP frees the cable.";
+            usbStatusColor = Ui.ACCENT;
+        }
+    }
+
+    private static synchronized boolean claimPort(String owner) {
+        if (!portOwner.isEmpty()) return false;
+        portOwner = owner;
         return true;
+    }
+
+    private static synchronized void releasePort(String owner) {
+        if (owner.equals(portOwner)) portOwner = "";
+    }
+
+    /** True when a press from an earlier tab still holds the cable. */
+    private boolean portTaken() {
+        if (portOwner.isEmpty()) return false;
+        setUsbStatus("The port is busy (" + portOwner + "); wait for it to finish.", Ui.ACCENT);
+        return true;
+    }
+
+    private boolean claimPortOrSay(String owner) {
+        if (claimPort(owner)) return true;
+        setUsbStatus("The port is busy (" + portOwner + "); wait for it to finish.", Ui.ACCENT);
+        return false;
     }
 
     /** Target-board pull-down. One board today; the list is the extension point. */
@@ -1002,7 +1075,8 @@ final class BoardTab extends ScrollView {
 
     /** Off the UI thread: USB I/O and the bootloader handshake both block. */
     private void probeUsb(UsbDevice device) {
-        if (usbProbing || usbFlashing || monitorBusy()) return;
+        if (usbProbing || usbFlashing) return;
+        if (!claimPortOrSay("probe")) return;
         usbProbing = true;
         final String label = describe(device);
         setUsbStatus("Probing " + label + "…", Ui.ACCENT);
@@ -1053,11 +1127,16 @@ final class BoardTab extends ScrollView {
                             + (e.getMessage() == null ? e.toString() : e.getMessage()));
                 }
             }
-            port.close();
+            try {
+                port.close();
+            } finally {
+                releasePort("probe");
+            }
             trace("port closed");
             final String result = message;
             final int resultColor = color;
             activity.runOnUiThread(() -> {
+                if (activity.isDestroyed()) return;
                 usbProbing = false;
                 setUsbStatus(result, resultColor);
             });
@@ -1066,7 +1145,8 @@ final class BoardTab extends ScrollView {
 
     /** Boots what is in flash without entering the bootloader. */
     private void restartBoard() {
-        if (usbProbing || usbFlashing || monitorBusy()) return;
+        if (usbProbing || usbFlashing) return;
+        if (!claimPortOrSay("restart")) return;
         final UsbManager manager = (UsbManager) activity.getSystemService(Context.USB_SERVICE);
         final UsbDevice device = UsbSerialCh340.find(manager);
         if (manager == null || device == null) {
@@ -1096,6 +1176,7 @@ final class BoardTab extends ScrollView {
             } finally {
                 port.close();
                 trace("port closed");
+                releasePort("restart");
             }
             final String result = message;
             final int resultColor = color;
@@ -1105,7 +1186,7 @@ final class BoardTab extends ScrollView {
 
     /** Confirms, then writes the image at 0x0 — the merged-image offset. */
     private void flashBinary(final FlashLibrary.Entry entry) {
-        if (usbProbing || usbFlashing || monitorBusy()) return;
+        if (usbProbing || usbFlashing || portTaken()) return;
         final byte[] image = FlashLibrary.readBytes(activity, entry);
         if (image == null || image.length == 0) {
             Actions.toast(activity, "Could not read " + entry.name);
@@ -1131,8 +1212,16 @@ final class BoardTab extends ScrollView {
     }
 
     private void startFlash(UsbDevice device, String name, byte[] image) {
+        // Claimed before the thread exists: two writers on one port is the one
+        // mistake this screen can make that costs the board.
+        if (!claimPortOrSay("flash")) return;
         final UsbManager manager = (UsbManager) activity.getSystemService(Context.USB_SERVICE);
         usbFlashing = true;
+        flashPercent = -1;
+        flashNote = "";
+        // A flash is a thirty-second investment; the screen timing out in the
+        // middle of it is not a good way to spend it.
+        activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         usbPercentShown = -1;
         setUsbStatus("Flashing " + name + "…", Ui.ACCENT);
 
@@ -1160,11 +1249,20 @@ final class BoardTab extends ScrollView {
             } finally {
                 port.close();
                 trace("port closed");
+                releasePort("flash");
             }
             final String result = message;
             final int resultColor = color;
             activity.runOnUiThread(() -> {
+                if (activity.isDestroyed()) {
+                    // The tab that started this is gone; leave the outcome for the
+                    // next one instead of writing into dead views.
+                    pendingOutcome = result;
+                    pendingOutcomeColor = resultColor;
+                    return;
+                }
                 usbFlashing = false;
+                activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 setUsbStatus(result, resultColor);
             });
         }, "usb-flash").start();
@@ -1174,7 +1272,12 @@ final class BoardTab extends ScrollView {
     private void reportProgress(int percent, String note) {
         if (percent / 5 == usbPercentShown) return;
         usbPercentShown = percent / 5;
+        // Written outside the UI thread so a tab built mid-flash shows the same
+        // percentage the writer is at, not a stale line.
+        flashPercent = percent;
+        flashNote = note;
         activity.runOnUiThread(() -> {
+            if (activity.isDestroyed()) return;
             usbStatus = percent + "%  ·  " + note;
             usbStatusColor = Ui.ACCENT;
             signature = "";

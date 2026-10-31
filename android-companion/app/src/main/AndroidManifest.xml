@@ -39,15 +39,31 @@
     <queries>
         <package android:name="name.antonsmirnov.android.arduinodroid2" />
         <package android:name="name.antonsmirnov.android.arduinodroid" />
+        <!-- NoticeFilter lists launchable apps so the user can choose which ones
+             reach the deck. Without this the list is empty on Android 11+, which
+             would look like a filter with nothing in it. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
     </queries>
 
     <application
         android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
         android:label="Off-site"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@android:style/Theme.Material.NoActionBar">
 
+        <!-- Rotation is handled rather than reloaded. This UI is built in code and
+             re-derived from state every second, so a configuration change has
+             nothing to restore; recreating the Activity mid-flash, on the other
+             hand, would hand a second BoardTab a port a live thread is writing to.
+             Backing out of the app during a flash is covered separately by the
+             port lock in BoardTab, which outlives the Activity. -->
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -19,7 +19,8 @@
 #
 # The versions are pinned rather than "latest" on purpose: the docs quote the
 # APK's size, and a newer AGP or build-tools writes a different archive from
-# the same sources. AGP 8.5.2 wants JDK 17 and Gradle 8.7 or newer.
+# the same sources. AGP 8.6.1 wants JDK 17 and Gradle 8.7 or newer, and it is the
+# first AGP that supports compileSdk 35, which targetSdk 35 needs.
 #
 set -euo pipefail
 
@@ -27,8 +28,8 @@ ROOT="${OFFSITE_HOME:-$HOME/.android-offsite}"
 JDK_VERSION="${OFFSITE_JDK:-17}"
 GRADLE_VERSION="${OFFSITE_GRADLE:-8.7}"
 CMDLINE_TOOLS="${OFFSITE_CMDLINE_TOOLS:-11076708}"   # cmdline-tools 12.0
-COMPILE_SDK=34
-BUILD_TOOLS=34.0.0
+COMPILE_SDK=35
+BUILD_TOOLS=35.0.0
 
 SETUP_ONLY=0
 CLEAN=1
@@ -215,6 +216,14 @@ printf '%s\n' "$BADGING" | grep -q 'android.permission.INTERNET' \
   && fail "the APK requests INTERNET; this app is meant to stay offline"
 printf '%s\n' "$BADGING" | grep -q 'application-debuggable' \
   && fail "the APK is debuggable; notification access must not be attachable"
+
+# A store listing checks these two first, so they are asserted rather than
+# remembered: target 35 or the upload is refused, and an icon or the launcher
+# falls back to the Android robot.
+printf '%s\n' "$BADGING" | grep -q "targetSdkVersion:'35'" \
+  || fail "targetSdk is not 35; a new store listing needs 35"
+printf '%s\n' "$BADGING" | grep -q 'application-icon' \
+  || fail "the APK ships no launcher icon"
 
 say "verify bundled widgets"
 TMP="$(mktemp -d)"
