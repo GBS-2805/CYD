@@ -172,6 +172,35 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
   as broken with the baud rates and byte counts tried; that record is what stops
   the next attempt from repeating it.
 
+## App UI
+
+The app is a drawer (`DrawerHome`) with three rows: `DECKS`, `PROJECTS`,
+`SERIAL`. `SETTINGS` is deliberately not a fourth: it is configuration rather
+than navigation, so it hangs off the gear at the outer end of the top bar, past
+the link pill. The bottom tab bar is gone on purpose, because a drawer that *is*
+the front page needs no second navigation.
+
+* **PROJECTS is alphabetical and folded.** `String.compareToIgnoreCase` on the
+  project name, so a new project lands where a reader would look for it. One
+  accordion per project: collapsed shows kind, status and name; body, log and
+  actions open on tap. Keep the fold state in `ProjectsTab`, not in the store.
+  The section states where it is — `PROJECTS › <board>` — from
+  `WidgetCatalog.boardLabel`, the same call the drawer groups by, so the crumb
+  and the board headings cannot drift apart.
+* **Libraries are one disclaimer at the top of PROJECTS**, read from the widget
+  descriptors and never retyped in Java. Each library is a button that copies the
+  exact name ArduinoDroid's library list searches for, and the ArduinoBLE warning
+  stays under it.
+* **Every UI change ships a render, embedded in the chat.** Draw the screens it
+  touches with `android-companion/render_ui.py`, which reads its colours and
+  metrics from `Ui.java`, and keep the PNGs in `artifacts/renders/`. Then *show*
+  them: every changed screen goes into the reply as an inline image
+  (`![home](artifacts/renders/home.png)`), not as a file link, so the render is one
+  scroll away instead of a hunt through the tree. Link — or skip — only the
+  screens the change did not touch. Renders are review artifacts: regenerate them
+  on the next change, never commit them. A render is metric-accurate, not a device
+  screenshot — say which.
+
 ## Adding a widget
 
 1. `mkdir my_deck_cyd24R`, put `my_deck_cyd24R.ino` in it — one file, no

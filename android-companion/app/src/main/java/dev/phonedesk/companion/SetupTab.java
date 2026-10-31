@@ -15,8 +15,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Setup tab: the two permissions that matter, background survival, and the
- * bridge start/stop switch.
+ * Settings section: the two permissions that matter, background survival, and
+ * the bridge start/stop switch.
  */
 final class SetupTab extends ScrollView {
 
@@ -41,7 +41,7 @@ final class SetupTab extends ScrollView {
                 Ui.dp(activity, 16), Ui.dp(activity, 24));
         addView(body, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        body.addView(Ui.text(activity, "SETUP", 20, Ui.TEXT));
+        body.addView(Ui.text(activity, "SETTINGS", 20, Ui.TEXT));
 
         LinearLayout statusCard = Ui.card(activity);
         statusText = Ui.text(activity, DeckService.getStatus(), 14, Ui.ACCENT);

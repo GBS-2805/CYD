@@ -33,6 +33,9 @@ final class WidgetCatalog {
     /** Project records for bundled widgets carry this id prefix. */
     static final String PREFIX = "widget:";
 
+    /** What this app calls the board it was written for, in the person's words. */
+    static final String CYD_LABEL = "2.4\" CYD (resistive)";
+
     static final class Widget {
         String id = "";
         String name = "";
@@ -73,6 +76,23 @@ final class WidgetCatalog {
     static Widget forProject(Context context, String projectId) {
         if (projectId == null || !projectId.startsWith(PREFIX)) return null;
         return byId(context, projectId.substring(PREFIX.length()));
+    }
+
+    /**
+     * The board a project runs on, as the person reading it says it. Bundled
+     * widgets carry the descriptor's model number; images and pasted sketches are
+     * the CYD this app was written for. One definition, so the drawer's board
+     * headings and the shelf's breadcrumb can never disagree.
+     */
+    static String boardLabel(Context context, String projectId) {
+        Widget widget = forProject(context, projectId);
+        if (widget != null && !widget.board.isEmpty()) return humanBoard(widget.board);
+        return CYD_LABEL;
+    }
+
+    /** 2432S024R and its siblings are the 2.4" CYD; anything else says what it is. */
+    static String humanBoard(String board) {
+        return board.startsWith("2432") ? CYD_LABEL : board;
     }
 
     static List<UUID> services(Context context) {

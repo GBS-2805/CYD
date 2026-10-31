@@ -2,15 +2,12 @@ package dev.phonedesk.companion;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.ComponentName;
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
+import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -21,14 +18,20 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
- * Project shelf: one card per CYD project, filtered by status.
+ * Projects section: the shelf, alphabetical, and folded down.
  *
- * Flashing lives on the BOARD tab. This one answers what a project is, what it
- * needs, and how far it got.
+ * One accordion per project, because the shelf exists to answer "which one am I
+ * on" before it answers "what does it need": a collapsed row is the name, the
+ * status and the kind, and the body, log and actions open on tap. The libraries
+ * a deck needs are a single disclaimer at the top rather than a card per project,
+ * with each name a button that copies exactly what ArduinoDroid's library list
+ * searches for.
  */
 final class ProjectsTab extends ScrollView {
 
@@ -43,6 +46,8 @@ final class ProjectsTab extends ScrollView {
     private final EditText search;
     /** Files handed to {@link #build}, so the deck card can reach its sketch. */
     private List<FlashLibrary.Entry> currentEntries = new ArrayList<>();
+    /** Ids whose details are showing; everything else stays folded. */
+    private final Set<String> expanded = new HashSet<>();
 
     ProjectsTab(Activity activity) {
         super(activity);
@@ -54,7 +59,7 @@ final class ProjectsTab extends ScrollView {
         addView(body, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         search = new EditText(activity);
-        search.setHint("Search widgets");
+        search.setHint("Search projects");
         search.setSingleLine(true);
         search.setInputType(InputType.TYPE_CLASS_TEXT);
         search.setTextSize(13);
@@ -93,7 +98,9 @@ final class ProjectsTab extends ScrollView {
         sig.append('v').append(ProjectStore.version(activity))
                 .append('b').append(BoardCatalog.selectedIndex(activity))
                 .append('f').append(activeFilter)
-                .append('q').append(query);
+                .append('q').append(query)
+                .append('e').append(expanded.size());
+        for (String id : expanded) sig.append('x').append(id);
         if (!sig.toString().equals(signature)) {
             signature = sig.toString();
             int keepScroll = getScrollY();
@@ -143,12 +150,28 @@ final class ProjectsTab extends ScrollView {
     private void build(List<FlashLibrary.Entry> entries) {
         body.removeAllViews();
         currentEntries = entries;
-        final List<ProjectStore.Project> projects = ProjectStore.all(activity);
+        // Alphabetical by what the card says it is, so the shelf reads the same on
+        // every phone regardless of the order projects were added or seeded.
+        List<ProjectStore.Project> projects = new ArrayList<>(ProjectStore.all(activity));
+        projects.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
 
         body.addView(Ui.text(activity, "PROJECTS", 20, Ui.TEXT));
-        TextView subtitle = Ui.text(activity, "What to flash, and how far it got.", 12, Ui.DIM);
+
+        // Where you are, in the app and on the bench: the section, then the board
+        // the shelf below belongs to.
+        TextView trail = Ui.text(activity, breadcrumb(projects), 10, Ui.DIM);
+        trail.setLetterSpacing(0.12f);
+        trail.setPadding(0, Ui.dp(activity, 6), 0, 0);
+        body.addView(trail);
+
+        TextView subtitle = Ui.text(activity, "Alphabetical. Tap a name for its notes.", 12, Ui.DIM);
         subtitle.setPadding(0, Ui.dp(activity, 4), 0, 0);
         body.addView(subtitle);
+
+        // The disclaimer comes before the shelf: what to install is a precondition
+        // for every project below, not a footnote on one of them.
+        View libraries = librariesCard();
+        if (libraries != null) body.addView(libraries);
 
         // The field outlives a rebuild: it is detached and re-added, so its text
         // and cursor survive the status chips and the search itself re-filtering.
@@ -156,7 +179,7 @@ final class ProjectsTab extends ScrollView {
         LinearLayout.LayoutParams fieldParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
-        fieldParams.topMargin = Ui.dp(activity, 12);
+        fieldParams.topMargin = Ui.dp(activity, 14);
         body.addView(search, fieldParams);
         if (hadFocus) {
             search.post(() -> {
@@ -173,17 +196,83 @@ final class ProjectsTab extends ScrollView {
             if (!matches(project)) continue;
             body.addView(projectCard(project));
             ++shown;
-            if (project.inside()) {
-                WidgetCatalog.Widget widget = WidgetCatalog.forProject(activity, project.id);
-                if (widget != null) body.addView(libraryCard(widget));
-            }
         }
         if (shown == 0) {
             String typed = search.getText().toString().trim();
             body.addView(Ui.text(activity, typed.isEmpty()
                     ? "Nothing in that status yet."
-                    : "No widget matches \"" + typed + "\".", 12, Ui.DIM));
+                    : "No project matches \"" + typed + "\".", 12, Ui.DIM));
         }
+    }
+
+    /**
+     * {@code PROJECTS › <board>}. The shelf normally holds one board and the crumb
+     * names it; a shelf with more lists them, so the crumb never claims a board
+     * that is not below it.
+     */
+    private String breadcrumb(List<ProjectStore.Project> projects) {
+        List<String> boards = new ArrayList<>();
+        for (ProjectStore.Project project : projects) {
+            String board = WidgetCatalog.boardLabel(activity, project.id).toUpperCase(Locale.US);
+            if (!boards.contains(board)) boards.add(board);
+        }
+        if (boards.isEmpty()) return "PROJECTS  \u203A  NO PROJECTS";
+        if (boards.size() > 3) return "PROJECTS  \u203A  " + boards.size() + " BOARDS";
+        return "PROJECTS  \u203A  " + String.join("  \u00B7  ", boards);
+    }
+
+    /**
+     * Every library the bundled widgets name, once each, read from the descriptors
+     * rather than retyped here. A button carries the exact string ArduinoDroid's
+     * library list searches for, because that is what gets pasted into it.
+     */
+    private View librariesCard() {
+        List<String> libraries = new ArrayList<>();
+        List<String> never = new ArrayList<>();
+        for (WidgetCatalog.Widget widget : WidgetCatalog.all(activity)) {
+            for (String library : widget.libraries) {
+                if (!libraries.contains(library)) libraries.add(library);
+            }
+            for (String banned : widget.never) {
+                if (!never.contains(banned)) never.add(banned);
+            }
+        }
+        if (libraries.isEmpty()) return null;
+
+        body.addView(Ui.section(activity, "LIBRARIES NEEDED"));
+
+        LinearLayout card = Ui.card(activity);
+        TextView hint = Ui.text(activity,
+                "Install these once in ArduinoDroid before compiling a deck. Tap a name to "
+                        + "copy it, then paste it into ArduinoDroid's library search.",
+                11, Ui.DIM);
+        hint.setLineSpacing(Ui.dp(activity, 2), 1f);
+        card.addView(hint);
+
+        if (!never.isEmpty()) {
+            TextView warning = Ui.text(activity,
+                    "Never install " + String.join(" or ", never)
+                            + ": it shadows the ESP32 core's BLE headers and every build fails.",
+                    11, Ui.PINK);
+            warning.setPadding(0, Ui.dp(activity, 8), 0, 0);
+            warning.setLineSpacing(Ui.dp(activity, 2), 1f);
+            card.addView(warning);
+        }
+
+        for (String library : libraries) {
+            Button copy = Ui.action(activity, library, false);
+            copy.setOnClickListener(v -> Actions.copyOrSay(activity, library, library));
+            Ui.space(activity, copy, 8);
+            card.addView(copy);
+        }
+
+        Button open = Ui.action(activity, "OPEN ARDUINODROID", false);
+        open.setOnClickListener(v -> openArduinoDroid());
+        Ui.space(activity, open, 10);
+        card.addView(open);
+
+        Ui.space(activity, card, 10);
+        return card;
     }
 
     /**
@@ -247,8 +336,17 @@ final class ProjectsTab extends ScrollView {
         row.addView(chip, params);
     }
 
+    /**
+     * One accordion. The header is the whole card while folded — kind, status,
+     * name — and the row that opens it is the name itself, which is what a thumb
+     * aims at anyway.
+     */
     private LinearLayout projectCard(ProjectStore.Project project) {
         LinearLayout card = Ui.card(activity);
+        final boolean open = expanded.contains(project.id);
+
+        LinearLayout header = Ui.row(activity);
+        header.setClickable(true);
 
         LinearLayout meta = Ui.row(activity);
         TextView kind = Ui.text(activity, project.kindLabel(), 10, Ui.DIM);
@@ -264,15 +362,30 @@ final class ProjectsTab extends ScrollView {
         status.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         status.setPadding(Ui.dp(activity, 8), 0, 0, 0);
         meta.addView(status);
-        card.addView(meta);
+        header.addView(meta, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView fold = Ui.text(activity, open ? "-" : "+", 16, Ui.DIM);
+        header.addView(fold);
+        card.addView(header);
 
         TextView name = Ui.text(activity, project.name, 16, Ui.TEXT);
         name.setPadding(0, Ui.dp(activity, 6), 0, 0);
         card.addView(name);
 
+        View.OnClickListener flip = v -> toggle(project.id);
+        header.setOnClickListener(flip);
+        name.setOnClickListener(flip);
+        fold.setOnClickListener(flip);
+
+        if (!open) {
+            Ui.space(activity, card, 8);
+            return card;
+        }
+
         if (!project.body.isEmpty()) {
             TextView description = Ui.text(activity, project.body, 12, Ui.DIM);
-            description.setPadding(0, Ui.dp(activity, 4), 0, 0);
+            description.setPadding(0, Ui.dp(activity, 6), 0, 0);
             description.setLineSpacing(Ui.dp(activity, 2), 1f);
             card.addView(description);
         }
@@ -330,8 +443,14 @@ final class ProjectsTab extends ScrollView {
             secondary.addView(recipe, spaced(8));
         }
         card.addView(secondary);
-        Ui.space(activity, card, 10);
+        Ui.space(activity, card, 8);
         return card;
+    }
+
+    private void toggle(String id) {
+        if (!expanded.remove(id)) expanded.add(id);
+        signature = "";
+        refresh();
     }
 
     private void pickStatus(ProjectStore.Project project) {
@@ -474,121 +593,6 @@ final class ProjectsTab extends ScrollView {
             "name.antonsmirnov.android.arduinodroid2",
             "name.antonsmirnov.android.arduinodroid"
     };
-
-    /** Libraries this widget needs, read from its descriptor rather than a list here. */
-    private LinearLayout libraryCard(WidgetCatalog.Widget widget) {
-        LinearLayout card = Ui.card(activity);
-
-        TextView title = Ui.text(activity, "LIBRARIES", 16, Ui.TEXT);
-        card.addView(title);
-
-        String warning = "";
-        if (!widget.never.isEmpty()) {
-            warning = " Never install " + String.join(" or ", widget.never)
-                    + ": it shadows the ESP32 BLE headers and every build fails.";
-        }
-        TextView hint = Ui.text(activity, widget.libraries.isEmpty()
-                ? "Nothing extra to install for " + widget.name + "."
-                : "INSTALL copies the name and opens ArduinoDroid's library list." + warning,
-                11, Ui.DIM);
-        hint.setPadding(0, Ui.dp(activity, 6), 0, 0);
-        hint.setLineSpacing(Ui.dp(activity, 2), 1f);
-        card.addView(hint);
-
-        for (String library : widget.libraries) {
-            TextView name = Ui.text(activity, library, 13, Ui.TEXT);
-            name.setPadding(0, Ui.dp(activity, 10), 0, 0);
-            card.addView(name);
-
-            LinearLayout row = Ui.row(activity);
-            row.setPadding(0, Ui.dp(activity, 6), 0, 0);
-
-            Button install = Ui.action(activity, "INSTALL", true);
-            install.setOnClickListener(v -> installLibrary(library, library));
-            row.addView(install);
-
-            Button copy = Ui.action(activity, "COPY NAME", false);
-            copy.setOnClickListener(v -> Actions.copyOrSay(activity, library, library));
-            row.addView(copy, spaced(8));
-            card.addView(row);
-        }
-
-        if (!widget.libraries.isEmpty()) {
-            final String joined = String.join("\n", widget.libraries);
-            LinearLayout actions = Ui.row(activity);
-            actions.setPadding(0, Ui.dp(activity, 12), 0, 0);
-
-            Button all = Ui.action(activity, "INSTALL ALL", true);
-            all.setOnClickListener(v -> installLibrary(widget.name, joined));
-            actions.addView(all);
-
-            Button copyAll = Ui.action(activity, "COPY ALL", false);
-            copyAll.setOnClickListener(v -> Actions.copyOrSay(activity, widget.name, joined));
-            actions.addView(copyAll, spaced(8));
-            card.addView(actions);
-        }
-
-        Button open = Ui.action(activity, "OPEN ARDUINODROID", false);
-        open.setOnClickListener(v -> openArduinoDroid());
-        Ui.space(activity, open, 8);
-        card.addView(open);
-
-        Ui.space(activity, card, 10);
-        return card;
-    }
-
-    /** Copy the name, then open ArduinoDroid's library list for pasting. */
-    private void installLibrary(String label, String payload) {
-        boolean copied = Actions.copy(activity, label, payload);
-        if (openArduinoDroidLibraryManager()) {
-            Actions.toast(activity, copied ? "Copied — paste it in Libraries"
-                    : "Search Libraries for " + label);
-            return;
-        }
-        openArduinoDroid();
-        Actions.toast(activity, copied ? "Copied — tap Libraries in ArduinoDroid"
-                : "Open Libraries and search for " + label);
-    }
-
-    /**
-     * Opens the library screen rather than the editor. Activity names differ
-     * between releases, so the installed package is scanned instead of hard-coding
-     * a class that may not exist; the manifest <queries> entry makes it visible.
-     */
-    private boolean openArduinoDroidLibraryManager() {
-        for (String pkg : ARDUINODROID_PACKAGES) {
-            for (String className : libraryActivities(pkg)) {
-                Intent intent = new Intent();
-                intent.setComponent(new ComponentName(pkg, className));
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                try {
-                    activity.startActivity(intent);
-                    return true;
-                } catch (Exception ignored) {
-                    // Not exported or renamed in this build: try the next one.
-                }
-            }
-        }
-        return false;
-    }
-
-    private List<String> libraryActivities(String pkg) {
-        List<String> found = new ArrayList<>();
-        try {
-            PackageInfo info = activity.getPackageManager()
-                    .getPackageInfo(pkg, PackageManager.GET_ACTIVITIES);
-            if (info.activities == null) return found;
-            for (ActivityInfo candidate : info.activities) {
-                if (candidate.name == null) continue;
-                if (candidate.name.toLowerCase(Locale.US).contains("librar")) {
-                    found.add(candidate.name);
-                }
-            }
-        } catch (Exception ignored) {
-            // Not installed, or hidden by package visibility.
-        }
-        return found;
-    }
 
     /** Opens ArduinoDroid if it is installed, otherwise its store page. */
     private void openArduinoDroid() {

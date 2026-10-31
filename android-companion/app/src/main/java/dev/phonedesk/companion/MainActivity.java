@@ -10,7 +10,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
@@ -19,24 +18,39 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
- * Host for the four surfaces: Decks (live link), Projects (the notebook),
- * Board (OTG connection and flashing) and Setup (permissions, bridge).
+ * Host for the drawer and the sections behind it — Decks (live link), Projects
+ * (the shelf) and Serial (OTG connection, flashing and the monitor) — plus
+ * Settings (permissions and the bridge), which the gear in the top bar opens so
+ * the drawer stays three rows of navigation.
+ *
+ * There is no tab bar. The drawer is the front page, so a section is opened from
+ * a row and left with BACK — the gesture the platform already teaches — and the
+ * top bar carries the way back plus the link pill.
  */
 public class MainActivity extends Activity {
 
     private static final int REQ_PERMISSIONS = 2;
-    private static final String[] TAB_TITLES = { "DECKS", "PROJECTS", "BOARD", "SETUP" };
+
+    /** The drawer itself; sections are numbered in the order the drawer lists them. */
+    static final int HOME = -1;
+    static final int SECTION_DECKS = 0;
+    static final int SECTION_PROJECTS = 1;
+    static final int SECTION_SERIAL = 2;
+    static final int SECTION_SETTINGS = 3;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final TextView[] tabViews = new TextView[TAB_TITLES.length];
 
+    private DrawerHome home;
     private DecksTab decksTab;
     private ProjectsTab projectsTab;
     private BoardTab boardTab;
     private SetupTab setupTab;
     private FrameLayout content;
+    private LinearLayout topBar;
+    private TextView crumb;
+    private TextView gear;
     private TextView pill;
-    private int activeTab;
+    private int activeSection = HOME;
 
     private final Runnable refresh = new Runnable() {
         @Override
@@ -54,10 +68,23 @@ public class MainActivity extends Activity {
                     pill.setTextColor(Ui.DIM);
                 }
             }
-            if (activeTab == 0) decksTab.refresh();
-            else if (activeTab == 1) projectsTab.refresh();
-            else if (activeTab == 2) boardTab.refresh();
-            else setupTab.refresh();
+            switch (activeSection) {
+                case SECTION_DECKS:
+                    decksTab.refresh();
+                    break;
+                case SECTION_PROJECTS:
+                    projectsTab.refresh();
+                    break;
+                case SECTION_SERIAL:
+                    boardTab.refresh();
+                    break;
+                case SECTION_SETTINGS:
+                    setupTab.refresh();
+                    break;
+                default:
+                    home.refresh();
+                    break;
+            }
             handler.postDelayed(this, 1000);
         }
     };
@@ -66,7 +93,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         // Before any view is built: a crash with no adb attached is otherwise just
-        // a system dialog with no trace. SETUP shows what this records.
+        // a system dialog with no trace. SETTINGS shows what this records.
         CrashLog.install(this);
         setContentView(buildUi());
         requestBluetoothPermissions();
@@ -92,6 +119,17 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    public void onBackPressed() {
+        // A section is one step from the drawer, so BACK is that step. Only the
+        // drawer itself leaves the app.
+        if (activeSection != HOME) {
+            showSection(HOME);
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != BoardTab.REQUEST_IMPORT) return;
@@ -109,33 +147,17 @@ public class MainActivity extends Activity {
         LinearLayout root = Ui.column(this);
         root.setBackgroundColor(Ui.BG);
 
-        LinearLayout header = Ui.row(this);
-        header.setPadding(Ui.dp(this, 18), Ui.dp(this, 18), Ui.dp(this, 18), Ui.dp(this, 10));
-
-        LinearLayout titles = Ui.column(this);
-        titles.addView(Ui.text(this, "OFF-SITE", 22, Ui.TEXT));
-        TextView subtitle = Ui.text(this, "cyd projects  //  board", 11, Ui.DIM);
-        subtitle.setLetterSpacing(0.12f);
-        subtitle.setPadding(0, Ui.dp(this, 2), 0, 0);
-        titles.addView(subtitle);
-        header.addView(titles, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        pill = Ui.text(this, "IDLE", 11, Ui.DIM);
-        pill.setLetterSpacing(0.14f);
-        pill.setTypeface(Typeface.DEFAULT_BOLD);
-        pill.setBackground(Ui.rounded(this, Ui.CARD, Ui.EDGE, 9));
-        pill.setPadding(Ui.dp(this, 12), Ui.dp(this, 6), Ui.dp(this, 12), Ui.dp(this, 6));
-        header.addView(pill);
-
-        root.addView(header, new LinearLayout.LayoutParams(
+        topBar = buildTopBar();
+        root.addView(topBar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         content = new FrameLayout(this);
+        home = new DrawerHome(this, this::showSection);
         decksTab = new DecksTab(this);
         projectsTab = new ProjectsTab(this);
         boardTab = new BoardTab(this);
         setupTab = new SetupTab(this);
+        content.addView(home, frameParams());
         content.addView(decksTab, frameParams());
         content.addView(projectsTab, frameParams());
         content.addView(boardTab, frameParams());
@@ -144,37 +166,68 @@ public class MainActivity extends Activity {
         root.addView(content, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        // Tab bar at the bottom, inside thumb reach.
-        View tabBar = buildTabBar();
-        root.addView(tabBar, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        applySystemBarInsets(root, header, tabBar);
-
-        selectTab(0);
+        applySystemBarInsets(root);
+        showSection(HOME);
         return root;
     }
 
     /**
-     * Android 15 draws every window edge to edge for apps targeting 35, so the
-     * header would sit under the clock and the tab bar under the gesture handle.
-     * Pad the two ends by the system bar height and leave the middle alone. Below
-     * 15 the window still fits the bars itself, and adding this padding there
-     * would push the header down by a status bar for no reason.
+     * The crumb, the link pill and the settings gear. The crumb reads OFF-SITE on
+     * the drawer and carries a back chevron everywhere else, so the bar is the
+     * same height and the same place on every screen. SETTINGS is not a row in the
+     * drawer: it is configuration, not navigation, so it sits at the outer end of
+     * the bar, past the pill.
      */
-    private void applySystemBarInsets(View root, View header, View tabBar) {
+    private LinearLayout buildTopBar() {
+        LinearLayout bar = Ui.row(this);
+        bar.setPadding(Ui.dp(this, 18), Ui.dp(this, 14), Ui.dp(this, 18), Ui.dp(this, 8));
+
+        crumb = Ui.text(this, "OFF-SITE", 12, Ui.DIM);
+        crumb.setLetterSpacing(0.12f);
+        crumb.setPadding(0, Ui.dp(this, 6), Ui.dp(this, 12), Ui.dp(this, 6));
+        crumb.setOnClickListener(v -> showSection(HOME));
+        bar.addView(crumb, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        pill = Ui.text(this, "IDLE", 11, Ui.DIM);
+        pill.setLetterSpacing(0.14f);
+        pill.setTypeface(Typeface.DEFAULT_BOLD);
+        pill.setBackground(Ui.rounded(this, Ui.CARD, Ui.EDGE, 9));
+        pill.setPadding(Ui.dp(this, 12), Ui.dp(this, 6), Ui.dp(this, 12), Ui.dp(this, 6));
+        bar.addView(pill);
+
+        // \u2699 with the text-presentation selector: a glyph, not the emoji, which
+        // would arrive in colour on a monochrome screen. It sits outside the pill,
+        // hard against the screen edge, so it reads as chrome rather than as part
+        // of the link state the pill reports.
+        gear = Ui.text(this, "\u2699\uFE0E", 15, Ui.DIM);
+        gear.setGravity(android.view.Gravity.CENTER);
+        gear.setPadding(Ui.dp(this, 10), Ui.dp(this, 4), Ui.dp(this, 2), Ui.dp(this, 4));
+        gear.setOnClickListener(v -> showSection(SECTION_SETTINGS));
+        LinearLayout.LayoutParams gearParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        gearParams.leftMargin = Ui.dp(this, 10);
+        bar.addView(gear, gearParams);
+        return bar;
+    }
+
+    /**
+     * Android 15 draws every window edge to edge for apps targeting 35, so the bar
+     * would sit under the clock and the last row under the gesture handle. Pad the
+     * two ends and leave the middle alone. Below 15 the window still fits the bars
+     * itself, and adding this padding there would push the bar down for no reason.
+     */
+    private void applySystemBarInsets(LinearLayout root) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return;
         final int side = Ui.dp(this, 18);
-        final int top = Ui.dp(this, 18);
-        final int under = Ui.dp(this, 10);
-        final int tabsSide = Ui.dp(this, 10);
-        final int tabsTop = Ui.dp(this, 6);
-        final int tabsBottom = Ui.dp(this, 12);
+        final int top = Ui.dp(this, 14);
+        final int under = Ui.dp(this, 8);
 
         root.setOnApplyWindowInsetsListener((view, insets) -> {
             android.graphics.Insets bars = insets.getInsets(
                     WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-            header.setPadding(side, top + bars.top, side, under);
-            tabBar.setPadding(tabsSide, tabsTop, tabsSide, tabsBottom + bars.bottom);
+            topBar.setPadding(side, top + bars.top, side, under);
+            content.setPadding(0, 0, 0, bars.bottom);
             return insets;
         });
         root.requestApplyInsets();
@@ -185,46 +238,26 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
     }
 
-    private View buildTabBar() {
-        LinearLayout bar = Ui.row(this);
-        bar.setPadding(Ui.dp(this, 10), Ui.dp(this, 6), Ui.dp(this, 10), Ui.dp(this, 12));
+    /** Shows one screen: {@link #HOME} for the drawer, otherwise a section. */
+    void showSection(int index) {
+        activeSection = index;
+        home.setVisibility(index == HOME ? View.VISIBLE : View.GONE);
+        decksTab.setVisibility(index == SECTION_DECKS ? View.VISIBLE : View.GONE);
+        projectsTab.setVisibility(index == SECTION_PROJECTS ? View.VISIBLE : View.GONE);
+        boardTab.setVisibility(index == SECTION_SERIAL ? View.VISIBLE : View.GONE);
+        setupTab.setVisibility(index == SECTION_SETTINGS ? View.VISIBLE : View.GONE);
 
-        for (int i = 0; i < TAB_TITLES.length; ++i) {
-            final int index = i;
-            TextView tab = Ui.text(this, TAB_TITLES[i], 12, Ui.DIM);
-            tab.setLetterSpacing(0.1f);
-            tab.setGravity(Gravity.CENTER);
-            tab.setPadding(0, Ui.dp(this, 10), 0, Ui.dp(this, 10));
-            tab.setOnClickListener(v -> selectTab(index));
-            tabViews[i] = tab;
-            bar.addView(tab, new LinearLayout.LayoutParams(0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        }
-        return bar;
-    }
+        crumb.setText(index == HOME ? "OFF-SITE" : "‹  OFF-SITE");
+        crumb.setTextColor(index == HOME ? Ui.DIM : Ui.TEXT);
+        if (gear != null) gear.setTextColor(index == SECTION_SETTINGS ? Ui.TEXT : Ui.DIM);
 
-    private void selectTab(int index) {
-        activeTab = index;
-        decksTab.setVisibility(index == 0 ? View.VISIBLE : View.GONE);
-        projectsTab.setVisibility(index == 1 ? View.VISIBLE : View.GONE);
-        boardTab.setVisibility(index == 2 ? View.VISIBLE : View.GONE);
-        setupTab.setVisibility(index == 3 ? View.VISIBLE : View.GONE);
-
-        for (int i = 0; i < tabViews.length; ++i) {
-            boolean selected = i == index;
-            tabViews[i].setTextColor(selected ? Ui.VIOLET : Ui.DIM);
-            tabViews[i].setTypeface(Typeface.MONOSPACE, selected ? Typeface.BOLD : Typeface.NORMAL);
-            tabViews[i].setBackground(selected
-                    ? Ui.rounded(this, Ui.CARD, Ui.VIOLET, 10)
-                    : null);
-        }
         handler.removeCallbacks(refresh);
         handler.post(refresh);
     }
 
     // ---------------------------------------------------------- permissions ---
 
-    /** Also called from Setup when permissions were denied earlier. */
+    /** Also called from Settings when permissions were denied earlier. */
     public void requestBluetoothPermissions() {
         java.util.ArrayList<String> wanted = new java.util.ArrayList<>();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

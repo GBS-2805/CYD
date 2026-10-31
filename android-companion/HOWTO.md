@@ -8,11 +8,11 @@ Short, task-shaped instructions. Background and payloads are in
 1. Install and open the app.
 2. Accept **Nearby devices** (Android 12+). On older Android, accept the location
    prompt — it is required to scan for BLE devices.
-3. Open **SETUP → NOTIFICATION ACCESS**, find **Off-site**, enable it.
+3. Open **SETTINGS → NOTIFICATION ACCESS**, find **Off-site**, enable it.
 4. The header pill should switch from `IDLE` to `SCANNING` and then `LINKED` when
    the deck is in range.
 
-If it stays on `IDLE`, tap **START BRIDGE** in SETUP.
+If it stays on `IDLE`, tap **START BRIDGE** in SETTINGS.
 
 ## Link a specific CYD
 
@@ -355,12 +355,12 @@ unmeasured rather than as expected values.
   build, forget it. That stale bond interferes with GATT connects.
 
 **Notifications never arrive though LINKED shows**
-- Notification access is off or was revoked by an app update; re-grant it in SETUP.
+- Notification access is off or was revoked by an app update; re-grant it in SETTINGS.
 - The posting app uses a fully custom notification layout with no title/text
   extras; those are skipped by design.
 
 **Deck stops updating overnight**
-- SETUP → BATTERY SETTINGS, exempt the app. Some vendors kill foreground services
+- SETTINGS → BATTERY SETTINGS, exempt the app. Some vendors kill foreground services
   regardless; re-opening the app restarts the bridge.
 
 **SAVE does nothing**

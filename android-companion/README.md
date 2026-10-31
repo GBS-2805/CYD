@@ -5,14 +5,15 @@ waits for a phone to write its Phone Link characteristics. Android has no built-
 way to do that, so this app is the phone side — and it is also where the CYDs are
 monitored and where firmware sketches are kept for ArduinoDroid.
 
-Four tabs:
+The drawer is the front page; it opens three sections, and the gear at the outer end of the top bar, past the link pill, opens
+settings:
 
-| Tab | What it is for |
+| Section | What it is for |
 | --- | --- |
 | **DECKS** | Live link: what is connected, signal, uptime, packets, nearby decks |
-| **PROJECTS** | Every project with status, build/touch log and links, plus a name search and the deck libraries |
-| **BOARD** | Target board, OTG connection, bootloader probe, image flashing, serial monitor |
-| **SETUP** | Permissions, battery, bridge switch, last crash |
+| **PROJECTS** | Alphabetical shelf: every project folded to its name, kind and status, opening to its body, log, links and actions, under one libraries disclaimer |
+| **SERIAL** | Target board, OTG connection, bootloader probe, image flashing, serial monitor |
+| **SETTINGS** (gear, top bar) | Permissions, battery, bridge switch, last crash |
 
 Ask it anything about the deck's state and it answers from the link itself, not
 from guesswork: `linked 4m 12s · -62 dBm · 18 packets · 5 notices`.
@@ -174,7 +175,7 @@ Time and battery are pushed on connect and then every 30 seconds. Notifications
 are pushed as they arrive; duplicates within 5 seconds are dropped, and group
 summaries and quiet ongoing items are skipped.
 
-**Which apps get through is the user's choice.** SETUP lists every launchable app
+**Which apps get through is the user's choice.** SETTINGS lists every launchable app
 with a checkbox, and the first **SAVE** turns filtering on: after that only the
 ticked apps reach the deck, and **ALL APPS** returns to the unfiltered default.
 Nothing is filtered until someone chooses, so a fresh install behaves like the
@@ -209,8 +210,9 @@ Android Studio still works: open the `android-companion` folder (Ladybug or
 newer), let it sync, and run the `app` configuration.
 
 `minSdk` is 26, `targetSdk` is 35 — what a new store listing requires. Targeting
-35 puts the app edge to edge on Android 15, so `MainActivity` pads the header and
-the tab bar by the system bar height there, and leaves older releases alone: below
+35 puts the app edge to edge on Android 15, so `MainActivity` pads the top bar and
+insets the content by the system bar height there, and leaves older releases
+alone: below
 15 the window still fits the bars itself and that padding would double it. The
 sketch is only bundled when the build goes
 through Gradle; a raw `javac` build produces an APK-less class check and the
@@ -255,7 +257,7 @@ over the previous one. Uninstall first, or build on the machine that made it.
 
 1. Open the app and accept the Bluetooth prompt (Android 12+ asks for *Nearby
    devices*).
-2. **SETUP → NOTIFICATION ACCESS** and enable **Off-site**. Without it,
+2. **SETTINGS → NOTIFICATION ACCESS** and enable **Off-site**. Without it,
    time and battery still flow but notifications never arrive. **CHOOSE APPS**
    under **NOTIFICATIONS** then decides which apps are allowed to reach the deck;
    until something is chosen, all of them are.

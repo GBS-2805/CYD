@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Board tab: the OTG link and the images that go on the board.
+ * Serial section: the OTG link, the flash handshake and the monitor.
  *
  * Two modes share one cable. FLASH picks the target, probes the ROM bootloader,
  * restarts it and writes an image; MONITOR opens the same CH340 as a plain serial
@@ -252,7 +252,7 @@ final class BoardTab extends ScrollView {
         monitorView = null;
         monitorBox = null;
 
-        body.addView(Ui.text(activity, "BOARD", 20, Ui.TEXT));
+        body.addView(Ui.text(activity, "SERIAL", 20, Ui.TEXT));
         TextView subtitle = Ui.text(activity, monitorMode
                 ? "Connect over OTG, then watch what the board prints."
                 : "Connect over OTG, then flash an image.", 12, Ui.DIM);

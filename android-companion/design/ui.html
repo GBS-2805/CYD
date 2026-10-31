@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OFF-SITE · phone app UI file</title>
+<style>
+/* ===========================================================================
+   TOKENS — the only place a colour or a radius lives.
+
+   Every variable below is the same value as the Java constant named beside it,
+   in android-companion/app/src/main/java/dev/phonedesk/companion/Ui.java. Change
+   a variable here, say so in the handoff, and the Java gets that value.
+   =========================================================================== */
+:root {
+  /* palette — Ui.BG … Ui.GOOD, the deck's INK theme slot for slot */
+  --bg:      #000000;   /* Ui.BG       screen ground              */
+  --card:    #0e0e0e;   /* Ui.CARD     card fill, pill fill       */
+  --card-hi: #1c1c1c;   /* Ui.CARD_HI  secondary action, chip off */
+  --edge:    #333333;   /* Ui.EDGE     1dp hairline               */
+  --text:    #ffffff;   /* Ui.TEXT     primary ink                */
+  --dim:     #8c8c8c;   /* Ui.DIM      secondary ink, hints        */
+  --accent:  #ffffff;   /* Ui.ACCENT   link state, primary action  */
+  --violet:  #707070;   /* Ui.VIOLET   a section tag               */
+  --pink:    #d4d4d4;   /* Ui.PINK     destructive, error          */
+  --good:    #a0a0a0;   /* Ui.GOOD     success                     */
+
+  /* radii, in dp — Ui.rounded(Context, fill, stroke, radiusDp) */
+  --r-card:   14px;     /* Ui.card()                                  */
+  --r-action: 10px;     /* Ui.action()                                */
+  --r-field:   8px;     /* search field, status chip                  */
+  --r-tag:     6px;     /* kind tag inside a project card             */
+  --r-pill:    9px;     /* top-bar link pill                          */
+  --r-drawer-project: 8px;
+
+  /* type — px here == sp in Android, because the file is 1dp = 1px */
+  --mono: "DejaVu Sans Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+          "Liberation Mono", monospace;
+
+  /* screen metrics */
+  --bar-top: 14px;  --bar-side: 18px;  --bar-bottom: 8px;   /* MainActivity.buildTopBar */
+  --body-side: 16px; --body-top: 8px;  --body-bottom: 24px; /* section bodies          */
+  --drawer-side: 18px; --drawer-bottom: 28px;               /* DrawerHome body padding */
+}
+
+/* --- the document around the frames (not part of the app) ------------------ */
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 40px 24px 80px;
+  background: #101010; color: #d8d8d8;
+  font: 14px/1.6 var(--mono);
+}
+h1, h2, h3 { color: #fff; font-weight: 700; letter-spacing: .04em; }
+h1 { font-size: 22px; margin: 0 0 6px; }
+h2 { font-size: 14px; letter-spacing: .14em; margin: 44px 0 12px; text-transform: uppercase; }
+h3 { font-size: 13px; margin: 22px 0 8px; }
+p, li { color: #a8a8a8; max-width: 78ch; }
+a { color: #fff; }
+code { color: #e8e8e8; background: #1b1b1b; padding: 1px 5px; border-radius: 4px; font-size: .92em; }
+.lede { max-width: 88ch; }
+.lede strong { color: #fff; }
+table { border-collapse: collapse; margin: 10px 0 4px; font-size: 13px; }
+th, td { text-align: left; padding: 6px 16px 6px 0; border-bottom: 1px solid #262626;
+         vertical-align: top; }
+th { color: #7f7f7f; font-weight: 400; letter-spacing: .1em; font-size: 11px;
+     text-transform: uppercase; }
+td:first-child { color: #fff; white-space: nowrap; }
+
+/* --- frames --------------------------------------------------------------- */
+.frames { display: flex; flex-wrap: wrap; gap: 34px; justify-content: center;
+          align-items: flex-start; }
+figure { margin: 0; }
+figcaption { width: 393px; padding-top: 10px; font-size: 12px; line-height: 1.55;
+             color: #8f8f8f; }
+figcaption b { color: #eee; font-weight: 700; letter-spacing: .06em; }
+figcaption span { color: #6d6d6d; }
+
+/* --- THE PHONE -------------------------------------------------------------
+   One screen is 393 x 852 dp on the reference phone. The dashed line at 852px
+   is the fold: everything below it exists and scrolls, but is off-screen until
+   the user drags. Content is never hidden here — it is shown so you can edit it.
+   ------------------------------------------------------------------------- */
+.screen {
+  position: relative; width: 393px; min-height: 852px;
+  background: var(--bg); color: var(--text);
+  font-family: var(--mono); font-size: 12px; line-height: 1.45;
+  text-align: left; letter-spacing: normal;
+  overflow: hidden;                      /* the phone's own clip, for wide rows */
+  box-shadow: 0 0 0 1px #2a2a2a, 0 18px 40px rgba(0, 0, 0, .6);
+}
+.fold { position: absolute; left: 0; right: 0; top: 852px;
+        border-top: 1px dashed #4a4a4a; pointer-events: none; }
+.fold span { position: absolute; right: 8px; top: 4px; font-size: 9px;
+             letter-spacing: .12em; color: #6a6a6a; background: var(--bg);
+             padding: 0 4px; }
+
+/* --- top bar — MainActivity.buildTopBar() --------------------------------- */
+.bar { display: flex; align-items: center;
+       padding: var(--bar-top) var(--bar-side) var(--bar-bottom); }
+.crumb { flex: 1; font-size: 12px; letter-spacing: .12em; color: var(--dim);
+         padding: 6px 12px 6px 0; }
+.bar--section .crumb { color: var(--text); }       /* showSection(): TEXT      */
+.pill { font-size: 11px; letter-spacing: .14em; font-weight: 700;
+        color: var(--dim); background: var(--card);
+        border: 1px solid var(--edge); border-radius: var(--r-pill);
+        padding: 6px 12px; white-space: nowrap; }
+.gear { font-size: 15px; line-height: 1; color: var(--dim);
+        padding: 4px 2px 4px 10px; margin-left: 10px; }
+.bar--settings .gear { color: var(--text); }        /* gear lit on SETTINGS     */
+
+/* --- drawer front page — DrawerHome --------------------------------------- */
+.drawer { padding: var(--body-top) var(--drawer-side) var(--drawer-bottom); }
+.wordmark { font-size: 34px; font-weight: 700; letter-spacing: .06em;
+            text-align: center; padding-top: 60px; }
+.status-line { font-size: 10px; letter-spacing: .16em; color: var(--dim);
+               text-align: center; padding-top: 10px; }
+.menu-row { display: flex; align-items: center; justify-content: space-between;
+            margin-top: 10px;                                  /* Ui.space(10)  */
+            background: var(--card); border: 1px solid var(--edge);
+            border-radius: var(--r-card); padding: 16px; }
+.menu-row__name { font-size: 17px; letter-spacing: .10em; }
+.menu-row__hint { font-size: 10px; letter-spacing: .10em; color: var(--dim); }
+.drawer-panel { padding-left: 4px; }
+.board-heading { font-size: 9px; letter-spacing: .14em; color: var(--dim);
+                 padding: 10px 0 4px; text-transform: uppercase; }
+.project-row { display: flex; align-items: center; justify-content: space-between;
+               background: var(--card);
+               border-radius: var(--r-drawer-project);   /* stroke 0, radius 8 */
+               padding: 6px 8px; }
+.project-row__name { font-size: 13px; }
+.project-row__status { font-size: 9px; font-weight: 700; letter-spacing: .10em; }
+
+/* --- sections: PROJECTS / SERIAL / SETTINGS --------------------------------- */
+.body { padding: var(--body-top) var(--body-side) var(--body-bottom); }
+.title { font-size: 20px; }
+.crumb-line { font-size: 10px; letter-spacing: .12em; color: var(--dim);
+              padding-top: 6px; }
+.subtitle { font-size: 12px; color: var(--dim); padding-top: 4px; }
+.label { font-size: 12px; letter-spacing: .14em; color: var(--dim);
+         padding: 18px 0 8px; }                    /* Ui.section()            */
+.card { background: var(--card); border: 1px solid var(--edge);
+        border-radius: var(--r-card); padding: 12px 14px; }
+.hint  { font-size: 11px; color: var(--dim); line-height: 1.6; }
+.warn  { font-size: 11px; color: var(--pink); line-height: 1.6; }
+.field { margin-top: 14px; background: var(--card-hi);
+         border: 1px solid var(--edge); border-radius: var(--r-field);
+         padding: 8px 12px; font-size: 13px; color: var(--dim); }
+.chips { display: flex; gap: 6px; padding: 10px 0 4px; overflow: hidden; }
+.chip  { font-size: 10px; font-weight: 700; letter-spacing: .1em;
+         background: var(--card-hi); border: 1px solid var(--edge);
+         border-radius: var(--r-field); color: var(--dim); padding: 5px 9px;
+         white-space: nowrap; }
+.chip--on { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+
+/* spacing utilities, each one a Ui.space(context, view, n) in the Java */
+.mt-4 { margin-top: 4px; }  .mt-6 { margin-top: 6px; }   .mt-8 { margin-top: 8px; }
+.mt-10 { margin-top: 10px; } .mt-12 { margin-top: 12px; } .mt-14 { margin-top: 14px; }
+
+/* one accordion — ProjectsTab.projectCard() */
+.proj { margin-top: 8px; background: var(--card); border: 1px solid var(--edge);
+        border-radius: var(--r-card); padding: 12px 14px; }
+.proj__head { display: flex; align-items: center; }
+.proj__meta { flex: 1; display: flex; align-items: center; }
+.tag { font-size: 10px; letter-spacing: .12em; color: var(--dim);
+       background: var(--card-hi); border: 1px solid var(--edge);
+       border-radius: var(--r-tag); padding: 2px 6px; }
+.proj__status { font-size: 10px; font-weight: 700; letter-spacing: .12em;
+                padding-left: 8px; }
+.proj__fold { font-size: 16px; color: var(--dim); }
+.proj__name { font-size: 16px; padding-top: 6px; }
+.proj__body { font-size: 12px; color: var(--dim); padding-top: 6px; line-height: 1.6; }
+.proj__needs { font-size: 11px; color: var(--accent); padding-top: 6px;
+               line-height: 1.6; }
+.proj__log { font-size: 11px; padding-top: 8px; line-height: 1.6; }
+
+/* buttons — Ui.action() */
+.action { display: inline-block; font: inherit; font-size: 13px;
+          background: var(--card-hi); border: 1px solid var(--edge);
+          border-radius: var(--r-action); color: var(--text);
+          padding: 8px 14px; line-height: 1.2; text-align: center; }
+.action--primary { background: var(--accent); border-color: var(--accent);
+                   color: var(--bg); }
+.action--dim { color: var(--dim); }
+.action--full { display: block; width: 100%; }
+.row-actions { display: flex; gap: 8px; padding-top: 10px; }
+.row-actions--tight { padding-top: 8px; }
+
+/* status inks — ProjectStore.statusColor(), case for case:
+   WORKING -> GOOD, FLASHED -> ACCENT, PARKED -> DIM, anything else -> VIOLET.
+   No hue anywhere: the statuses separate by luminance, like the deck. */
+.s-good   { color: var(--good); }
+.s-accent { color: var(--accent); }
+.s-violet { color: var(--violet); }
+.s-dim    { color: var(--dim); }
+.s-pink   { color: var(--pink); }
+</style>
+</head>
+<body>
+
+<h1>OFF-SITE — phone app, UI file</h1>
+<p class="lede">
+  <strong>This is the whole app, drawn as one static page.</strong> Six screens, at
+  the reference phone's 393 × 852 dp, using the same dp, sp, radii and colours the
+  Android views use. No build step: open this file in any browser and edit it.
+</p>
+<p class="lede">
+  Edit it however you like — but keep the file honest. Every measurement here was
+  copied from the Java, so a number you change is a number I can implement. The
+  variables at the top of the <code>&lt;style&gt;</code> block are the
+  <code>Ui</code> constants, one for one; the class names are the view-building
+  methods. When you hand it back, I read the diff, change the Java, rebuild the APK
+  and paste fresh renders of every screen I touched back into the chat.
+  <code>tokens.json</code> in this folder is the same numbers as data, which is
+  what makes "make the cards 12dp round" a checked change rather than a guess.
+</p>
+<p class="lede">
+  Screens marked <b>fold</b> are taller than the glass: the dashed line at 852px
+  is the bottom of the screen, and anything under it is reached by scrolling. It is
+  drawn here rather than clipped so you can still edit it.
+</p>
+
+<h2>Screens</h2>
+<div class="frames">
+
+<!-- ======================================================================
+     1. DRAWER, FOLDED — DrawerHome.build()
+     ====================================================================== -->
+<figure>
+  <div class="screen">
+    <!-- MainActivity.buildTopBar(): crumb, pill, gear at the outer edge -->
+    <div class="bar">
+      <div class="crumb">OFF-SITE</div>
+      <div class="pill">IDLE</div>
+      <div class="gear">&#9881;&#65038;</div>
+    </div>
+
+    <!-- DrawerHome.build() -->
+    <div class="drawer">
+      <div class="wordmark">[OFF-SITE]</div>
+      <div class="status-line">IDLE &middot; BRIDGE STOPPED</div>
+
+      <!-- DrawerHome.menuRow("DECKS", "live link", …) -->
+      <div class="menu-row">
+        <div class="menu-row__name">DECKS</div>
+        <div class="menu-row__hint">live link</div>
+      </div>
+
+      <!-- DrawerHome.projectsRow(), folded -->
+      <div class="menu-row">
+        <div class="menu-row__name">PROJECTS</div>
+        <div class="menu-row__hint">+</div>
+      </div>
+
+      <!-- DrawerHome.menuRow("SERIAL", "usb · flash", …) -->
+      <div class="menu-row">
+        <div class="menu-row__name">SERIAL</div>
+        <div class="menu-row__hint">usb &middot; flash</div>
+      </div>
+    </div>
+
+    <div class="fold"><span>852 dp</span></div>
+  </div>
+  <figcaption>
+    <b>1 · DRAWER (FRONT PAGE)</b><br>
+    <span>DrawerHome.build()</span> — the app opens here. Three rows; SETTINGS is
+    not one of them, it is the gear in the bar. BACK on this screen exits.
+  </figcaption>
+</figure>
+
+<!-- ======================================================================
+     2. DRAWER, PROJECTS EXPANDED — DrawerHome.projectsPanel()
+     ====================================================================== -->
+<figure>
+  <div class="screen">
+    <div class="bar">
+      <div class="crumb">OFF-SITE</div>
+      <div class="pill">IDLE</div>
+      <div class="gear">&#9881;&#65038;</div>
+    </div>
+
+    <div class="drawer">
+      <div class="wordmark">[OFF-SITE]</div>
+      <div class="status-line">IDLE &middot; BRIDGE STOPPED</div>
+
+      <div class="menu-row">
+        <div class="menu-row__name">DECKS</div>
+        <div class="menu-row__hint">live link</div>
+      </div>
+
+      <!-- open: the aside becomes −, and the panel appears under the row -->
+      <div class="menu-row">
+        <div class="menu-row__name">PROJECTS</div>
+        <div class="menu-row__hint">&minus;</div>
+      </div>
+
+      <!-- DrawerHome.projectsPanel(): one heading per board, projects A–Z -->
+      <div class="drawer-panel">
+        <div class="board-heading">2.4&quot; CYD (RESISTIVE)</div>
+
+        <div class="project-row">
+          <div class="project-row__name">Bruce</div>
+          <div class="project-row__status s-dim">PARKED</div>
+        </div>
+        <div class="project-row">
+          <div class="project-row__name">ESP32 Marauder</div>
+          <div class="project-row__status s-violet">WANT TO TRY</div>
+        </div>
+        <div class="project-row">
+          <div class="project-row__name">Launcher</div>
+          <div class="project-row__status s-dim">PARKED</div>
+        </div>
+        <div class="project-row">
+          <div class="project-row__name">Phone Deck &middot; 2.4&quot; CYD (resistive)</div>
+          <div class="project-row__status s-good">WORKING</div>
+        </div>
+        <div class="project-row">
+          <div class="project-row__name">Spotify Deck &middot; 2.4&quot; CYD (resistive)</div>
+          <div class="project-row__status s-good">WORKING</div>
+        </div>
+      </div>
+
+      <div class="menu-row">
+        <div class="menu-row__name">SERIAL</div>
+        <div class="menu-row__hint">usb &middot; flash</div>
+      </div>
+    </div>
+
+    <div class="fold"><span>852 dp</span></div>
+  </div>
+  <figcaption>
+    <b>2 · DRAWER, PROJECTS OPEN</b><br>
+    <span>DrawerHome.projectsRow() + projectsPanel()</span> — an index you can read
+    without leaving the page. The board heading comes from
+    <code>WidgetCatalog.boardLabel()</code>, the same call the PROJECTS crumb uses,
+    so a second panel becomes a second heading.
+  </figcaption>
+</figure>
+
+<!-- ======================================================================
+     3. PROJECTS, EVERY CARD FOLDED — ProjectsTab.build()
+     ====================================================================== -->
+<figure>
+  <div class="screen">
+    <div class="bar bar--section">
+      <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
+      <div class="pill">IDLE</div>
+      <div class="gear">&#9881;&#65038;</div>
+    </div>
+
+    <div class="body">
+      <div class="title">PROJECTS</div>
+      <!-- ProjectsTab.breadcrumb(): section › board -->
+      <div class="crumb-line">PROJECTS&nbsp; &rsaquo;&nbsp; 2.4&quot; CYD (RESISTIVE)</div>
+      <div class="subtitle">Alphabetical. Tap a name for its notes.</div>
+
+      <!-- Ui.section("LIBRARIES NEEDED") + ProjectsTab.librariesCard() -->
+      <div class="label">LIBRARIES NEEDED</div>
+      <div class="card mt-10">
+        <div class="hint">Install these once in ArduinoDroid before compiling a
+          deck. Tap a name to copy it, then paste it into ArduinoDroid's library
+          search.</div>
+        <div class="warn mt-8">Never install ArduinoBLE: it shadows the ESP32
+          core's BLE headers and every build fails.</div>
+        <div class="action action--full mt-8">Adafruit GFX Library</div>
+        <div class="action action--full mt-8">Adafruit ILI9341</div>
+        <div class="action action--full mt-8">XPT2046_Touchscreen</div>
+        <div class="action action--full mt-10">OPEN ARDUINODROID</div>
+      </div>
+
+      <!-- the one live EditText in the app; its own field, not rebuilt -->
+      <div class="field">Search projects</div>
+
+      <!-- ProjectsTab.filterRow(): ALL plus one chip per status, with counts -->
+      <div class="chips">
+        <div class="chip chip--on">ALL 5</div>
+        <div class="chip">WANT TO TRY 0</div>
+        <div class="chip">FLASHED 0</div>
+        <div class="chip">WORKING 2</div>
+        <div class="chip">PARKED 3</div>
+      </div>
+
+      <div class="proj">
+        <div class="proj__head">
+          <div class="proj__meta">
+            <div class="tag">IMAGE</div>
+            <div class="proj__status s-dim">PARKED</div>
+          </div>
+          <div class="proj__fold">+</div>
+        </div>
+        <div class="proj__name">Bruce</div>
+      </div>
+
+      <div class="proj">
+        <div class="proj__head">
+          <div class="proj__meta">
+            <div class="tag">IMAGE</div>
+            <div class="proj__status s-violet">WANT TO TRY</div>
+          </div>
+          <div class="proj__fold">+</div>
+        </div>
+        <div class="proj__name">ESP32 Marauder</div>
+      </div>
+
+      <div class="proj">
+        <div class="proj__head">
+          <div class="proj__meta">
+            <div class="tag">IMAGE</div>
+            <div class="proj__status s-dim">PARKED</div>
+          </div>
+          <div class="proj__fold">+</div>
+        </div>
+        <div class="proj__name">Launcher</div>
+      </div>
+
+      <div class="proj">
+        <div class="proj__head">
+          <div class="proj__meta">
+            <div class="tag">INSIDE APP</div>
+            <div class="proj__status s-good">WORKING</div>
+          </div>
+          <div class="proj__fold">+</div>
+        </div>
+        <div class="proj__name">Phone Deck &middot; 2.4&quot; CYD (resistive)</div>
+      </div>
+
+      <div class="proj">
+        <div class="proj__head">
+          <div class="proj__meta">
+            <div class="tag">INSIDE APP</div>
+            <div class="proj__status s-good">WORKING</div>
+          </div>
+          <div class="proj__fold">+</div>
+        </div>
+        <div class="proj__name">Spotify Deck &middot; 2.4&quot; CYD (resistive)</div>
+      </div>
+    </div>
+
+    <div class="fold"><span>852 dp</span></div>
+  </div>
+  <figcaption>
+    <b>3 · PROJECTS, FOLDED</b><br>
+    <span>ProjectsTab.build()</span> — title, path, advice, then the libraries
+    disclaimer before the shelf, because what to install is a precondition for
+    every card below rather than a footnote on one of them.
+  </figcaption>
+</figure>
+
+<!-- ======================================================================
+     4. PROJECTS, ONE CARD OPEN — ProjectsTab.projectCard()
+     ====================================================================== -->
+<figure>
+  <div class="screen">
+    <div class="bar bar--section">
+      <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
+      <div class="pill">IDLE</div>
+      <div class="gear">&#9881;&#65038;</div>
+    </div>
+
+    <div class="body">
+      <div class="title">PROJECTS</div>
+      <div class="crumb-line">PROJECTS&nbsp; &rsaquo;&nbsp; 2.4&quot; CYD (RESISTIVE)</div>
+      <div class="subtitle">Alphabetical. Tap a name for its notes.</div>
+
+      <div class="label">LIBRARIES NEEDED</div>
+      <div class="card mt-10">
+        <div class="hint">Install these once in ArduinoDroid before compiling a
+          deck. Tap a name to copy it, then paste it into ArduinoDroid's library
+          search.</div>
+        <div class="warn mt-8">Never install ArduinoBLE: it shadows the ESP32
+          core's BLE headers and every build fails.</div>
+        <div class="action action--full mt-8">Adafruit GFX Library</div>
+        <div class="action action--full mt-8">Adafruit ILI9341</div>
+        <div class="action action--full mt-8">XPT2046_Touchscreen</div>
+        <div class="action action--full mt-10">OPEN ARDUINODROID</div>
+      </div>
+
+      <div class="field">Search projects</div>
+
+      <div class="chips">
+        <div class="chip chip--on">ALL 5</div>
+        <div class="chip">WANT TO TRY 0</div>
+        <div class="chip">FLASHED 0</div>
+        <div class="chip">WORKING 2</div>
+        <div class="chip">PARKED 3</div>
+      </div>
+
+      <!-- folded card, above the one that is open -->
+      <div class="proj">
+        <div class="proj__head">
+          <div class="proj__meta">
+            <div class="tag">IMAGE</div>
+            <div class="proj__status s-dim">PARKED</div>
+          </div>
+          <div class="proj__fold">+</div>
+        </div>
+        <div class="proj__name">Bruce</div>
+      </div>
+
+      <!-- the open accordion: body, needs, log, then two button rows -->
+      <div class="proj">
+        <div class="proj__head">
+          <div class="proj__meta">
+            <div class="tag">INSIDE APP</div>
+            <div class="proj__status s-good">WORKING</div>
+          </div>
+          <div class="proj__fold">&minus;</div>
+        </div>
+        <div class="proj__name">Phone Deck &middot; 2.4&quot; CYD (resistive)</div>
+
+        <div class="proj__body">A desk dashboard for your phone: clock, battery and
+          notifications, set like a woodblock print in two monochrome themes.</div>
+        <div class="proj__needs">NEEDS&nbsp; Adafruit GFX Library, Adafruit
+          ILI9341, XPT2046_Touchscreen</div>
+        <div class="proj__log s-good">TOUCH: WORKS &nbsp; &middot; &nbsp; BUILD:
+          2432S024R-v2.1 &nbsp; &middot; &nbsp; 2 days ago</div>
+
+        <div class="row-actions">
+          <div class="action action--primary">COPY DROID</div>
+          <div class="action">SAVE</div>
+        </div>
+        <div class="row-actions row-actions--tight">
+          <div class="action">LOG</div>
+          <div class="action">STATUS</div>
+        </div>
+      </div>
+
+      <div class="proj">
+        <div class="proj__head">
+          <div class="proj__meta">
+            <div class="tag">INSIDE APP</div>
+            <div class="proj__status s-good">WORKING</div>
+          </div>
+          <div class="proj__fold">+</div>
+        </div>
+        <div class="proj__name">Spotify Deck &middot; 2.4&quot; CYD (resistive)</div>
+      </div>
+    </div>
+
+    <div class="fold"><span>852 dp</span></div>
+  </div>
+  <figcaption>
+    <b>4 · PROJECTS, ONE OPEN</b><br>
+    <span>ProjectsTab.projectCard()</span> — the folded card is kind, status, name
+    and a <code>+</code>. Opening adds the notes, what it needs, the last log line
+    and the actions. <code>COPY DROID</code> / <code>SAVE</code> only exist for a
+    deck bundled inside the APK; an outside project gets
+    <code>INSTALLER</code> / <code>SOURCE</code> / <code>RECIPE</code> instead.
+  </figcaption>
+</figure>
+
+<!-- ======================================================================
+     5. SERIAL — BoardTab.build()
+     ====================================================================== -->
+<figure>
+  <div class="screen">
+    <div class="bar bar--section">
+      <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
+      <div class="pill">IDLE</div>
+      <div class="gear">&#9881;&#65038;</div>
+    </div>
+
+    <div class="body">
+      <div class="title">SERIAL</div>
+      <div class="subtitle">Connect over OTG, then flash an image.</div>
+
+      <!-- target board card -->
+      <div class="card mt-10">
+        <div class="hint" style="letter-spacing:.14em;font-size:10px">TARGET BOARD</div>
+        <div style="font-size:14px;padding-top:6px">ESP32-2432S024R &nbsp;(2432S024R)</div>
+      </div>
+
+      <!-- FLASH / MONITOR: the two modes that share one cable -->
+      <div class="row-actions mt-14">
+        <div class="action action--primary" style="flex:1">FLASH</div>
+        <div class="action" style="flex:1">MONITOR</div>
+      </div>
+
+      <!-- the USB card: status, PROBE, then the three retries and the lines -->
+      <div class="card mt-14">
+        <div style="font-size:12px">Plug the CYD in with an OTG cable, then tap
+          PROBE.</div>
+        <div class="action action--primary action--full mt-10">PROBE USB</div>
+        <div class="action action--full mt-8">SYNC ONLY</div>
+        <div class="action action--full mt-8">RESTART BOARD</div>
+        <div class="action action--full mt-8">MANUAL BOOT: OFF</div>
+        <div class="action action--full mt-8">LINES: NORMAL</div>
+        <div class="hint mt-6">PROBE sweeps four wirings by itself — normal and
+          swapped lines, each with the reset driven here and with EN pulsed while
+          BOOT is held — and stops at the first that answers.</div>
+      </div>
+
+      <!-- the probe log: narration from the last probe or flash, newest last -->
+      <div class="label">PROBE LOG</div>
+      <div class="card mt-10">
+        <div class="hint">Nothing yet. PROBE and FLASH write each handshake step
+          here, and a quiet ROM reports the raw bytes it did send.</div>
+      </div>
+    </div>
+
+    <div class="fold"><span>852 dp</span></div>
+  </div>
+  <figcaption>
+    <b>5 · SERIAL</b><br>
+    <span>BoardTab.build()</span> — the OTG link, the flash handshake, the
+    monitor. <code>MANUAL BOOT</code> and <code>LINES</code> are switches that
+    carry their own state in the label, so a screenshot says what is set.
+  </figcaption>
+</figure>
+
+<!-- ======================================================================
+     6. SETTINGS — SetupTab
+     ====================================================================== -->
+<figure>
+  <div class="screen">
+    <div class="bar bar--section bar--settings">
+      <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
+      <div class="pill">IDLE</div>
+      <div class="gear">&#9881;&#65038;</div>
+    </div>
+
+    <div class="body">
+      <div class="title">SETTINGS</div>
+
+      <!-- DeckService.getStatus(), 14sp ACCENT -->
+      <div class="card mt-12" style="font-size:14px;color:var(--accent)">
+        Bridge stopped &mdash; start it below
+      </div>
+
+      <div class="label">PERMISSIONS</div>
+      <div class="card">
+        <div style="font-size:13px;color:var(--pink)">Notification access: not
+          granted</div>
+        <div class="action action--full mt-10">NOTIFICATION ACCESS</div>
+      </div>
+      <div class="card mt-10">
+        <div style="font-size:13px;color:var(--good)">Bluetooth: granted</div>
+        <div class="action action--full mt-10">BLUETOOTH PERMISSIONS</div>
+      </div>
+
+      <div class="label">NOTIFICATIONS</div>
+      <div class="card">
+        <div style="font-size:13px;color:var(--dim)">Apps allowed: all of them</div>
+        <div class="hint mt-6">The deck sits where other people can read it. Pick
+          the apps it may show.</div>
+        <div class="row-actions">
+          <div class="action" style="flex:1">CHOOSE APPS</div>
+          <div class="action action--dim" style="flex:1">ALL APPS</div>
+        </div>
+      </div>
+
+      <div class="label">BACKGROUND</div>
+      <div class="card">
+        <div style="font-size:13px;color:var(--dim)">Android may stop the bridge
+          overnight. Exempting it from battery optimisation keeps the deck updating
+          with the screen off.</div>
+        <div class="action action--full mt-10">BATTERY SETTINGS</div>
+      </div>
+
+      <div class="label">BRIDGE</div>
+      <div class="action action--primary action--full">START BRIDGE</div>
+    </div>
+
+    <div class="fold"><span>852 dp</span></div>
+  </div>
+  <figcaption>
+    <b>6 · SETTINGS</b><br>
+    <span>SetupTab</span> — reached by the gear, never by a drawer row. The gear is
+    lit here (<code>.bar--settings</code>) because you are already in it.
+  </figcaption>
+</figure>
+
+</div><!-- /frames -->
+
+<h2>What is what</h2>
+<table>
+  <tr><th>Here</th><th>In the app</th></tr>
+  <tr><td>.screen</td><td>one full screen, 393 × 852 dp</td></tr>
+  <tr><td>.bar / .crumb / .pill / .gear</td><td>MainActivity.buildTopBar, showSection</td></tr>
+  <tr><td>.drawer / .wordmark / .status-line</td><td>DrawerHome.build</td></tr>
+  <tr><td>.menu-row</td><td>DrawerHome.menuRow</td></tr>
+  <tr><td>.board-heading</td><td>DrawerHome.projectsPanel (heading per board)</td></tr>
+  <tr><td>.project-row</td><td>DrawerHome.projectRow (a project inside the drawer)</td></tr>
+  <tr><td>.body / .title</td><td>the section ScrollView body and its 20sp title</td></tr>
+  <tr><td>.crumb-line</td><td>ProjectsTab.breadcrumb</td></tr>
+  <tr><td>.label</td><td>Ui.section — 12sp, 0.14em, 18dp above</td></tr>
+  <tr><td>.card</td><td>Ui.card — CARD fill, EDGE hairline, 14dp radius, 14×12 padding</td></tr>
+  <tr><td>.field</td><td>the search EditText in ProjectsTab</td></tr>
+  <tr><td>.chip / .chip--on</td><td>ProjectsTab.addChip</td></tr>
+  <tr><td>.proj, .tag, .proj__status, .proj__fold</td><td>ProjectsTab.projectCard</td></tr>
+  <tr><td>.action, --primary, --dim</td><td>Ui.action</td></tr>
+  <tr><td>.s-good / .s-accent / .s-dim / .s-violet</td><td>ProjectStore.statusColor — WORKING, FLASHED, PARKED, WANT TO TRY</td></tr>
+</table>
+
+<h2>Type</h2>
+<table>
+  <tr><th>Size</th><th>Used for</th></tr>
+  <tr><td>34 sp bold</td><td>[OFF-SITE] wordmark, 0.06em</td></tr>
+  <tr><td>20 sp</td><td>section title (PROJECTS, SERIAL, SETTINGS)</td></tr>
+  <tr><td>17 sp</td><td>drawer row name, 0.10em</td></tr>
+  <tr><td>16 sp</td><td>project name in the shelf; the +/− fold</td></tr>
+  <tr><td>15 sp</td><td>the gear glyph</td></tr>
+  <tr><td>14 sp</td><td>bridge status line on SETTINGS; target board name</td></tr>
+  <tr><td>13 sp</td><td>body text in a card, buttons, the search field</td></tr>
+  <tr><td>12 sp</td><td>crumb in the top bar (0.12em), subtitle, project notes</td></tr>
+  <tr><td>11 sp</td><td>button-level hints, log line, status pill</td></tr>
+  <tr><td>10 sp</td><td>labels (0.14em), chips, kind tags, crumb line, drawer hint</td></tr>
+  <tr><td>9 sp</td><td>board heading in the drawer, drawer project status</td></tr>
+</table>
+<p>
+  Everything is monospace — the deck is a terminal, so the phone reads as the same
+  instrument. Letter-spacing is Android's em value, so it is the same number here.
+</p>
+
+<h2>Copy</h2>
+<p>
+  Strings worth keeping verbatim, because they carry the tone: the status line
+  <code>IDLE · BRIDGE STOPPED</code> / <code>SCANNING</code> /
+  <code>LINKED · &lt;DEVICE&gt;</code>; the serial hint
+  <code>Plug the CYD in with an OTG cable, then tap PROBE.</code>; the empty log
+  <code>Nothing yet. PROBE and FLASH write each handshake step here, and a quiet
+  ROM reports the raw bytes it did send.</code>; the privacy line
+  <code>The deck sits where other people can read it. Pick the apps it may
+  show.</code>; and the shelf's own promise,
+  <code>Alphabetical. Tap a name for its notes.</code>
+</p>
+
+<h2>Handing it back</h2>
+<ol>
+  <li>Edit this page (or <code>tokens.json</code>, if it is only numbers).</li>
+  <li>Tell me what you changed, in words, in the chat — "cards at 12dp, ditch the
+      chips, the crumb should be sentence case".</li>
+  <li>I change the Java, rebuild the APK, regenerate the renders from the same
+      numbers and paste every touched screen inline in the chat.</li>
+  <li>If a render disagrees with this file, the render wins for the phone and this
+      file gets corrected — they must not drift apart.</li>
+</ol>
+<p>
+  Read <code>design/README.md</code> for the file inventory and the limits of
+  drawing an app this way.
+</p>
+
+</body>
+</html>
