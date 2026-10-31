@@ -262,7 +262,9 @@ try another cable, and confirm the phone supports USB host mode.
    reset wiring are all fine and the chip runs when it is released — but keep
    reading, because that is one pulse, not the rounds below. The quote is the whole banner (up to 600 bytes), so the
    `rst:` and `boot:` lines and the ROM's build date are readable in the log —
-   `boot:0x13` is flash, `boot:0x3` is download mode.
+   `boot:0x13` is flash, `boot:0x3` is download mode. A flash boot after a pulse is
+   the strap, not the packet: EN and the cable worked, IO0 was high, and no rate
+   will change that; the probe's closing line says so.
 2. All four say `nothing` → not a byte reached the phone after a reset: cable, the
    adapter's receive line, or a board held in reset.
 3. All four say `no text — <hex>` → the board is transmitting at some rate the
@@ -280,12 +282,14 @@ try another cable, and confirm the phone supports USB host mode.
    answers only on the inverted rounds.
 5. Nothing answers and the board's IO0 may not be wired to the adapter at all:
    tap **MANUAL BOOT** until it reads **MANUAL BOOT: ON**, hold **BOOT** down, then
-   press **PROBE USB**. The sweep never touches IO0 and pulses EN once per rate, so
-   the button decides flash or download mode and each round's header says whether
-   that pulse produced a banner. If every round reads no bytes, the EN pulse is not
-   arriving either — then tap the board's own reset by hand while the sweep
-   listens, and let go of **BOOT** once it answers. The ROM stays in download mode
-   in that case, so press **RESTART BOARD** to boot the firmware back.
+   press **PROBE USB**. The sweep never drives IO0 low and pulses EN once per rate,
+   writing both control lines together because one line on its own is not a reset
+   on this board, so the button decides flash or download mode and each round's
+   header says whether that pulse produced a banner. If every round reads no bytes,
+   the EN pulse is not arriving either — then tap the board's own reset by hand
+   while the sweep listens, and let go of **BOOT** once it answers. A round whose
+   banner reads `boot:0x13 (SPI_FAST_FLASH_BOOT)` is the opposite: the chip did
+   restart, EN is fine, and IO0 was high, so only BOOT can change the strap.
 6. Still nothing? Set **LINES: SWAPPED** and probe again. That drives EN on DTR
    and IO0 on RTS, which is what an adapter with a reversed pair needs; without
    it the reset is released with IO0 high and the ROM never runs, at any rate.

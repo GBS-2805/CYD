@@ -229,8 +229,13 @@ URL and a flashing note. Decisions behind it:
   version left DTR/RTS untouched and told the user to tap the board's reset, so
   the app's own handshake contained no reset at all and every round ran against
   whatever state the board happened to be in. It now pulses EN once per round and
-  never drives IO0, so the BOOT button alone chooses the strap, each round reports
-  what its own pulse produced, and the button and its note read MANUAL BOOT.
+  never drives IO0 low, so the BOOT button alone chooses the strap, each round
+  reports what its own pulse produced, and the button and its note read MANUAL
+  BOOT. That pulse writes **both** lines, `lines(false, true)` then
+  `lines(false, false)`: on 31 October a DTR-only pulse read `0 B` at all five
+  rates while the both-lines pulse of the phase before it printed a banner on
+  every round, which is what a pair of reset transistors does when only one of its
+  two inputs moves.
 - **The protocol has host tests, and they are not optional.** `test.sh` compiles
   `EspRom.java` against a stub `UsbSerialCh340` and asserts framing, the `0xDD`
   sync checksum, the handshake, opcode skipping, the refused-write and silent-board
@@ -243,11 +248,14 @@ URL and a flashing note. Decisions behind it:
   arrived on, round 2 the other, round 3 the first again, and the log names the
   inverted rounds, so the log alone identifies the wiring.
 - **Manual reset** (`EspRom.setManualReset`) is the way out when IO0 is not wired
-  to the adapter: `connect()` skips `detectPolarity()`, runs one round per rate
-  with no `enterBootloader()`, and `probeUsb()` skips `hardReset()`, so DTR/RTS are
-  never asserted after the port opens. The user holds BOOT and taps the board's
-  reset while the sweep listens; the log says that instead of blaming polarity,
-  and the failure line states that nothing in the run reset the board.
+  to the adapter: `connect()` runs the proof of life as usual, then one round per
+  rate with `resetOnly()` instead of `enterBootloader()`, so EN is pulsed and IO0
+  is only ever driven high. The proof of life used to be skipped here to keep DTR
+  still, which also meant this phase inherited whatever polarity the phase before
+  it left behind — on 31 October that happened to be the workable one, so the
+  inheritance was not the fault, but the blind spot was real. `probeUsb()`
+  hard-resets on this path too, so a failed attempt does not leave the ROM in
+  download mode.
 - **Swapped control lines** (`EspRom.setSwappedLines`, the **LINES** button) put EN
   on DTR and IO0 on RTS. Inverting both lines, which the polarity rounds do,
   cannot fix a crosswired pair: each line only becomes its opposite, so reset is
@@ -336,6 +344,16 @@ URL and a flashing note. Decisions behind it:
   **untested on hardware**; what is tested is that it stops at wiring 1 when the
   stub answers and that a silent stub reports all 4 wirings tried (26 host checks).
 
+- **A flash boot is its own verdict.** The 31 October run ended with every round of
+  wiring 3 printing a banner, and the banner reading `boot:0x13
+  (SPI_FAST_FLASH_BOOT)`: the chip restarted into its firmware, so EN, the cable
+  and the receive path all worked and IO0 was high as it left reset. The old
+  closing message guessed "the packet or the rate", which sends the next attempt
+  in the wrong direction. `bootMode()` now lifts the ROM's `boot:0x..` field out of
+  the banner, `flashNote()` puts it on the round line, and the verdict in the
+  failure message is that the strap never took — hold BOOT, or find where the
+  adapter's IO0 leg stops reaching the board.
+
 ## Crash reporting
 
 - `CrashLog` installs a default uncaught-exception handler from
@@ -421,7 +439,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-10-31 after the sketch
-  header change and the probe work **110,009 bytes** after the icon, the app
+  header change and the probe work **110,509 bytes** after the icon, the app
   allowlist, the edge-to-edge padding and the four-wiring sweep.
   The earlier 128,924-byte APK unpacked to the same six entries with the same
   uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
@@ -447,8 +465,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
   build-time data. The probe changes shipped **99,533 bytes**, the flash-shelf
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
-  and edge-to-edge work **110,009 bytes**; `dist/` holds that last artifact. Quote
-  the size to the nearest kB (~107 kB), never as a checksum.
+  and edge-to-edge work **110,509 bytes**; `dist/` holds that last artifact. Quote
+  the size to the nearest kB (~108 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set,
   `application-icon: 'res/BW.xml'` (resource names are shortened) and

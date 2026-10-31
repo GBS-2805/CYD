@@ -42,6 +42,7 @@ public final class HostTests {
         flashWithoutHandshake();
         sweepStopsAtFirstAnswer();
         sweepTriesEveryWiring();
+        flashBootNamesTheStrap();
 
         System.out.println();
         if (failures.isEmpty()) {
@@ -105,8 +106,10 @@ public final class HostTests {
         }
 
         final String lines = String.join(" | ", port.control);
-        check("manual mode never moves DTR, which is IO0", !lines.contains("dtr "));
-        check("manual mode pulses EN, which is RTS", lines.contains("rts "));
+        check("a pulse writes both control lines together",
+                lines.contains("both dtr="));
+        check("no pulse moves one line on its own",
+                !lines.contains("dtr ") && !lines.contains("rts "));
     }
 
     private static void decoyReplyIsSkipped() throws Exception {
@@ -180,6 +183,32 @@ public final class HostTests {
         } catch (IOException e) {
             check("a silent board fails every wiring", e.getMessage().contains("4 wirings"));
             check("the sweep reached the last wiring", joined(trace).contains("wiring 4/4"));
+        }
+    }
+
+    /**
+     * The 31 October banner: the chip restarts, but into its firmware. That means
+     * IO0 was high at reset, so the failure message has to name the strap instead of
+     * blaming the packet or the rate the way it used to.
+     */
+    private static void flashBootNamesTheStrap() throws Exception {
+        final UsbSerialCh340 port = new UsbSerialCh340();
+        port.refuseRates = true;   // the banner is all this test needs
+        port.printOnPulse = "ets Jul 29 2019 12:21:46\r\n\r\n"
+                + "rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)\r\n";
+        final EspRom rom = new EspRom(port);
+        final List<String> trace = new ArrayList<>();
+        rom.setTrace(trace::add);
+        try {
+            rom.connect();
+            check("a flash-boot banner still fails the probe", false);
+        } catch (IOException e) {
+            check("a flash-boot banner is called a flash boot",
+                    joined(trace).contains("flash boot"));
+            check("a flash boot blames the IO0 strap, not the packet",
+                    e.getMessage().contains("IO0 stayed high"));
+            check("a flash boot points at BOOT by hand",
+                    e.getMessage().contains("MANUAL BOOT"));
         }
     }
 

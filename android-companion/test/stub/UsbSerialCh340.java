@@ -2,6 +2,7 @@ package dev.phonedesk.companion;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -39,6 +40,8 @@ final class UsbSerialCh340 {
     boolean refuseRates;
     /** Fail every write, the way a bridge that will not take bytes would. */
     boolean failWrites;
+    /** Text the chip prints on every pulse, the way the ROM prints its banner. */
+    String printOnPulse;
     int baud = 115200;
 
     void answer(Responder responder) {
@@ -141,6 +144,7 @@ final class UsbSerialCh340 {
 
     void setDtrRts(boolean dtr, boolean rts) {
         control.add("both dtr=" + dtr + " rts=" + rts);
+        if (printOnPulse != null) inject(printOnPulse.getBytes(StandardCharsets.UTF_8));
     }
 
     void setDtr(boolean on) {

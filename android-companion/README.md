@@ -80,8 +80,8 @@ them owns the cable at a time; the choice is remembered across restarts.
   here and with EN pulsed while you hold **BOOT**. It stops at the first that
   answers, says `found on wiring 2 of 4`, and sets **LINES** / **MANUAL BOOT** to
   match so FLASH and RESTART reuse it. Hold BOOT from the moment the log reaches
-  wiring 3; the last two phases never touch IO0, and no software can press that
-  button.
+  wiring 3; the last two phases never drive IO0 low, and no software can press
+  that button.
 - **FLASH** on an imported `.bin` erases and writes it at `0x0`, verifies it by
   MD5 and reboots into it. `0x0` is the merged-image offset; an app-only image
   belongs at `0x10000` and will not boot from `0x0`.
@@ -94,14 +94,17 @@ them owns the cable at a time; the choice is remembered across restarts.
 - **RESTART BOARD** boots whatever is in flash without entering the bootloader.
   That is the way out of download mode (black screen, red LED) after a failed
   attempt, short of unplugging.
-- **MANUAL BOOT** leaves IO0 alone and pulses EN from here, once per round, for a
+- **MANUAL BOOT** holds IO0 high and pulses EN from here, once per round, for a
   board whose IO0 leg is not driven by the adapter's DTR line: hold **BOOT** down
   for the manual phases, then let go. The toggle is what FLASH and RESTART use;
-  PROBE tries this mode by itself. Each round's header says what its own pulse
-  produced, so a round that reads nothing says the EN pulse is not arriving
-  either. That run sends no proof of life, because a polarity sweep would move
-  DTR, and does not restart the board afterwards, so the ROM is left in download
-  mode for you to handle.
+  PROBE tries this mode by itself. Every pulse writes both control lines, at
+  levels that leave IO0 high, because a single line is not a reset on a board with
+  the usual pair of reset transistors — a run that moved DTR alone read `0 B` at
+  all five rates and looked exactly like a finger that never pressed BOOT. The
+  proof of life runs here too, and the board is restarted afterwards like any
+  other probe. A round whose banner says `boot:0x13 (SPI_FAST_FLASH_BOOT)`
+  restarted into the firmware: EN works and IO0 was high, so BOOT is the thing to
+  change.
 - **LINES** swaps which control line carries which signal: **NORMAL** is DTR to
   IO0 and RTS to EN, **SWAPPED** is the reverse, for an adapter wired that way.
   The two look identical in the log — silence at every rate in both polarities —
@@ -202,7 +205,7 @@ through Gradle; a raw `javac` build produces an APK-less class check and the
 PROJECTS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
-[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (107 kB,
+[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (108 kB,
 package `dev.phonedesk.companion`, debug-signed). Install it with
 `adb install -r dist/PhoneDeckBridge-debug.apk`, or copy it to the phone and open
 it with "install unknown apps" allowed.

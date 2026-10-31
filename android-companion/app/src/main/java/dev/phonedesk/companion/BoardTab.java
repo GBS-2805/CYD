@@ -57,7 +57,7 @@ final class BoardTab extends ScrollView {
     private boolean usbProbing;
     private boolean usbFlashing;
     private int usbPercentShown = -1;
-    /** Leave IO0 alone and pulse EN from here; BOOT is held by hand. */
+    /** Never drive IO0 low; pulse EN from here and let BOOT hold the strap. */
     private boolean manualReset;
     /** DTR drives EN and RTS drives IO0; see EspRom.setSwappedLines(). */
     private boolean swappedLines;
@@ -966,7 +966,7 @@ final class BoardTab extends ScrollView {
 
         if (manualReset) {
             TextView manualNote = Ui.text(activity,
-                    "EN only, IO0 left alone: FLASH and RESTART leave the strap to the"
+                    "EN pulse, IO0 held high: FLASH and RESTART leave the strap to the"
                             + " BOOT button, so hold it while they run. PROBE tries this"
                             + " mode by itself as its last two wirings.", 11, Ui.ACCENT);
             manualNote.setPadding(0, Ui.dp(activity, 6), 0, 0);

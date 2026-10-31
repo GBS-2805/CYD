@@ -114,6 +114,13 @@ final class EspRom {
     private boolean swapControl;
     /** True once a plain reset produced readable boot text, not just noise. */
     private boolean bannerSeen;
+    /**
+     * The ROM's boot-mode line when a banner showed a flash boot, e.g.
+     * "boot:0x13 (SPI_FAST_FLASH_BOOT)", or "" until one is seen. A flash boot after
+     * a pulse is proof that EN worked and IO0 was high as the chip left reset, which
+     * no sync packet can change, so the verdict is kept for the closing message.
+     */
+    private String flashBootMode = "";
     /** Reset rounds that ran, and how many of those read any byte at all. */
     private int roundsSeen;
     private int roundsWithBytes;
@@ -130,11 +137,10 @@ final class EspRom {
     }
 
     /**
-     * Leave IO0 alone for the whole handshake and pulse EN from here instead, once
-     * per round. For a board whose IO0 leg is not driven by the adapter, BOOT has
-     * to be held by hand while something resets the chip; pulsing EN is that
-     * something, and touching IO0 is what would fight the button. connect() skips
-     * the proof of life in this mode, since a polarity sweep would move DTR.
+     * Never drive IO0 low, and pulse EN from here instead, once per round. For a
+     * board whose IO0 leg is not driven by the adapter, BOOT has to be held by hand
+     * while something resets the chip; pulsing EN is that something, and driving
+     * IO0 low is what would fight the button.
      */
     void setManualReset(boolean manual) {
         manualReset = manual;
@@ -180,10 +186,11 @@ final class EspRom {
                 roundsSeen = 0;
                 roundsWithBytes = 0;
                 bannerSeen = false;
+                flashBootMode = "";
                 connected = false;
                 log("-- wiring " + phase + "/4: " + wiringName(swap, manual) + " --");
                 if (manual) {
-                    log("   hold BOOT down now: this phase pulses EN and never touches IO0,"
+                    log("   hold BOOT down now: this phase pulses EN with IO0 held high,"
                             + " so the strap is the button's");
                     sleep(bootHoldLeadMs);
                 }
@@ -286,11 +293,13 @@ final class EspRom {
             log("control lines swapped: DTR drives EN, RTS drives IO0");
         }
         if (manualReset) {
-            log("manual mode: IO0 is left alone and EN is pulsed once per round. Hold"
+            log("manual mode: IO0 is held high and EN is pulsed once per round. Hold"
                     + " BOOT down while this sweeps, then let go of BOOT.");
-        } else {
-            detectPolarity();
         }
+        // Measured in both modes. The boot text is what says which control polarity
+        // resets this board, and manual mode needs that answer as much as the other
+        // three: it used to inherit whatever the phase before it happened to leave.
+        detectPolarity();
         // Whatever polarity the boot text arrived on is the starting point; the
         // rounds then alternate away from it and back.
         final boolean base = invertControl;
@@ -328,10 +337,12 @@ final class EspRom {
                 if (manualReset) {
                     resetOnly();
                     final int afterPulse = listenWindow(300);
-                    log("  round " + (round + 1) + ": EN pulsed, IO0 left alone"
+                    log("  round " + (round + 1) + ": EN pulsed, IO0 held high"
+                            + (invertControl ? ", inverted lines" : "")
                             + (afterPulse == 0
-                            ? " — the pulse produced no bytes; is BOOT held down?"
-                            : " — " + afterPulse + " B of boot text after the pulse"));
+                            ? " — the pulse produced no bytes: EN did not reset the chip"
+                            : " — " + afterPulse + " B of boot text after the pulse"
+                                    + flashNote()));
                 } else {
                     enterBootloader();
                     // Read the pulse's own output before any sync packet goes out, so
@@ -342,7 +353,8 @@ final class EspRom {
                             + (invertControl ? ", inverted lines" : "")
                             + (afterPulse == 0
                             ? " — the pulse produced no bytes at all"
-                            : " — " + afterPulse + " B of boot text after the pulse"));
+                            : " — " + afterPulse + " B of boot text after the pulse"
+                                    + flashNote()));
                 }
                 try {
                     sync(attempts);
@@ -379,15 +391,23 @@ final class EspRom {
             final String rates = silent.length() == 0 ? "none" : silent.toString();
             final String tail;
             if (manualReset) {
-                tail = ", with IO0 left alone and EN pulsed once per round. If the rounds"
-                        + " read no bytes at all, that EN pulse is not reaching the board"
-                        + " either: hold BOOT down and tap the board's own reset while the"
-                        + " sweep listens, then let go of BOOT.";
+                tail = ", with IO0 held high and EN pulsed once per round. If the rounds"
+                        + " read no bytes at all, EN is not resetting the chip at all: hold"
+                        + " BOOT down and tap the board's own reset while the sweep"
+                        + " listens, then let go of BOOT.";
             } else if (!bannerSeen) {
                 tail = ", in either reset polarity. Not one readable byte arrived after a"
                         + " plain reset, at 115200 or 74880, in either polarity. That"
                         + " points at the cable, the adapter's receive line or a board"
                         + " held in reset.";
+            } else if (!flashBootMode.isEmpty()) {
+                tail = ", in either reset polarity. The chip does restart, and the banner"
+                        + " it prints says " + flashBootMode + ": that is the firmware"
+                        + " booting, not download mode, so EN, the cable and the receive"
+                        + " path all work and IO0 stayed high at the moment of reset. No"
+                        + " packet or rate can undo that — hold BOOT by hand (MANUAL"
+                        + " BOOT) or look at where the adapter's IO0 leg stops reaching"
+                        + " the board.";
             } else if (roundsWithBytes == 0) {
                 tail = ", in either reset polarity. Boot text did arrive once, so the"
                         + " cable and the receive path work, but none of the "
@@ -481,22 +501,21 @@ final class EspRom {
     }
 
     /**
-     * esptool's classic reset: hold EN low, drop IO0 low, release EN, then
-     * release IO0 — the ROM samples the strapping pin as it leaves reset.
-     */
-    /**
-     * Manual-BOOT entry: pulse EN and never touch IO0, so the strap is whatever the
-     * board's BOOT button holds. A hand on BOOT is the one way into download mode
-     * that does not depend on this app driving DTR at all — and the 31 October
-     * rounds are consistent with DTR being exactly what does not work here.
+     * Manual-BOOT entry: pulse EN and never drive IO0 low, so the strap is whatever
+     * the board's BOOT button holds.
+     *
+     * Both lines are written together, at levels that leave IO0 high, because one
+     * line on its own is not a reset on a board with the usual pair of reset
+     * transistors: EN's state there is a function of the pair, not of DTR alone. The
+     * 31 October run showed exactly that — wiring 3 pulsed both lines and printed a
+     * banner on every round, while wiring 4 moved DTR alone for the whole phase and
+     * read 0 B at all five rates, as if nothing had been pressed.
      */
     private void resetOnly() throws IOException {
         port.flushInput();
-        en(false);            // EN released, IO0 untouched
-        sleep(60);
-        en(true);             // EN low: reset
+        lines(false, true);   // IO0 high, EN low: reset, with both lines defined
         sleep(120);
-        en(false);            // EN high: BOOT decides flash or download mode
+        lines(false, false);  // EN released: BOOT decides flash or download mode
         sleep(120);
     }
 
@@ -574,6 +593,13 @@ final class EspRom {
                     log("  boot text arrived after a reset, so the cable, the adapter"
                             + " and the reset wiring work; keeping "
                             + (inverted ? "inverted" : "normal") + " lines");
+                    final String mode = bootMode();
+                    if (isFlashBoot(mode)) {
+                        flashBootMode = mode;
+                        log("  that banner is a flash boot (" + mode + "), not download"
+                                + " mode: EN resets the chip and IO0 was high while it"
+                                + " did, so the strap never took");
+                    }
                     return;
                 }
                 noiseOnly |= seen > 0;
@@ -630,6 +656,32 @@ final class EspRom {
         }
         final String text = out.toString().trim();
         return bytesIn > raw.length ? text + " …" : text;
+    }
+
+    /**
+     * The ROM's boot-mode line from the captured banner — "boot:0x13
+     * (SPI_FAST_FLASH_BOOT)" — or "" when the window held no banner. That line is
+     * the only direct evidence of whether IO0 was low as the chip left reset, so it
+     * decides which advice a failed probe gives.
+     */
+    private String bootMode() {
+        final String text = bannerText();
+        final int at = text.indexOf("boot:0x");
+        if (at < 0) return "";
+        final int close = text.indexOf(')', at);
+        return text.substring(at, close < 0 ? Math.min(text.length(), at + 16) : close + 1);
+    }
+
+    private static boolean isFlashBoot(String mode) {
+        return mode.contains("SPI_FAST_FLASH_BOOT");
+    }
+
+    /** A round-line clause when its banner shows a flash boot, else "". */
+    private String flashNote() {
+        final String mode = bootMode();
+        if (!isFlashBoot(mode)) return "";
+        flashBootMode = mode;
+        return " — " + mode + ": flash boot, so IO0 was high at reset";
     }
 
     /** Bytes the board sent in the window after a reset with IO0 high. */
