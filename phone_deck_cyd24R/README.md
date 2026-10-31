@@ -349,11 +349,37 @@ A compile in this repo, on 2026-10-30, with `arduino-cli` 1.5.2-rc.1:
 ~16 bytes with the build root, so read it as 1,162.8 kB rather than a fixed count.
 Core 3.x costs ~1 kB of flash and 3.6 kB of RAM for this sketch.
 
-Not verified: **nothing has run on a phone since the HID removal and the new
-advertising packet**; the binding has never been exercised end to end (phone A
-binds, phone B is refused, the gear hold releases); the touch mapping has not met
-a real panel; and the status LED has not been confirmed dark after flashing. The
-first flash of a new board is the test of those, not a formality.
+### At a glance
+
+**Verified here** — none of this needs hardware:
+
+* Core **2.0.17**, the version `toolchain.sh` pins, links the committed sketch at
+  1,162,797–1,162,813 bytes (88 %) with 41,436 bytes of RAM (12 %), measured on
+  2026-10-30; the spread is the build root, so read it as 1,162.8 kB.
+* Core **3.3.12** links it at 1,165,174 bytes (88 %) with 45,060 bytes of RAM
+  (13 %), `EXIT=0` under `--warnings all`, re-measured on 2026-10-31. An earlier
+  3.3.12 build on a shorter path reported 1,163,930 / 45,004, so 3.x is
+  path-sensitive too — 1,164–1,165 kB, not a fixed count.
+* The bundled copy matches byte for byte after `:app:syncWidgets`;
+  `check_widget_assets.py` prints `2 widgets bundled, every copy matches`
+  (this sketch md5 `496952d5…`, the Spotify one `eca02e93…`).
+* Core 3.x costs this sketch ~2.4 kB of flash and ~3.6 kB of RAM over 2.0.17 —
+  nothing like the Spotify deck's 155 kB gap, which is that sketch's network
+  stack rather than the core (see the build note in
+  [CONVENTIONS](../CONVENTIONS.md#build)).
+
+**Unverified — these need a board, and a phone:**
+
+* **Nothing has run on a phone since the HID removal and the new advertising
+  packet**, so the 28-byte packet and the scan-response name have never been
+  seen on the air.
+* The binding has never been exercised end to end: phone A binds, phone B is
+  refused, the 1.2 s gear hold clears it, and a re-flash does not.
+* The touch mapping has not met a real panel, so every tap target here is
+  arithmetic until then.
+* The status LED has not been confirmed dark after flashing.
+
+The first flash of a new board is the test of those, not a formality.
 
 ## When it misbehaves
 
