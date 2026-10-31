@@ -59,7 +59,7 @@ public class DeckService extends Service {
 
     private static final String TAG = "PhoneDeck";
 
-    // Must match the UUIDs in cyd_phone_deck.ino.
+    // Must match the UUIDs in phone_deck_cyd24R.ino.
     static final UUID SERVICE_UUID = UUID.fromString("6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10");
     static final UUID TIME_UUID = UUID.fromString("6f2d0002-9a3c-4b57-9d21-6a1e0c4f8b10");
     static final UUID BATTERY_UUID = UUID.fromString("6f2d0003-9a3c-4b57-9d21-6a1e0c4f8b10");

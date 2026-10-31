@@ -14,11 +14,10 @@ hues, so link state, the one action and the battery warning separate by
 luminance instead of colour, which is what keeps both themes readable on a panel
 this size. The full table is `THEMES[]` at the top of the sketch.
 
-The folder and the sketch file keep the name `cyd_phone_deck`: ArduinoDroid
-compiles one `.ino` whose name must match its folder, and the companion app's
-Gradle task copies that exact path into the APK. Everything a person reads — the
-BLE name, the header wordmark, the app's project card, these docs — says
-**Phone Deck**. Boards flashed before the rename still advertise
+The folder and the sketch share one name, `phone_deck_cyd24R`, like every widget
+here: ArduinoDroid compiles one `.ino` whose name must match its folder, and
+the companion app resolves both from `widget.json`, so they move together.
+Boards flashed back when this was `cyd_phone_deck/` still advertise
 `ESP32 Phone_Widget <TAG>`, and the app matches that fragment too.
 
 The deck is a Bluetooth LE peripheral exposing a small GATT service called
@@ -111,13 +110,13 @@ what the screen actually draws.
 * Libraries: **Adafruit GFX Library**, **Adafruit ILI9341**,
   **XPT2046_Touchscreen**.
 * Do **not** install **ArduinoBLE** — its `BLEDevice.h` shadows the core header.
-* One file only: `cyd_phone_deck.ino`, no extra headers.
+* One file only: `phone_deck_cyd24R.ino`, no extra headers.
 
 ```bash
 arduino-cli core install esp32:esp32
 arduino-cli lib install "Adafruit GFX Library" "Adafruit ILI9341" "XPT2046_Touchscreen"
-arduino-cli compile --fqbn esp32:esp32:esp32 cyd_phone_deck
-arduino-cli upload  --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 cyd_phone_deck
+arduino-cli compile --fqbn esp32:esp32:esp32 phone_deck_cyd24R
+arduino-cli upload  --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 phone_deck_cyd24R
 ```
 
 On a machine with none of that installed, [`toolchain.sh`](toolchain.sh) does all
@@ -125,7 +124,7 @@ of it — arduino-cli, the core, the three libraries, the pyserial the core's
 esptool imports — and compiles the sketch, in one idempotent command:
 
 ```bash
-cd cyd_phone_deck
+cd phone_deck_cyd24R
 ./toolchain.sh                        # into ~/.arduino-cyd, then compile
 ARDUINO_HOME=/opt/cyd ./toolchain.sh  # or somewhere else
 ./toolchain.sh --setup-only           # install without compiling
@@ -150,7 +149,7 @@ upload that will not sync, not a step.
 
 1. **PROJECTS** → the **Phone Deck** card → **COPY DROID**, then paste into a new
    ArduinoDroid sketch. **SAVE** writes it to Downloads instead.
-2. Keep it one tab named `cyd_phone_deck.ino`, and do not add `.h` files: an
+2. Keep it one tab named `phone_deck_cyd24R.ino`, and do not add `.h` files: an
    earlier split into `deck_types.h` failed on the phone with
    `fatal error: deck_types.h: No such file or directory`, because only the
    `.ino` is compiled.
@@ -172,7 +171,7 @@ widget is a folder that describes itself.
 
 | Field | Used for |
 | --- | --- |
-| `id` | the project id (`widget:phone_deck`) and the asset folder name |
+| `id` | the project id (`widget:phone_deck_cyd24R`) and the asset folder name |
 | `name`, `tagline`, `body`, `notes` | the project card in the app |
 | `sketch` | the file copied into the APK; must match the folder plus `.ino` |
 | `libraries`, `never` | the LIBRARIES card, including what to refuse to install |
@@ -187,7 +186,7 @@ confirm the two copies still match byte for byte.
 
 To get a new widget onto the phone without publishing anything: put this folder
 in your own private transfer location (Drive, mail, USB), download
-`cyd_phone_deck.ino` on the phone, and use the app's **IMPORT** button. The
+`phone_deck_cyd24R.ino` on the phone, and use the app's **IMPORT** button. The
 sketch lands on the flash shelf and opens in ArduinoDroid, exactly like the
 bundled copy.
 

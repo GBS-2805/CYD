@@ -9,8 +9,8 @@ docs — are in [CONVENTIONS.md](CONVENTIONS.md). Read it before adding a widget
 
 | Project | Folder | What it is | Read |
 | --- | --- | --- | --- |
-| **Phone Deck** | [`cyd_phone_deck/`](cyd_phone_deck) | ESP32-2432S024R (2.4" CYD) phone dashboard: clock, battery and notifications | [README](cyd_phone_deck/README.md) |
-| **Spotify Deck** | [`spotify_deck/`](spotify_deck) | The same board on the network: what you are playing on Spotify, with previous / play / next on the screen | [README](spotify_deck/README.md) |
+| **Phone Deck** | [`phone_deck_cyd24R/`](phone_deck_cyd24R) | ESP32-2432S024R (2.4" CYD) phone dashboard: clock, battery and notifications | [README](phone_deck_cyd24R/README.md) |
+| **Spotify Deck** | [`spotify_deck_cyd24R/`](spotify_deck_cyd24R) | The same board on the network: what you are playing on Spotify, with previous / play / next on the screen | [README](spotify_deck_cyd24R/README.md) |
 | **ESP32_Widgets app** | [`android-companion/`](android-companion) | **Off-site**, the Android app: CYD monitor, BLE bridge, USB flasher and sketch shelf | [README](android-companion/README.md) · [HOWTO](android-companion/HOWTO.md) · [handoff](android-companion/HANDOFF.md) |
 
 **Phone Deck** is a BLE peripheral exposing a small **Phone Link** GATT
@@ -32,9 +32,14 @@ A built debug APK is at [`android-companion/dist/PhoneDeckBridge-debug.apk`](and
 Nothing here needs Bluetooth pairing. The deck is a GATT peripheral, not a
 keyboard, so it does not appear in the phone's Bluetooth settings list.
 
-The folder `cyd_phone_deck/` and the file `cyd_phone_deck.ino` keep their old
-names deliberately: ArduinoDroid compiles one `.ino` whose name must match its
-folder, and the companion app's Gradle task copies that exact path into the APK.
-Everything a person reads — BLE name, header wordmark, the app's project card,
-these docs — says **Phone Deck**; a board flashed before the rename still
+Widget folders are named `<topic>_deck_<board>`: `phone_deck_cyd24R/` and
+`spotify_deck_cyd24R/` are one deck pinned to the 2.4" resistive CYD. The tag is
+part of the folder, the sketch and the descriptor `id`, because one deck is meant
+to exist on several panels at once — `cyd28R` and `cyd28C` next, then `ili9341_28`
+on a devkit, `tdisplay_s3`. How to write a tag, and why one never carries a quote
+or a dot, is in the [CONVENTIONS](CONVENTIONS.md#naming-topic_deck_board).
+ArduinoDroid compiles one `.ino` whose name must match its folder, and the app's
+Gradle task reads both names from `widget.json`, so a rename moves the folder and
+the sketch together. This deck was `cyd_phone_deck/` until 2026-10-31, and
+`phone_deck/` until the same day; a board flashed before either rename still
 advertises `ESP32 Phone_Widget <TAG>`, which the app matches too.

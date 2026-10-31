@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Re-check the Spotify chains and refresh the roots pinned in spotify_deck.ino.
+"""Re-check the Spotify chains and refresh the roots pinned in spotify_deck_cyd24R.ino.
 
-    python3 spotify_deck/refresh_pins.py            rewrite the sketch if a root moved
-    python3 spotify_deck/refresh_pins.py --check    report only; exit 1 when stale
-    python3 spotify_deck/refresh_pins.py -v         also print the chain resolved
+    python3 spotify_deck_cyd24R/refresh_pins.py            rewrite the sketch if a root moved
+    python3 spotify_deck_cyd24R/refresh_pins.py --check    report only; exit 1 when stale
+    python3 spotify_deck_cyd24R/refresh_pins.py -v         also print the chain resolved
 
 The deck pins *roots* with setCACert(), one per hostname, because
 api.spotify.com and accounts.spotify.com do not share a certificate authority. A
@@ -26,7 +26,7 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SKETCH = os.path.join(HERE, "spotify_deck.ino")
+SKETCH = os.path.join(HERE, "spotify_deck_cyd24R.ino")
 
 # hostname, C array name in the sketch
 PINS = [
@@ -186,7 +186,7 @@ def array_pattern(name):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Refresh the Spotify roots pinned in spotify_deck.ino.")
+        description="Refresh the Spotify roots pinned in spotify_deck_cyd24R.ino.")
     parser.add_argument("--check", action="store_true",
                         help="report only; exit 1 when a pin is stale")
     parser.add_argument("-v", "--verbose", action="store_true",

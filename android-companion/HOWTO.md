@@ -54,11 +54,11 @@ The bundled sketch is the one in this repo. Pick whichever route suits you.
 **File route (keeps a real file):**
 
 1. **PROJECTS** → on the ESP32 Phone_Widget card, tap **SAVE**.
-2. The file lands in `Downloads/cyd_phone_deck.ino` (Android 10+).
+2. The file lands in `Downloads/phone_deck_cyd24R.ino` (Android 10+).
 3. In ArduinoDroid, open the sketch through its file browser.
 
 ArduinoDroid must see the sketch as a **single tab** named exactly
-`cyd_phone_deck.ino`. The sketch is deliberately one file; splitting it fails
+`phone_deck_cyd24R.ino`. The sketch is deliberately one file; splitting it fails
 with `deck_types.h: No such file or directory`.
 
 ## Install Marauder, Bruce or Launcher on the CYD
@@ -91,7 +91,7 @@ exactly three libraries:
 
 | Sketch | Libraries | Never install |
 | --- | --- | --- |
-| Deck (`cyd_phone_deck.ino`) | Adafruit GFX Library, Adafruit ILI9341, XPT2046_Touchscreen | ArduinoBLE |
+| Deck (`phone_deck_cyd24R.ino`) | Adafruit GFX Library, Adafruit ILI9341, XPT2046_Touchscreen | ArduinoBLE |
 | Marauder / Bruce / Launcher | none — flash the prebuilt image | — |
 
 ### Install them without retyping the names

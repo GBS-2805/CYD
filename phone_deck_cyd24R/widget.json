@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "id": "phone_deck",
-  "name": "Phone Deck",
-  "sketch": "cyd_phone_deck.ino",
+  "id": "phone_deck_cyd24R",
+  "name": "Phone Deck \u00b7 2.4\" CYD (resistive)",
+  "sketch": "phone_deck_cyd24R.ino",
   "board": "2432S024R",
   "tagline": "INSIDE APP",
   "body": "A desk dashboard for your phone: clock, battery and notifications, set like a woodblock print in two monochrome themes \u2014 black ink on paper, or white ink on black.",

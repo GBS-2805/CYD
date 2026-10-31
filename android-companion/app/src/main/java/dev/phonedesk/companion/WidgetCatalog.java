@@ -166,14 +166,14 @@ final class WidgetCatalog {
 
     /**
      * A raw build that skipped Gradle still gets the deck, never an empty app. The
-     * values mirror `cyd_phone_deck/widget.json`, which is what wins when Gradle did
+     * values mirror `phone_deck_cyd24R/widget.json`, which is what wins when Gradle did
      * run; edit both or the two builds show different cards.
      */
     private static Widget fallback() {
         Widget widget = new Widget();
-        widget.id = "phone_deck";
+        widget.id = "phone_deck_cyd24R";
         widget.name = "Phone Deck";
-        widget.sketch = "cyd_phone_deck.ino";
+        widget.sketch = "phone_deck_cyd24R.ino";
         widget.board = "2432S024R";
         widget.tagline = "INSIDE APP";
         widget.body = "A desk dashboard for your phone: clock, battery and notifications, "
@@ -181,7 +181,7 @@ final class WidgetCatalog {
                 + "or white ink on black.";
         widget.notes = "Bundled with the app: copy it into ArduinoDroid and compile, there is "
                 + "nothing to download.";
-        widget.assetPath = "widgets/phone_deck/cyd_phone_deck.ino";
+        widget.assetPath = "widgets/phone_deck_cyd24R/phone_deck_cyd24R.ino";
         widget.libraries.add("Adafruit GFX Library");
         widget.libraries.add("Adafruit ILI9341");
         widget.libraries.add("XPT2046_Touchscreen");

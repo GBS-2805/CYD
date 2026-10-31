@@ -1,6 +1,6 @@
 # Off-site (Android companion)
 
-The firmware in [`../cyd_phone_deck`](../cyd_phone_deck) is a BLE peripheral that
+The firmware in [`../phone_deck_cyd24R`](../phone_deck_cyd24R) is a BLE peripheral that
 waits for a phone to write its Phone Link characteristics. Android has no built-in
 way to do that, so this app is the phone side — and it is also where the CYDs are
 monitored and where firmware sketches are kept for ArduinoDroid.
@@ -54,7 +54,7 @@ links it needs.
 - **TARGET BOARD** is a pull-down that drives the `FILES / <code>` header and the
   RECIPE text; `BoardCatalog` is where further boards get added.
 - The **ESP32 Phone_Widget** card is this repo's firmware, marked `INSIDE APP` —
-  the title is `name` in `cyd_phone_deck/widget.json`. It keeps **COPY DROID**
+  the title is `name` in `phone_deck_cyd24R/widget.json`. It keeps **COPY DROID**
   (whole sketch to the clipboard), **SAVE** (to Downloads) and the **LIBRARIES**
   card, whose **INSTALL** buttons copy a library name and open ArduinoDroid's
   library screen.

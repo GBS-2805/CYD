@@ -10,16 +10,17 @@ controller or bridge gets its own section here first.
 
 ## One folder per widget
 
-* Folder and sketch share a name: `my_widget/my_widget.ino`. ArduinoDroid
-  compiles one `.ino` whose name must match its folder, so renaming either breaks
-  the phone workflow and the app's build.
+* Folder and sketch share a name: `phone_deck_cyd24R/phone_deck_cyd24R.ino`.
+  ArduinoDroid compiles one `.ino` whose name must match its folder, so renaming
+  either breaks the phone workflow and the app's build. The name carries the
+  board it runs on — see [Naming](#naming-topic_deck_board) below.
 * One sketch, one tab, **no extra headers**. A pasted `.ino` cannot see a header
   beside it.
 * Each folder has **one** `README.md`: what it is, how to flash it, the traps, and
   what is verified. No `HOWTO.md`, no `HANDOFF.md` — a task that needs steps gets
   them in that README.
 * Add the row to the [root README](README.md) table in the same change.
-* Widgets bundled into the APK also carry [`widget.json`](cyd_phone_deck/widget.json)
+* Widgets bundled into the APK also carry [`widget.json`](phone_deck_cyd24R/widget.json)
   (`schema: 1`, with `id`, `name`, `sketch`, `board`, `tagline`, `body`, `notes`,
   `libraries`, `never`, and a `ble` block when it speaks BLE). The app copies the
   sketch at build time, so `android-companion/app/src/main/assets/widgets/<id>/`
@@ -27,6 +28,31 @@ controller or bridge gets its own section here first.
   [`check_widget_assets.py`](check_widget_assets.py) before committing: it fails
   when a descriptor names a missing sketch, when a bundled copy has drifted, or
   when `assets/widgets/` holds a widget no descriptor claims.
+
+### Naming: `<topic>_deck_<board>`
+
+One deck, many boards, so the board is part of the name — in the folder, the
+sketch and the descriptor `id`, which always move together:
+
+| Tag | For | Example |
+| --- | --- | --- |
+| `cyd24R`, `cyd28R`, `cyd28C` | an all-in-one CYD: inches × 10, then the touch panel — `R` resistive, `C` capacitive | `phone_deck_cyd24R` |
+| `ili9341_28`, `st7735_16` | a bare panel on a devkit: controller, then inches × 10; the touch letter only when a touch panel is wired | `weather_deck_ili9341_28` |
+| `tdisplay_s3` | a module whose module name *is* the board | `maps_deck_tdisplay_s3` |
+
+* Lowercase ASCII, never a `"`, a `.` or a space: a quote breaks shell quoting and
+  Gradle asset paths, a dot reads as a version, a space splits the asset folder.
+  Inches are × 10 as digits, so `cyd24R` is the 2.4" resistive CYD.
+* The spoken form — `2.4" CYD (resistive)` — lives in `widget.json`'s `name`,
+  never in an identifier.
+* One folder, one sketch, one `id`, one board. Two sizes of one deck are two
+  widgets that share prose, not one widget that switches panel at compile time:
+  the phone holds one project per sketch and the app keys its shelf by filename.
+* `board` in the descriptor keeps the model number where there is one
+  (`2432S024R`); the tag is the human summary of the same fact.
+* Variants differ only in a `BOARD` block at the top of the sketch — pins,
+  rotation, driver, backlight, touch — so a diff between two tags stays small and
+  a fix is the same small patch in every copy.
 
 ## The board
 
@@ -66,7 +92,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
 ```
 
 * Board package `esp32:esp32`. The deck compiles clean on core **3.3.12** and
-  2.0.17; `cyd_phone_deck/toolchain.sh` defaults to 2.0.17, so pass
+  2.0.17; `phone_deck_cyd24R/toolchain.sh` defaults to 2.0.17, so pass
   `ARDUINO_CORE=esp32:esp32@3.3.12` when you need 3.x. One core per install root —
   the compiler picks the newest installed platform.
 * Libraries, and only these unless the widget genuinely needs more: `Adafruit GFX
@@ -74,7 +100,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
 * **Never install ArduinoBLE.** Its `BLEDevice.h` shadows the core's header and
   the build dies in a wall of errors. BLE comes from the core (Bluedroid) —
   `BLEDevice`, `BLEServer`, `BLEClient`.
-* Use the widget's [`toolchain.sh`](cyd_phone_deck/toolchain.sh) rather than
+* Use the widget's [`toolchain.sh`](phone_deck_cyd24R/toolchain.sh) rather than
   assembling a toolchain per chat; it is idempotent and keeps everything under one
   `ARDUINO_HOME`.
 * Report what actually ran. "Compiles" means a compile exited 0 in this repo.
@@ -126,7 +152,10 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
   efuse MAC, and let the first phone to connect claim it.
 * Keep every name the widget has ever advertised in the app's `nameMatch`, or
   boards flashed before a rename stop being found.
-* Service and characteristic UUIDs are per widget, never reused.
+* Service and characteristic UUIDs are per deck, never reused across decks:
+  every board tag of one deck speaks the same service, so one phone drives
+  whichever board is flashed, and `nameMatch` keeps every name a tag has ever
+  advertised.
 * Nothing here pairs in the phone's Bluetooth settings: these are GATT
   peripherals, not keyboards. A design that makes Android treat the board as an
   input device gets the link dropped.
@@ -145,7 +174,8 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
 
 ## Adding a widget
 
-1. `mkdir my_widget`, put `my_widget.ino` in it — one file, no headers.
+1. `mkdir my_deck_cyd24R`, put `my_deck_cyd24R.ino` in it — one file, no
+   headers, and the board tag on both.
 2. Copy a sibling's shape: `README.md` (and `toolchain.sh` if it needs its own).
 3. Compile it, then write down what you verified and what you did not, in the
    README's first paragraph of notes.

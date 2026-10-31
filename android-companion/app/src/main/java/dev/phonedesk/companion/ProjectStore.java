@@ -44,7 +44,7 @@ final class ProjectStore {
     static final int KIND_IMAGE = 1;
     static final int KIND_INSIDE = 2;
 
-    /** Project ids for widgets that ship inside the APK, e.g. `widget:phone_deck`. */
+    /** Project ids for widgets that ship inside the APK, e.g. `widget:phone_deck_cyd24R`. */
     static final String WIDGET_PREFIX = "widget:";
     /** What that id looked like before the descriptors; renamed in place on read. */
     private static final String LEGACY_DECK_ID = "deck";
@@ -139,7 +139,7 @@ final class ProjectStore {
         boolean changed = false;
         for (Project project : projects) {
             if (LEGACY_DECK_ID.equals(project.id)) {
-                project.id = WIDGET_PREFIX + "phone_deck";
+                project.id = WIDGET_PREFIX + "phone_deck_cyd24R";
                 changed = true;
             }
         }

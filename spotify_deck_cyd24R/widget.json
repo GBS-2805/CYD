@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "id": "spotify_deck",
-  "name": "Spotify Deck",
-  "sketch": "spotify_deck.ino",
+  "id": "spotify_deck_cyd24R",
+  "name": "Spotify Deck \u00b7 2.4\" CYD (resistive)",
+  "sketch": "spotify_deck_cyd24R.ino",
   "board": "2432S024R",
   "tagline": "NEEDS WIFI",
   "body": "The network deck: it signs in to Spotify with a refresh token, draws what is playing and sends previous, play/pause and next from the screen's three chips. Mono ink on paper, same as its sibling.",

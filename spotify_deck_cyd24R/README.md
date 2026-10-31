@@ -13,7 +13,7 @@ slots are a grey ramp rather than hues, so the transport chip, an error and the
 WiFi state separate by luminance instead of colour. Spotify's green is not on
 this screen.
 
-The folder is `spotify_deck` and the sketch is `spotify_deck.ino`. Anything a
+The folder is `spotify_deck_cyd24R` and the sketch is `spotify_deck_cyd24R.ino`. Anything a
 person reads says **Spotify Deck**.
 
 ## What it needs before it can do anything
@@ -165,10 +165,10 @@ control, unlike the phone deck's PWM one.
   **XPT2046_Touchscreen**.
 * Do **not** install **ArduinoBLE**. This sketch does not use BLE at all, and on
   a machine shared with the phone deck its `BLEDevice.h` shadows the core header.
-* One file only: `spotify_deck.ino`, no extra headers.
+* One file only: `spotify_deck_cyd24R.ino`, no extra headers.
 
 ```bash
-cd spotify_deck
+cd spotify_deck_cyd24R
 ./toolchain.sh          # installs into ~/.arduino-cyd, then compiles
 ```
 
@@ -282,8 +282,8 @@ sketch from a desktop on 2026-10-31.
 `refresh_pins.py` in this folder is the measurement above, mechanised:
 
 ```bash
-python3 spotify_deck/refresh_pins.py            # rewrite the sketch if a root moved
-python3 spotify_deck/refresh_pins.py --check    # report only; exit 1 when stale
+python3 spotify_deck_cyd24R/refresh_pins.py            # rewrite the sketch if a root moved
+python3 spotify_deck_cyd24R/refresh_pins.py --check    # report only; exit 1 when stale
 ```
 
 It fetches each host's chain, walks it up to the issuing root in the machine's
@@ -360,7 +360,7 @@ trouble table below applies. It needs `openssl` and nothing else.
 ## widget.json: how the app finds this widget
 
 `widget.json` in this folder is this sketch's side of the contract with the
-companion app: `id: spotify_deck`, the sketch name, the project-card copy, the
+companion app: `id: spotify_deck_cyd24R`, the sketch name, the project-card copy, the
 libraries to install and the library to refuse. The app's Gradle task walks every
 `*/widget.json` beside `android-companion/` and copies the descriptor and its
 sketch into `app/src/main/assets/widgets/<id>/` at build time, so

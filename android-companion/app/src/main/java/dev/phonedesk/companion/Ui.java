@@ -17,7 +17,7 @@ import android.widget.TextView;
  */
 final class Ui {
 
-    // The deck's INK palette (cyd_phone_deck.ino, THEMES[1]) slot for slot: black
+    // The deck's INK palette (phone_deck_cyd24R.ino, THEMES[1]) slot for slot: black
     // ground, #0e0e0e panels, #333333 hairlines, white ink, and a grey ramp where
     // the coloured build had blue, violet, pink and green. The names keep their
     // old jobs — ACCENT for the link and a primary button, PINK for the one
