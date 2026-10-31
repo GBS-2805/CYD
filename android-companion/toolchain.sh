@@ -165,6 +165,11 @@ fi
 # `clean` by default: a warm build dir reports BUILD SUCCESSFUL and runs no
 # compile at all, which is not evidence that the sources still compile.
 
+# Host tests first: they are the only check that does not need the board, and a
+# failure here means the protocol's framing or checksum broke.
+say "host tests"
+"$HERE/test.sh"
+
 say "build $(basename "$APP_DIR")"
 cd "$APP_DIR"
 TASKS=(assembleDebug)
@@ -202,6 +207,14 @@ BADGING="$("$BT/aapt2" dump badging "$APK" 2>/dev/null)"
 printf '%s\n' "$BADGING" | grep -E '^package:|^sdkVersion|^targetSdkVersion' || fail "aapt2 read no manifest"
 printf '%s\n' "$BADGING" | grep -q "name='dev.phonedesk.companion'" \
   || fail "package is not dev.phonedesk.companion"
+
+# Two properties this build is supposed to keep, checked instead of assumed: the
+# app must not be able to reach a network, and the debugger must not attach to a
+# process holding notification access.
+printf '%s\n' "$BADGING" | grep -q 'android.permission.INTERNET' \
+  && fail "the APK requests INTERNET; this app is meant to stay offline"
+printf '%s\n' "$BADGING" | grep -q 'application-debuggable' \
+  && fail "the APK is debuggable; notification access must not be attachable"
 
 say "verify bundled widgets"
 TMP="$(mktemp -d)"

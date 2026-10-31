@@ -231,6 +231,12 @@ URL and a flashing note. Decisions behind it:
   whatever state the board happened to be in. It now pulses EN once per round and
   never drives IO0, so the BOOT button alone chooses the strap, each round reports
   what its own pulse produced, and the button and its note read MANUAL BOOT.
+- **The protocol has host tests, and they are not optional.** `test.sh` compiles
+  `EspRom.java` against a stub `UsbSerialCh340` and asserts framing, the `0xDD`
+  sync checksum, the handshake, opcode skipping, the refused-write and silent-board
+  branches, and the flash guard, all on a JVM. The `0xDD` bug was found by reading
+  a log, which is not a method; `toolchain.sh` now runs these before Gradle, so no
+  APK ships without them.
 - **Control polarity alternates between sync rounds**, because an inverted EN/IO0
   pair holds the chip in reset for the whole handshake: no bytes at any rate,
   indistinguishable from a dead link. Round 1 uses the polarity the boot text
@@ -399,7 +405,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-10-31 after the sketch
-  header change and the probe work, **120,958 bytes**.
+  header change and the probe work, **101,029 bytes**.
   The earlier 128,924-byte APK unpacked to the same six entries with the same
   uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
   the archive was written, not in the code: both are `zipalign -c 4` clean and
@@ -423,8 +429,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the then-committed 97,757, so the APK is *not* byte-reproducible: dex files embed
   build-time data. The probe changes shipped **99,533 bytes**, the flash-shelf
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
-  merged firmware plus the probe work **120,958 bytes**; `dist/` holds that last
-  artifact. Quote the size to the nearest kB (~118 kB), never as a checksum.
+  merged firmware plus the probe work **101,029 bytes**; `dist/` holds that last
+  artifact. Quote the size to the nearest kB (~98 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 34, the expected permission set, and
   `MainActivity` as the launchable activity.

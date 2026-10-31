@@ -20,6 +20,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Private builds only. A debuggable APK lets any machine with adb
+            // attach to the process that holds notification access, which is the
+            // one component here that reads message text. The APK stays
+            // debug-signed; this only removes the debugger.
+            debuggable false
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'

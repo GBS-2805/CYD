@@ -163,9 +163,10 @@ adb install -r dist/PhoneDeckBridge-debug.apk
 
 `./toolchain.sh --setup-only` stops once the toolchain is ready; `--no-clean`
 reuses Gradle's build directory. The first run downloads about 1 GB and needs
-`curl` and `unzip`. It finishes by checking the signature, the 4-byte alignment,
-the manifest and the bundled sketch, and prints the size and SHA-256 of what it
-copied to `dist/`.
+`curl` and `unzip`. It runs the host tests below before Gradle, then checks the
+signature, the 4-byte alignment, the manifest and the bundled sketch, refuses an
+APK that asks for `INTERNET` or is `debuggable`, and prints the size and SHA-256
+of what it copied to `dist/`.
 
 Android Studio still works: open the `android-companion` folder (Ladybug or
 newer), let it sync, and run the `app` configuration.
@@ -175,12 +176,42 @@ through Gradle; a raw `javac` build produces an APK-less class check and the
 PROJECTS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
-[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (118 kB,
+[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (98 kB,
 package `dev.phonedesk.companion`, debug-signed). Install it with
 `adb install -r dist/PhoneDeckBridge-debug.apk`, or copy it to the phone and open
 it with "install unknown apps" allowed.
 
 Step-by-step usage is in [HOWTO.md](HOWTO.md).
+
+## Tests
+
+`./test.sh` compiles `EspRom.java` against a stub `UsbSerialCh340` — no USB, no
+Android class — and runs the protocol checks on a plain JVM in a few seconds: SLIP
+framing round-trips, the sync packet carries esptool's `0xDD` checksum, the
+handshake reaches download mode and reads the MAC, a reply with the wrong opcode
+is skipped, a refused write is blamed on the bridge rather than the board, a
+silent board fails, and `flash` refuses a session that never synced. `build/host`
+is its scratch directory.
+
+It cannot test the board. Nothing on a JVM can: the reset pulse, the adapter's
+line coding and the ROM's willingness to answer are hardware facts.
+
+## Private distribution
+
+This build has no store listing and no hosted copy, and the app contains no
+network code. The artifact lives in `dist/` inside this private repository — do
+not enable Pages, attach it to a release, or upload it anywhere public.
+
+Two properties are checked by `toolchain.sh` on every build, and fail it rather
+than warn: the APK must not request `android.permission.INTERNET`, and it must not
+be `debuggable`. The second matters most here, because notification access plus a
+debuggable process means any machine with adb can attach to the code that reads
+message text; `build.gradle` sets `debuggable false` on the debug type for exactly
+that reason.
+
+The APK is still signed with the debug certificate, which only affects updates: a
+build made on a different machine carries a different key, so it will not install
+over the previous one. Uninstall first, or build on the machine that made it.
 
 ## Setup on the phone
 
