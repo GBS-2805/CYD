@@ -1314,7 +1314,8 @@ static void pumpSetupWizard() {
 //   GET  /spotify  join state, the Spotify link and the paste box
 //   GET  /auth     302 to Spotify with a fresh S256 challenge (app=1: app scheme)
 //   POST /code     exchange the pasted code, store the token, reboot
-//   GET  /code     the same exchange for the app, which hands its code back
+//   GET  /code     the same exchange for the app, which hands its code back;
+//                  &json=1 asks for a one-line answer instead of a page
 //                  through the phone's browser instead of opening a socket
 //
 // The access point is open on purpose: the page is where the credentials are
@@ -1740,24 +1741,49 @@ static void handleWebSave(WiFiClient &client, const String &body) {
                  "Content-Length: 0\r\nConnection: close\r\n\r\n"));
 }
 
+// The app asks for a one-line answer (`json=1`) instead of a page, so it can say
+// what happened and close: `signed-in` means the token is stored, `refused: ...`
+// is the reason it is not. A browser gets the page it always got, which is also
+// what the app falls back to when no answer arrives at all.
+static void codeReply(WiFiClient &client, bool plainReply, const char *heading,
+                      const String &text, bool bad) {
+  if (!plainReply) {
+    if (!bad) {
+      sendDonePage(client);
+      return;
+    }
+    sendMessagePage(client, heading, text, true);
+    return;
+  }
+  const String body =
+      bad ? String(F("refused: ")) + text + "\n" : String(F("signed-in\n"));
+  client.print(F("HTTP/1.1 "));
+  client.print(bad ? F("409 Conflict") : F("200 OK"));
+  client.print(F("\r\nContent-Type: text/plain; charset=utf-8\r\n"
+                 "Cache-Control: no-store\r\nContent-Length: "));
+  client.print(body.length());
+  client.print(F("\r\nConnection: close\r\n\r\n"));
+  client.print(body);
+}
+
 // `fields` is a form body or a query string; the two have the same shape, and
-// the app path arrives as a query string because the phone's browser makes the
-// request, not the app.
+// the app path arrives as a query string: the app makes that one request itself
+// now, and the browser is only the fallback when the deck does not answer.
 static void handleWebCode(WiFiClient &client, const String &fields,
-                          bool appRedirect) {
+                          bool appRedirect, bool plainReply) {
   char pasted[1024];
   if (!formField(fields, "code", pasted, sizeof(pasted)) || pasted[0] == '\0') {
-    sendMessagePage(client, "Nothing pasted",
-                    "Paste the whole address the browser landed on, or just its "
-                    "code= value.",
-                    true);
+    codeReply(client, plainReply, "Nothing pasted",
+              "Paste the whole address the browser landed on, or just its "
+              "code= value.",
+              true);
     return;
   }
   if (WiFi.status() != WL_CONNECTED) {
-    sendMessagePage(client, "Not on WiFi yet",
-                    "The deck has to be on your network before it can exchange "
-                    "the code. Wait for the sign-in page to say connected.",
-                    true);
+    codeReply(client, plainReply, "Not on WiFi yet",
+              "The deck has to be on your network before it can exchange the "
+              "code. Wait for the sign-in page to say connected.",
+              true);
     return;
   }
 
@@ -1774,10 +1800,9 @@ static void handleWebCode(WiFiClient &client, const String &fields,
   }
   code.trim();
   if (code.length() < 8) {
-    sendMessagePage(client, "That is not a code",
-                    "It should look like AQ... and be hundreds of characters "
-                    "long.",
-                    true);
+    codeReply(client, plainReply, "That is not a code",
+              "It should look like AQ... and be hundreds of characters long.",
+              true);
     return;
   }
 
@@ -1785,14 +1810,14 @@ static void handleWebCode(WiFiClient &client, const String &fields,
   const char *redirectUri =
       appRedirect ? OAUTH_REDIRECT_APP : OAUTH_REDIRECT_PASTE;
   if (!exchangeCode(code, redirectUri, detail)) {
-    sendMessagePage(client, "Spotify said no", detail, true);
+    codeReply(client, plainReply, "Spotify said no", detail, true);
     return;
   }
   // One code, one verifier: a second paste must start a fresh challenge rather
   // than reuse the pair that already worked.
   pkceVerifier = "";
   clearVerifier();
-  sendDonePage(client);
+  codeReply(client, plainReply, "", "", false);
   setupRebootMs = millis() + 1500;
 }
 
@@ -1933,17 +1958,19 @@ static void handleWebRequest(WiFiClient &client) {
       formField(query, "app", flag, sizeof(flag)) && flag[0] == '1';
   const bool appCode = formField(query, "redir", flag, sizeof(flag)) &&
                        strcmp(flag, "app") == 0;
+  const bool plainReply =
+      formField(query, "json", flag, sizeof(flag)) && flag[0] == '1';
 
   if (method == "POST" && path == "/save") {
     handleWebSave(client, body);
   } else if (method == "POST" && path == "/code") {
-    handleWebCode(client, body, false);
+    handleWebCode(client, body, false, false);
   } else if (method == "GET" && path == "/code") {
-    // A GET that changes state, deliberately: the app opens this in the phone's
-    // browser rather than opening a socket of its own, which is what keeps the
-    // APK free of the INTERNET permission. The code is single-use, so a replayed
-    // load only earns a second `invalid_grant`.
-    handleWebCode(client, query, appCode);
+    // A GET that changes state, deliberately: the code is single-use, so a
+    // replayed load only earns a second `invalid_grant`. The app asks for a
+    // one-line answer (`json=1`) so it can report the result and close; a browser
+    // loading the same address — the fallback — still gets the page.
+    handleWebCode(client, query, appCode, plainReply);
   } else if (method == "POST" && path == "/wipe") {
     handleWebWipe(client);
   } else if (method == "GET" && path == "/auth") {

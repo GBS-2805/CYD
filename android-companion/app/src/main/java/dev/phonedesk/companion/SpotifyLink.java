@@ -2,6 +2,7 @@ package dev.phonedesk.companion;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 
 /**
  * The two fields the deck's sign-in needs out of a Spotify redirect.
@@ -28,6 +29,36 @@ final class SpotifyLink {
     static String deck(String link) {
         String state = query(link, "state");
         return isDeckAddress(state) ? state : "";
+    }
+
+    /**
+     * The one request the app makes for the deck: its address, the code, and
+     * {@code json=1}, which asks the deck for a one-line answer instead of a page.
+     * Everything but unreserved characters is escaped, so a code containing
+     * {@code +}, {@code /} or {@code =} arrives as typed — the deck's own decoder
+     * does not read {@code +} as a space.
+     */
+    static String codeUrl(String deck, String code) {
+        return "http://" + deck + "/code?redir=app&code=" + escape(code) + "&json=1";
+    }
+
+    /** RFC 3986 escaping: percent signs, never {@code +}. */
+    private static String escape(String text) {
+        final StringBuilder out = new StringBuilder(text.length() + 8);
+        for (byte raw : text.getBytes(StandardCharsets.UTF_8)) {
+            final int value = raw & 0xFF;
+            if ((value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z')
+                    || (value >= '0' && value <= '9')
+                    || value == '-' || value == '.' || value == '_' || value == '~') {
+                out.append((char) value);
+            } else {
+                out.append('%')
+                        .append(Character.toUpperCase(
+                                Character.forDigit((value >> 4) & 0xF, 16)))
+                        .append(Character.toUpperCase(Character.forDigit(value & 0xF, 16)));
+            }
+        }
+        return out.toString();
     }
 
     /** One decoded query value; a later copy wins, as it does in a browser. */

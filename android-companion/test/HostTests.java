@@ -48,6 +48,7 @@ public final class HostTests {
         flashBootNamesTheStrap();
         downloadBootAsksForASecondHost();
         spotifyCallbackLink();
+        spotifyCallbackUrl();
 
         System.out.println();
         if (failures.isEmpty()) {
@@ -340,6 +341,27 @@ public final class HostTests {
         check("an address with a port is kept",
                 "192.168.4.1:8080".equals(SpotifyLink.deck(
                         "phonedesk://spotify-callback?state=192.168.4.1%3A8080")));
+    }
+
+    /**
+     * The one request the app makes. It has to survive a code holding characters
+     * that mean something in a query string — which is why nothing is escaped as
+     * '+' — and it has to ask for the one-line answer, or the app would be reading
+     * a page to work out whether the sign-in worked.
+     */
+    private static void spotifyCallbackUrl() {
+        final String url = SpotifyLink.codeUrl("192.168.1.50", "AQDx+y/z=");
+        check("the hand-off asks the deck's own address",
+                url.startsWith("http://192.168.1.50/code?redir=app&code="));
+        check("the hand-off marks the app's redirect", url.contains("redir=app"));
+        check("the hand-off asks for a one-line answer", url.endsWith("&json=1"));
+        check("a plus in the code is escaped, never a space",
+                url.contains("%2B") && !url.contains("+"));
+        check("a slash and an equals in the code are escaped",
+                url.contains("%2F") && url.contains("%3D"));
+        check("the hand-off keeps the deck's port",
+                SpotifyLink.codeUrl("192.168.4.1:8080", "c")
+                        .startsWith("http://192.168.4.1:8080/code?"));
     }
 
     private static void flashWithoutHandshake() {

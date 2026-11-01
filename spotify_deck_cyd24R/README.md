@@ -64,8 +64,11 @@ There is nothing to install on the phone and nothing to type into a monitor.
    WiFi, and reload it.
 5. Tap **Sign in with the app** and approve the scopes. Spotify hands
    `phonedesk://spotify-callback?code=...&state=<deck-ip>` to the companion app
-   (first time: pick it once in Android's chooser), which gives the code straight
-   back to the deck at `http://<deck-ip>/code`. Nothing is copied.
+   (first time: pick it once in Android's chooser), which sends the code straight
+   to the deck at `http://<deck-ip>/code?redir=app&code=...&json=1` and shows what
+   the deck answered. Nothing is copied. If the deck does not answer — asleep, or
+   the phone on the wrong network — the app opens that address in the browser
+   instead, which is the page from before.
 6. The deck exchanges that code itself, stores the refresh token, and reboots
    into the player.
 
@@ -89,9 +92,11 @@ Two things look like failures and are not:
 * **The page that lands on `127.0.0.1` is blank.** That is the browser fallback
   only. Nothing is listening there; the `code=` in the address bar is the whole
   point.
-* **The app flashes past and the browser opens by itself.** That is the app path
-  working: the activity reads the code out of Spotify's link and opens
-  `http://<deck-ip>/code`, which is the page that says `Signed in`.
+* **The app flashes past and shows a card.** That is the app path working: the
+  activity reads the code out of Spotify's link, sends it to
+  `http://<deck-ip>/code?redir=app&code=...&json=1`, and closes once the deck
+  answers `signed-in`. A browser opening instead means the deck did not answer
+  within 30 s and the code is going over the old way, which still works.
 
 ### The serial wizard (fallback)
 
@@ -287,15 +292,15 @@ core **3.3.12**, default partition scheme:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,122,461 | **188,259** | 1,310,720 (85 % used) |
+| flash | 1,123,241 | **187,479** | 1,310,720 (85 % used) |
 | DRAM | 53,572 globals | **274,108** | 327,680 |
 
 The check refuses a deck that overflows, that drops under **64 KiB** of free flash
 or that leaves under **160 KiB** of DRAM — the last floor is just over the
 153,600 B a full 320x240 RGB565 framebuffer needs, which this deck does not
-allocate but a sibling does. 188 kB is 43 kB more slack than the phone deck has,
-and it is the 155 kB the 3.x WiFi stack cost that ate the rest: on 2.0.17 the
-same sketch left 343,307 B. Re-measure with
+allocate but a sibling does. It is still the wider of the two decks' margins, and
+it is the 155 kB the 3.x WiFi stack cost that ate the rest: on 2.0.17 the same
+sketch left 343,307 B. Re-measure with
 `python3 ../check_headroom.py spotify_deck_cyd24R` from the repo root, after
 sourcing a toolchain.
 
@@ -306,17 +311,18 @@ sourcing a toolchain.
 * The committed sketch links under the documented core **2.0.17** at 967,413
   bytes (73 %), the measurement above. Re-measured on 2026-10-31 with
   `arduino-cli` 1.5.2-rc.1, core **3.3.12** links the committed file at
-  1,122,461 bytes (85 %) with 53,572 bytes of globals (16 %), `EXIT=0` under
-  `--warnings all` (1,122,249 before the app callback path, so the second
-  redirect URI and the `state` field cost **212 B**); a comment-only edit links to exactly the same size, so the
+  1,123,241 bytes (85 %) with 53,572 bytes of globals (16 %), `EXIT=0` under
+  `--warnings all` (1,122,249 before the app callback path, so the app path costs
+  **992 B**: 212 B for the second redirect URI and the `state` field, 780 B for the
+  one-line answer the app now reads); a comment-only edit links to exactly the same size, so the
   figure is a stable build rather than a stale build path. The two cores differ
   by ~155 kB, which is the WiFi stack as IDF 5 links it rather than mbedTLS (see
   [the build note](../CONVENTIONS.md#build)); 3.3.12 is what `toolchain.sh` pins
   now, so that is where the release numbers come from, and 2.0.17 is kept as the
   A/B build rather than the shipping one.
-* **It still fits on 3.3.12, on about a third of the slack:** 1,122,461 bytes
+* **It still fits on 3.3.12, on about a third of the slack:** 1,123,241 bytes
   against the 1,310,720-byte app slot the default scheme gives leaves
-  **188,259 B (14 %)** free, where 2.0.17 leaves 343,307 B (26 %). `default.csv`
+  **187,479 B (14 %)** free, where 2.0.17 leaves 343,307 B (26 %). `default.csv`
   sizes `app0` and `app1` at 1,310,720 each, so a wireless update faces the same
   ceiling; under `huge_app` the same build reads 36 % — a bigger room, not
   smaller code.
@@ -343,11 +349,12 @@ been flashed, so all of the following are still assumptions:
   JSON reader against a real payload — the album-first trap is reasoned from
   Spotify's documented shape, not seen on the wire.
 * The app path end to end: Android offering **Off-site** for
-  `phonedesk://spotify-callback` and remembering the choice, the activity handing
-  the code to `http://<deck-ip>/code`, and the deck exchanging a code minted for
-  the custom-scheme URI rather than the loopback one. None of it has run on a
-  phone. The only part with a test is the link parser, and that test runs on a
-  JVM — nine checks in `android-companion/test/HostTests.java`.
+  `phonedesk://spotify-callback` and remembering the choice, the activity asking
+  the deck at `http://<deck-ip>/code?redir=app&code=...&json=1` and getting
+  `signed-in` back, the browser fallback when that request fails, and the deck
+  exchanging a code minted for the custom-scheme URI rather than the loopback one.
+  None of it has run on a phone. What has tests is the link parser and the address
+  it builds — fifteen JVM checks in `android-companion/test/HostTests.java`.
 
 ## Traps worth keeping
 
@@ -377,13 +384,15 @@ been flashed, so all of the following are still assumptions:
   not a nicer error page, is why the one-tap path exists: Chrome will never pass
   `http://127.0.0.1:8080` to another app, but it does pass
   `phonedesk://spotify-callback`. The scheme carries no host, so the deck puts its
-  own address in `state`, the field Spotify echoes back untouched; the app posts
-  nothing and opens no socket, it just sends the phone's browser to
-  `http://<deck-ip>/code?redir=app&code=...`, so the APK still holds no
-  INTERNET permission. Nothing secret rides in `state` — a forged one can only
-  aim a code at the wrong LAN address, where the verifier on the board cannot
-  complete it. That `GET /code` changes state, which is unusual and deliberate:
-  the code is single-use, so a replayed load only earns `invalid_grant`.
+  own address in `state`, the field Spotify echoes back untouched; the app makes
+  one request to `http://<deck-ip>/code?redir=app&code=...&json=1` and asks for a
+  one-line answer, and the browser only takes over when that request gets none.
+  That is why the APK now asks for INTERNET and cleartext: one outbound request to
+  a LAN address, where the browser used to make it. Nothing secret rides in
+  `state` — a forged one can only aim a code at the wrong LAN address, where the
+  verifier on the board cannot complete it. That `GET /code` changes state, which
+  is unusual and deliberate: the code is single-use, so a replayed load only earns
+  `invalid_grant`.
 * **One Enter used to answer two questions.** Monitors send `\r\n`, and a wizard
   that commits on both characters answers the next question with nothing typed.
   That is how the WiFi password prompt was skipped: the SSID committed on the

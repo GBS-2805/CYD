@@ -1,6 +1,7 @@
 package dev.phonedesk.companion;
 
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -10,21 +11,42 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+
 /**
- * Catches the Spotify deck's sign-in redirect.
+ * Catches the Spotify deck's sign-in redirect and finishes it.
  *
  * Spotify's only plain-HTTP redirect URI is a loopback literal, and no browser
  * hands {@code http://127.0.0.1} to another app, so the deck's app path uses a
  * custom scheme instead: {@code phonedesk://spotify-callback?code=...&state=...}.
- * This activity lifts the code out of that link and gives it back to the deck
- * through the phone's browser, at {@code http://<deck>/code}. It opens no socket
- * of its own, which is why the APK keeps its no-INTERNET profile.
+ * This activity lifts the code out of that link, asks the deck to exchange it, and
+ * reports what the deck said — no browser tab. That request is this app's only
+ * network use: the deck's own address is the only host it ever opens.
+ *
+ * The code is single-use, so the request is sent at most once. Silence is not a
+ * refusal: when no answer comes back the code has not been spent, and the old
+ * browser hand-off is tried instead, because the browser reaches the deck from
+ * wherever the phone actually is.
  */
 public class SpotifyCallbackActivity extends Activity {
+
+    private static final int CONNECT_TIMEOUT_MS = 5000;
+
+    /**
+     * The deck exchanges the code with Spotify before it answers, and that request
+     * can take seconds, so this waits far longer than a local page ever would.
+     */
+    private static final int READ_TIMEOUT_MS = 30000;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView status;
     private View close;
+    private Thread worker;
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -43,6 +65,7 @@ public class SpotifyCallbackActivity extends Activity {
     @Override
     protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
+        if (worker != null) worker.interrupt();
         super.onDestroy();
     }
 
@@ -120,19 +143,90 @@ public class SpotifyCallbackActivity extends Activity {
     }
 
     /**
-     * The browser makes the request, not this app: the code travels to the deck
-     * over the LAN the same way a pasted one does, and the APK never needs a
-     * network permission.
+     * One request, off the main thread, to the deck's own address. The answer
+     * decides what happens next: {@code signed-in} finishes here, a 409 is a
+     * refusal worth showing (the code is spent, so a browser replay would earn
+     * {@code invalid_grant} instead of an explanation), and anything else — silence,
+     * a hotspot's login page, a deck that moved — falls back to the browser, which
+     * still holds a usable code.
      */
     private void deliver(String code, String deck) {
+        final String url = SpotifyLink.codeUrl(deck, code);
+        worker = new Thread(() -> {
+            final String answer = fetch(url);
+            handler.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (answer.startsWith("200") && answer.contains("signed-in")) {
+                    note("Signed in. The deck is storing the token and restarting…",
+                            Ui.TEXT);
+                    handler.postDelayed(this::finish, 1200);
+                } else if (answer.startsWith("409")) {
+                    fail(readable(answer));
+                } else {
+                    note("The deck did not answer. Handing the sign-in to the browser…",
+                            Ui.TEXT);
+                    openBrowser(code, deck);
+                }
+            });
+        }, "spotify-hand-off");
+        worker.start();
+    }
+
+    /** The deck's answer as {@code "<status> <body>"}, or "" when none arrived. */
+    private static String fetch(String url) {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(url).openConnection();
+            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(READ_TIMEOUT_MS);
+            connection.setUseCaches(false);
+            connection.setRequestProperty("Cache-Control", "no-store");
+            final int status = connection.getResponseCode();
+            final InputStream stream = status >= 400
+                    ? connection.getErrorStream() : connection.getInputStream();
+            if (stream == null) return "";
+            final StringBuilder body = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null && body.length() < 400) {
+                    if (body.length() > 0) body.append(' ');
+                    body.append(line.trim());
+                }
+            }
+            return status + " " + body;
+        } catch (Exception e) {
+            // No answer rather than a refusal: a sleeping deck, the wrong network,
+            // or a phone that moved to mobile data. The caller still has a browser.
+            return "";
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+    }
+
+    /** {@code "409 refused: Spotify said no"} becomes {@code "Spotify said no"}. */
+    private static String readable(String answer) {
+        String text = answer;
+        final int space = text.indexOf(' ');
+        if (space > 0 && space < 4) text = text.substring(space + 1).trim();
+        if (text.startsWith("refused:")) text = text.substring("refused:".length()).trim();
+        return text.isEmpty() ? "The deck refused the code without saying why." : text;
+    }
+
+    /**
+     * The hand-off as it was before: the phone's browser makes the request. Slower
+     * and it leaves a tab behind, which is why it is no longer the first choice —
+     * but it needs no answer from the app's own socket, so a deck that is reachable
+     * from the browser and not from here still finishes.
+     */
+    private void openBrowser(String code, String deck) {
         Uri url = Uri.parse("http://" + deck + "/code?redir=app&code=" + Uri.encode(code));
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, url));
-        } catch (Exception e) {
+            finish();
+        } catch (ActivityNotFoundException e) {
             fail("No browser answered, so the code could not reach the deck. Open "
                     + "http://" + deck + "/spotify on the phone and sign in there.");
-            return;
         }
-        finish();
     }
 }
