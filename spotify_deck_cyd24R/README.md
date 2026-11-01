@@ -225,6 +225,25 @@ all of that. What *is* measured is the chain: `api.spotify.com` and
 `accounts.spotify.com` were each verified against the root compiled into the
 sketch from a desktop on 2026-10-31.
 
+### Headroom
+
+Measured here on 2026-11-01 with [`../check_headroom.py`](../check_headroom.py),
+core **3.3.12**, default partition scheme:
+
+| | used | free | ceiling |
+| --- | --- | --- | --- |
+| flash | 1,122,249 | **188,471** | 1,310,720 (85 % used) |
+| DRAM | 53,572 globals | **274,108** | 327,680 |
+
+The check refuses a deck that overflows, that drops under **64 KiB** of free flash
+or that leaves under **160 KiB** of DRAM — the last floor is just over the
+153,600 B a full 320x240 RGB565 framebuffer needs, which this deck does not
+allocate but a sibling does. 188 kB is 43 kB more slack than the phone deck has,
+and it is the 155 kB the 3.x WiFi stack cost that ate the rest: on 2.0.17 the
+same sketch left 343,307 B. Re-measure with
+`python3 ../check_headroom.py spotify_deck_cyd24R` from the repo root, after
+sourcing a toolchain.
+
 ### At a glance
 
 **Verified here** — none of this needs hardware:
