@@ -207,17 +207,6 @@ def para_h(value, sp, max_w, leading=2):
 
 # --- screens ---------------------------------------------------------------
 
-# The shelf, in the order ProjectsTab sorts it and with the ink
-# ProjectStore.statusColor() picks: PARKED is DIM, WANT TO TRY VIOLET, WORKING GOOD.
-SHELF = [
-    ("Bruce", "PARKED", DIM),
-    ("ESP32 Marauder", "WANT TO TRY", VIOLET),
-    ("Launcher", "PARKED", DIM),
-    ("Phone Deck \u00b7 2.4\" CYD (resistive)", "WORKING", GOOD),
-    ("Spotify Deck \u00b7 2.4\" CYD (resistive)", "WORKING", GOOD),
-]
-
-
 def home(open_projects=False):
     s = Screen()
     s.top_bar("OFF-SITE")
@@ -247,19 +236,20 @@ def home(open_projects=False):
 
 
 def drawer_panel(s, y):
-    """DrawerHome.projectsPanel(): a board heading, then projects A-Z, 6dp apart."""
+    """DrawerHome.projectsPanel(): one row per board, and the row opens the shelf.
+
+    The projects stay on the shelf: listing them here as well made two indexes of
+    one list, and the drawer's copy carried no body or log to show.
+    """
     x, w = 18 + 4, W_DP - 36 - 4
-    s.text(x, y + 10, "2.4\" CYD (RESISTIVE)", 9, DIM, spacing=0.14)
-    y += 10 + 9 * 1.45 + 4
-    y += 6                              # Ui.space(row, 6): every row's top margin
-    for name, status, ink in SHELF:
-        h = 6 + 13 * 1.45 + 6
-        # stroke 0 in the Java, so the fill is its own outline here.
-        s.card(x, y, w, h, 8, CARD, CARD)
-        s.text(x + 8, y + 6, name, 13, TEXT)
-        s.right(x + w - 8, y + 8, status, 9, ink, bold=True, spacing=0.10)
-        y += h + 6
-    return y - 6                        # no trailing gap: SERIAL carries its own 10
+    y += 6                              # Ui.space(row, 6): the row's top margin
+    h = 6 + 13 * 1.45 + 6
+    # stroke 0 in the Java, so the fill is its own outline here.
+    s.card(x, y, w, h, 8, CARD, CARD)
+    s.text(x + 8, y + 6, "2.4\" CYD (RESISTIVE)", 13, TEXT)
+    s.right(x + w - 8, y + 8, "\u203a", 16, DIM)
+    y += h
+    return y                            # no trailing gap: SERIAL carries its own 10
 
 
 def projects(open_first=False):

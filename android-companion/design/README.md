@@ -73,9 +73,11 @@ page or note it as unverified until it runs on the phone.
 Three rough edges this file used to list are now fixed in both the page and the
 Java, which is what the pair is for:
 
-* the drawer's project rows have a 6dp gap (`Ui.space(row, 6)`) instead of sitting
-  flush, where five of them read as one block — the fill is only 6% above the
-  ground, so the 8dp edge alone did not separate them;
+* the drawer's expansion names the boards only, one row each, and a row opens the
+  shelf: the same projects in both places made two indexes of one list, and the
+  drawer's copy could only carry a name and a status. Two boards keep the 6dp gap
+  (`Ui.space(row, 6)`) the project rows had, because the fill is only 6% above the
+  ground and the 8dp edge alone did not separate them;
 * the BOARDS crumb is now just the board (`2.4" CYD (RESISTIVE)`), not
   `BOARDS › board`: the bar already says `‹ OFF-SITE` and the title already says
   BOARDS;

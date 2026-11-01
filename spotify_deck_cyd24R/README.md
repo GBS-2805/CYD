@@ -193,7 +193,7 @@ arduino-cli upload --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 spotify_deck_cyd24R
 
 From the phone, with an OTG adapter and a USB **data** cable:
 
-1. **PROJECTS** → the **Spotify Deck** card → **COPY DROID**, then paste into a
+1. **BOARDS** → the **Spotify Deck** card → **COPY DROID**, then paste into a
    new ArduinoDroid sketch. If no such card is there, **IMPORT** the `.ino` from
    wherever you put it and open it from the flash shelf instead.
 2. Keep it one tab named exactly `spotify_deck_cyd24R.ino`, and add no `.h`

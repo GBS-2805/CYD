@@ -147,7 +147,7 @@ upload that will not sync, not a step.
 
 ## Edit it on the phone (ArduinoDroid)
 
-1. **PROJECTS** → the **Phone Deck** card → **COPY DROID**, then paste into a new
+1. **BOARDS** → the **Phone Deck** card → **COPY DROID**, then paste into a new
    ArduinoDroid sketch. **SAVE** writes it to Downloads instead.
 2. Keep it one tab named `phone_deck_cyd24R.ino`, and do not add `.h` files: an
    earlier split into `deck_types.h` failed on the phone with

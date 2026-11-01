@@ -19,8 +19,8 @@ import java.util.Map;
  *
  * A slide-out panel behind a button would hide the only navigation this app has,
  * so the menu is the screen. The wordmark sits where a launcher's icon would, the
- * three sections hang under it, and BOARDS expands in place into the boards that
- * hold projects — an index you can read without leaving the page.
+ * three sections hang under it, and BOARDS expands in place to name the boards
+ * that hold projects, each row opening the shelf they live on.
  *
  * SETTINGS is deliberately not a row here: it is configuration rather than
  * navigation, so it lives behind the gear in the top bar.
@@ -66,9 +66,9 @@ final class DrawerHome extends ScrollView {
     }
 
     /**
-     * Everything that changes a pixel: the link state and the shelf. Project
-     * names come from the store, so a rename or a new deck (or the board tag on
-     * it) redraws the index without a restart.
+     * Everything that changes a pixel: the link state and the shelf. Board tags
+     * come from the store through {@link WidgetCatalog}, so a new deck, or the
+     * board it names, redraws the index without a restart.
      */
     private String signatureOf(DeckService.Snapshot snapshot) {
         StringBuilder sig = new StringBuilder();
@@ -155,9 +155,14 @@ final class DrawerHome extends ScrollView {
     }
 
     /**
-     * The boards that hold projects, each with its own alphabetical list. Today
-     * that is the one CYD; a second panel becomes a second heading rather than a
+     * The boards that hold projects, one row each, and every row opens the shelf.
+     * Today that is the one CYD; a second panel becomes a second row rather than a
      * second screen, which is the whole point of the board tag.
+     *
+     * The projects are deliberately not listed here. They are on the shelf with
+     * their bodies, logs and actions, and printing them twice made two indexes of
+     * one list that could disagree: the drawer's copy had a name and a status and
+     * nothing else to say.
      */
     private LinearLayout projectsPanel() {
         LinearLayout panel = Ui.column(activity);
@@ -166,50 +171,33 @@ final class DrawerHome extends ScrollView {
         List<ProjectStore.Project> projects = new ArrayList<>(ProjectStore.all(activity));
         projects.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
 
-        Map<String, List<ProjectStore.Project>> boards = new LinkedHashMap<>();
+        Map<String, Boolean> boards = new LinkedHashMap<>();
         for (ProjectStore.Project project : projects) {
-            String board = boardLabel(project);
-            List<ProjectStore.Project> onBoard = boards.get(board);
-            if (onBoard == null) {
-                onBoard = new ArrayList<>();
-                boards.put(board, onBoard);
-            }
-            onBoard.add(project);
+            boards.put(boardLabel(project), Boolean.TRUE);
         }
-
-        for (Map.Entry<String, List<ProjectStore.Project>> entry : boards.entrySet()) {
-            TextView board = Ui.text(activity, entry.getKey().toUpperCase(Locale.US), 9, Ui.DIM);
-            board.setLetterSpacing(0.14f);
-            board.setPadding(0, Ui.dp(activity, 10), 0, Ui.dp(activity, 4));
-            panel.addView(board);
-
-            for (ProjectStore.Project project : entry.getValue()) {
-                panel.addView(projectRow(project));
-            }
+        for (String board : boards.keySet()) {
+            panel.addView(boardRow(board));
         }
         return panel;
     }
 
-    /** A project inside an expanded board: name, status, and it opens the shelf. */
-    private LinearLayout projectRow(ProjectStore.Project project) {
+    /** A board in the drawer: its label, and the shelf behind it. */
+    private LinearLayout boardRow(String label) {
         LinearLayout row = Ui.row(activity);
         row.setPadding(Ui.dp(activity, 8), Ui.dp(activity, 6),
                 Ui.dp(activity, 8), Ui.dp(activity, 6));
         row.setBackground(Ui.rounded(activity, Ui.CARD, 0, 8));
 
-        TextView name = Ui.text(activity, project.name, 13, Ui.TEXT);
+        TextView name = Ui.text(activity, label.toUpperCase(Locale.US), 13, Ui.TEXT);
         row.addView(name, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        TextView status = Ui.text(activity, ProjectStore.statusLabel(project.status), 9,
-                ProjectStore.statusColor(project.status));
-        status.setLetterSpacing(0.10f);
-        status.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        row.addView(status);
+        TextView aside = Ui.text(activity, "\u203A", 16, Ui.DIM);
+        row.addView(aside);
 
         row.setOnClickListener(v -> nav.openSection(MainActivity.SECTION_PROJECTS));
-        // A gap between the rows, or five of them read as one block: the fill is
-        // only 6% above the ground, so the edge alone does not separate them.
+        // Two boards need the gap the project rows had: the fill is only 6% above
+        // the ground, so the edge alone does not separate them.
         Ui.space(activity, row, 6);
         return row;
     }

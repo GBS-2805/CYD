@@ -268,20 +268,31 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
 
 ## App UI
 
-The app is a drawer (`DrawerHome`) with three rows: `DECKS`, `PROJECTS`,
-`SERIAL`. `SETTINGS` is deliberately not a fourth: it is configuration rather
+The app is a drawer (`DrawerHome`) with three rows: `PAIRED` (the row that
+opens the link and the bridge), `BOARDS` (the one that opens the shelf) and
+`SERIAL`. The first two were labelled `DECKS` and `PROJECTS` until 2026-11-01;
+the names behind them did not move — `DecksTab`, `ProjectsTab`, `SECTION_DECKS`,
+`SECTION_PROJECTS` and the `"decks"`/`"projects"` prefs keys still describe what
+the screens are — so a grep for the old words finds code, not copy.
+`SETTINGS` is deliberately not a fourth: it is configuration rather
 than navigation, so it hangs off the gear at the outer end of the top bar, past
 the link pill. The bottom tab bar is gone on purpose, because a drawer that *is*
 the front page needs no second navigation.
 
-* **PROJECTS is alphabetical and folded.** `String.compareToIgnoreCase` on the
+* **BOARDS expands to the board alone.** One row per distinct board, labelled
+  exactly as the shelf's crumb labels it — `2.4" CYD (resistive)` — and tapping
+  that row opens the shelf. The projects are not repeated underneath it: their
+  rows live on the shelf beside their bodies, logs and actions, and a copy in
+  the drawer could only ever carry a name and a status. A second board is a
+  second row, not a second screen.
+* **The shelf is alphabetical and folded.** `String.compareToIgnoreCase` on the
   project name, so a new project lands where a reader would look for it. One
   accordion per project: collapsed shows kind, status and name; body, log and
   actions open on tap. Keep the fold state in `ProjectsTab`, not in the store.
-  The section states where it is — `PROJECTS › <board>` — from
-  `WidgetCatalog.boardLabel`, the same call the drawer groups by, so the crumb
-  and the board headings cannot drift apart.
-* **Libraries are one disclaimer at the top of PROJECTS**, read from the widget
+  The screen states where it is — `BOARDS › <board>` — from
+  `WidgetCatalog.boardLabel`, the same call the drawer's row is drawn from, so
+  the crumb and the drawer cannot drift apart.
+* **Libraries are one disclaimer at the top of the shelf**, read from the widget
   descriptors and never retyped in Java. Each library is a button that copies the
   exact name ArduinoDroid's library list searches for, and the ArduinoBLE warning
   stays under it.
@@ -291,9 +302,10 @@ the front page needs no second navigation.
   them: every changed screen goes into the reply as an inline image
   (`![home](artifacts/renders/home.png)`), not as a file link, so the render is one
   scroll away instead of a hunt through the tree. Link — or skip — only the
-  screens the change did not touch. Renders are review artifacts: regenerate them
-  on the next change, never commit them. A render is metric-accurate, not a device
-  screenshot — say which.
+  screens the change did not touch. The PNGs are the page's own images —
+  `tokens.json`'s `screens` maps each frame to one — so a change that redraws a
+  screen regenerates that render and commits it with the code and the page. A
+  render is metric-accurate, not a device screenshot — say which.
 
 ## Adding a widget
 

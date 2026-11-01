@@ -31,7 +31,7 @@
   --r-field:   8px;     /* search field, status chip                  */
   --r-tag:     6px;     /* kind tag inside a project card             */
   --r-pill:    9px;     /* top-bar link pill                          */
-  --r-drawer-project: 8px;
+  --r-drawer-board: 8px;
 
   /* type — px here == sp in Android, because the file is 1dp = 1px */
   --mono: "DejaVu Sans Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
@@ -121,15 +121,13 @@ figcaption span { color: #6d6d6d; }
 .menu-row__name { font-size: 17px; letter-spacing: .10em; }
 .menu-row__hint { font-size: 10px; letter-spacing: .10em; color: var(--dim); }
 .drawer-panel { padding-left: 4px; }
-.board-heading { font-size: 9px; letter-spacing: .14em; color: var(--dim);
-                 padding: 10px 0 4px; text-transform: uppercase; }
-.project-row { display: flex; align-items: center; justify-content: space-between;
-               margin-top: 6px;   /* Ui.space(row, 6) — they were flush before */
-               background: var(--card);
-               border-radius: var(--r-drawer-project);   /* stroke 0, radius 8 */
-               padding: 6px 8px; }
-.project-row__name { font-size: 13px; }
-.project-row__status { font-size: 9px; font-weight: 700; letter-spacing: .10em; }
+.board-row { display: flex; align-items: center; justify-content: space-between;
+             margin-top: 6px;                /* Ui.space(row, 6) */
+             background: var(--card);
+             border-radius: var(--r-drawer-board);      /* stroke 0, radius 8 */
+             padding: 6px 8px; }
+.board-row__name { font-size: 13px; }
+.board-row__go { font-size: 16px; color: var(--dim); }
 
 /* --- sections: BOARDS / SERIAL / SETTINGS ----------------------------------- */
 .body { padding: var(--body-top) var(--body-side) var(--body-bottom); }
@@ -298,29 +296,12 @@ figcaption span { color: #6d6d6d; }
         <div class="menu-row__hint">&minus;</div>
       </div>
 
-      <!-- DrawerHome.projectsPanel(): one heading per board, projects A–Z -->
+      <!-- DrawerHome.projectsPanel(): one row per board, and the row opens the
+           shelf — the projects, their bodies and logs already live there -->
       <div class="drawer-panel">
-        <div class="board-heading">2.4&quot; CYD (RESISTIVE)</div>
-
-        <div class="project-row">
-          <div class="project-row__name">Bruce</div>
-          <div class="project-row__status s-dim">PARKED</div>
-        </div>
-        <div class="project-row">
-          <div class="project-row__name">ESP32 Marauder</div>
-          <div class="project-row__status s-violet">WANT TO TRY</div>
-        </div>
-        <div class="project-row">
-          <div class="project-row__name">Launcher</div>
-          <div class="project-row__status s-dim">PARKED</div>
-        </div>
-        <div class="project-row">
-          <div class="project-row__name">Phone Deck &middot; 2.4&quot; CYD (resistive)</div>
-          <div class="project-row__status s-good">WORKING</div>
-        </div>
-        <div class="project-row">
-          <div class="project-row__name">Spotify Deck &middot; 2.4&quot; CYD (resistive)</div>
-          <div class="project-row__status s-good">WORKING</div>
+        <div class="board-row">
+          <div class="board-row__name">2.4&quot; CYD (RESISTIVE)</div>
+          <div class="board-row__go">&rsaquo;</div>
         </div>
       </div>
 
@@ -334,10 +315,11 @@ figcaption span { color: #6d6d6d; }
   </div>
   <figcaption>
     <b>2 · DRAWER, BOARDS OPEN</b><br>
-    <span>DrawerHome.projectsRow() + projectsPanel()</span> — an index you can read
-    without leaving the page. The board heading comes from
-    <code>WidgetCatalog.boardLabel()</code>, the same call the BOARDS crumb uses,
-    so a second panel becomes a second heading.
+    <span>DrawerHome.projectsRow() + projectsPanel()</span> — the expansion names the
+    boards and nothing else; every row opens the shelf, where the projects, their
+    bodies and their logs already live. The label comes from
+    <code>WidgetCatalog.boardLabel()</code>, the same call the BOARDS crumb uses, so
+    a second panel becomes a second row.
   </figcaption>
 </figure>
 
@@ -697,8 +679,7 @@ figcaption span { color: #6d6d6d; }
   <tr><td>.bar / .crumb / .pill / .gear</td><td>MainActivity.buildTopBar, showSection</td></tr>
   <tr><td>.drawer / .wordmark / .status-line</td><td>DrawerHome.build</td></tr>
   <tr><td>.menu-row</td><td>DrawerHome.menuRow</td></tr>
-  <tr><td>.board-heading</td><td>DrawerHome.projectsPanel (heading per board)</td></tr>
-  <tr><td>.project-row</td><td>DrawerHome.projectRow (a project inside the drawer)</td></tr>
+  <tr><td>.board-row</td><td>DrawerHome.boardRow (a board in the drawer, opening the shelf)</td></tr>
   <tr><td>.body / .title</td><td>the section ScrollView body and its 20sp title</td></tr>
   <tr><td>.crumb-line</td><td>ProjectsTab.breadcrumb</td></tr>
   <tr><td>.label</td><td>Ui.section — 12sp, 0.14em, 18dp above</td></tr>

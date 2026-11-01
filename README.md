@@ -25,10 +25,10 @@ it, so every board flashed is a distinct widget that answers to one phone. It
 renders whatever it receives; it cannot read a phone on its own. Apple's ANCS is
 iOS-only, so on Android the companion app is not optional.
 
-The companion — **Off-site** — is more than a bridge: its **DECKS** tab monitors
-the link (RSSI, uptime, packets, nearby and saved boards), **PROJECTS** keeps the
+The companion — **Off-site** — is more than a bridge: its **PAIRED** row monitors
+the link (RSSI, uptime, packets, nearby and saved boards), **BOARDS** keeps the
 sketches, including this repo's deck sketch copied into the APK at build time and
-ready to paste into ArduinoDroid, and **BOARD** drives the ESP32 over an OTG
+ready to paste into ArduinoDroid, and **SERIAL** drives the ESP32 over an OTG
 cable. It files its projects under **ESP32_Widgets**, with this one as
 **Phone Deck**.
 
