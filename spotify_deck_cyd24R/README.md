@@ -32,12 +32,21 @@ person reads says **Spotify Deck**.
 ### The Spotify app (once, from the phone)
 
 At <https://developer.spotify.com/dashboard>, **Create app**, then under Settings
-add the redirect URI `http://127.0.0.1:8080/callback` and copy the **Client ID**.
-Spotify refuses a plain-HTTP redirect unless it points at a loopback literal, so
-that address is the only one that works — and it can never reach the board, which
-is exactly why the deck serves the page itself and does the token exchange on
-the other end. Leave the client secret alone: the page signs in with PKCE
-(S256), which does not use one.
+add **two** redirect URIs and copy the **Client ID**:
+
+| Redirect URI | Who catches it | Which path uses it |
+| --- | --- | --- |
+| `phonedesk://spotify-callback` | the companion app | **Sign in with the app**, one tap |
+| `http://127.0.0.1:8080/callback` | nothing — the page fails to load | **or sign in in the browser**, then paste |
+
+Those two are what Spotify's rules leave. A plain-HTTP redirect is accepted only
+for a loopback IP literal (`http://127.0.0.1:PORT`), `localhost` is refused, and
+the board can never be the redirect target — which is why the deck serves the
+page, keeps the PKCE verifier and does the token exchange on its own side. A
+custom scheme is still accepted (`com.example://callback` "can still be used as
+before", Spotify, February 2025) and it is the only kind of redirect a browser
+will hand to an app, which is what makes the one-tap path possible. Leave the
+client secret alone: the page signs in with PKCE (S256), which does not use one.
 
 ## First run: the setup page
 
@@ -50,18 +59,25 @@ There is nothing to install on the phone and nothing to type into a monitor.
 2. Open `http://192.168.4.1` in the phone's browser.
 3. Type the WiFi network name, its password (or tick *this network has no
    password*), and the Client ID, then **Save and join WiFi**.
-4. The page turns into step 2, says `wifi connected`, and shows the deck's
-   address on your network. Tap **Open Spotify sign-in** and approve the scopes.
-5. The browser lands on `127.0.0.1:8080/callback?code=...` and *fails to load*.
-   That is the design: copy the whole address from the address bar, paste it into
-   the box on the deck's page, and press **Finish setup**.
+4. The page says `wifi connected` and prints the deck's address on your network.
+   Open `http://<deck-ip>/spotify` in a new tab, switch the phone back to your own
+   WiFi, and reload it.
+5. Tap **Sign in with the app** and approve the scopes. Spotify hands
+   `phonedesk://spotify-callback?code=...&state=<deck-ip>` to the companion app
+   (first time: pick it once in Android's chooser), which gives the code straight
+   back to the deck at `http://<deck-ip>/code`. Nothing is copied.
 6. The deck exchanges that code itself, stores the refresh token, and reboots
-   into the player. Put the phone back on your own WiFi.
+   into the player.
 
-No token is typed, shown or pasted: the code goes one way over the deck's own
-TLS connection and comes back as a refresh token in NVS. The page never renders
-a stored password or token back, and the form is prefilled only with the network
-name and the client id.
+Without the app, step 5 is **or sign in in the browser** and the address has to
+walk back by hand: approve, let the browser land on
+`127.0.0.1:8080/callback?code=...` — which *fails to load*, by design — copy the
+whole address out of the bar and paste it into the box on the deck's page.
+
+Either path ends the same way: the code goes one way over the deck's own TLS
+connection and comes back as a refresh token in NVS. No token is typed, shown or
+pasted, the page never renders a stored password or token back, and the form is
+prefilled only with the network name and the client id.
 
 Two things look like failures and are not:
 
@@ -70,8 +86,12 @@ Two things look like failures and are not:
   data anyway and some do not. If yours does not, put the phone back on your own
   WiFi and open `http://<deck-ip>/spotify` — the address is on the page's step 2
   and on the deck's screen.
-* **The page that lands on `127.0.0.1` is blank.** Nothing is listening there;
-  the `code=` in the address bar is the whole point.
+* **The page that lands on `127.0.0.1` is blank.** That is the browser fallback
+  only. Nothing is listening there; the `code=` in the address bar is the whole
+  point.
+* **The app flashes past and the browser opens by itself.** That is the app path
+  working: the activity reads the code out of Spotify's link and opens
+  `http://<deck-ip>/code`, which is the page that says `Signed in`.
 
 ### The serial wizard (fallback)
 
@@ -267,7 +287,7 @@ core **3.3.12**, default partition scheme:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,122,249 | **188,471** | 1,310,720 (85 % used) |
+| flash | 1,122,461 | **188,259** | 1,310,720 (85 % used) |
 | DRAM | 53,572 globals | **274,108** | 327,680 |
 
 The check refuses a deck that overflows, that drops under **64 KiB** of free flash
@@ -286,16 +306,17 @@ sourcing a toolchain.
 * The committed sketch links under the documented core **2.0.17** at 967,413
   bytes (73 %), the measurement above. Re-measured on 2026-10-31 with
   `arduino-cli` 1.5.2-rc.1, core **3.3.12** links the committed file at
-  1,122,249 bytes (85 %) with 53,572 bytes of globals (16 %), `EXIT=0` under
-  `--warnings all`; a comment-only edit links to exactly the same size, so the
+  1,122,461 bytes (85 %) with 53,572 bytes of globals (16 %), `EXIT=0` under
+  `--warnings all` (1,122,249 before the app callback path, so the second
+  redirect URI and the `state` field cost **212 B**); a comment-only edit links to exactly the same size, so the
   figure is a stable build rather than a stale build path. The two cores differ
   by ~155 kB, which is the WiFi stack as IDF 5 links it rather than mbedTLS (see
   [the build note](../CONVENTIONS.md#build)); 3.3.12 is what `toolchain.sh` pins
   now, so that is where the release numbers come from, and 2.0.17 is kept as the
   A/B build rather than the shipping one.
-* **It still fits on 3.3.12, on about a third of the slack:** 1,122,249 bytes
+* **It still fits on 3.3.12, on about a third of the slack:** 1,122,461 bytes
   against the 1,310,720-byte app slot the default scheme gives leaves
-  **188,471 B (14 %)** free, where 2.0.17 leaves 343,307 B (26 %). `default.csv`
+  **188,259 B (14 %)** free, where 2.0.17 leaves 343,307 B (26 %). `default.csv`
   sizes `app0` and `app1` at 1,310,720 each, so a wireless update faces the same
   ceiling; under `huge_app` the same build reads 36 % — a bigger room, not
   smaller code.
@@ -321,6 +342,12 @@ been flashed, so all of the following are still assumptions:
 * The CRLF fix against a monitor that really sends `\r\n`, and the depth-aware
   JSON reader against a real payload — the album-first trap is reasoned from
   Spotify's documented shape, not seen on the wire.
+* The app path end to end: Android offering **Off-site** for
+  `phonedesk://spotify-callback` and remembering the choice, the activity handing
+  the code to `http://<deck-ip>/code`, and the deck exchanging a code minted for
+  the custom-scheme URI rather than the loopback one. None of it has run on a
+  phone. The only part with a test is the link parser, and that test runs on a
+  JVM — nine checks in `android-companion/test/HostTests.java`.
 
 ## Traps worth keeping
 
@@ -346,6 +373,17 @@ been flashed, so all of the following are still assumptions:
   allow plain HTTP only for a loopback literal. That pair of facts is why setup is
   a page the deck serves itself: the board holds the PKCE verifier, the phone
   holds the login, and only the authorization code crosses between them.
+* **A custom scheme is the one redirect a browser will hand to an app.** That,
+  not a nicer error page, is why the one-tap path exists: Chrome will never pass
+  `http://127.0.0.1:8080` to another app, but it does pass
+  `phonedesk://spotify-callback`. The scheme carries no host, so the deck puts its
+  own address in `state`, the field Spotify echoes back untouched; the app posts
+  nothing and opens no socket, it just sends the phone's browser to
+  `http://<deck-ip>/code?redir=app&code=...`, so the APK still holds no
+  INTERNET permission. Nothing secret rides in `state` — a forged one can only
+  aim a code at the wrong LAN address, where the verifier on the board cannot
+  complete it. That `GET /code` changes state, which is unusual and deliberate:
+  the code is single-use, so a replayed load only earns `invalid_grant`.
 * **One Enter used to answer two questions.** Monitors send `\r\n`, and a wizard
   that commits on both characters answers the next question with nothing typed.
   That is how the WiFi password prompt was skipped: the SSID committed on the
@@ -444,7 +482,9 @@ trouble table below applies. It needs `openssl` and nothing else.
 | `192.168.4.1` will not load | the phone is not joined to `Spotify Deck` | join it; Android's "no internet" warning is expected. The bottom line of the setup card says whether a phone joined and whether it asked for the page |
 | Spotify sign-in page will not load | the phone is routing through the deck's access point | switch the phone to your own WiFi and use `http://<deck-ip>/spotify` |
 | `not on WiFi yet` | the deck has not joined the network | wrong password, or a 5 GHz-only network; the page retries every 3 s |
-| `Spotify said no` | the code expired (ten minutes) or the redirect URI does not match | tap Open Spotify sign-in again and paste the new address |
+| `Spotify said no` | the code expired (ten minutes) or the redirect URI does not match | start the sign-in again from the deck's page; both URIs above have to be listed on the Spotify app |
+| approving does nothing, or `no app can open this link` | the companion app is missing, or the APK predates the callback | install the APK from [`android-companion/dist`](../android-companion/dist), or use the browser button and paste |
+| the app opens, then the browser says the site cannot be reached | `state` named an address the phone cannot reach, usually after a network change | reopen `http://<deck-ip>/spotify` and sign in again |
 | `SETTING CLOCK` for more than a few seconds | NTP is blocked on the network | allow UDP 123 out; without the date no certificate validates |
 | `SPOTIFY UNREACHABLE`, serial `[poll] status 0` | the TLS handshake failed: a rotated CA, or no clock | check `[time]` in the log, then run `refresh_pins.py` |
 | setup will not join after a WiFi password change | the stored network no longer works | press Forget on the page, or hold the screen 4 s at boot |

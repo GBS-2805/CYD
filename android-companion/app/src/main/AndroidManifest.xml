@@ -71,6 +71,26 @@
             </intent-filter>
         </activity>
 
+        <!-- The Spotify deck's sign-in returns here. Spotify's redirect has to be a
+             custom scheme for this to work at all: a browser will not hand
+             http://127.0.0.1 to another app, so phonedesk://spotify-callback is the
+             only redirect an activity can catch. The activity opens no socket — it
+             hands the code back to the deck through the browser, which is why this
+             manifest still requests no INTERNET permission. -->
+        <activity
+            android:name=".SpotifyCallbackActivity"
+            android:excludeFromRecents="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="spotify-callback"
+                    android:scheme="phonedesk" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".DeckService"
             android:exported="false"

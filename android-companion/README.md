@@ -30,6 +30,21 @@ from guesswork: `linked 4m 12s · -62 dBm · 18 packets · 5 notices`.
 - The header pill reads `LINKED`, `SCANNING` or `IDLE`, and the monitor refreshes
   once a second. RSSI is polled from the live link every 10 s.
 
+## The Spotify deck's sign-in
+
+The only thing here that is not a tab: `SpotifyCallbackActivity` is opened by
+Android when Spotify redirects the deck's sign-in to
+`phonedesk://spotify-callback?code=...&state=...`. It reads the code out of that
+link and opens `http://<deck>/code` in the phone's browser, and the deck — which
+holds the PKCE verifier — does the exchange and reboots into the player.
+
+It is deliberately **not** a network client: it opens no socket, so the APK still
+requests **no INTERNET permission** and `toolchain.sh` still fails the build if
+one appears. Spotify's plain-HTTP redirect is a loopback literal, and a browser
+will never hand `http://127.0.0.1` to another app, which is the whole reason the
+custom scheme exists. Without this app the deck still works: its setup page
+falls back to copying the address out of the browser bar.
+
 ## The project shelf
 
 **PROJECTS** is the notebook: every project is a card with a status, a log and the

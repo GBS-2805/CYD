@@ -47,6 +47,7 @@ public final class HostTests {
         sweepTriesEveryWiring();
         flashBootNamesTheStrap();
         downloadBootAsksForASecondHost();
+        spotifyCallbackLink();
 
         System.out.println();
         if (failures.isEmpty()) {
@@ -305,6 +306,40 @@ public final class HostTests {
             check("download mode stops the BOOT-holding advice",
                     !e.getMessage().contains("hold BOOT down and tap"));
         }
+    }
+
+    // --------------------------------------------------------- spotify link ---
+
+    /**
+     * The deck's sign-in comes back as a custom-scheme link. What matters is that
+     * the code survives percent-encoding, a refusal carries no code, and the
+     * address the deck sends back in state is only used when it is a bare IPv4
+     * literal — anything else would aim the phone's browser somewhere else.
+     */
+    private static void spotifyCallbackLink() {
+        final String link = "phonedesk://spotify-callback?code=AQDx%2By%2Fz&state=192.168.1.50";
+        check("the sign-in link carries its code, decoded",
+                "AQDx+y/z".equals(SpotifyLink.code(link)));
+        check("the sign-in link carries the deck's address",
+                "192.168.1.50".equals(SpotifyLink.deck(link)));
+        check("a link with no query carries no code",
+                SpotifyLink.code("phonedesk://spotify-callback").isEmpty());
+        check("a refused sign-in carries no code",
+                SpotifyLink.code("phonedesk://spotify-callback?error=access_denied")
+                        .isEmpty());
+        check("a refused sign-in names its reason",
+                "access_denied".equals(SpotifyLink.query(
+                        "phonedesk://spotify-callback?error=access_denied", "error")));
+        check("a spelled-out address is refused",
+                SpotifyLink.deck("phonedesk://spotify-callback?state=evil.example").isEmpty());
+        check("an address with a scheme is refused",
+                SpotifyLink.deck("phonedesk://spotify-callback?state=http%3A%2F%2F192.168.1.5")
+                        .isEmpty());
+        check("an out-of-range octet is refused",
+                SpotifyLink.deck("phonedesk://spotify-callback?state=192.168.1.999").isEmpty());
+        check("an address with a port is kept",
+                "192.168.4.1:8080".equals(SpotifyLink.deck(
+                        "phonedesk://spotify-callback?state=192.168.4.1%3A8080")));
     }
 
     private static void flashWithoutHandshake() {
