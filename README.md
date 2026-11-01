@@ -7,6 +7,11 @@ the traps already hit, and what is verified and what is not.
 The rules that shape those folders — hardware, build, palette, NVS, BLE identity,
 docs — are in [CONVENTIONS.md](CONVENTIONS.md). Read it before adding a widget.
 
+A sketch change is verified by [`check_headroom.py`](check_headroom.py), which
+compiles the decks and fails one that no longer fits its partition;
+[`selftest_headroom.py`](selftest_headroom.py) proves the check's own refusals in
+about a second, with no toolchain installed.
+
 | Project | Folder | What it is | Read |
 | --- | --- | --- | --- |
 | **Phone Deck** | [`phone_deck_cyd24R/`](phone_deck_cyd24R) | ESP32-2432S024R (2.4" CYD) phone dashboard: clock, battery and notifications | [README](phone_deck_cyd24R/README.md) |
