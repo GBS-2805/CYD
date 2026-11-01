@@ -155,10 +155,10 @@ final class ProjectsTab extends ScrollView {
         List<ProjectStore.Project> projects = new ArrayList<>(ProjectStore.all(activity));
         projects.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
 
-        body.addView(Ui.text(activity, "PROJECTS", 20, Ui.TEXT));
+        body.addView(Ui.text(activity, "BOARDS", 20, Ui.TEXT));
 
-        // Where you are, in the app and on the bench: the section, then the board
-        // the shelf below belongs to.
+        // Which board the shelf below belongs to. The bar's crumb already carries
+        // the way back, so this line does not repeat the section name.
         TextView trail = Ui.text(activity, breadcrumb(projects), 10, Ui.DIM);
         trail.setLetterSpacing(0.12f);
         trail.setPadding(0, Ui.dp(activity, 6), 0, 0);
@@ -206,9 +206,9 @@ final class ProjectsTab extends ScrollView {
     }
 
     /**
-     * {@code PROJECTS › <board>}. The shelf normally holds one board and the crumb
-     * names it; a shelf with more lists them, so the crumb never claims a board
-     * that is not below it.
+     * Just the board(s) the shelf holds. The bar's crumb already says
+     * {@code ‹ OFF-SITE} and the title says BOARDS, so leading with the section
+     * name said the same thing twice; what is left answers only "which board".
      */
     private String breadcrumb(List<ProjectStore.Project> projects) {
         List<String> boards = new ArrayList<>();
@@ -216,15 +216,17 @@ final class ProjectsTab extends ScrollView {
             String board = WidgetCatalog.boardLabel(activity, project.id).toUpperCase(Locale.US);
             if (!boards.contains(board)) boards.add(board);
         }
-        if (boards.isEmpty()) return "PROJECTS  \u203A  NO PROJECTS";
-        if (boards.size() > 3) return "PROJECTS  \u203A  " + boards.size() + " BOARDS";
-        return "PROJECTS  \u203A  " + String.join("  \u00B7  ", boards);
+        if (boards.isEmpty()) return "NO BOARD";
+        if (boards.size() > 3) return boards.size() + " BOARDS";
+        return String.join("  \u00B7  ", boards);
     }
 
     /**
      * Every library the bundled widgets name, once each, read from the descriptors
      * rather than retyped here. A button carries the exact string ArduinoDroid's
-     * library list searches for, because that is what gets pasted into it.
+     * library list searches for, because that is what gets pasted into it. Two
+     * names share a row: stacked full width, three of them made the disclaimer
+     * taller than the shelf it introduces.
      */
     private View librariesCard() {
         List<String> libraries = new ArrayList<>();
@@ -243,8 +245,8 @@ final class ProjectsTab extends ScrollView {
 
         LinearLayout card = Ui.card(activity);
         TextView hint = Ui.text(activity,
-                "Install these once in ArduinoDroid before compiling a deck. Tap a name to "
-                        + "copy it, then paste it into ArduinoDroid's library search.",
+                "Install these once in ArduinoDroid before compiling a deck. "
+                        + "Tap a name to copy it.",
                 11, Ui.DIM);
         hint.setLineSpacing(Ui.dp(activity, 2), 1f);
         card.addView(hint);
@@ -259,11 +261,27 @@ final class ProjectsTab extends ScrollView {
             card.addView(warning);
         }
 
-        for (String library : libraries) {
+        // Two names to a row: stacked full width, three of them made the
+        // disclaimer taller than the shelf it introduces, and the shelf is what
+        // the screen is for. A name still copies the exact string ArduinoDroid's
+        // library list searches for.
+        LinearLayout pair = null;
+        for (int i = 0; i < libraries.size(); ++i) {
+            if (i % 2 == 0) {
+                pair = Ui.row(activity);
+                Ui.space(activity, pair, 8);
+                card.addView(pair);
+            }
+            final String library = libraries.get(i);
             Button copy = Ui.action(activity, library, false);
+            // 11sp so the longest name still fits half the card; Ui.action() sets
+            // 13sp, which clipped "Adafruit GFX Library" once it was halved.
+            copy.setTextSize(11);
             copy.setOnClickListener(v -> Actions.copyOrSay(activity, library, library));
-            Ui.space(activity, copy, 8);
-            card.addView(copy);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            if (i % 2 == 1) params.leftMargin = Ui.dp(activity, 8);
+            pair.addView(copy, params);
         }
 
         Button open = Ui.action(activity, "OPEN ARDUINODROID", false);

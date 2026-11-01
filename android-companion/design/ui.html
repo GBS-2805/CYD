@@ -124,13 +124,14 @@ figcaption span { color: #6d6d6d; }
 .board-heading { font-size: 9px; letter-spacing: .14em; color: var(--dim);
                  padding: 10px 0 4px; text-transform: uppercase; }
 .project-row { display: flex; align-items: center; justify-content: space-between;
+               margin-top: 6px;   /* Ui.space(row, 6) — they were flush before */
                background: var(--card);
                border-radius: var(--r-drawer-project);   /* stroke 0, radius 8 */
                padding: 6px 8px; }
 .project-row__name { font-size: 13px; }
 .project-row__status { font-size: 9px; font-weight: 700; letter-spacing: .10em; }
 
-/* --- sections: PROJECTS / SERIAL / SETTINGS --------------------------------- */
+/* --- sections: BOARDS / SERIAL / SETTINGS ----------------------------------- */
 .body { padding: var(--body-top) var(--body-side) var(--body-bottom); }
 .title { font-size: 20px; }
 .crumb-line { font-size: 10px; letter-spacing: .12em; color: var(--dim);
@@ -182,6 +183,10 @@ figcaption span { color: #6d6d6d; }
                    color: var(--bg); }
 .action--dim { color: var(--dim); }
 .action--full { display: block; width: 100%; }
+/* two copy buttons a row — ProjectsTab.librariesCard(); 11sp so the longest
+   library name still fits half the card */
+.lib-grid { display: flex; gap: 8px; margin-top: 8px; }
+.lib-grid .action { flex: 1; font-size: 11px; padding: 6px 8px; }
 .row-actions { display: flex; gap: 8px; padding-top: 10px; }
 .row-actions--tight { padding-top: 8px; }
 
@@ -239,15 +244,15 @@ figcaption span { color: #6d6d6d; }
       <div class="wordmark">[OFF-SITE]</div>
       <div class="status-line">IDLE &middot; BRIDGE STOPPED</div>
 
-      <!-- DrawerHome.menuRow("DECKS", "live link", …) -->
+      <!-- DrawerHome.menuRow("PAIRED", "live link", …) -->
       <div class="menu-row">
-        <div class="menu-row__name">DECKS</div>
+        <div class="menu-row__name">PAIRED</div>
         <div class="menu-row__hint">live link</div>
       </div>
 
       <!-- DrawerHome.projectsRow(), folded -->
       <div class="menu-row">
-        <div class="menu-row__name">PROJECTS</div>
+        <div class="menu-row__name">BOARDS</div>
         <div class="menu-row__hint">+</div>
       </div>
 
@@ -268,7 +273,7 @@ figcaption span { color: #6d6d6d; }
 </figure>
 
 <!-- ======================================================================
-     2. DRAWER, PROJECTS EXPANDED — DrawerHome.projectsPanel()
+     2. DRAWER, BOARDS EXPANDED — DrawerHome.projectsPanel()
      ====================================================================== -->
 <figure>
   <div class="screen">
@@ -283,13 +288,13 @@ figcaption span { color: #6d6d6d; }
       <div class="status-line">IDLE &middot; BRIDGE STOPPED</div>
 
       <div class="menu-row">
-        <div class="menu-row__name">DECKS</div>
+        <div class="menu-row__name">PAIRED</div>
         <div class="menu-row__hint">live link</div>
       </div>
 
       <!-- open: the aside becomes −, and the panel appears under the row -->
       <div class="menu-row">
-        <div class="menu-row__name">PROJECTS</div>
+        <div class="menu-row__name">BOARDS</div>
         <div class="menu-row__hint">&minus;</div>
       </div>
 
@@ -328,16 +333,16 @@ figcaption span { color: #6d6d6d; }
     <div class="fold"><span>852 dp</span></div>
   </div>
   <figcaption>
-    <b>2 · DRAWER, PROJECTS OPEN</b><br>
+    <b>2 · DRAWER, BOARDS OPEN</b><br>
     <span>DrawerHome.projectsRow() + projectsPanel()</span> — an index you can read
     without leaving the page. The board heading comes from
-    <code>WidgetCatalog.boardLabel()</code>, the same call the PROJECTS crumb uses,
+    <code>WidgetCatalog.boardLabel()</code>, the same call the BOARDS crumb uses,
     so a second panel becomes a second heading.
   </figcaption>
 </figure>
 
 <!-- ======================================================================
-     3. PROJECTS, EVERY CARD FOLDED — ProjectsTab.build()
+     3. BOARDS, EVERY CARD FOLDED — ProjectsTab.build()
      ====================================================================== -->
 <figure>
   <div class="screen">
@@ -348,22 +353,29 @@ figcaption span { color: #6d6d6d; }
     </div>
 
     <div class="body">
-      <div class="title">PROJECTS</div>
-      <!-- ProjectsTab.breadcrumb(): section › board -->
-      <div class="crumb-line">PROJECTS&nbsp; &rsaquo;&nbsp; 2.4&quot; CYD (RESISTIVE)</div>
+      <div class="title">BOARDS</div>
+      <!-- ProjectsTab.breadcrumb(): the board only — the bar carries the way back -->
+      <div class="crumb-line">2.4&quot; CYD (RESISTIVE)</div>
       <div class="subtitle">Alphabetical. Tap a name for its notes.</div>
 
       <!-- Ui.section("LIBRARIES NEEDED") + ProjectsTab.librariesCard() -->
       <div class="label">LIBRARIES NEEDED</div>
       <div class="card mt-10">
         <div class="hint">Install these once in ArduinoDroid before compiling a
-          deck. Tap a name to copy it, then paste it into ArduinoDroid's library
-          search.</div>
+          deck. Tap a name to copy it.</div>
         <div class="warn mt-8">Never install ArduinoBLE: it shadows the ESP32
           core's BLE headers and every build fails.</div>
-        <div class="action action--full mt-8">Adafruit GFX Library</div>
-        <div class="action action--full mt-8">Adafruit ILI9341</div>
-        <div class="action action--full mt-8">XPT2046_Touchscreen</div>
+
+        <!-- two names to a row: three full-width buttons made the disclaimer
+             taller than the shelf it introduces -->
+        <div class="lib-grid">
+          <div class="action">Adafruit GFX Library</div>
+          <div class="action">Adafruit ILI9341</div>
+        </div>
+        <div class="lib-grid">
+          <div class="action">XPT2046_Touchscreen</div>
+        </div>
+
         <div class="action action--full mt-10">OPEN ARDUINODROID</div>
       </div>
 
@@ -438,7 +450,7 @@ figcaption span { color: #6d6d6d; }
     <div class="fold"><span>852 dp</span></div>
   </div>
   <figcaption>
-    <b>3 · PROJECTS, FOLDED</b><br>
+    <b>3 · BOARDS, FOLDED</b><br>
     <span>ProjectsTab.build()</span> — title, path, advice, then the libraries
     disclaimer before the shelf, because what to install is a precondition for
     every card below rather than a footnote on one of them.
@@ -446,7 +458,7 @@ figcaption span { color: #6d6d6d; }
 </figure>
 
 <!-- ======================================================================
-     4. PROJECTS, ONE CARD OPEN — ProjectsTab.projectCard()
+     4. BOARDS, ONE CARD OPEN — ProjectsTab.projectCard()
      ====================================================================== -->
 <figure>
   <div class="screen">
@@ -457,20 +469,27 @@ figcaption span { color: #6d6d6d; }
     </div>
 
     <div class="body">
-      <div class="title">PROJECTS</div>
-      <div class="crumb-line">PROJECTS&nbsp; &rsaquo;&nbsp; 2.4&quot; CYD (RESISTIVE)</div>
+      <div class="title">BOARDS</div>
+      <div class="crumb-line">2.4&quot; CYD (RESISTIVE)</div>
       <div class="subtitle">Alphabetical. Tap a name for its notes.</div>
 
       <div class="label">LIBRARIES NEEDED</div>
       <div class="card mt-10">
         <div class="hint">Install these once in ArduinoDroid before compiling a
-          deck. Tap a name to copy it, then paste it into ArduinoDroid's library
-          search.</div>
+          deck. Tap a name to copy it.</div>
         <div class="warn mt-8">Never install ArduinoBLE: it shadows the ESP32
           core's BLE headers and every build fails.</div>
-        <div class="action action--full mt-8">Adafruit GFX Library</div>
-        <div class="action action--full mt-8">Adafruit ILI9341</div>
-        <div class="action action--full mt-8">XPT2046_Touchscreen</div>
+
+        <!-- two names to a row: three full-width buttons made the disclaimer
+             taller than the shelf it introduces -->
+        <div class="lib-grid">
+          <div class="action">Adafruit GFX Library</div>
+          <div class="action">Adafruit ILI9341</div>
+        </div>
+        <div class="lib-grid">
+          <div class="action">XPT2046_Touchscreen</div>
+        </div>
+
         <div class="action action--full mt-10">OPEN ARDUINODROID</div>
       </div>
 
@@ -539,7 +558,7 @@ figcaption span { color: #6d6d6d; }
     <div class="fold"><span>852 dp</span></div>
   </div>
   <figcaption>
-    <b>4 · PROJECTS, ONE OPEN</b><br>
+    <b>4 · BOARDS, ONE OPEN</b><br>
     <span>ProjectsTab.projectCard()</span> — the folded card is kind, status, name
     and a <code>+</code>. Opening adds the notes, what it needs, the last log line
     and the actions. <code>COPY DROID</code> / <code>SAVE</code> only exist for a
@@ -688,6 +707,7 @@ figcaption span { color: #6d6d6d; }
   <tr><td>.chip / .chip--on</td><td>ProjectsTab.addChip</td></tr>
   <tr><td>.proj, .tag, .proj__status, .proj__fold</td><td>ProjectsTab.projectCard</td></tr>
   <tr><td>.action, --primary, --dim</td><td>Ui.action</td></tr>
+  <tr><td>.lib-grid</td><td>ProjectsTab.librariesCard — two copy buttons to a row</td></tr>
   <tr><td>.s-good / .s-accent / .s-dim / .s-violet</td><td>ProjectStore.statusColor — WORKING, FLASHED, PARKED, WANT TO TRY</td></tr>
 </table>
 
@@ -695,14 +715,14 @@ figcaption span { color: #6d6d6d; }
 <table>
   <tr><th>Size</th><th>Used for</th></tr>
   <tr><td>34 sp bold</td><td>[OFF-SITE] wordmark, 0.06em</td></tr>
-  <tr><td>20 sp</td><td>section title (PROJECTS, SERIAL, SETTINGS)</td></tr>
+  <tr><td>20 sp</td><td>section title (BOARDS, SERIAL, SETTINGS)</td></tr>
   <tr><td>17 sp</td><td>drawer row name, 0.10em</td></tr>
   <tr><td>16 sp</td><td>project name in the shelf; the +/− fold</td></tr>
   <tr><td>15 sp</td><td>the gear glyph</td></tr>
   <tr><td>14 sp</td><td>bridge status line on SETTINGS; target board name</td></tr>
   <tr><td>13 sp</td><td>body text in a card, buttons, the search field</td></tr>
   <tr><td>12 sp</td><td>crumb in the top bar (0.12em), subtitle, project notes</td></tr>
-  <tr><td>11 sp</td><td>button-level hints, log line, status pill</td></tr>
+  <tr><td>11 sp</td><td>button-level hints, log line, status pill, library copy buttons</td></tr>
   <tr><td>10 sp</td><td>labels (0.14em), chips, kind tags, crumb line, drawer hint</td></tr>
   <tr><td>9 sp</td><td>board heading in the drawer, drawer project status</td></tr>
 </table>

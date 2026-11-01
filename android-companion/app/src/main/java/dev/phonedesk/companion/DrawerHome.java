@@ -19,11 +19,15 @@ import java.util.Map;
  *
  * A slide-out panel behind a button would hide the only navigation this app has,
  * so the menu is the screen. The wordmark sits where a launcher's icon would, the
- * three sections hang under it, and PROJECTS expands in place into the boards that
+ * three sections hang under it, and BOARDS expands in place into the boards that
  * hold projects — an index you can read without leaving the page.
  *
  * SETTINGS is deliberately not a row here: it is configuration rather than
  * navigation, so it lives behind the gear in the top bar.
+ *
+ * The rows are named for what they answer, not for the classes behind them: PAIRED
+ * is the link and BOARDS is the shelf. The Java keeps the platform's words (a Decks
+ * tab, a Projects store) because that is what the code models; only the labels moved.
  *
  * Sections are one tap away; every row goes through {@link Nav}, so this class
  * knows nothing about the screens behind it.
@@ -38,7 +42,7 @@ final class DrawerHome extends ScrollView {
     private final Activity activity;
     private final Nav nav;
     private final LinearLayout body;
-    /** PROJECTS is collapsed until asked; the state survives refreshes. */
+    /** BOARDS is collapsed until asked; the state survives refreshes. */
     private boolean projectsOpen;
     private String signature = "";
 
@@ -94,7 +98,7 @@ final class DrawerHome extends ScrollView {
         line.setPadding(0, Ui.dp(activity, 10), 0, 0);
         body.addView(line);
 
-        body.addView(menuRow("DECKS", "live link",
+        body.addView(menuRow("PAIRED", "live link",
                 () -> nav.openSection(MainActivity.SECTION_DECKS)));
         body.addView(projectsRow());
         if (projectsOpen) body.addView(projectsPanel());
@@ -130,10 +134,10 @@ final class DrawerHome extends ScrollView {
         return row;
     }
 
-    /** PROJECTS, with a plus or minus where the other rows carry a hint. */
+    /** BOARDS, with a plus or minus where the other rows carry a hint. */
     private LinearLayout projectsRow() {
         LinearLayout row = rowCard();
-        TextView name = Ui.text(activity, "PROJECTS", 17, Ui.TEXT);
+        TextView name = Ui.text(activity, "BOARDS", 17, Ui.TEXT);
         name.setLetterSpacing(0.10f);
         row.addView(name, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -204,6 +208,9 @@ final class DrawerHome extends ScrollView {
         row.addView(status);
 
         row.setOnClickListener(v -> nav.openSection(MainActivity.SECTION_PROJECTS));
+        // A gap between the rows, or five of them read as one block: the fill is
+        // only 6% above the ground, so the edge alone does not separate them.
+        Ui.space(activity, row, 6);
         return row;
     }
 

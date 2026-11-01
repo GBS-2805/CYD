@@ -55,7 +55,7 @@ reason to add a resource pipeline.
 ## Firmware files
 
 - **Two surfaces, one store.** The bundled sketch appears on the **ESP32
-  Phone_Widget** card in PROJECTS — the title is `name` in the project's
+  Phone_Widget** card in BOARDS — the title is `name` in the project's
   `widget.json`, not a string in the app; imported `.ino`/`.bin` files appear under
   **IMAGES** on BOARD, which is also the only place with COPY / SAVE / FLASH.
   `FlashLibrary` backs both.
@@ -403,7 +403,7 @@ URL and a flashing note. Decisions behind it:
 - The app is **Off-site** (`android:label`, header title). The package stays
   `dev.phonedesk.companion` and the APK stays `dist/PhoneDeckBridge-debug.apk`, so
   an upgrade replaces the installed copy instead of sitting beside it.
-- Four tabs: **DECKS** (live link), **PROJECTS** (the notebook: status chips,
+- Four tabs: **PAIRED** (live link), **BOARDS** (the notebook: status chips,
   cards, deck libraries), **BOARD** (target picker, USB probe/restart, images,
   flashing and the serial monitor) and **SETUP** (permissions, bridge switch,
   last crash).
@@ -542,7 +542,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
 
 ## Open risks
 
-- **Missing bundled sketch**: a non-Gradle build has no asset, and the PROJECTS
+- **Missing bundled sketch**: a non-Gradle build has no asset, and the BOARDS
   deck card says so. That is expected, not a bug.
 - **Stale bond** from the old HID build can still block GATT connects; the app does
   not call `removeBond()`. Forget the entry in Bluetooth settings.

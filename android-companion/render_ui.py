@@ -8,8 +8,8 @@ reply as inline images so they can be read without opening a file manager, then
 regenerated on the next change and never committed.
 
     python3 render_ui.py              draw every screen
-    python3 render_ui.py home         draw one (home, projects, projects-open,
-                                      serial, settings)
+    python3 render_ui.py home         draw one (home, home-open, projects,
+                                      projects-open, serial, settings)
 
 A render is metric-accurate, not a device screenshot: type is DejaVu Mono at the
 same size in sp, cards and gaps are the same dp, and the viewport is the 393 x
@@ -207,54 +207,102 @@ def para_h(value, sp, max_w, leading=2):
 
 # --- screens ---------------------------------------------------------------
 
-def home():
+# The shelf, in the order ProjectsTab sorts it and with the ink
+# ProjectStore.statusColor() picks: PARKED is DIM, WANT TO TRY VIOLET, WORKING GOOD.
+SHELF = [
+    ("Bruce", "PARKED", DIM),
+    ("ESP32 Marauder", "WANT TO TRY", VIOLET),
+    ("Launcher", "PARKED", DIM),
+    ("Phone Deck \u00b7 2.4\" CYD (resistive)", "WORKING", GOOD),
+    ("Spotify Deck \u00b7 2.4\" CYD (resistive)", "WORKING", GOOD),
+]
+
+
+def home(open_projects=False):
     s = Screen()
     s.top_bar("OFF-SITE")
     s.centered(84, "[OFF-SITE]", 34, TEXT, bold=True, spacing=0.06)
-    s.centered(84 + 34 * 1.45 + 10, "IDLE · BRIDGE STOPPED", 10, DIM, spacing=0.16)
+    s.centered(84 + 34 * 1.45 + 10, "IDLE \u00b7 BRIDGE STOPPED", 10, DIM, spacing=0.16)
 
     # SETTINGS is not here: it hangs off the gear in the top bar.
-    rows = [("DECKS", "live link"), ("PROJECTS", "+"), ("SERIAL", "usb · flash")]
-    y = 188
-    for label, hint in rows:
-        s.card(18, y, W_DP - 36, 56)
-        s.text(34, y + 18, label, 17, TEXT, spacing=0.10)
-        s.right(W_DP - 34, y + 22, hint, 10, DIM, spacing=0.10)
-        y += 56 + 10
+    s.card(18, 188, W_DP - 36, 56)
+    s.text(34, 188 + 18, "PAIRED", 17, TEXT, spacing=0.10)
+    s.right(W_DP - 34, 188 + 22, "live link", 10, DIM, spacing=0.10)
+
+    y = 188 + 56 + 10
+    s.card(18, y, W_DP - 36, 56)
+    s.text(34, y + 18, "BOARDS", 17, TEXT, spacing=0.10)
+    s.right(W_DP - 34, y + 22, "\u2212" if open_projects else "+", 16, DIM)
+    y += 56
+
+    if open_projects:
+        y = drawer_panel(s, y)
+
+    # SERIAL always lands here, whether the panel is open or not: the panel is
+    # added between the two rows and pushes it down rather than replacing it.
+    s.card(18, y + 10, W_DP - 36, 56)
+    s.text(34, y + 10 + 18, "SERIAL", 17, TEXT, spacing=0.10)
+    s.right(W_DP - 34, y + 10 + 22, "usb \u00b7 flash", 10, DIM, spacing=0.10)
     return s.image
+
+
+def drawer_panel(s, y):
+    """DrawerHome.projectsPanel(): a board heading, then projects A-Z, 6dp apart."""
+    x, w = 18 + 4, W_DP - 36 - 4
+    s.text(x, y + 10, "2.4\" CYD (RESISTIVE)", 9, DIM, spacing=0.14)
+    y += 10 + 9 * 1.45 + 4
+    y += 6                              # Ui.space(row, 6): every row's top margin
+    for name, status, ink in SHELF:
+        h = 6 + 13 * 1.45 + 6
+        # stroke 0 in the Java, so the fill is its own outline here.
+        s.card(x, y, w, h, 8, CARD, CARD)
+        s.text(x + 8, y + 6, name, 13, TEXT)
+        s.right(x + w - 8, y + 8, status, 9, ink, bold=True, spacing=0.10)
+        y += h + 6
+    return y - 6                        # no trailing gap: SERIAL carries its own 10
 
 
 def projects(open_first=False):
     s = Screen()
     s.top_bar("\u2039  OFF-SITE")
-    # Title, the breadcrumb (PROJECTS › board), then the hint: the crumb is a path,
-    # the sentence under it is advice. Mirrors ProjectsTab.build().
-    s.text(16, 56, "PROJECTS", 20, TEXT)
-    s.text(16, 56 + 20 * 1.45 + 4, "PROJECTS  \u203A  2.4\" CYD (RESISTIVE)", 10, DIM,
-           spacing=0.12)
+    # Title, then which board this shelf belongs to, then the hint. The crumb no
+    # longer leads with the section name: the title says it and the bar carries
+    # the way back. Mirrors ProjectsTab.build().
+    s.text(16, 56, "BOARDS", 20, TEXT)
+    s.text(16, 56 + 20 * 1.45 + 4, "2.4\" CYD (RESISTIVE)", 10, DIM, spacing=0.12)
     subtitle_y = 56 + 20 * 1.45 + 4 + 10 * 1.45 + 6
     s.text(16, subtitle_y, "Alphabetical. Tap a name for its notes.", 12, DIM)
     y = subtitle_y + 12 * 1.45 + 4
 
     y = s.section_label(y, "LIBRARIES NEEDED")
     # Disclaimer card: hint, the banned library, one button per name, then Droid.
-    hint_text = ("Install these once in ArduinoDroid before compiling a deck. Tap "
-                 "a name to copy it, then paste it into ArduinoDroid's library "
-                 "search.")
+    hint_text = ("Install these once in ArduinoDroid before compiling a deck. "
+                 "Tap a name to copy it.")
     warn_text = ("Never install ArduinoBLE: it shadows the ESP32 core's BLE "
                  "headers and every build fails.")
+    libraries = ("Adafruit GFX Library", "Adafruit ILI9341", "XPT2046_Touchscreen")
+    rows = (len(libraries) + 1) // 2
+    grid_h = rows * 30 + (rows - 1) * 8
     card_h = (12 + para_h(hint_text, 11, W_DP - 60)
               + 8 + para_h(warn_text, 11, W_DP - 60)
-              + 8 + 3 * (35 + 8) + 2 + 35 + 12)
+              + 8 + grid_h + 2 + 35 + 12)
     s.card(16, y, W_DP - 32, card_h)
     inner = y + 12
     inner = s.paragraph(30, inner, hint_text, 11, DIM, W_DP - 60)
     inner = s.paragraph(30, inner + 8, warn_text, 11, PINK, W_DP - 60, 2)
     inner += 8
-    for library in ("Adafruit GFX Library", "Adafruit ILI9341", "XPT2046_Touchscreen"):
-        s.button(30, inner, W_DP - 60, library)
-        inner += 35 + 8
-    s.button(30, inner + 2, W_DP - 60, "OPEN ARDUINODROID")
+    # Two names to a row at 11sp, 8dp apart — the grid librariesCard() builds now.
+    # An odd count leaves one name in the last row, and a weight-1 child with no
+    # sibling takes the whole width, so it is drawn full width here too.
+    col_w = (W_DP - 60 - 8) / 2.0
+    for i, library in enumerate(libraries):
+        if i % 2 == 0:
+            row_y = inner
+            inner += 30 + 8
+        alone = i == len(libraries) - 1 and len(libraries) % 2 == 1
+        s.button(30 + (i % 2) * (col_w + 8), row_y, W_DP - 60 if alone else col_w,
+                 library, sp=11, h=30)
+    s.button(30, inner - 6, W_DP - 60, "OPEN ARDUINODROID")
     y += card_h + 10
 
     # Search field.
@@ -417,7 +465,8 @@ def settings():
 
 
 SCREENS = {
-    "home": home,
+    "home": lambda: home(False),
+    "home-open": lambda: home(True),
     "projects": lambda: projects(False),
     "projects-open": lambda: projects(True),
     "serial": serial,

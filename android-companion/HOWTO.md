@@ -18,7 +18,7 @@ If it stays on `IDLE`, tap **START BRIDGE** in SETTINGS.
 
 Use this when you have more than one deck powered on.
 
-1. Open **DECKS** and let the scan run for a few seconds.
+1. Open **PAIRED** and let the scan run for a few seconds.
 2. Find the board under **NEARBY** — it shows name, MAC and signal strength.
 3. Tap **LINK**. The bridge pins itself to that MAC and drops any other link.
 4. The row changes to `LINKED`, and the deck's own screen shows `LINKED` too.
@@ -31,7 +31,7 @@ currently switched off. Bring it near the phone and tap LINK again.
 
 ## Check the link health
 
-The **DECKS** status card shows, live:
+The **PAIRED** status card shows, live:
 
 - **linked 4m 12s** — how long this link has held
 - **-62 dBm** — RSSI, polled every 10 s
@@ -47,13 +47,13 @@ The bundled sketch is the one in this repo. Pick whichever route suits you.
 
 **Clipboard route (fastest):**
 
-1. **PROJECTS** → on the ESP32 Phone_Widget card, tap **COPY DROID**.
+1. **BOARDS** → on the ESP32 Phone_Widget card, tap **COPY DROID**.
 2. Open ArduinoDroid, create or open a sketch, select the whole editor and paste.
 3. Compile and upload.
 
 **File route (keeps a real file):**
 
-1. **PROJECTS** → on the ESP32 Phone_Widget card, tap **SAVE**.
+1. **BOARDS** → on the ESP32 Phone_Widget card, tap **SAVE**.
 2. The file lands in `Downloads/phone_deck_cyd24R.ino` (Android 10+).
 3. In ArduinoDroid, open the sketch through its file browser.
 
@@ -63,11 +63,11 @@ with `deck_types.h: No such file or directory`.
 
 ## Install Marauder, Bruce or Launcher on the CYD
 
-Other firmwares are not flashed by this app. **PROJECTS** opens the
+Other firmwares are not flashed by this app. **BOARDS** opens the
 project's official installer in your browser instead.
 
 1. Power the board and connect it to a computer over USB (data cable).
-2. In **PROJECTS**, tap **INSTALLER** for the firmware you want.
+2. In **BOARDS**, tap **INSTALLER** for the firmware you want.
    Marauder and Bruce both offer a browser flasher; it handles bootloader,
    partitions and offsets for the CYD.
 3. In Chrome or Edge, select the CYD / ESP32-2432S024 target, connect, and flash.
@@ -96,7 +96,7 @@ exactly three libraries:
 
 ### Install them without retyping the names
 
-**PROJECTS → ESP32 Phone_Widget → LIBRARIES** has an **INSTALL** button for each library.
+**BOARDS → ESP32 Phone_Widget → LIBRARIES** has an **INSTALL** button for each library.
 One tap copies that exact name and opens ArduinoDroid's library list.
 
 1. Tap **INSTALL** next to **Adafruit GFX Library**.
@@ -136,7 +136,7 @@ dead touch.
 
 After flashing a third-party firmware, record it so you never have to guess later.
 
-1. **PROJECTS**, find the card you flashed, tap **LOG**.
+1. **BOARDS**, find the card you flashed, tap **LOG**.
 2. Fill in the build/version string (for example the release name shown by the
    installer), pick the touch status, and add anything worth remembering.
 3. **Save**. The card now shows `TOUCH: WORKS · BUILD: … · logged 2h ago` plus
@@ -173,7 +173,7 @@ first-boot touch calibration was needed, screen orientation quirks, and whether 
 
 ## Find a project on the shelf
 
-1. **PROJECTS** → the field under the title. Type part of a name and the shelf
+1. **BOARDS** → the field under the title. Type part of a name and the shelf
    redraws as you type.
 2. It matches the project's own name and, when a bundled widget backs the card,
    the descriptor's name, id and tagline. Log notes and imported file names are

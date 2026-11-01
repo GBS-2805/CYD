@@ -10,8 +10,8 @@ settings:
 
 | Section | What it is for |
 | --- | --- |
-| **DECKS** | Live link: what is connected, signal, uptime, packets, nearby decks |
-| **PROJECTS** | Alphabetical shelf: every project folded to its name, kind and status, opening to its body, log, links and actions, under one libraries disclaimer |
+| **PAIRED** | Live link: what is connected, signal, uptime, packets, nearby decks |
+| **BOARDS** | Alphabetical shelf: every project folded to its name, kind and status, opening to its body, log, links and actions, under one libraries disclaimer |
 | **SERIAL** | Target board, OTG connection, bootloader probe, image flashing, serial monitor |
 | **SETTINGS** (gear, top bar) | Permissions, battery, bridge switch, last crash |
 
@@ -33,7 +33,7 @@ from guesswork: `linked 4m 12s · -62 dBm · 18 packets · 5 notices`.
 
 ## The project shelf
 
-**PROJECTS** is the notebook: every project is a card with a status, a log and the
+**BOARDS** is the notebook: every project is a card with a status, a log and the
 links it needs.
 
 - Four states, filterable with chips at the top: **WANT TO TRY**, **FLASHED**,
@@ -216,7 +216,7 @@ alone: below
 15 the window still fits the bars itself and that padding would double it. The
 sketch is only bundled when the build goes
 through Gradle; a raw `javac` build produces an APK-less class check and the
-PROJECTS deck card reports that the bundled sketch is missing.
+BOARDS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
 [`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (140 kB,

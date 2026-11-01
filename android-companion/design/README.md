@@ -31,7 +31,7 @@ plain HTML and CSS:
 * **Sizes** are copied as px where the app says dp or sp, because the drawing is
   1 dp = 1 px. Change `16px` to `14px` and it means 14 dp.
 * **Each block** carries an HTML comment naming the method that draws it, e.g.
-  `<!-- DrawerHome.menuRow("DECKS", "live link", …) -->`.
+  `<!-- DrawerHome.menuRow("PAIRED", "live link", …) -->`.
 * **Type** is monospace throughout on purpose: the deck is a terminal, so the
   phone is meant to read as the same instrument. A proportional face here would be
   a different design, not a restyle.
@@ -68,17 +68,20 @@ Be sceptical of anything here that is about *behaviour* rather than layout:
 If a design depends on one of those, describe it and I will mock the dialog in the
 page or note it as unverified until it runs on the phone.
 
-## Known rough edges worth a look
+## Settled in the last pass
 
-These are real in the app today, not drawing mistakes:
+Three rough edges this file used to list are now fixed in both the page and the
+Java, which is what the pair is for:
 
-* the project rows inside the expanded drawer are flush — `DrawerHome.projectRow`
-  gives them a fill and an 8dp radius but no gap, so five of them read as one
-  block;
-* the PROJECTS crumb repeats the section name (`PROJECTS › 2.4" CYD (RESISTIVE)`)
-  because the bar crumb already says `‹ OFF-SITE`; it could drop the first word;
-* the libraries card is taller than the first screen, so the shelf itself starts
-  below the fold on a 393 × 852 phone.
+* the drawer's project rows have a 6dp gap (`Ui.space(row, 6)`) instead of sitting
+  flush, where five of them read as one block — the fill is only 6% above the
+  ground, so the 8dp edge alone did not separate them;
+* the BOARDS crumb is now just the board (`2.4" CYD (RESISTIVE)`), not
+  `BOARDS › board`: the bar already says `‹ OFF-SITE` and the title already says
+  BOARDS;
+* the libraries card puts two copy buttons to a row at 11sp instead of three
+  full-width ones, and the hint is one sentence. The card is ~80dp shorter, so the
+  shelf starts on the first screen rather than under the fold.
 
-Fix any of these in `ui.html` first; they are cheap to try there and each is a
-handful of lines in the Java.
+If you disagree with any of those, they are three edits in `ui.html` — say which
+and why, and they go back the other way.
