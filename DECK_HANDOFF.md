@@ -50,3 +50,19 @@ python3 check_widget_assets.py
 `main` holds its own copies of both decks. Pick a change into the app tree and
 push it back, or work on top of `main` here, so the two copies do not drift. If
 they do, the sketches are the truth and the app copy is the stale one.
+
+## After a documentation-only deck change
+
+The widget `README.md` files and `CONVENTIONS.md` are sketch-side docs.
+`syncWidgets` copies only `widget.json` and the sketch that descriptor names, and
+`check_widget_assets.py` compares exactly those two files, so nothing under
+`android-companion/app/src/main/assets/widgets/` depends on a README. A
+docs-only deck commit therefore needs no `:app:syncWidgets`, no APK rebuild and no
+Java change to be correct; taking the commit anyway just keeps the two trees
+level, and the READMEs are how the next deck edit finds its numbers.
+
+The one way these docs can go stale in the app is if an app-side document quotes
+a deck's flash use. Say which core: the same Spotify sketch is 967,413 B on
+2.0.17 and 1,122,249 B on 3.3.12 — 73 % against 85 % of the 1,310,720-byte app
+slot. The deck READMEs hold the measured figures and the verified/unverified
+split, so point at them instead of copying numbers out.

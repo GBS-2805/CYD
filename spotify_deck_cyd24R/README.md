@@ -237,6 +237,12 @@ sketch from a desktop on 2026-10-31.
   by ~155 kB, which is the WiFi stack as IDF 5 links it rather than mbedTLS (see
   [the build note](../CONVENTIONS.md#build)); 2.0.17 is the one `toolchain.sh`
   pins, so that is where the release numbers come from.
+* **It still fits on 3.3.12, on about a third of the slack:** 1,122,249 bytes
+  against the 1,310,720-byte app slot the default scheme gives leaves
+  **188,471 B (14 %)** free, where 2.0.17 leaves 343,307 B (26 %). `default.csv`
+  sizes `app0` and `app1` at 1,310,720 each, so a wireless update faces the same
+  ceiling; under `huge_app` the same build reads 36 % — a bigger room, not
+  smaller code.
 * Seven warnings, all accounted for above.
 * The bundled copy in `app/src/main/assets/widgets/spotify_deck_cyd24R/` matches
   this folder byte for byte after `:app:syncWidgets`, and
