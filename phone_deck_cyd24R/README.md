@@ -393,9 +393,10 @@ from the repo root, after sourcing a toolchain.
 
 **Unverified — these need a board, and a phone:**
 
-* **Nothing has run on a phone since the HID removal and the new advertising
-  packet**, so the 28-byte packet and the scan-response name have never been
-  seen on the air.
+* **No run of this sketch on a phone has been confirmed since the HID removal
+  and the new advertising packet**, so the 28-byte packet and the scan-response
+  name have not been seen on the air in this build. A board did flash from
+  ArduinoDroid on 2026-10-31, but that record does not name the image.
 * The binding has never been exercised end to end: phone A binds, phone B is
   refused, the 1.2 s gear hold clears it, and a re-flash does not.
 * The touch mapping has not met a real panel, so every tap target here is
