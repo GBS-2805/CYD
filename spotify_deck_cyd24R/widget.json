@@ -6,7 +6,13 @@
   "board": "2432S024R",
   "tagline": "NEEDS WIFI",
   "body": "The network deck: it signs in to Spotify with a refresh token, draws what is playing and sends previous, play/pause and next from the screen's three chips. Mono ink on paper, same as its sibling.",
-  "notes": "First boot opens a WiFi access point called Spotify Deck and serves a setup page at http://192.168.4.1: join it from the phone, type the WiFi password and a Spotify client id and let it join your network. Then sign in at http://<deck-ip>/spotify: with this app installed Spotify's reply comes back to it and setup finishes in one tap, and without the app the page takes the address the browser lands on. No laptop. Hold the SETUP chip in the footer, or type setup + Enter at 115200, to run it again; hold the screen four seconds at boot to forget the stored credentials.",
+  "notes": "First boot opens a WiFi access point called Spotify Deck and serves a setup page at http://192.168.4.1: join it from the phone, type the WiFi password and a Spotify client id and let it join your network. Pair the deck in this app once with the address it prints, then SIGN IN starts the whole thing from here: Spotify's reply comes back to the app, the app hands the code to the deck and the deck stores the token. Without the app the page at http://<deck-ip>/spotify takes the address the browser lands on. Hold the SETUP chip in the footer, or type setup + Enter at 115200, to run it again; hold the screen four seconds at boot to forget the stored credentials.",
+  "lan": {
+    "role": "spotify",
+    "identity": "/deck.json",
+    "signIn": "/auth?app=1&json=1",
+    "page": "/spotify"
+  },
   "libraries": [
     "Adafruit GFX Library",
     "Adafruit ILI9341",

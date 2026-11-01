@@ -96,6 +96,7 @@ final class ProjectsTab extends ScrollView {
         }
         // Everything that changes what a card says, so a LOG or STATUS tap shows up.
         sig.append('v').append(ProjectStore.version(activity))
+                .append('d').append(DeckRegistry.version(activity))
                 .append('b').append(BoardCatalog.selectedIndex(activity))
                 .append('f').append(activeFilter)
                 .append('q').append(query)
@@ -415,6 +416,9 @@ final class ProjectsTab extends ScrollView {
             card.addView(libs);
         }
 
+        WidgetCatalog.Widget lan = WidgetCatalog.forProject(activity, project.id);
+        if (lan != null && lan.lan) card.addView(deckCard(lan));
+
         card.addView(logView(project));
 
         LinearLayout primary = Ui.row(activity);
@@ -593,6 +597,175 @@ final class ProjectsTab extends ScrollView {
                     .append(", touch=").append(FirmwareNotes.touchLabel(project.touch));
         }
         Actions.copyOrSay(activity, project.name + " recipe", text.toString());
+    }
+
+    /**
+     * The shelf's view of a deck that answers on the network: which boards are
+     * paired, what each said the last time it was asked, and the one action that
+     * starts its sign-in. Pairing is an address; the record is the board.
+     */
+    private LinearLayout deckCard(WidgetCatalog.Widget widget) {
+        LinearLayout card = Ui.card(activity);
+
+        TextView label = Ui.text(activity, "DECK", 10, Ui.DIM);
+        label.setLetterSpacing(0.14f);
+        card.addView(label);
+
+        List<DeckRegistry.Deck> decks = DeckRegistry.forWidget(activity, widget.id);
+        final long now = System.currentTimeMillis();
+        if (decks.isEmpty()) {
+            TextView empty = Ui.text(activity,
+                    "No deck paired yet. The deck prints its address on its setup page, "
+                            + "and in the serial log at 115200.", 11, Ui.DIM);
+            empty.setPadding(0, Ui.dp(activity, 6), 0, 0);
+            empty.setLineSpacing(Ui.dp(activity, 2), 1f);
+            card.addView(empty);
+        } else {
+            for (DeckRegistry.Deck deck : decks) {
+                // Two lines and then a row of buttons: beside a name this narrow,
+                // two buttons left the detail clipped to its first field.
+                LinearLayout row = Ui.column(activity);
+                row.setPadding(0, Ui.dp(activity, 8), 0, 0);
+
+                row.addView(Ui.text(activity, deck.name() + " \u00B7 " + deck.tag,
+                        13, Ui.TEXT));
+                TextView detail = Ui.text(activity, deck.detail(now), 11,
+                        deck.signed ? Ui.GOOD : Ui.DIM);
+                detail.setPadding(0, Ui.dp(activity, 2), 0, 0);
+                detail.setLineSpacing(Ui.dp(activity, 2), 1f);
+                row.addView(detail);
+
+                LinearLayout buttons = Ui.row(activity);
+                buttons.setPadding(0, Ui.dp(activity, 8), 0, 0);
+
+                Button signIn = Ui.action(activity, "SIGN IN", !deck.signed);
+                signIn.setOnClickListener(v -> signIn(deck));
+                buttons.addView(signIn);
+
+                Button forget = Ui.action(activity, "FORGET", false);
+                forget.setOnClickListener(v -> {
+                    DeckRegistry.forget(activity, deck.id);
+                    signature = "";
+                    refresh();
+                });
+                buttons.addView(forget, spaced(8));
+                row.addView(buttons);
+                card.addView(row);
+            }
+        }
+
+        Button pair = Ui.action(activity, "PAIR A DECK", false);
+        pair.setOnClickListener(v -> pairDeck(widget));
+        Ui.space(activity, pair, 10);
+        card.addView(pair);
+
+        TextView hint = Ui.text(activity,
+                "One record per board: a deck's address can move, its tag cannot.",
+                11, Ui.DIM);
+        hint.setPadding(0, Ui.dp(activity, 8), 0, 0);
+        hint.setLineSpacing(Ui.dp(activity, 2), 1f);
+        card.addView(hint);
+
+        Ui.space(activity, card, 10);
+        return card;
+    }
+
+    /** Asks for the address the deck printed, then reads which board answered. */
+    private void pairDeck(WidgetCatalog.Widget widget) {
+        List<DeckRegistry.Deck> known = DeckRegistry.forWidget(activity, widget.id);
+        EditText field = new EditText(activity);
+        field.setHint(known.isEmpty() ? "192.168.1.50" : known.get(0).host);
+        field.setSingleLine(true);
+        field.setInputType(InputType.TYPE_CLASS_TEXT);
+        field.setTextSize(14);
+        field.setPadding(Ui.dp(activity, 18), Ui.dp(activity, 8), Ui.dp(activity, 18), 0);
+
+        new AlertDialog.Builder(activity)
+                .setTitle("Pair a deck")
+                .setMessage("The address the deck prints on its setup page. The phone has "
+                        + "to be on the same WiFi as the deck.")
+                .setView(field)
+                .setPositiveButton("Pair",
+                        (dialog, which) -> readAndPair(widget, field.getText().toString()))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void readAndPair(WidgetCatalog.Widget widget, String typed) {
+        final String host = LanDeck.host(typed);
+        if (host.isEmpty()) {
+            Actions.toast(activity, "That is not a LAN address, e.g. 192.168.1.50");
+            return;
+        }
+        Actions.toast(activity, "Asking " + host + "\u2026");
+        new Thread(() -> {
+            final LanDeck.Reply reply = LanDeck.fetch(LanDeck.url(host, widget.identityPath));
+            activity.runOnUiThread(() -> applyPair(widget, host, reply));
+        }, "deck-pair").start();
+    }
+
+    /** What answered at that address decides: a deck of this widget, or nothing. */
+    private void applyPair(WidgetCatalog.Widget widget, String host, LanDeck.Reply reply) {
+        if (reply.status != 200) {
+            Actions.toast(activity, reply.why(host));
+            return;
+        }
+        LanDeck.Identity identity = LanDeck.parse(reply.body);
+        if (!identity.usable()) {
+            Actions.toast(activity, "Something answered at " + host + ", but it is not a deck.");
+            return;
+        }
+        if (!widget.id.equals(identity.widget)) {
+            Actions.toast(activity,
+                    "That deck runs " + identity.widget + ", not " + widget.id + ".");
+            return;
+        }
+        DeckRegistry.Deck deck = new DeckRegistry.Deck();
+        deck.id = identity.id;
+        deck.widget = identity.widget;
+        deck.tag = identity.tag;
+        deck.label = identity.label;
+        deck.host = host;
+        deck.ip = identity.ip;
+        deck.signed = identity.signed;
+        deck.setup = identity.setup;
+        deck.seenMs = System.currentTimeMillis();
+        DeckRegistry.upsert(activity, deck);
+        signature = "";
+        refresh();
+        Actions.toast(activity, "Paired " + identity.label + " " + identity.tag);
+    }
+
+    /**
+     * Starts the sign-in the deck's own page offers, without the page. The deck
+     * builds the authorize URL and keeps the PKCE verifier, so the app only asks for
+     * the URL and opens it; the code comes back through the custom scheme and
+     * {@link SpotifyCallbackActivity} finishes it.
+     */
+    private void signIn(DeckRegistry.Deck deck) {
+        if (deck.signed && !deck.setup) {
+            Actions.toast(activity, "That deck is already signed in. Hold SETUP on it to "
+                    + "sign in to another account.");
+            return;
+        }
+        final String host = deck.host;
+        Actions.toast(activity, "Asking the deck for a sign-in link\u2026");
+        new Thread(() -> {
+            final LanDeck.Reply reply = LanDeck.fetch(LanDeck.signInUrl(host));
+            activity.runOnUiThread(() -> {
+                if (reply.status == 404) {
+                    Actions.toast(activity, "The deck is signed in and out of setup, so it "
+                            + "has no sign-in page. Hold SETUP on it first.");
+                    return;
+                }
+                final String url = reply.url();
+                if (url.isEmpty()) {
+                    Actions.toast(activity, reply.why(host));
+                    return;
+                }
+                Actions.openUrl(activity, url);
+            });
+        }, "deck-sign-in").start();
     }
 
     /**

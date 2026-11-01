@@ -497,7 +497,20 @@ figcaption span { color: #6d6d6d; }
         <div class="proj__name">Bruce</div>
       </div>
 
-      <!-- the open accordion: body, needs, log, then two button rows -->
+      <div class="proj">
+        <div class="proj__head">
+          <div class="proj__meta">
+            <div class="tag">INSIDE APP</div>
+            <div class="proj__status s-good">WORKING</div>
+          </div>
+          <div class="proj__fold">+</div>
+        </div>
+        <div class="proj__name">Phone Deck &middot; 2.4&quot; CYD (resistive)</div>
+      </div>
+
+      <!-- the open accordion: body, the DECK block, needs, log, then two button
+           rows. Spotify is the deck with a network face, so it is the one this
+           frame opens. -->
       <div class="proj">
         <div class="proj__head">
           <div class="proj__meta">
@@ -506,10 +519,24 @@ figcaption span { color: #6d6d6d; }
           </div>
           <div class="proj__fold">&minus;</div>
         </div>
-        <div class="proj__name">Phone Deck &middot; 2.4&quot; CYD (resistive)</div>
+        <div class="proj__name">Spotify Deck &middot; 2.4&quot; CYD (resistive)</div>
 
-        <div class="proj__body">A desk dashboard for your phone: clock, battery and
-          notifications, set like a woodblock print in two monochrome themes.</div>
+        <div class="proj__body">What you are playing on Spotify, with previous /
+          play / next on the screen.</div>
+
+        <!-- ProjectsTab.deckCard(): one row per paired board, keyed by its tag -->
+        <div class="label" style="padding:0">DECK</div>
+        <div class="proj__name" style="font-size:13px">Spotify Deck &middot; A1B2C3</div>
+        <div class="proj__log s-good">A1B2C3 &nbsp; &middot; &nbsp; 192.168.1.50
+          &nbsp; &middot; &nbsp; signed in &nbsp; &middot; &nbsp; 4m ago</div>
+        <div class="row-actions">
+          <div class="action action--primary">SIGN IN</div>
+          <div class="action">FORGET</div>
+        </div>
+        <div class="action action--full mt-10">PAIR A DECK</div>
+        <div class="hint mt-8">One record per board: a deck's address can move,
+          its tag cannot.</div>
+
         <div class="proj__needs">NEEDS&nbsp; Adafruit GFX Library, Adafruit
           ILI9341, XPT2046_Touchscreen</div>
         <div class="proj__log s-good">TOUCH: WORKS &nbsp; &middot; &nbsp; BUILD:
@@ -524,17 +551,6 @@ figcaption span { color: #6d6d6d; }
           <div class="action">STATUS</div>
         </div>
       </div>
-
-      <div class="proj">
-        <div class="proj__head">
-          <div class="proj__meta">
-            <div class="tag">INSIDE APP</div>
-            <div class="proj__status s-good">WORKING</div>
-          </div>
-          <div class="proj__fold">+</div>
-        </div>
-        <div class="proj__name">Spotify Deck &middot; 2.4&quot; CYD (resistive)</div>
-      </div>
     </div>
 
     <div class="fold"><span>852 dp</span></div>
@@ -545,7 +561,10 @@ figcaption span { color: #6d6d6d; }
     and a <code>+</code>. Opening adds the notes, what it needs, the last log line
     and the actions. <code>COPY DROID</code> / <code>SAVE</code> only exist for a
     deck bundled inside the APK; an outside project gets
-    <code>INSTALLER</code> / <code>SOURCE</code> / <code>RECIPE</code> instead.
+    <code>INSTALLER</code> / <code>SOURCE</code> / <code>RECIPE</code> instead. A
+    <code>lan</code> widget also carries the <code>DECK</code> block: the paired
+    board's tag, address and state, with <code>SIGN IN</code>,
+    <code>FORGET</code> and <code>PAIR A DECK</code>.
   </figcaption>
 </figure>
 

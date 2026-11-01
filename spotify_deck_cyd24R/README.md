@@ -48,6 +48,31 @@ before", Spotify, February 2025) and it is the only kind of redirect a browser
 will hand to an app, which is what makes the one-tap path possible. Leave the
 client secret alone: the page signs in with PKCE (S256), which does not use one.
 
+## Pairing, and signing in from the app
+
+The app can start the sign-in instead of you finding the deck's page. It needs the
+deck's address once; after that the deck is a row on the shelf, and the row is
+tracked by the board rather than by the address.
+
+1. **Pair.** On the shelf, open **Spotify Deck**, tap **PAIR A DECK** and type the
+   address the deck printed (the setup page's step 2 and the serial log at 115200
+   both show it). The app reads `http://<deck-ip>/deck.json` and keeps what the
+   deck says it is — `spotify_deck_cyd24R-A1B2C3`, where the tag is the low 24 bits
+   of that board's efuse MAC. That id is what the shelf tracks, so two Spotify
+   decks are two rows and a deck that changes address keeps one.
+2. **Sign in.** Tap `SIGN IN`. The app asks the deck for its authorize URL
+   (`/auth?app=1&json=1`) and opens it, so the reply still comes back to the app
+   and the app still hands the code to the deck. The PKCE verifier and the token
+   stay on the board: the app never sees either.
+3. The deck exchanges the code, stores the refresh token and restarts. The row now
+   reads *signed in*.
+
+The row is only as live as the deck: one that is off, asleep or on another network
+shows the last state it reported and how long ago that was. `/deck.json` answers in
+setup **and** in the player, but `/auth`, `/code` and `/spotify` belong to setup — a
+deck that is already playing has no sign-in page, so hold the footer `SETUP` chip
+to get one back. The app says that rather than failing quietly.
+
 ## First run: the setup page
 
 With no stored credentials the deck draws a SETUP card, raises an **open** WiFi

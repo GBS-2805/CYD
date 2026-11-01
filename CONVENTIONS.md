@@ -259,6 +259,36 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
   peripherals, not keyboards. A design that makes Android treat the board as an
   input device gets the link dropped.
 
+## Deck identity
+
+* **A deck is a board, not an address.** The identity is the low 24 bits of the
+  efuse MAC as six hex digits — `A1B2C3` — the same tag the Bluetooth deck puts in
+  the name it advertises. A network deck puts it in its id instead:
+  `spotify_deck_cyd24R-A1B2C3`. Two boards of one widget are two decks; a re-flash
+  keeps the id, so the address is only ever a cache of where that id was last
+  seen.
+* **A network deck answers `GET /deck.json`** with one line of JSON: `id`,
+  `widget`, `tag`, `name`, `role`, `board`, `ip`, `setup`, `signed`. Nothing
+  secret — no token, no password, no client id — so the app can ask any address
+  who lives there.
+* **It is served in setup and in the player.** Setup already runs the page server
+  on port 80; the player runs a listener that answers this one path and 404s
+  everything else, because the sign-in pages belong to setup. Its read gives up
+  after a second, so a stray connection cannot hold the poll loop.
+* **The sign-in URL is the deck's.** `GET /auth?app=1&json=1` answers the
+  authorize URL as text — `409` and `refused: <why>` when it cannot build one — so
+  an app can open it without scraping a page. The PKCE verifier never leaves the
+  board, which is exactly why the app asks for the URL instead of minting its own.
+* **The app keys its records by id and rewrites the address.** The shelf's card
+  for a widget with a `lan` block pairs by typed address, reads `/deck.json` to
+  learn which board answered, and stores `{id, widget, tag, address, state, age}`.
+  An id seen at a new address moves its record; a *different* id seen at a known
+  address replaces the stale one, because two decks cannot honestly share an
+  address at the same moment.
+* A descriptor declares its network face in a `lan` block (`role`, `identity`,
+  `signIn`, `page`), so the shelf draws that section from the widget instead of
+  from a list in Java.
+
 ## Working in this repo
 
 * One widget per change. A change touching two widget folders is two changes.
@@ -302,6 +332,12 @@ the front page needs no second navigation.
   descriptors and never retyped in Java. Each library is a button that copies the
   exact name ArduinoDroid's library list searches for, and the ArduinoBLE warning
   stays under it.
+* **A network deck is paired by address and tracked by tag.** A `lan` widget's
+  card carries a `DECK` block: one row per paired board (`tag · address · state ·
+  age`), with `SIGN IN` and `FORGET`, then `PAIR A DECK`, which asks for the
+  address the deck printed. `SIGN IN` fetches the deck's own authorize URL and
+  opens it, so the custom scheme still returns into this app; a deck that is
+  signed in and out of setup says so instead of asking a page it does not serve.
 * **Every UI change ships a render, embedded in the chat.** Draw the screens it
   touches with `android-companion/render_ui.py`, which reads its colours and
   metrics from `Ui.java`, and keep the PNGs in `artifacts/renders/`. Then *show*

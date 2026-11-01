@@ -11,13 +11,6 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-
 /**
  * Catches the Spotify deck's sign-in redirect and finishes it.
  *
@@ -153,12 +146,18 @@ public class SpotifyCallbackActivity extends Activity {
     private void deliver(String code, String deck) {
         final String url = SpotifyLink.codeUrl(deck, code);
         worker = new Thread(() -> {
-            final String answer = fetch(url);
+            final String answer = LanDeck.fetch(url, CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS)
+                    .answer();
             handler.post(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 if (answer.startsWith("200") && answer.contains("signed-in")) {
                     note("Signed in. The deck is storing the token and restarting…",
                             Ui.TEXT);
+                    // The sign-in is also the pairing: ask the deck which board it is
+                    // while it is still awake, and keep that as this phone's record of
+                    // which deck the address belongs to.
+                    new Thread(() -> DeckRegistry.rememberLan(getApplicationContext(), deck),
+                            "deck-register").start();
                     handler.postDelayed(this::finish, 1200);
                 } else if (answer.startsWith("409")) {
                     fail(readable(answer));
@@ -172,37 +171,8 @@ public class SpotifyCallbackActivity extends Activity {
         worker.start();
     }
 
-    /** The deck's answer as {@code "<status> <body>"}, or "" when none arrived. */
-    private static String fetch(String url) {
-        HttpURLConnection connection = null;
-        try {
-            connection = (HttpURLConnection) new URL(url).openConnection();
-            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
-            connection.setReadTimeout(READ_TIMEOUT_MS);
-            connection.setUseCaches(false);
-            connection.setRequestProperty("Cache-Control", "no-store");
-            final int status = connection.getResponseCode();
-            final InputStream stream = status >= 400
-                    ? connection.getErrorStream() : connection.getInputStream();
-            if (stream == null) return "";
-            final StringBuilder body = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null && body.length() < 400) {
-                    if (body.length() > 0) body.append(' ');
-                    body.append(line.trim());
-                }
-            }
-            return status + " " + body;
-        } catch (Exception e) {
-            // No answer rather than a refusal: a sleeping deck, the wrong network,
-            // or a phone that moved to mobile data. The caller still has a browser.
-            return "";
-        } finally {
-            if (connection != null) connection.disconnect();
-        }
-    }
+    // The request itself lives in LanDeck, beside the identity read: one place in the
+    // app knows how to talk to a deck on the LAN.
 
     /** {@code "409 refused: Spotify said no"} becomes {@code "Spotify said no"}. */
     private static String readable(String answer) {

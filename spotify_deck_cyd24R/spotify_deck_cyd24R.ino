@@ -1312,11 +1312,13 @@ static void pumpSetupWizard() {
 //   GET  /net      the form, even when a client id is already stored
 //   POST /save     store the network and the client id, join the network
 //   GET  /spotify  join state, the Spotify link and the paste box
-//   GET  /auth     302 to Spotify with a fresh S256 challenge (app=1: app scheme)
+//   GET  /auth     302 to Spotify with a fresh S256 challenge (app=1: app scheme);
+//                  &json=1 answers that URL as text, so the app can open it
 //   POST /code     exchange the pasted code, store the token, reboot
-//   GET  /code     the same exchange for the app, which hands its code back;
+//   GET  /code     the same exchange for the app, which hands its code back
+//                  through the phone's browser instead of opening a socket;
 //                  &json=1 asks for a one-line answer instead of a page
-//                  through the phone's browser instead of opening a socket
+//   GET  /deck.json  what this board is - served in setup *and* in the player
 //
 // The access point is open on purpose: the page is where the credentials are
 // typed, it exists only while the deck is in setup, and it never renders a
@@ -1337,10 +1339,30 @@ static constexpr char OAUTH_SCOPES[] =
     "user-read-currently-playing";
 
 static WiFiServer setupServer(80);
+static WiFiServer idServer(80);  // player mode: /deck.json and nothing else
+static bool idServerUp = false;
 static WiFiClientSecure webTls;  // not the poller's client: another task owns that
 static bool webSetupActive = false;
 static String pkceVerifier;
 static uint32_t setupRebootMs = 0;
+
+// ---------------------------------------------------------------- identity ---
+// A deck is a board, not an address. DHCP moves, so the app keys its records by
+// `<widget>-<TAG>`, the same low 24 bits of the efuse MAC that the Bluetooth deck
+// puts in the name it advertises. Two Spotify decks are two ids, and re-flashing
+// a board keeps its id while only the address changes.
+static constexpr char DECK_WIDGET[] = "spotify_deck_cyd24R";
+static constexpr char DECK_NAME[] = "Spotify Deck";
+static constexpr char DECK_BOARD[] = "2432S024R";
+static constexpr char DECK_ROLE[] = "spotify";
+static char deckTag[7] = "000000";
+
+static void initDeckIdentity() {
+  snprintf(deckTag, sizeof(deckTag), "%06X",
+           static_cast<unsigned>(ESP.getEfuseMac() & 0xFFFFFF));
+}
+
+static String deckId() { return String(DECK_WIDGET) + "-" + deckTag; }
 
 static String htmlEscape(const char *text) {
   String out;
@@ -1835,24 +1857,23 @@ static void handleWebWipe(WiFiClient &client) {
   setupRebootMs = millis() + 1500;
 }
 
-static void handleWebAuth(WiFiClient &client, bool appRedirect) {
-  if (creds.clientId[0] == '\0') {
-    sendMessagePage(client, "No client id",
-                    "Save the network and the client id on the first page first.",
-                    true);
-    return;
-  }
+// Builds the authorize URL and stores the verifier it belongs to. An empty
+// result comes with `heading` and `why` set, because both callers have to say
+// what was wrong rather than hand back nothing.
+static String buildAuthUrl(bool appRedirect, const char *&heading,
+                           const char *&why) {
+  heading = "No client id";
+  why = "Save the network and the client id on the first page first.";
+  if (creds.clientId[0] == '\0') return "";
+
   pkceVerifier = makeVerifier();
   // Stored before the redirect: everything after this point happens on the
   // phone, out of the deck's control.
   saveVerifier(pkceVerifier);
   const String challenge = pkceChallenge(pkceVerifier);
-  if (challenge.length() == 0) {
-    sendMessagePage(client, "No challenge",
-                    "The SHA-256 behind the PKCE challenge could not be built.",
-                    true);
-    return;
-  }
+  heading = "No challenge";
+  why = "The SHA-256 behind the PKCE challenge could not be built.";
+  if (challenge.length() == 0) return "";
 
   const char *redirectUri =
       appRedirect ? OAUTH_REDIRECT_APP : OAUTH_REDIRECT_PASTE;
@@ -1870,11 +1891,73 @@ static void handleWebAuth(WiFiClient &client, bool appRedirect) {
   url += urlEncode(OAUTH_SCOPES);
   url += "&code_challenge_method=S256&code_challenge=";
   url += challenge;
+  return url;
+}
+
+static void handleWebAuth(WiFiClient &client, bool appRedirect) {
+  const char *heading = "";
+  const char *why = "";
+  const String url = buildAuthUrl(appRedirect, heading, why);
+  if (url.length() == 0) {
+    sendMessagePage(client, heading, why, true);
+    return;
+  }
 
   Serial.println("[setup] handing the phone to Spotify");
   client.print(F("HTTP/1.1 302 Found\r\nLocation: "));
   client.print(url);
   client.print(F("\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"));
+}
+
+// The same URL as text, for the app. The PKCE verifier stays on the board, so the
+// app cannot mint this itself — but it can open what the deck hands it, which is
+// the whole of "sign in from the app". A browser asking without json=1 still gets
+// the 302 above.
+static void sendAuthUrl(WiFiClient &client, bool appRedirect) {
+  const char *heading = "";
+  const char *why = "";
+  const String url = buildAuthUrl(appRedirect, heading, why);
+  if (url.length() == 0) {
+    client.print(F("HTTP/1.1 409 Conflict\r\nContent-Type: text/plain\r\n"
+                   "Cache-Control: no-store\r\nConnection: close\r\n\r\n"
+                   "refused: "));
+    client.print(why);
+    client.print('\n');
+    return;
+  }
+  client.print(F("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n"
+                 "Cache-Control: no-store\r\nConnection: close\r\n\r\n"));
+  client.print(url);
+  client.print('\n');
+}
+
+// What the app asks for to know which deck it is talking to. No token, no
+// password, no client id: an id, the widget that is flashed, the address and the
+// two states that decide what the app can offer. Served in setup and in the
+// player, because a deck that is already playing is exactly the one the app
+// needs to keep apart from the deck on the bench.
+static void sendDeckJson(WiFiClient &client) {
+  client.print(F("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                 "Cache-Control: no-store\r\nConnection: close\r\n\r\n"));
+  client.print(F("{\"id\":\""));
+  client.print(deckId());
+  client.print(F("\",\"widget\":\""));
+  client.print(DECK_WIDGET);
+  client.print(F("\",\"tag\":\""));
+  client.print(deckTag);
+  client.print(F("\",\"name\":\""));
+  client.print(DECK_NAME);
+  client.print(F("\",\"role\":\""));
+  client.print(DECK_ROLE);
+  client.print(F("\",\"board\":\""));
+  client.print(DECK_BOARD);
+  client.print(F("\",\"ip\":\""));
+  if (WiFi.status() == WL_CONNECTED) client.print(WiFi.localIP().toString());
+  client.print(F("\",\"setup\":"));
+  client.print(setupActive ? F("true") : F("false"));
+  client.print(F(",\"signed\":"));
+  client.print(creds.refresh[0] != '\0' ? F("true") : F("false"));
+  client.print(F("}\n"));
 }
 
 // What the page's live line asks for. no-store, because the whole point is the
@@ -1974,7 +2057,13 @@ static void handleWebRequest(WiFiClient &client) {
   } else if (method == "POST" && path == "/wipe") {
     handleWebWipe(client);
   } else if (method == "GET" && path == "/auth") {
-    handleWebAuth(client, appRedirect);
+    if (plainReply) {
+      sendAuthUrl(client, appRedirect);
+    } else {
+      handleWebAuth(client, appRedirect);
+    }
+  } else if (method == "GET" && path == "/deck.json") {
+    sendDeckJson(client);
   } else if (method == "GET" && path == "/net") {
     sendNetworkPage(client);
   } else if (method == "GET" && path == "/spotify") {
@@ -2066,6 +2155,54 @@ static void pumpCaptiveDns() {
   dnsUdp.endPacket();
 }
 
+// Player mode answers one path and nothing else: the sign-in pages belong to
+// setup, so a deck that is already playing has no /auth, /code or /spotify to
+// reach. Every other path is a 404, and the read gives up after a second so a
+// stray connection cannot hold the panel's poll loop.
+static void ensureIdServer() {
+  if (idServerUp || setupActive || WiFi.status() != WL_CONNECTED) return;
+  idServer.begin();
+  idServer.setNoDelay(true);
+  idServerUp = true;
+  Serial.printf("[id] answering /deck.json as %s on %s\n", deckId().c_str(),
+                WiFi.localIP().toString().c_str());
+}
+
+static void pumpIdServer() {
+  if (!idServerUp) return;
+  WiFiClient client = idServer.accept();
+  if (!client) return;
+
+  const uint32_t startMs = millis();
+  String requestLine;
+  while (requestLine.length() == 0 &&
+         static_cast<int32_t>(millis() - startMs) < 1000) {
+    if (!client.available()) {
+      delay(2);
+      continue;
+    }
+    requestLine = client.readStringUntil('\n');
+  }
+  requestLine.trim();
+  const int firstSpace = requestLine.indexOf(' ');
+  const int secondSpace =
+      firstSpace < 0 ? -1 : requestLine.indexOf(' ', firstSpace + 1);
+  String path = secondSpace > firstSpace
+                    ? requestLine.substring(firstSpace + 1, secondSpace)
+                    : String("");
+  const int query = path.indexOf('?');
+  if (query >= 0) path.remove(query);
+
+  if (path == "/deck.json") {
+    sendDeckJson(client);
+  } else {
+    client.print(F("HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n"
+                   "Cache-Control: no-store\r\nConnection: close\r\n\r\n"
+                   "a signed-in deck answers only /deck.json\n"));
+  }
+  client.stop();
+}
+
 static void pumpWebSetup() {
   if (!webSetupActive) return;
   if (setupRebootMs != 0 &&
@@ -2081,6 +2218,11 @@ static void pumpWebSetup() {
 }
 
 static void startWebSetup() {
+  // The player-mode listener holds port 80 until setup owns it again.
+  if (idServerUp) {
+    idServer.end();
+    idServerUp = false;
+  }
   webSetupActive = true;
   WiFi.persistent(false);
   WiFi.mode(WIFI_AP_STA);
@@ -2485,6 +2627,7 @@ void setup() {
 
   touch.begin(SPI);
 
+  initDeckIdentity();
   loadMapping();
   loadCredentials();
 
@@ -2512,6 +2655,7 @@ void setup() {
 
   Serial.printf("[id] Spotify Deck, esp32 // %08lx\n",
                 static_cast<unsigned long>(ESP.getEfuseMac()));
+  Serial.printf("[id] %s\n", deckId().c_str());
   drawNow();
   ensureNetTask();
 }
@@ -2530,6 +2674,11 @@ void loop() {
   }
   pumpSerialCommand();
   if (setupActive) return;
+
+  // Identity first: it is one accept() on a socket that is usually idle, and it
+  // is what lets the app tell this deck from another one on the same network.
+  ensureIdServer();
+  pumpIdServer();
 
   int x = 0, y = 0;
   const bool down = readTouch(x, y);

@@ -49,6 +49,11 @@ final class WidgetCatalog {
         List<String> never = new ArrayList<>();
         List<String> nameMatch = new ArrayList<>();
         UUID service;
+        /** True when this deck answers on the network instead of over BLE. */
+        boolean lan;
+        String role = "";
+        String identityPath = "/deck.json";
+        String signInPath = "/auth?app=1&json=1";
 
         boolean usable() {
             return !id.isEmpty() && !sketch.isEmpty();
@@ -147,6 +152,17 @@ final class WidgetCatalog {
             if (ble != null) {
                 readInto(ble.optJSONArray("nameMatch"), widget.nameMatch, true);
                 widget.service = uuidOrNull(ble.optString("service", ""));
+            }
+            // A network deck says so in its descriptor, so the shelf's remote
+            // section is drawn from the widget rather than from a list in Java.
+            JSONObject lan = root.optJSONObject("lan");
+            if (lan != null) {
+                widget.lan = true;
+                widget.role = lan.optString("role", "").trim();
+                String identity = lan.optString("identity", "/deck.json").trim();
+                if (!identity.isEmpty()) widget.identityPath = identity;
+                String signIn = lan.optString("signIn", "/auth?app=1&json=1").trim();
+                if (!signIn.isEmpty()) widget.signInPath = signIn;
             }
             return widget;
         } catch (JSONException e) {

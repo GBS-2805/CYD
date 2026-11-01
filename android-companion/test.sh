@@ -36,6 +36,7 @@ mkdir -p "$OUT/src/dev/phonedesk/companion" "$OUT/classes"
 # handed. Only these two files are compiled: the rest of the app is Android.
 cp "$PKG/EspRom.java" "$OUT/src/dev/phonedesk/companion/"
 cp "$PKG/SpotifyLink.java" "$OUT/src/dev/phonedesk/companion/"
+cp "$PKG/LanDeck.java" "$OUT/src/dev/phonedesk/companion/"
 cp "$HERE/test/stub/UsbSerialCh340.java" "$OUT/src/dev/phonedesk/companion/"
 cp "$HERE/test/HostTests.java" "$OUT/src/dev/phonedesk/companion/"
 
@@ -43,6 +44,7 @@ printf '\n== host tests (%s)\n' "$("$BIN/java" -version 2>&1 | awk -F'"' 'NR == 
 "$BIN/javac" -encoding UTF-8 -d "$OUT/classes" \
   "$OUT/src/dev/phonedesk/companion/EspRom.java" \
   "$OUT/src/dev/phonedesk/companion/SpotifyLink.java" \
+  "$OUT/src/dev/phonedesk/companion/LanDeck.java" \
   "$OUT/src/dev/phonedesk/companion/UsbSerialCh340.java" \
   "$OUT/src/dev/phonedesk/companion/HostTests.java"
 "$BIN/java" -cp "$OUT/classes" dev.phonedesk.companion.HostTests

@@ -89,8 +89,8 @@ def font(sp, bold=False):
 class Screen:
     """A 393 x 852 dp canvas with the card, text and button primitives."""
 
-    def __init__(self):
-        self.image = Image.new("RGB", (px(W_DP), px(H_DP)), BG)
+    def __init__(self, height_dp=H_DP):
+        self.image = Image.new("RGB", (px(W_DP), px(height_dp)), BG)
         self.draw = ImageDraw.Draw(self.image)
 
     # -- primitives --------------------------------------------------------
@@ -253,7 +253,11 @@ def drawer_panel(s, y):
 
 
 def projects(open_first=False):
-    s = Screen()
+    # The opened card sits several screens down, so that frame is drawn on a taller
+    # canvas and cropped to the scroll position afterwards — the same thing the
+    # shelf does when a thumb scrolls to it, with the top bar staying put.
+    s = Screen(1800 if open_first else H_DP)
+    open_top = None
     s.top_bar("\u2039  OFF-SITE")
     # Title, then which board this shelf belongs to, then the hint. The crumb no
     # longer leads with the section name: the title says it and the bar carries
@@ -329,14 +333,21 @@ def projects(open_first=False):
          "screen."),
     ]
     for index, (kind, status, name, body) in enumerate(projects_list):
-        # The bundled deck is the one with notes worth opening in a render.
-        open_card = open_first and name.startswith("Phone Deck")
+        # The network deck is the one with a remote face worth opening in a render.
+        open_card = open_first and name.startswith("Spotify Deck")
+        if open_card:
+            open_top = y
         head_h = 12 + 10 * 1.45 + 6 + 16 * 1.45 + 12
         if open_card:
-            head_h += 3 * (12 * 1.45 + 2) + 8      # body
-            head_h += 11 * 1.45 + 8                 # needs
-            head_h += 11 * 1.45 + 8                 # log
-            head_h += 10 + 35 + 8 + 35 + 10         # primary row
+            head_h += 2 * (12 * 1.45 + 2) + 8         # body, two short lines
+            head_h += 4 + 10 * 1.45 + 8               # DECK label
+            head_h += 13 * 1.45 + 2 + 11 * 1.45        # the deck's name and detail
+            head_h += 8 + 35                           # SIGN IN / FORGET
+            head_h += 10 + 35                          # PAIR A DECK
+            head_h += 8 + 2 * (11 * 1.45 + 2)          # the tag hint, two lines
+            head_h += 6 + 2 * (11 * 1.45 + 2)          # needs, two lines
+            head_h += 4 + 11 * 1.45 + 2                # the log line
+            head_h += 8 + 35 + 8 + 35 + 12             # both action rows
         s.card(16, y, W_DP - 32, head_h)
         tx = 30
         kind_w = s.width(kind, 10, spacing=0.12) + 12
@@ -350,7 +361,23 @@ def projects(open_first=False):
         if open_card:
             inner = y + 12 + 10 * 1.45 + 6 + 16 * 1.45 + 6
             inner = s.paragraph(30, inner, body, 12, DIM, W_DP - 60)
-            inner = s.paragraph(30, inner + 4, "NEEDS  Adafruit GFX Library, Adafruit "
+            # ProjectsTab.deckCard(): a paired board is two lines and then its own
+            # row of buttons, because two buttons beside a name clip the detail.
+            s.text(30, inner + 4, "DECK", 10, DIM, spacing=0.14)
+            row_y = inner + 4 + 10 * 1.45 + 8
+            s.text(30, row_y, "Spotify Deck \u00b7 A1B2C3", 13, TEXT)
+            s.text(30, row_y + 13 * 1.45 + 2,
+                   "A1B2C3  \u00b7  192.168.1.50  \u00b7  signed in  \u00b7  4m ago",
+                   11, GOOD)
+            button_y = row_y + 13 * 1.45 + 2 + 11 * 1.45 + 8
+            s.button(30, button_y, s.width("SIGN IN", 13) + 28, "SIGN IN")
+            s.button(30 + s.width("SIGN IN", 13) + 36, button_y,
+                     s.width("FORGET", 13) + 28, "FORGET")
+            s.button(30, button_y + 35 + 10, W_DP - 60, "PAIR A DECK")
+            inner = s.paragraph(30, button_y + 35 + 10 + 35 + 8,
+                                "One record per board: a deck's address can move, "
+                                "its tag cannot.", 11, DIM, W_DP - 60)
+            inner = s.paragraph(30, inner + 6, "NEEDS  Adafruit GFX Library, Adafruit "
                                 "ILI9341, XPT2046_Touchscreen", 11, ACCENT,
                                 W_DP - 60)
             inner = s.paragraph(30, inner + 4, "TOUCH: WORKS   ·   BUILD: 2432S024R-v2.1"
@@ -364,6 +391,14 @@ def projects(open_first=False):
             s.button(30 + s.width("LOG", 13) + 36, inner, s.width("STATUS", 13) + 28,
                      "STATUS")
         y += head_h + 8
+
+    if open_first and open_top is not None:
+        scroll = max(0, open_top - 70)
+        image = s.image.crop((0, px(scroll), px(W_DP), px(scroll + H_DP)))
+        bar = Screen()
+        bar.top_bar("\u2039  OFF-SITE")
+        image.paste(bar.image.crop((0, 0, px(W_DP), px(70))), (0, 0))
+        return image
     return s.image
 
 

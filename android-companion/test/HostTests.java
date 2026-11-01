@@ -49,6 +49,8 @@ public final class HostTests {
         downloadBootAsksForASecondHost();
         spotifyCallbackLink();
         spotifyCallbackUrl();
+        deckIdentity();
+        deckAddresses();
 
         System.out.println();
         if (failures.isEmpty()) {
@@ -362,6 +364,65 @@ public final class HostTests {
         check("the hand-off keeps the deck's port",
                 SpotifyLink.codeUrl("192.168.4.1:8080", "c")
                         .startsWith("http://192.168.4.1:8080/code?"));
+    }
+
+    /**
+     * The identity document is what tells two decks apart, so the parser is held to
+     * the line the sketch prints: the id carries the tag, the booleans read as
+     * booleans, and a document that names no deck is refused rather than guessed at.
+     */
+    private static void deckIdentity() {
+        final String json = "{\"id\":\"spotify_deck_cyd24R-A1B2C3\","
+                + "\"widget\":\"spotify_deck_cyd24R\",\"tag\":\"A1B2C3\","
+                + "\"name\":\"Spotify Deck\",\"role\":\"spotify\","
+                + "\"board\":\"2432S024R\",\"ip\":\"192.168.1.50\","
+                + "\"setup\":false,\"signed\":true}";
+        final LanDeck.Identity identity = LanDeck.parse(json);
+        check("the deck names its widget and tag",
+                "spotify_deck_cyd24R".equals(identity.widget)
+                        && "A1B2C3".equals(identity.tag));
+        check("the deck id is the widget plus the tag",
+                (identity.widget + "-" + identity.tag).equals(identity.id));
+        check("the deck says what it is called", "Spotify Deck".equals(identity.label));
+        check("the deck says where it is", "192.168.1.50".equals(identity.ip));
+        check("a signed deck reads as signed", identity.signed);
+        check("a player-mode deck is not in setup", !identity.setup);
+        check("a document with no id is not usable",
+                !LanDeck.parse("{\"signed\":true}").usable());
+        check("two decks of one widget are two ids",
+                !LanDeck.parse(json).id.equals(LanDeck.parse(
+                        json.replace("A1B2C3", "D4E5F6")).id));
+    }
+
+    /**
+     * The addresses, from a typed one and from the sign-in link's state: both end up
+     * as the same bare host, and nothing that is not an IPv4 literal gets through.
+     * The two URLs are what the app asks the deck for, so their shape is pinned.
+     */
+    private static void deckAddresses() {
+        check("a typed address is kept", "192.168.1.50".equals(LanDeck.host("192.168.1.50")));
+        check("a pasted URL loses its scheme and path",
+                "192.168.1.50".equals(LanDeck.host("http://192.168.1.50/spotify")));
+        check("a port survives",
+                "192.168.4.1:8080".equals(LanDeck.host(" 192.168.4.1:8080 ")));
+        check("a spelled-out name is refused", LanDeck.host("evil.example").isEmpty());
+        check("an octet over 255 is refused", LanDeck.host("192.168.1.999").isEmpty());
+        check("the identity is one path off the deck",
+                "http://192.168.1.50/deck.json".equals(LanDeck.identityUrl("192.168.1.50")));
+        check("the sign-in asks for the app's scheme, as text",
+                "http://192.168.1.50/auth?app=1&json=1"
+                        .equals(LanDeck.signInUrl("192.168.1.50")));
+        check("a text answer yields the authorize URL",
+                new LanDeck.Reply(200, LanDeck.AUTH_PREFIX + "client_id=x\n", "")
+                        .url().startsWith(LanDeck.AUTH_PREFIX));
+        check("an older deck's redirect yields it too",
+                new LanDeck.Reply(302, "", LanDeck.AUTH_PREFIX + "client_id=x")
+                        .url().startsWith(LanDeck.AUTH_PREFIX));
+        check("a refusal explains itself",
+                "no client id stored".equals(new LanDeck.Reply(409,
+                        "refused: no client id stored", "").why("192.168.1.50")));
+        check("an answer from anywhere else is not a URL",
+                new LanDeck.Reply(200, "https://evil.example/authorize?", "").url().isEmpty());
     }
 
     private static void flashWithoutHandshake() {
