@@ -157,10 +157,11 @@ control, unlike the phone deck's PWM one.
 
 ## Build
 
-* ESP32 Arduino core **2.0.17** (what the numbers below are from). WiFi,
-  `WiFiServer`, `WiFiClientSecure` and `HTTPClient` come from the core, and so
-  does the mbedTLS the PKCE digest uses; there is nothing extra to install for
-  the network side or the setup page.
+* ESP32 Arduino core **3.3.12**, which is what `toolchain.sh` installs; 2.0.17
+  builds it too, and the at-a-glance list above carries both sets of numbers.
+  WiFi, `WiFiServer`, `WiFiClientSecure` and `HTTPClient` come from the core,
+  and so does the mbedTLS the PKCE digest uses; there is nothing extra to
+  install for the network side or the setup page.
 * Libraries: **Adafruit GFX Library**, **Adafruit ILI9341**,
   **XPT2046_Touchscreen**.
 * Do **not** install **ArduinoBLE**. This sketch does not use BLE at all, and on
@@ -235,8 +236,9 @@ sketch from a desktop on 2026-10-31.
   `--warnings all`; a comment-only edit links to exactly the same size, so the
   figure is a stable build rather than a stale build path. The two cores differ
   by ~155 kB, which is the WiFi stack as IDF 5 links it rather than mbedTLS (see
-  [the build note](../CONVENTIONS.md#build)); 2.0.17 is the one `toolchain.sh`
-  pins, so that is where the release numbers come from.
+  [the build note](../CONVENTIONS.md#build)); 3.3.12 is what `toolchain.sh` pins
+  now, so that is where the release numbers come from, and 2.0.17 is kept as the
+  A/B build rather than the shipping one.
 * **It still fits on 3.3.12, on about a third of the slack:** 1,122,249 bytes
   against the 1,310,720-byte app slot the default scheme gives leaves
   **188,471 B (14 %)** free, where 2.0.17 leaves 343,307 B (26 %). `default.csv`

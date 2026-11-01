@@ -91,10 +91,10 @@ sketch and the descriptor `id`, which always move together:
 arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
 ```
 
-* Board package `esp32:esp32`. The deck compiles clean on core **3.3.12** and
-  2.0.17; `phone_deck_cyd24R/toolchain.sh` defaults to 2.0.17, so pass
-  `ARDUINO_CORE=esp32:esp32@3.3.12` when you need 3.x. One core per install root —
-  the compiler picks the newest installed platform.
+* Board package `esp32:esp32`. Both decks default to core **3.3.12** and compile
+  clean on 2.0.17 too; keep a second install root for the old core when you want
+  an A/B measurement, because one root holds one core and the compiler picks the
+  newest installed platform.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
@@ -111,6 +111,20 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   in headers, so the sketch's own object grows with it. So never scale one
   deck's core delta onto another: recompile and quote `Sketch uses …`, and check
   the partition before assuming a sketch still fits.
+* **Why 3.x is the default, and what would reverse it.** Core 2.0.17 ships
+  mbedTLS 2.28.7, a branch that reached end of life at the end of 2024, and the
+  Spotify deck's whole job is TLS to a third party — an unpatched TLS stack
+  holding OAuth tokens is the argument that matters here, not flash. 3.3.12
+  ships mbedTLS **3.6.6**, an LTS with fixes promised until at least March 2027;
+  Espressif's own 2.0.x support ended in July 2024; and neither deck has ever
+  been flashed, so today is the cheapest this migration will ever be — both
+  already link clean on both cores. The price is **155 kB** in the WiFi deck
+  (343 kB → 188 kB of its app slot) and ~3 kB of RAM; the Bluetooth deck pays
+  2.4 kB. Reverse only for a measured reason: if the WiFi deck runs out of flash,
+  use `huge_app` (3 MB slot, 36 % used today) rather than an unsupported TLS
+  stack. **Still unmeasured: heap during the TLS handshake on 3.x** — the first
+  thing to watch when the Spotify deck reaches hardware, since 53,572 B of
+  globals leaves 274 kB and mbedTLS 3.x is the larger consumer.
 * Libraries, and only these unless the widget genuinely needs more: `Adafruit GFX
   Library`, `Adafruit ILI9341`, `XPT2046_Touchscreen`.
 * **Never install ArduinoBLE.** Its `BLEDevice.h` shadows the core's header and
