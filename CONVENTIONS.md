@@ -36,6 +36,11 @@ controller or bridge gets its own section here first.
   [`check_widget_assets.py`](check_widget_assets.py) before committing: it fails
   when a descriptor names a missing sketch, when a bundled copy has drifted, or
   when `assets/widgets/` holds a widget no descriptor claims.
+* **A deck's id is its own and no rule pools it.** Each folder keeps its name, its
+  `widget.json`, its `README.md` and the id its sketch prints: `<widget>-<tag>`,
+  the folder-named widget plus the low 24 bits of that board's efuse MAC. A
+  re-flash keeps the id, a second board of the same widget is a second id, and this
+  file records rules — it never assigns, renames or merges a deck's id.
 
 ### Naming: `<topic>_deck_<board>`
 
@@ -315,12 +320,59 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
   services and asks again after `onMtuChanged`; a truncated read names no widget
   and falls back to the address rather than inventing a half id.
 
+## The two chats
+
+Two chats work this repository, each in its own worktree on its own
+`freebuff/<id>` branch. This section is the whole agreement between them; every
+other mention of it in this repo is a pointer back here.
+
+| Chat | Owns | May do without asking |
+| --- | --- | --- |
+| **this chat**, `freebuff/e9252a57…` | both decks, this file, the root checkers and all of `android-companion/` | build, measure and edit any of it; merge the deck chat's branch |
+| **the deck chat**, `freebuff/60e73bbb…` | its own worktree and branch | edit anything in its own tree; merge this branch; read this tree |
+
+* **The app's Java is this chat's.** It was written in the deck chat while the
+  split lasted, which made a deck change that needed one line of Java a two-branch
+  dance and left the two worktrees quoting different numbers. `android-companion/`
+  is edited here now, by the chat that edits the sketches.
+* **A change crosses as a commit and an SHA, never as a file copy.** The chat with
+  work to give commits on its own branch, pushes, and names the SHA; the receiving
+  chat merges it. A merge shows both sides of a disagreement, where a copy
+  silently drops whichever version was written second. Nothing is copied into
+  another chat's worktree — not `android-companion/`, not a sketch, not a doc —
+  and nothing is checked out over files the owner has changed since.
+* **Neither chat writes into the other's worktree**, and no branch checked out
+  somewhere else is force-pushed. A file that appears in a tree without a commit
+  is drift, not a handoff: `git status` there is that tree's owner to explain
+  before anything is merged over it.
+* **A rule has one home.** Anything true of the whole board or of both chats lives
+  in this file; anything true of one widget lives in that widget's `README.md`;
+  everywhere else a rule is a link, never a restatement. Two copies disagree
+  eventually, and then neither is trusted.
+* **A checker beats a paragraph.** If a rule can be tested, it becomes an assertion
+  in a root checker and the prose shrinks to a pointer at it — a rule that cannot
+  drift does not need repeating.
+* **The owner edits; the other reports.** A failure in another chat's area is
+  reported with the command that printed it and the SHA it printed on, never
+  quietly fixed in that tree.
+* **A measurement is true of the tree that printed it.** Merge this branch before
+  quoting a number, and run [`check_branches.py`](check_branches.py) when a doc and
+  a tree seem to disagree.
+* **Exact bytes live in one file.**
+  [`android-companion/HANDOFF.md`](android-companion/HANDOFF.md) keeps the exact APK
+  size with the date it was measured; every other file rounds it to the nearest kB,
+  so a rebuild is one edit. A number a chat did not print is quoted with its date
+  or not at all.
+* **Commit before going quiet.** Uncommitted work is what makes an edit look
+  ownerless a session later, so anything left uncommitted gets a line in that
+  tree's `HANDOFF.md` saying what and why.
+
 ## Working in this repo
 
 * One widget per change. A change touching two widget folders is two changes.
-* The Android app's Java belongs to the app's own chat and worktree. This tree
-  gets sketch and asset copies only; check `git status` before assuming the files
-  you see are yours.
+* **Two chats share this repo, and [`## The two chats`](#the-two-chats) is the
+  whole agreement.** Nothing needs the other chat's permission: the table is the
+  permission.
 * **Another chat's work reaches this tree by merge, never by copy.** Each chat is
   a worktree on its own `freebuff/<id>` branch, so a commit made over there
   leaves `main` green and these numbers true for the tree that printed them, and

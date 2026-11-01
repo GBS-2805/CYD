@@ -546,5 +546,5 @@ does, for this widget, from a `:app:syncWidgets` run on 2026-11-01.
 
 There is **no `ble` block**: this deck has no Bluetooth link to find, so the
 app's scan side has nothing to look for. Turning the descriptor into a project
-card with setup steps of its own is the app chat's work; the sketch and the
-asset copy are done here.
+card with its own setup steps is still unbuilt; the sketch, the descriptor and
+the asset copy are done.

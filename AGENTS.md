@@ -17,6 +17,3 @@ Non-negotiables if you read nothing else:
   claim a compile, a flash or a measurement that did not happen.
 * Do not commit, push or deploy unless asked, and do not touch another widget's
   folder or another chat's worktree.
-
-The Android app's Java belongs to its own chat; this tree takes sketch and asset
-copies only.

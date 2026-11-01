@@ -1,7 +1,15 @@
 # Handing a deck change to the app
 
-This tree owns the sketches; the app tree (`android-companion/`) owns the Java.
-A deck change reaches the APK by moving the commit, never by editing the app.
+One chat edits the sketches and `android-companion/`'s Java, so a deck change that
+needs a line of Java is one commit instead of a hand-off between branches. Who owns
+what, and how another chat's work reaches this tree, is
+[`## The two chats`](CONVENTIONS.md#the-two-chats) in `CONVENTIONS.md` — this page
+is only the build step.
+
+What still matters is that the APK carries a *copy* of each sketch.
+`:app:syncWidgets` is what moves a sketch into `app/src/main/assets/widgets/`,
+nothing else does, and a build that skipped it ships the previous file under the
+new name. The rest of this page is that step.
 
 ## Preferred: cherry-pick the commit
 
@@ -47,9 +55,9 @@ python3 check_widget_assets.py
 
 ## Keep one line
 
-`main` holds its own copies of both decks. Pick a change into the app tree and
-push it back, or work on top of `main` here, so the two copies do not drift. If
-they do, the sketches are the truth and the app copy is the stale one.
+`main` holds its own copies of both decks. Work on top of `main` here, so the two
+copies do not drift. If they do, the sketches are the truth and the app copy is
+the stale one.
 
 ## The app now carries two decks
 
@@ -59,9 +67,9 @@ decks travel: `assets/widgets/phone_deck_cyd24R/` and
 `2 widgets bundled, every copy matches` (phone deck md5 `62c7e6c3…`, Spotify
 `00bb1560…`, both on 2026-11-01), and that is the check to run after either
 sketch changes — a passing `assembleDebug` says nothing about which copies went
-into the APK. The app's own docs described one bundled widget and a folder name
-from before the rename; that side is the app chat's to keep current, and what
-this tree has to get right is that a second descriptor now exists.
+into the APK. The app's own docs described one bundled widget and a folder name from
+before the rename; both halves are this tree's now, so keeping that current is
+one more thing to do here.
 
 ## After a documentation-only deck change
 
