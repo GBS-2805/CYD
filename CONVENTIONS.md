@@ -101,6 +101,13 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   1,122,281 B (85 %) / 53,572 B globals. Those are 48 B and 32 B above the same
   sketches built straight through `arduino-cli` from another path — the build-root
   sensitivity above, not a different toolchain.
+* **The margin is checked, not assumed.** [`check_flash_headroom.py`](check_flash_headroom.py)
+  compiles every deck with the deck FQBN and reads the compiler's own
+  `Maximum is …` figure, so the slot comes from the partition scheme rather than
+  a hard-coded number: switch to `huge_app` and it follows. It exits 1 when a
+  deck overflows or falls under its `--min-free-kb` floor (64 KiB by default),
+  and prints used, slot, free and globals for every deck so erosion shows up even
+  on a run that passes.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows

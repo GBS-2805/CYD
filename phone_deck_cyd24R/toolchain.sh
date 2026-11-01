@@ -117,7 +117,11 @@ else
        separate install root per core version, e.g.
        ARDUINO_HOME=$HOME/.arduino-cyd-3 ARDUINO_CORE=$CORE $0"
   fi
-  say "install core $CORE (downloads the xtensa toolchain, ~2 GB)"
+  # Measured on 3.3.12 in a fresh root: 927 MiB of downloads that unpack to
+  # 6.1 GB, because the platform now carries two toolchains (esp-x32 and
+  # esp-rv32, 5.9 GB together) against 2.4 GB on 2.0.17. staging/ also keeps a
+  # 1.7 GB copy of the archives and is safe to delete, so budget ~8 GB.
+  say "install core $CORE (downloads ~1 GB, unpacks to ~6 GB of toolchains)"
   "${ACLI[@]}" core update-index
   "${ACLI[@]}" core install "$CORE"
 fi
