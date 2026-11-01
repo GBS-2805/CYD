@@ -95,6 +95,12 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   clean on 2.0.17 too; keep a second install root for the old core when you want
   an A/B measurement, because one root holds one core and the compiler picks the
   newest installed platform.
+* **The default path is proven end to end.** `ARDUINO_HOME=~/.arduino-cyd-3
+  ./toolchain.sh` in a fresh root installed the core and libraries and built both
+  sketches, exit 0: phone deck 1,165,222 B (88 %) / 45,060 B globals, Spotify
+  1,122,281 B (85 %) / 53,572 B globals. Those are 48 B and 32 B above the same
+  sketches built straight through `arduino-cli` from another path — the build-root
+  sensitivity above, not a different toolchain.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
