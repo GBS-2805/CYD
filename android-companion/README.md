@@ -270,7 +270,7 @@ a GATT peripheral, not a keyboard or headset.
 
 - **SAVE to Downloads needs Android 10+.** On older versions use COPY.
 - Imported sketches live inside the app; uninstalling the app removes them.
-- The bundled sketch is read-only, by design — it tracks the repo.
+- Bundled sketches are read-only, by design — they track the repo.
 - Notification text comes from the title/text extras; apps with fully custom
   notification layouts may post neither and are skipped.
 - Notification access also exposes message content to this app. Nothing is stored:
