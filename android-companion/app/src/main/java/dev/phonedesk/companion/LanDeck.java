@@ -13,29 +13,14 @@ import java.nio.charset.StandardCharsets;
  *
  * Two things live here and nothing else. The identity is read from
  * {@code /deck.json}, which the sketch serves whenever the deck is awake and on
- * the network; the sign-in URL comes from {@code /auth?app=1&json=1}, because the
- * PKCE verifier never leaves the board — the app can open the URL the deck built,
- * it cannot build one itself. Plain Java with no Android imports, so test.sh can
- * check the parser and the addresses on a JVM.
+ * the network — {@link DeckIdentity} parses it, the same parser the Bluetooth deck
+ * feeds from its identity characteristic; the sign-in URL comes from
+ * {@code /auth?app=1&json=1}, because the PKCE verifier never leaves the board —
+ * the app can open the URL the deck built, it cannot build one itself. Plain Java
+ * with no Android imports, so test.sh can check the addresses and the one request
+ * on a JVM.
  */
 final class LanDeck {
-
-    /** What the deck says it is. Empty fields mean the answer was not one. */
-    static final class Identity {
-        String id = "";
-        String widget = "";
-        String tag = "";
-        String label = "";
-        String role = "";
-        String ip = "";
-        boolean signed;
-        boolean setup;
-
-        /** True when the document named both a deck and the widget behind it. */
-        boolean usable() {
-            return !id.isEmpty() && !widget.isEmpty();
-        }
-    }
 
     /** One HTTP answer, with the redirect left unfollowed on purpose. */
     static final class Reply {
@@ -119,79 +104,6 @@ final class LanDeck {
         text = text.trim();
         while (text.endsWith("/")) text = text.substring(0, text.length() - 1);
         return SpotifyLink.isDeckAddress(text) ? text : "";
-    }
-
-    /** The identity document, read without org.json so a JVM test can hold it. */
-    static Identity parse(String json) {
-        final Identity identity = new Identity();
-        if (json == null) return identity;
-        identity.id = value(json, "id");
-        identity.widget = value(json, "widget");
-        identity.tag = value(json, "tag");
-        identity.label = value(json, "name");
-        identity.role = value(json, "role");
-        identity.ip = value(json, "ip");
-        identity.signed = flag(json, "signed");
-        identity.setup = flag(json, "setup");
-        return identity;
-    }
-
-    /** One string value; "" when the key is absent or is not a string. */
-    static String value(String json, String key) {
-        if (json == null || key == null) return "";
-        final String needle = "\"" + key + "\"";
-        final int at = json.indexOf(needle);
-        if (at < 0) return "";
-        final int colon = json.indexOf(':', at + needle.length());
-        if (colon < 0) return "";
-        final int open = json.indexOf('"', colon + 1);
-        if (open < 0) return "";
-        final StringBuilder out = new StringBuilder();
-        for (int i = open + 1; i < json.length(); ++i) {
-            final char c = json.charAt(i);
-            if (c == '"') return out.toString();
-            if (c == '\\' && i + 1 < json.length()) {
-                final char next = json.charAt(++i);
-                switch (next) {
-                    case 'n':
-                        out.append('\n');
-                        break;
-                    case 't':
-                        out.append('\t');
-                        break;
-                    case 'u':
-                        if (i + 4 < json.length()) {
-                            try {
-                                out.append((char) Integer.parseInt(
-                                        json.substring(i + 1, i + 5), 16));
-                                i += 4;
-                            } catch (NumberFormatException e) {
-                                out.append("\\u");
-                            }
-                        }
-                        break;
-                    default:
-                        out.append(next);
-                        break;
-                }
-                continue;
-            }
-            out.append(c);
-        }
-        return out.toString();
-    }
-
-    /** One boolean value; false when the key is absent or is not a boolean. */
-    static boolean flag(String json, String key) {
-        if (json == null || key == null) return false;
-        final String needle = "\"" + key + "\"";
-        final int at = json.indexOf(needle);
-        if (at < 0) return false;
-        final int colon = json.indexOf(':', at + needle.length());
-        if (colon < 0) return false;
-        int from = colon + 1;
-        while (from < json.length() && Character.isWhitespace(json.charAt(from))) ++from;
-        return json.startsWith("true", from);
     }
 
     static Reply fetch(String url) {

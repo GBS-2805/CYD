@@ -6,7 +6,7 @@
   "board": "2432S024R",
   "tagline": "INSIDE APP",
   "body": "A desk dashboard for your phone: clock, battery and notifications, set like a woodblock print in two monochrome themes \u2014 black ink on paper, or white ink on black.",
-  "notes": "Bundled with the app: copy it into ArduinoDroid and compile, there is nothing to download.",
+  "notes": "Bundled with the app: copy it into ArduinoDroid and compile, there is nothing to download. With the bridge linked, whatever is playing on the phone is mirrored onto the deck over the same link, with no Spotify sign-in.",
   "libraries": [
     "Adafruit GFX Library",
     "Adafruit ILI9341",

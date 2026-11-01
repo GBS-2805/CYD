@@ -10,8 +10,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Which network decks this phone has paired, by board rather than by address.
+/**     * Which network decks this phone has paired, by board rather than by address.
  *
  * The address is DHCP's business and moves; the identity is the efuse tag the deck
  * puts in {@code /deck.json}, so a record is keyed by {@code <widget>-<TAG>}. A
@@ -164,7 +163,7 @@ final class DeckRegistry {
         if (host == null || host.isEmpty()) return;
         final LanDeck.Reply reply = LanDeck.fetch(LanDeck.identityUrl(host), 3000, 5000);
         if (reply.status != 200) return;
-        final LanDeck.Identity identity = LanDeck.parse(reply.body);
+        final DeckIdentity identity = DeckIdentity.parse(reply.body);
         if (!identity.usable()) return;
         final Deck deck = new Deck();
         deck.id = identity.id;

@@ -64,6 +64,17 @@ public class DeckService extends Service {
     static final UUID TIME_UUID = UUID.fromString("6f2d0002-9a3c-4b57-9d21-6a1e0c4f8b10");
     static final UUID BATTERY_UUID = UUID.fromString("6f2d0003-9a3c-4b57-9d21-6a1e0c4f8b10");
     static final UUID NOTICE_UUID = UUID.fromString("6f2d0004-9a3c-4b57-9d21-6a1e0c4f8b10");
+    /** Read-only: the identity document. Missing on a deck flashed before it existed. */
+    static final UUID IDENTITY_UUID = UUID.fromString("6f2d0005-9a3c-4b57-9d21-6a1e0c4f8b10");
+    /** What the phone is playing, mirrored. Also optional: an older flash has no such line. */
+    static final UUID NOW_UUID = UUID.fromString("6f2d0006-9a3c-4b57-9d21-6a1e0c4f8b10");
+
+    /**
+     * The deck's identity document is ~150 bytes, so the default 23-byte ATT MTU
+     * would return it truncated. 185 is the smallest size both ends are required
+     * to support above the default.
+     */
+    private static final int MTU_BYTES = 185;
 
     private static final String CHANNEL_ID = "deck_link";
     private static final int FOREGROUND_ID = 7;
@@ -100,6 +111,9 @@ public class DeckService extends Service {
         public String status = "Stopped";
         public String deviceName = "";
         public String deviceMac = "";
+        /** {@code phone_deck_cyd24R-A1B2C3}, or "" until the deck names itself. */
+        public String deviceId = "";
+        public String deviceTag = "";
         public int rssi;
         public int writes;
         public int notices;
@@ -124,6 +138,12 @@ public class DeckService extends Service {
     public static void forwardNotification(String app, String title, String body) {
         final DeckService svc = instance;
         if (svc != null) svc.enqueueNotice(app, title, body);
+    }
+
+    /** A now-playing line from {@link NowPlaying}; dropped when the deck has no characteristic. */
+    public static void publishNowPlaying(String packet) {
+        final DeckService svc = instance;
+        if (svc != null) svc.enqueueNowPlaying(packet);
     }
 
     /** User picked a deck in the monitor; remember it and link to it now. */
@@ -188,6 +208,8 @@ public class DeckService extends Service {
     private BluetoothGattCharacteristic timeChar;
     private BluetoothGattCharacteristic batteryChar;
     private BluetoothGattCharacteristic noticeChar;
+    private BluetoothGattCharacteristic identityChar;
+    private BluetoothGattCharacteristic nowChar;
 
     private boolean scanning;
     private boolean connecting;
@@ -196,6 +218,8 @@ public class DeckService extends Service {
     private volatile String preferredMac = "";
     private volatile String linkedMac = "";
     private volatile String linkedName = "";
+    private volatile String linkedId = "";
+    private volatile String linkedTag = "";
     private volatile int linkedRssi;
     private volatile long connectedAtMs;
     private volatile long lastWriteMs;
@@ -204,6 +228,10 @@ public class DeckService extends Service {
 
     private String lastNotice = "";
     private long lastNoticeMs;
+
+    /** The line last written to a deck, so an unchanged second is not re-sent. */
+    private volatile String lastNow = "";
+    private NowPlaying nowPlaying;
 
     private final Runnable scanTimeout = () -> {
         stopScan();
@@ -268,6 +296,10 @@ public class DeckService extends Service {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 setStatus("Discovering services");
                 try {
+                    // Ask for the larger MTU before the services are up: at the
+                    // default the identity read comes back cut short and names no
+                    // widget, so the deck would be filed under its MAC.
+                    g.requestMtu(MTU_BYTES);
                     g.discoverServices();
                 } catch (SecurityException e) {
                     setStatus("Bluetooth permission needed");
@@ -297,6 +329,10 @@ public class DeckService extends Service {
             timeChar = service.getCharacteristic(TIME_UUID);
             batteryChar = service.getCharacteristic(BATTERY_UUID);
             noticeChar = service.getCharacteristic(NOTICE_UUID);
+            // Optional: a deck flashed before the document existed still links,
+            // and is remembered under its address instead.
+            identityChar = service.getCharacteristic(IDENTITY_UUID);
+            nowChar = service.getCharacteristic(NOW_UUID);
             if (timeChar == null || batteryChar == null || noticeChar == null) {
                 setStatus("Deck characteristics missing");
                 releaseGatt();
@@ -305,13 +341,15 @@ public class DeckService extends Service {
             }
             linkedMac = g.getDevice().getAddress();
             linkedName = safeName(g.getDevice());
+            linkedId = "";
+            linkedTag = "";
             linkedRssi = 0;
             connectedAtMs = System.currentTimeMillis();
             if (preferredMac == null || preferredMac.isEmpty()) {
                 preferredMac = linkedMac;
                 DeckStore.setPreferred(DeckService.this, linkedMac);
             }
-            DeckStore.remember(DeckService.this, linkedMac, linkedName);
+            readIdentity();
             setStatus("Linked to " + linkedName);
             try {
                 g.readRemoteRssi();
@@ -320,6 +358,13 @@ public class DeckService extends Service {
             }
             pushTime();
             pushBattery();
+            // The mirror only runs while a deck that can take it is linked: it
+            // costs a media-session read a second, and there is nothing to send
+            // it to otherwise.
+            if (nowChar != null) {
+                if (nowPlaying == null) nowPlaying = new NowPlaying(DeckService.this);
+                nowPlaying.start();
+            }
         }
 
         @Override
@@ -337,6 +382,23 @@ public class DeckService extends Service {
             }
             writing = false;
             writeNext();
+        }
+
+        @Override
+        public void onMtuChanged(BluetoothGatt g, int mtu, int statusCode) {
+            // The first read can land before the MTU is agreed and come back
+            // truncated, which names no widget. This is the second ask, once the
+            // link carries the whole document.
+            if (linkedId.isEmpty()) readIdentity();
+        }
+
+        @Override
+        public void onCharacteristicRead(BluetoothGatt g, BluetoothGattCharacteristic ch,
+                                         int statusCode) {
+            if (ch == null || !IDENTITY_UUID.equals(ch.getUuid())) return;
+            final byte[] raw = statusCode == BluetoothGatt.GATT_SUCCESS ? ch.getValue() : null;
+            rememberIdentity(DeckIdentity.parse(
+                    raw == null ? "" : new String(raw, StandardCharsets.UTF_8)));
         }
     };
 
@@ -383,6 +445,8 @@ public class DeckService extends Service {
         snapshot.status = status;
         snapshot.deviceName = linkedName;
         snapshot.deviceMac = linkedMac;
+        snapshot.deviceId = linkedId;
+        snapshot.deviceTag = linkedTag;
         snapshot.rssi = linkedRssi;
         snapshot.writes = writesSent;
         snapshot.notices = noticesForwarded;
@@ -620,6 +684,34 @@ public class DeckService extends Service {
         }
     }
 
+    /**
+     * Asks the deck who it is. No characteristic (an older flash) or a failed read
+     * still records it by address, so the deck appears in SAVED DECKS and is
+     * upgraded to its id the next time it answers.
+     */
+    private void readIdentity() {
+        if (gatt == null || identityChar == null) {
+            rememberIdentity(null);
+            return;
+        }
+        try {
+            if (!gatt.readCharacteristic(identityChar)) rememberIdentity(null);
+        } catch (SecurityException e) {
+            rememberIdentity(null);
+        }
+    }
+
+    private void rememberIdentity(DeckIdentity identity) {
+        if (linkedMac.isEmpty()) return;
+        linkedId = identity == null ? "" : identity.id;
+        linkedTag = identity == null ? "" : identity.tag;
+        DeckStore.remember(this, identity, linkedMac, linkedName);
+        if (identity != null && identity.usable()) {
+            final String label = identity.label.isEmpty() ? linkedName : identity.label;
+            setStatus("Linked to " + label);
+        }
+    }
+
     private void releaseGatt() {
         handler.removeCallbacks(writeTimeout);
         BluetoothGatt old = gatt;
@@ -627,8 +719,14 @@ public class DeckService extends Service {
         timeChar = null;
         batteryChar = null;
         noticeChar = null;
+        identityChar = null;
+        nowChar = null;
+        lastNow = "";
+        if (nowPlaying != null) nowPlaying.stop();
         linkedMac = "";
         linkedName = "";
+        linkedId = "";
+        linkedTag = "";
         linkedRssi = 0;
         connectedAtMs = 0;
         writes.clear();
@@ -699,6 +797,15 @@ public class DeckService extends Service {
                 (appText + '|' + titleText + '|' + bodyText).getBytes(StandardCharsets.UTF_8),
                 NOTICE_LIMIT_BYTES);
         if (enqueue(noticeChar, payload)) ++noticesForwarded;
+    }
+
+    private void enqueueNowPlaying(String packet) {
+        if (nowChar == null || packet == null || packet.isEmpty()) return;
+        if (packet.equals(lastNow)) return;
+        lastNow = packet;
+        // NowPacket keeps the line inside one write already; the clamp is the
+        // belt to that braces, because a broken line is worse than a short one.
+        enqueue(nowChar, clamp(packet.getBytes(StandardCharsets.UTF_8), 150));
     }
 
     private static String clean(String value) {

@@ -51,6 +51,7 @@ public final class HostTests {
         spotifyCallbackUrl();
         deckIdentity();
         deckAddresses();
+        nowPacket();
 
         System.out.println();
         if (failures.isEmpty()) {
@@ -377,7 +378,7 @@ public final class HostTests {
                 + "\"name\":\"Spotify Deck\",\"role\":\"spotify\","
                 + "\"board\":\"2432S024R\",\"ip\":\"192.168.1.50\","
                 + "\"setup\":false,\"signed\":true}";
-        final LanDeck.Identity identity = LanDeck.parse(json);
+        final DeckIdentity identity = DeckIdentity.parse(json);
         check("the deck names its widget and tag",
                 "spotify_deck_cyd24R".equals(identity.widget)
                         && "A1B2C3".equals(identity.tag));
@@ -388,10 +389,26 @@ public final class HostTests {
         check("a signed deck reads as signed", identity.signed);
         check("a player-mode deck is not in setup", !identity.setup);
         check("a document with no id is not usable",
-                !LanDeck.parse("{\"signed\":true}").usable());
+                !DeckIdentity.parse("{\"signed\":true}").usable());
         check("two decks of one widget are two ids",
-                !LanDeck.parse(json).id.equals(LanDeck.parse(
+                !DeckIdentity.parse(json).id.equals(DeckIdentity.parse(
                         json.replace("A1B2C3", "D4E5F6")).id));
+
+        // The Bluetooth deck publishes the same keys in a read-only characteristic,
+        // minus the three a board with no network cannot answer. The same parser
+        // has to hold it, or the app would key one deck by id and the other by MAC.
+        final String ble = "{\"id\":\"phone_deck_cyd24R-A1B2C3\","
+                + "\"widget\":\"phone_deck_cyd24R\",\"tag\":\"A1B2C3\","
+                + "\"name\":\"Phone Deck\",\"role\":\"phone\","
+                + "\"board\":\"2432S024R\",\"link\":\"ble\"}";
+        final DeckIdentity overBle = DeckIdentity.parse(ble);
+        check("a Bluetooth deck names itself the same way",
+                overBle.usable() && "phone_deck_cyd24R-A1B2C3".equals(overBle.id));
+        check("the document says which link it arrived on", overBle.bluetooth());
+        check("a Bluetooth deck has no network state to report",
+                overBle.ip.isEmpty() && !overBle.signed && !overBle.setup);
+        check("a read cut at the default ATT MTU names no widget",
+                !DeckIdentity.parse(ble.substring(0, 22)).usable());
     }
 
     /**
@@ -499,6 +516,37 @@ public final class HostTests {
         }
         out.write(0xC0);
         return out.toByteArray();
+    }
+
+    // ---------------------------------------------------------- now playing ---
+
+    /** The line the deck's Now Playing characteristic takes: a mirror, not a login. */
+    private static void nowPacket() {
+        check("a now line is state|position|duration|title|artist|album",
+                NowPacket.encode("play", 61_000, 210_000, "Song", "Artist", "Album")
+                        .equals("play|61|210|Song|Artist|Album"));
+        check("a paused line says pause",
+                NowPacket.encode("pause", 5_000, 0, "T", "A", "").equals("pause|5|0|T|A|"));
+        check("a state the app does not know reads as pause, not as a cleared deck",
+                NowPacket.encode("buffering", 0, 0, "", "", "").equals("pause|0|0|||"));
+        check("a pipe in the text becomes a slash, so it cannot move the fields",
+                NowPacket.encode("play", 0, 0, "Left | Right", "A|B", "C")
+                        .equals("play|0|0|Left / Right|A/B|C"));
+        check("a newline never reaches the board",
+                NowPacket.encode("play", 0, 0, "one\ntwo", "", "").equals("play|0|0|one two||"));
+        check("a title is cut to the sketch's buffer, byte for byte",
+                NowPacket.text("x".repeat(200), NowPacket.TITLE_BYTES)
+                        .getBytes(StandardCharsets.UTF_8).length == NowPacket.TITLE_BYTES);
+        check("a missing duration reads as --:-- on the deck, i.e. zero here",
+                NowPacket.encode("play", 1_000, -1, "a", "b", "c").equals("play|1|0|a|b|c"));
+        check("a position past a day is a broken line, not a bootleg concert",
+                NowPacket.seconds(9_000_000_000L) == 86_400L);
+        check("the longest line still fits one ATT write at MTU 185",
+                NowPacket.encode("pause", 86_400_000, 86_400_000, "x".repeat(80),
+                        "y".repeat(60), "z".repeat(60))
+                        .getBytes(StandardCharsets.UTF_8).length <= NowPacket.ONE_WRITE_BYTES);
+        check("a state that is neither play nor stop never claims to be playing",
+                !NowPacket.word("buffering").equals("play") && !NowPacket.word(null).equals("play"));
     }
 
     // ------------------------------------------------------------- helpers ---

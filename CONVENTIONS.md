@@ -288,6 +288,18 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
 * A descriptor declares its network face in a `lan` block (`role`, `identity`,
   `signIn`, `page`), so the shelf draws that section from the widget instead of
   from a list in Java.
+* **A Bluetooth deck publishes the same document**, read-only, in characteristic
+  `6f2d0005-…` of its Phone Link service: `id`, `widget`, `tag`, `name`, `role`,
+  `board` and `link`, and only a network deck adds `ip`, `setup` and `signed`. The
+  app's `DeckIdentity` parses either, so one reader holds both decks, and the
+  phone deck is keyed by `<widget>-<TAG>` too: `DeckStore` keeps the MAC inside
+  the record as the address, never as the key. A board that has not published a
+  document (an older flash, a read that failed) is filed under its MAC and
+  upgraded the first time it answers, so the list migrates itself.
+* **An identity document is longer than a default ATT MTU.** It is ~150 bytes
+  against the 20 usable at MTU 23, so the app asks for 185 before discovering
+  services and asks again after `onMtuChanged`; a truncated read names no widget
+  and falls back to the address rather than inventing a half id.
 
 ## Working in this repo
 
@@ -332,6 +344,11 @@ the front page needs no second navigation.
   descriptors and never retyped in Java. Each library is a button that copies the
   exact name ArduinoDroid's library list searches for, and the ArduinoBLE warning
   stays under it.
+* **PAIRED lists boards, not addresses.** One row per deck, titled with its name
+  and detailed `tag · linked <age>`; the linked card above it says
+  `tag · MAC · packet <age>`. The tag is the half of the id that cannot move, and
+  the MAC appears once, as the address the live link runs over — so a board that
+  re-pairs to a new address keeps its row.
 * **A network deck is paired by address and tracked by tag.** A `lan` widget's
   card carries a `DECK` block: one row per paired board (`tag · address · state ·
   age`), with `SIGN IN` and `FORGET`, then `PAIR A DECK`, which asks for the
@@ -348,6 +365,16 @@ the front page needs no second navigation.
   `tokens.json`'s `screens` maps each frame to one — so a change that redraws a
   screen regenerates that render and commits it with the code and the page. A
   render is metric-accurate, not a device screenshot — say which.
+* **Music is mirrored, not fetched.** Nothing on this board holds a Spotify token
+  and nothing asks the user to make a developer app: the companion app reads the
+  phone's media session (already permitted by the notification access it needs for
+  notifications) and writes one line — `state|position|duration|title|artist|album`
+  — down the link at 1 Hz. The deck draws what it was told and cannot control
+  playback, so its now-playing page has no transport buttons. This is also why the
+  two decks differ: the WiFi deck signs itself in and can play on its own, and a
+  Bluetooth deck shows the phone's own player instead. Cost of the mirror: one
+  characteristic, ~120 bytes of RAM, and an optional dependency on a phone in the
+  room.
 
 ## Adding a widget
 

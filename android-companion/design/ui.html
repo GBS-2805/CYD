@@ -201,8 +201,7 @@ figcaption span { color: #6d6d6d; }
 <body>
 
 <h1>OFF-SITE — phone app, UI file</h1>
-<p class="lede">
-  <strong>This is the whole app, drawn as one static page.</strong> Six screens, at
+<p class="lede">    <strong>This is the whole app, drawn as one static page.</strong> Seven screens, at
   the reference phone's 393 × 852 dp, using the same dp, sp, radii and colours the
   Android views use. No build step: open this file in any browser and edit it.
 </p>
@@ -686,6 +685,81 @@ figcaption span { color: #6d6d6d; }
     <b>6 · SETTINGS</b><br>
     <span>SetupTab</span> — reached by the gear, never by a drawer row. The gear is
     lit here (<code>.bar--settings</code>) because you are already in it.
+  </figcaption>
+</figure>
+
+<!-- ======================================================================
+     7. PAIRED — DecksTab.build()
+     ====================================================================== -->
+<figure>
+  <div class="screen">
+    <div class="bar bar--section">
+      <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
+      <div class="pill">LINKED</div>
+      <div class="gear">&#9881;&#65038;</div>
+    </div>
+
+    <div class="body">
+      <!-- DeckService snapshot: state, telemetry, last status line -->
+      <div class="card">
+        <div style="font-size:11px;color:var(--good);letter-spacing:.14em">BRIDGE ACTIVE</div>
+        <div style="font-size:14px;padding-top:6px">linked 2m 14s &nbsp;&middot;&nbsp;
+          -58 dBm &nbsp;&middot;&nbsp; 412 packets &nbsp;&middot;&nbsp; 7 notices</div>
+        <div style="font-size:12px;color:var(--dim);padding-top:6px">Linked to Phone
+          Deck A1B2C3</div>
+      </div>
+
+      <!-- the linked board: name, then tag · address · last packet -->
+      <div class="card mt-10">
+        <div style="font-size:18px">Phone Deck A1B2C3</div>
+        <div style="font-size:12px;color:var(--dim);padding-top:4px">A1B2C3
+          &nbsp;&middot;&nbsp; 24:0A:C4:11:22:33 &nbsp;&middot;&nbsp; packet 2s ago</div>
+      </div>
+
+      <!-- DecksTab.addNearbyRow(): what is advertising, with the one it is on marked -->
+      <div class="label">NEARBY</div>
+      <div class="card" style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1">
+          <div style="font-size:15px">Phone Deck A1B2C3</div>
+          <div style="font-size:12px;color:var(--dim);padding-top:2px">24:0A:C4:11:22:33
+            &nbsp;&middot;&nbsp; -58 dBm &nbsp;&middot;&nbsp; 2s ago</div>
+        </div>
+        <div style="font-size:11px;color:var(--good);font-weight:bold">LINKED</div>
+      </div>
+
+      <!-- DecksTab.addKnownRow(): one row per deck id, not per address -->
+      <div class="label">SAVED DECKS</div>
+      <div class="card" style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1">
+          <div style="font-size:15px">Phone Deck A1B2C3</div>
+          <div style="font-size:12px;color:var(--dim);padding-top:2px">A1B2C3
+            &nbsp;&middot;&nbsp; linked 2m ago</div>
+        </div>
+        <div style="font-size:11px;color:var(--good);font-weight:bold">LINKED</div>
+      </div>
+      <div class="card mt-10" style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1">
+          <div style="font-size:15px">Phone Deck D4E5F6</div>
+          <div style="font-size:12px;color:var(--dim);padding-top:2px">D4E5F6
+            &nbsp;&middot;&nbsp; linked 3d ago</div>
+        </div>
+        <div class="action">LINK</div>
+      </div>
+
+      <div class="hint" style="padding-top:18px">One deck is linked at a time.
+        Linking here pins the bridge to that board, so a second CYD in range never
+        steals the connection.</div>
+    </div>
+
+    <div class="fold"><span>852 dp</span></div>
+  </div>
+  <figcaption>
+    <b>7 · PAIRED</b><br>
+    <span>DecksTab.build()</span> — the link, the board under it, what is
+    advertising, and the boards this phone has met. A saved row is the deck's id
+    (<code>phone_deck_cyd24R-A1B2C3</code>, from its identity document), with the
+    MAC printed as <i>where</i> it was last seen — so two boards of one widget are
+    two rows and a re-pair keeps one.
   </figcaption>
 </figure>
 

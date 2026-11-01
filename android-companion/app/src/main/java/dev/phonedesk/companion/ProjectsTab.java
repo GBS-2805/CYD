@@ -710,7 +710,7 @@ final class ProjectsTab extends ScrollView {
             Actions.toast(activity, reply.why(host));
             return;
         }
-        LanDeck.Identity identity = LanDeck.parse(reply.body);
+        DeckIdentity identity = DeckIdentity.parse(reply.body);
         if (!identity.usable()) {
             Actions.toast(activity, "Something answered at " + host + ", but it is not a deck.");
             return;

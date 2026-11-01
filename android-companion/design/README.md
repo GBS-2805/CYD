@@ -10,15 +10,15 @@ read at runtime. It is a drawing that is metric-accurate enough to argue with.
 
 | File | What it is |
 | --- | --- |
-| `ui.html` | The app's six screens at 393 × 852 dp, one static page. Open it in any browser. No build, no server, no dependencies. |
+| `ui.html` | The app's seven screens at 393 × 852 dp, one static page. Open it in any browser. No build, no server, no dependencies. |
 | `tokens.json` | The same numbers as data — palette, radii, type sizes, letter-spacing, padding — each tied to the `Ui.java` constant or the method that uses it. This is what a handoff gets diffed against. |
 | `README.md` | This file. |
 
 Both files were written by reading the Java, not by memory: the colours came from
 `Ui.java`, the metrics from `MainActivity.buildTopBar()`, `DrawerHome`,
-`ProjectsTab`, `BoardTab` and `SetupTab`. The `render_ui.py` script in the parent
-folder draws the same six screens to PNG from the same numbers, so there are three
-descriptions of one design and they have to agree.
+`ProjectsTab`, `DecksTab`, `BoardTab` and `SetupTab`. The `render_ui.py` script in
+the parent folder draws the same seven screens to PNG from the same numbers, so
+there are three descriptions of one design and they have to agree.
 
 ## Opening and editing it
 

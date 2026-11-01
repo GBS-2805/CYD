@@ -232,13 +232,46 @@ board's MAC, so it differs per board.
 
 ## Phone Link service
 
-Service `6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10`, three write characteristics:
+Service `6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10`: four write characteristics and one
+read.
 
 | Characteristic | UUID | Payload |
 | --- | --- | --- |
 | Time | `6f2d0002-9a3c-4b57-9d21-6a1e0c4f8b10` | 7 bytes: year−2000, month, day, hour, minute, second, weekday (ignored — see below) |
 | Battery | `6f2d0003-9a3c-4b57-9d21-6a1e0c4f8b10` | 1–2 bytes: level 0–100, optional charging flag |
 | Notification | `6f2d0004-9a3c-4b57-9d21-6a1e0c4f8b10` | UTF-8 `app\|title\|body`, any part may be empty |
+| Identity | `6f2d0005-9a3c-4b57-9d21-6a1e0c4f8b10` | **read** |
+| Now playing | `6f2d0006-9a3c-4b57-9d21-6a1e0c4f8b10` | UTF-8 `state\|position\|duration\|title\|artist\|album`, whole seconds, state `play`/`pause`/`stop` |
+
+The now-playing line is a **mirror, not a login**. This deck never talks to
+Spotify: the companion app reads the phone's own media session — the same
+notification access it already asks for — and writes one line a second, so there
+is no client id, no browser page and no token anywhere in this path. `stop` clears
+the card; a `play` line starts the deck's progress bar moving on its own between
+writes. The track shows on the status card's last line (`>> 1:12 3:45  Title`) and
+the whole page opens with a tap on it. That page has no transport buttons on
+purpose: the deck has no way to ask Spotify anything, so a pause here would be a
+promise it cannot keep. The text fields are capped at 47, 31 and 31 UTF-8 bytes,
+and the app replaces any `|` in a title with `/` before sending, because this
+characteristic splits on it.
+
+The identity characteristic is one line of JSON and it is the one thing a reader
+asks for: the same keys a network deck answers at `GET /deck.json`, so the app
+keys this board by widget and tag — `phone_deck_cyd24R-A1B2C3` — instead of by MAC.
+A re-flashed board keeps its row in the app, and a second board of the same widget
+is a second row.
+
+```json
+{"id":"phone_deck_cyd24R-A1B2C3","widget":"phone_deck_cyd24R",
+ "tag":"A1B2C3","name":"Phone Deck","role":"phone",
+ "board":"2432S024R","link":"ble"}
+```
+
+The three a board with no network has none of — `ip`, `setup`, `signed` — are
+simply absent. The document is about 150 bytes, longer than the 20 a default ATT
+MTU carries, so a reader asks for a larger MTU first (the app asks for 185) and a
+read that comes back cut short names no widget, which leaves the app on the
+address fallback rather than inventing an id.
 
 Writes are normal GATT write-with-response; no subscription is needed and no
 pairing is required. Time is local wall-clock time, so the deck needs no timezone

@@ -48,12 +48,13 @@ final class DecksTab extends ScrollView {
         StringBuilder sb = new StringBuilder();
         sb.append(snapshot.running).append('|').append(snapshot.linked).append('|')
                 .append(snapshot.status).append('|').append(snapshot.deviceMac).append('|')
+                .append(snapshot.deviceId).append('|')
                 .append(snapshot.rssi / 5).append('|');
         for (DeckService.Nearby nearby : snapshot.nearby) {
             sb.append(nearby.mac).append(':').append(nearby.rssi / 5).append(';');
         }
         sb.append('#');
-        for (DeckStore.Known deck : known) sb.append(deck.mac).append(';');
+        for (DeckStore.Known deck : known) sb.append(deck.key()).append(';');
         return sb.toString();
     }
 
@@ -94,7 +95,12 @@ final class DecksTab extends ScrollView {
         if (snapshot.linked) {
             LinearLayout deck = Ui.card(activity);
             deck.addView(Ui.text(activity, snapshot.deviceName, 18, Ui.TEXT));
-            TextView mac = Ui.text(activity, snapshot.deviceMac + "  ·  last packet "
+            // Tag first: it is the half of the id that cannot move, and the MAC
+            // below it is only the address this connection happened over.
+            final String where = snapshot.deviceTag.isEmpty()
+                    ? snapshot.deviceMac
+                    : snapshot.deviceTag + " \u00B7 " + snapshot.deviceMac;
+            TextView mac = Ui.text(activity, where + " \u00B7 packet "
                     + Ui.ago(snapshot.lastWriteMs, System.currentTimeMillis()), 12, Ui.DIM);
             mac.setPadding(0, Ui.dp(activity, 4), 0, 0);
             deck.addView(mac);
@@ -166,8 +172,12 @@ final class DecksTab extends ScrollView {
 
         LinearLayout labels = Ui.column(activity);
         labels.addView(Ui.text(activity, deck.name, 15, Ui.TEXT));
+        // One row per board, keyed by widget and tag: the tag is the half of the id
+        // that cannot move. The address is in the card above, where the link is.
+        final String where = deck.tag.isEmpty() ? deck.mac : deck.tag;
         TextView detail = Ui.text(activity,
-                deck.mac + "  ·  last linked " + Ui.ago(deck.seenMs, System.currentTimeMillis()),
+                where + " \u00B7 linked "
+                        + Ui.ago(deck.seenMs, System.currentTimeMillis()),
                 12, Ui.DIM);
         detail.setPadding(0, Ui.dp(activity, 2), 0, 0);
         labels.addView(detail);

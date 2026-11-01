@@ -9,7 +9,7 @@ regenerated on the next change and never committed.
 
     python3 render_ui.py              draw every screen
     python3 render_ui.py home         draw one (home, home-open, projects,
-                                      projects-open, serial, settings)
+                                      projects-open, paired, serial, settings)
 
 A render is metric-accurate, not a device screenshot: type is DejaVu Mono at the
 same size in sp, cards and gaps are the same dp, and the viewport is the 393 x
@@ -160,7 +160,7 @@ class Screen:
                 px(cy + math.sin(angle) * (radius + 1.2)),
             ], fill=color, width=max(1, px(1.0)))
 
-    def top_bar(self, crumb, gear=False):
+    def top_bar(self, crumb, gear=False, pill="IDLE"):
         pill_w, pill_h = 62, 26
         # The gear is the outermost thing in the bar: 2dp past the glyph, then the
         # 10dp it is padded with, a 10dp gap, and the pill ends there.
@@ -168,8 +168,8 @@ class Screen:
         self.text(18, 20, crumb, 12, TEXT if crumb.startswith("\u2039") else DIM,
                   spacing=0.12)
         self.card(pill_right - pill_w, 14, pill_w, pill_h, 9)
-        self.text(pill_right - pill_w + 12, 20, "IDLE", 11, DIM, bold=True,
-                  spacing=0.14)
+        self.text(pill_right - pill_w + 12, 20, pill, 11, DIM if pill == "IDLE" else GOOD,
+                  bold=True, spacing=0.14)
         self.gear(W_DP - 20 - 5.4, 14 + pill_h / 2.0, TEXT if gear else DIM)
 
     def section_title(self, title, subtitle):
@@ -402,6 +402,92 @@ def projects(open_first=False):
     return s.image
 
 
+def deck_row(s, y, name, detail, action, primary=False):
+    """DecksTab.addNearbyRow / addKnownRow: labels in a weighted column, then the
+    badge or the LINK button. Ui.space(row, 8) is the gap above each row, and the
+    detail wraps inside the column the badge or button leaves rather than running
+    underneath it.
+    """
+    x, w, pad = 16, W_DP - 32, 14
+    reserve = 44 if action == "LINKED" else 62
+    lines = wrap(detail, 12, w - 2 * pad - reserve)
+    h = 10 + 15 * 1.45 + 2 + len(lines) * 12 * 1.45 + 10
+    s.card(x, y + 8, w, h, 12)
+    s.text(x + pad, y + 8 + 10, name, 15, TEXT)
+    line_y = y + 8 + 10 + 15 * 1.45 + 2
+    for line in lines:
+        s.text(x + pad, line_y, line, 12, DIM)
+        line_y += 12 * 1.45
+    if action == "LINKED":
+        s.right(x + w - pad, y + 8 + 10, "LINKED", 11, GOOD, bold=True)
+    else:
+        s.button(x + w - pad - 52, y + 8 + 10, 52, "LINK", primary)
+    return y + 8 + h
+
+
+def paired():
+    """DecksTab.build(): the link's telemetry, the board it is linked to, what is in
+    range, and the boards this phone has met before.
+
+    A saved row is keyed by the deck's id (`<widget>-<TAG>`) from its identity
+    document; the MAC printed under the name is only where the board was last
+    seen. That is why two boards of one widget are two rows.
+    """
+    s = Screen()
+    s.top_bar("\u2039  OFF-SITE", pill="LINKED")
+    x, w = 16, W_DP - 32
+    inner = w - 28                      # Ui.card padding is 14 either side
+    y = 56
+
+    # The bridge card. Every line here is a TextView in a 333dp column, so a long
+    # one wraps instead of running off the card — the render wraps it the same way,
+    # and the card is measured before it is filled so the text is never painted
+    # over.
+    live_text = "linked 2m 14s  \u00b7  -58 dBm  \u00b7  412 packets  \u00b7  7 notices"
+    status_text = "Linked to Phone Deck A1B2C3"
+    live_lines = wrap(live_text, 14, inner)
+    status_lines = wrap(status_text, 12, inner)
+    card_h = (12 + 11 * 1.45 + 6
+              + len(live_lines) * (14 * 1.45 + 2) + 4
+              + len(status_lines) * 12 * 1.45 + 12)
+    s.card(x, y, w, card_h)
+    s.text(x + 14, y + 12, "BRIDGE ACTIVE", 11, GOOD, spacing=0.14)
+    line_y = y + 12 + 11 * 1.45 + 6
+    for line in live_lines:
+        s.text(x + 14, line_y, line, 14, TEXT)
+        line_y += 14 * 1.45 + 2
+    line_y += 4
+    for line in status_lines:
+        s.text(x + 14, line_y, line, 12, DIM)
+        line_y += 12 * 1.45
+    y += card_h + 10
+
+    # The linked board: its name, then tag, address and the last packet it took.
+    detail = "A1B2C3 \u00b7 24:0A:C4:11:22:33 \u00b7 packet 2s ago"
+    lines = wrap(detail, 12, inner)
+    linked_h = 12 + 18 * 1.45 + 4 + len(lines) * 12 * 1.45 + 12
+    s.card(x, y, w, linked_h)
+    s.text(x + 14, y + 12, "Phone Deck A1B2C3", 18, TEXT)
+    line_y = y + 12 + 18 * 1.45 + 4
+    for line in lines:
+        s.text(x + 14, line_y, line, 12, DIM)
+        line_y += 12 * 1.45
+    y += linked_h
+
+    y = s.section_label(y, "NEARBY")
+    y = deck_row(s, y, "Phone Deck A1B2C3",
+                 "24:0A:C4:11:22:33  \u00b7  -58 dBm  \u00b7  2s ago", "LINKED")
+
+    y = s.section_label(y, "SAVED DECKS")
+    y = deck_row(s, y, "Phone Deck A1B2C3", "A1B2C3  \u00b7  linked 2m ago", "LINKED")
+    y = deck_row(s, y, "Phone Deck D4E5F6", "D4E5F6  \u00b7  linked 3d ago", "LINK")
+
+    hint = ("One deck is linked at a time. Linking here pins the bridge to that "
+            "board, so a second CYD in range never steals the connection.")
+    s.paragraph(16, y + 18, hint, 12, DIM, w)
+    return s.image
+
+
 def serial():
     s = Screen()
     s.top_bar("\u2039  OFF-SITE")
@@ -494,6 +580,7 @@ SCREENS = {
     "home-open": lambda: home(True),
     "projects": lambda: projects(False),
     "projects-open": lambda: projects(True),
+    "paired": paired,
     "serial": serial,
     "settings": settings,
 }
