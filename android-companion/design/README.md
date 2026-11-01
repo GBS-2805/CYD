@@ -10,7 +10,7 @@ read at runtime. It is a drawing that is metric-accurate enough to argue with.
 
 | File | What it is |
 | --- | --- |
-| `ui.html` | The whole app: six screens at 393 × 852 dp, one static page. Open it in any browser. No build, no server, no dependencies. |
+| `ui.html` | The app's six screens at 393 × 852 dp, one static page. Open it in any browser. No build, no server, no dependencies. |
 | `tokens.json` | The same numbers as data — palette, radii, type sizes, letter-spacing, padding — each tied to the `Ui.java` constant or the method that uses it. This is what a handoff gets diffed against. |
 | `README.md` | This file. |
 
@@ -63,7 +63,11 @@ Be sceptical of anything here that is about *behaviour* rather than layout:
 * the `AlertDialog`s behind `LOG` and `STATUS`, and the `Spinner` inside the log
   form — those are platform chrome, not part of this page;
 * ripples, long-press, and whether a 22dp chip is actually comfortable to hit;
-* permission sheets and the notification-access system screen.
+* permission sheets and the notification-access system screen;
+* the Spotify callback — `SpotifyCallbackActivity` answering
+  `phonedesk://spotify-callback`, the browser chooser that leads to it and the one
+  line of result it shows. The deck's own screen carries the sign-in, and this
+  page draws that screen, not the return trip.
 
 If a design depends on one of those, describe it and I will mock the dialog in the
 page or note it as unverified until it runs on the phone.
