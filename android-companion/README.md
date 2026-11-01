@@ -57,13 +57,15 @@ links it needs.
   the title is `name` in `phone_deck_cyd24R/widget.json`. It keeps **COPY DROID**
   (whole sketch to the clipboard), **SAVE** (to Downloads) and the **LIBRARIES**
   card, whose **INSTALL** buttons copy a library name and open ArduinoDroid's
-  library screen.
+  library screen. The APK bundles the Spotify deck as well
+  (`assets/widgets/spotify_deck_cyd24R/`), so that descriptor and its sketch
+  arrive with the assets rather than from a list in Java.
 - **INSTALLER** and **SOURCE** open a project's pages. **RECIPE** copies a runnable
   recipe: target board, why there is no ArduinoDroid source, both links, the saved
   log, and the esptool command that writes the image.
 - **FILES** holds imports. **IMPORT A FILE** takes any `.ino`/`.bin` through the
   system picker and keeps the copy inside the app, with COPY / SAVE / FLASH /
-  DELETE. The bundled deck is read-only.
+  DELETE. The bundled decks are read-only.
 - The catalogue is still fixed at the four seeded projects: adding, editing and
   deleting projects, and attaching a file to a card, is the next step.
 
