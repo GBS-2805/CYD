@@ -8,8 +8,11 @@
 #
 # Only a staged <folder>/<folder>.ino counts, so the copies the app syncs into
 # android-companion/app/src/main/assets/ never trigger a compile, and a docs-only
-# commit returns immediately. A machine without arduino-cli says so and lets the
-# commit through rather than blocking work it cannot check.
+# commit returns immediately. A machine that never had a deck toolchain says so
+# and lets the commit through; one whose toolchain root exists without a runnable
+# arduino-cli is a half-finished install, and that is refused, because silence
+# there is a check that failed quietly. HEADROOM_ALLOW_MISSING_TOOLCHAIN=1
+# overrides it for one commit.
 set -uo pipefail
 
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
@@ -47,7 +50,35 @@ if [ -z "$cli" ]; then
 fi
 
 if [ -z "$cli" ]; then
-  echo "headroom: no arduino-cli found (source ~/.arduino-cyd-3/env.sh), so the check did NOT run" >&2
+  # No compiler is one thing; a toolchain root with no compiler in it is another.
+  # The first is a machine that never installed one and should still be able to
+  # commit a sketch it cannot check. The second is a broken or half-finished
+  # install, and letting that pass would make the gate quietly decorative.
+  broken_root=""
+  for maybe_root in "${ARDUINO_HOME:-}" "${HOME:-}/.arduino-cyd-3" "${HOME:-}/.arduino-cyd"; do
+    if [ -n "$maybe_root" ] && [ -d "$maybe_root" ]; then
+      broken_root="$maybe_root"
+      break
+    fi
+  done
+
+  if [ -n "$broken_root" ] && [ "${HEADROOM_ALLOW_MISSING_TOOLCHAIN:-0}" = "1" ]; then
+    echo "headroom: $broken_root holds no runnable arduino-cli; continuing only because HEADROOM_ALLOW_MISSING_TOOLCHAIN=1" >&2
+    exit 0
+  fi
+
+  if [ -n "$broken_root" ]; then
+    {
+      echo "headroom: $broken_root exists but holds no runnable arduino-cli,"
+      echo "          so the check cannot run and the commit is refused."
+      echo "          finish the install:  ARDUINO_HOME=$broken_root ./toolchain.sh"
+      echo "          or name a compiler:  ARDUINO_CLI=/path/to/arduino-cli git commit ..."
+      echo "          or accept the gap:   HEADROOM_ALLOW_MISSING_TOOLCHAIN=1 git commit ..."
+    } >&2
+    exit 1
+  fi
+
+  echo "headroom: no arduino-cli and no deck toolchain root on this machine, so the check did NOT run" >&2
   exit 0
 fi
 

@@ -115,9 +115,13 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   commit if one fails, so a sketch cannot grow past its partition unnoticed.
   Docs-only commits return immediately, the app's synced asset copies are
   ignored, and `git commit --no-verify` is the deliberate escape hatch. It needs
-  `git config core.hooksPath .githooks` once per clone; with no `arduino-cli` it
-  says the check did not run and lets the commit through rather than blocking a
-  machine that cannot check.
+  `git config core.hooksPath .githooks` once per clone. A machine with no deck
+  toolchain at all says the check did not run and lets the commit through, so a
+  fresh clone is never blocked; but a root that exists with no runnable
+  `arduino-cli` in it (`~/.arduino-cyd-3`, `~/.arduino-cyd` or `$ARDUINO_HOME`)
+  is a half-finished install, and that refuses the commit and prints three ways
+  out — finish the install, point `ARDUINO_CLI` at a compiler, or accept the gap
+  with `HEADROOM_ALLOW_MISSING_TOOLCHAIN=1` for that one commit.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
