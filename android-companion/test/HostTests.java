@@ -16,8 +16,8 @@ import java.util.List;
  * What is covered: SLIP framing round-trips, the sync packet carries esptool's
  * checksum, the handshake reaches download mode and reads the MAC, a reply with
  * the wrong opcode is skipped, a refused write is blamed on the bridge rather
- * than the board, a silent board fails, and flash refuses a session that never
- * synced.
+ * than the board, a silent board fails, flash refuses a session that never synced,
+ * and a hand on BOOT and RESET is tried before any wiring is.
  */
 public final class HostTests {
 
@@ -44,6 +44,7 @@ public final class HostTests {
         silentBoard();
         flashWithoutHandshake();
         sweepStopsAtFirstAnswer();
+        handResetComesBeforeAnyWiring();
         sweepTriesEveryWiring();
         flashBootNamesTheStrap();
         downloadBootAsksForASecondHost();
@@ -217,7 +218,10 @@ public final class HostTests {
         }
     }
 
-    /** The first wiring is the one most adapters need, so it must win immediately. */
+    /**
+     * An awake loader is the cheapest entry there is, so it must be taken before a
+     * line moves: the probe may not pulse a board that was already listening.
+     */
     private static void sweepStopsAtFirstAnswer() throws Exception {
         final UsbSerialCh340 port = new UsbSerialCh340();
         port.answer(chip(false));
@@ -228,10 +232,45 @@ public final class HostTests {
 
         final EspRom.Sweep sweep = rom.connectAll();
 
-        check("a sweep ends on the wiring that answers", "ESP32".equals(sweep.detected.chip));
-        check("the first wiring is the one that answered", !sweep.swapped && !sweep.manual);
-        check("the sweep stops at wiring 1", sweep.phases == 1);
-        check("later wirings are never tried", !joined(trace).contains("wiring 2/4"));
+        check("the probe finds the chip", "ESP32".equals(sweep.detected.chip));
+        check("an awake loader answers before any wiring", sweep.phases == 0);
+        check("no wiring is claimed when none was needed",
+                !sweep.swapped && !sweep.manual);
+        check("the log says the loader was already in its loader",
+                joined(trace).contains("already sitting in its loader"));
+        check("no wiring is tried at all", !joined(trace).contains("wiring 1/4"));
+        check("no control line moves for an awake loader", port.control.isEmpty());
+    }
+
+    /**
+     * Step 2, which is what the board's buttons are for: no control line ever moves,
+     * and a loader that starts answering mid-window is exactly a chip someone just put
+     * into download mode by hand. It has to be found before the four wirings, because
+     * on the board this was written for the wirings all depend on an EN leg that
+     * reaches nothing.
+     */
+    private static void handResetComesBeforeAnyWiring() throws Exception {
+        final UsbSerialCh340 port = new UsbSerialCh340();
+        final UsbSerialCh340.Responder answers = chip(false);
+        final int[] packets = {0};
+        port.answer((p, op, checksum, payload) -> {
+            // Silent through step 1's three packets, then awake: the hand that came
+            // down on BOOT and RESET between the two steps.
+            if (op == OP_SYNC && ++packets[0] <= 3) return;
+            answers.onCommand(p, op, checksum, payload);
+        });
+        final EspRom rom = new EspRom(port);
+        final List<String> trace = new ArrayList<>();
+        rom.setTrace(trace::add);
+
+        final EspRom.Sweep sweep = rom.connectAll();
+
+        check("BOOT + RESET enters the loader with no wiring", sweep.phases == 0);
+        check("the log asks for BOOT held and RESET tapped",
+                joined(trace).contains("hold the board's BOOT button down"));
+        check("step 2 is credited, not a wiring", joined(trace).contains("step 2 answered"));
+        check("step 2 is credited before any wiring", !joined(trace).contains("wiring 1/4"));
+        check("the hand path moves no control line", port.control.isEmpty());
     }
 
     /** A board that never answers must say all four were tried, not one. */
@@ -240,6 +279,7 @@ public final class HostTests {
         port.refuseRates = true;
         final EspRom rom = new EspRom(port);
         rom.setBootHoldLeadIn(0);
+        rom.setHandResetWait(0);   // no hand to wait for; go straight to the wirings
         final List<String> trace = new ArrayList<>();
         rom.setTrace(trace::add);
         try {
@@ -248,6 +288,10 @@ public final class HostTests {
         } catch (IOException e) {
             check("a silent board fails every wiring", e.getMessage().contains("4 wirings"));
             check("the sweep reached the last wiring", joined(trace).contains("wiring 4/4"));
+            check("the failure counts BOOT + RESET before the wirings",
+                    e.getMessage().contains("after BOOT + RESET by hand"));
+            check("the log asked for BOOT + RESET before sweeping",
+                    joined(trace).contains("hold the board's BOOT button down"));
         }
     }
 

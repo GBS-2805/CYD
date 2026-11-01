@@ -100,16 +100,19 @@ them owns the cable at a time; the choice is remembered across restarts.
 
 - **PROBE USB** reads the chip magic and MAC, then restarts the board into its
   firmware — it never leaves the deck sitting in its bootloader.
-- **One PROBE press tries four wirings**, because a silent board can hide behind
-  any of them: normal and swapped control lines, each with the reset driven from
-  here and with EN pulsed while you hold **BOOT**. It stops at the first that
-  answers, says `found on wiring 2 of 4`, and sets **LINES** / **MANUAL BOOT** to
-  match so FLASH and RESTART reuse it. Hold BOOT from the moment the log reaches
-  wiring 3; the last two phases never drive IO0 low, and no software can press
-  that button. Before any of those four, one phase sends sync packets without
-  touching DTR or RTS at all: the ROM stays in its loader until something resets
-  it, so a board already sitting in download mode answers that phase — the only
-  case a wrong reset wiring cannot hide.
+- **One PROBE press asks for as little as it can, in three steps.** It listens
+  first, sending packets without touching DTR or RTS: the ROM stays in its loader
+  until something resets it, so a board already in download mode answers, and a
+  wrong reset wiring cannot hide that. If nothing answers it asks you to hold
+  **BOOT**, tap the board's own **RESET** and let go — the strap is a finger's and
+  the reset is the board's button, so the adapter's EN and IO0 legs are out of the
+  circuit entirely. Only then does it fall back to four wirings of its own: normal
+  and swapped control lines, each with the reset driven from here and with EN
+  pulsed while you hold **BOOT**. It stops at the first that answers, says `found
+  on wiring 2 of 4`, and sets **LINES** / **MANUAL BOOT** to match so RESTART
+  reuses it; an entry by hand reads `BOOT + RESET · no wiring needed` instead.
+  FLASH walks the same three steps before it writes, and its dialog says to keep
+  the board in reach for the buttons.
   A round whose banner reads `boot:0x3 (DOWNLOAD_BOOT…) waiting for
   download` has the chip in its loader and ignoring packets, so the closing line
   asks for a second host — a PC flashing over the same cable — instead of blaming
@@ -253,7 +256,7 @@ through Gradle; a raw `javac` build produces an APK-less class check and the
 BOARDS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
-[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (161 kB,
+[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (162 kB,
 package `dev.phonedesk.companion`, debug-signed). Install it with
 `adb install -r dist/PhoneDeckBridge-debug.apk`, or copy it to the phone and open
 it with "install unknown apps" allowed.

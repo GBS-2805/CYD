@@ -373,7 +373,8 @@ URL and a flashing note. Decisions behind it:
   block sizes are taken from esptool, but no erase or MD5 check has completed on
   a board.
 
-- **One PROBE press now covers all four wirings.** Trying a crosswired adapter
+- **One PROBE press covers all four wirings**, as its third step now — see *Probe
+  order* at the end of this file for what runs before them. Trying a crosswired adapter
   used to mean flipping **LINES**, pressing PROBE, waiting out a silent sweep and
   flipping it back; `EspRom.connectAll()` runs `connect()` four times — normal and
   swapped lines, each with the reset driven from the app and with EN pulsed while
@@ -387,7 +388,8 @@ URL and a flashing note. Decisions behind it:
 - The manual phases log `hold BOOT down now` and pause 2.5 s first: no software
   can press that button, and phases 3–4 only answer while it is held. The sweep is
   **untested on hardware**; what is tested is that it stops at wiring 1 when the
-  stub answers and that a silent stub reports all 4 wirings tried (26 host checks).
+  stub answers and that a silent stub reports all 4 wirings tried, with the host
+  suite covering both.
 
 - **A flash boot is its own verdict.** The 31 October run ended with every round of
   wiring 3 printing a banner, and the banner reading `boot:0x13
@@ -487,10 +489,10 @@ Identical to the sketch, checked against its `onWrite` handlers:
 - `gradle assembleDebug` (Gradle 8.7, AGP 8.6.1, SDK 35, JDK 17) builds a debug
   APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
-  the artifact in `dist/` now is the one rebuilt on 2026-10-31 after the sketch
-  header change, the probe work, the drawer's rework and the deck's sign-in —
-  **165,242 bytes** on the file in `dist/` as measured on 2026-11-01 after the
-  mirror, against the 112,473 that the same work produced before the second
+  the artifact in `dist/` now is the one rebuilt on 2026-11-01 after the probe
+  order changed, which followed the sketch header change, the probe work, the
+  drawer's rework and the deck's sign-in — **166,042 bytes** on the file in
+  `dist/`, against the 112,473 that the same work produced before the second
   widget joined it. The two
   halves were measured on their own branches the same day before they met —
   146,290 bytes for the drawer alone, 149,494 for the sign-in alone — and this
@@ -514,7 +516,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
   cleartext real requirements, so `toolchain.sh` now fails a build that lacks
   either instead of failing a build that has `INTERNET`, and its `aapt2 dump
   xmltree` check is what enforces the cleartext flag. `./toolchain.sh` passed end
-  to end on 2026-11-01: `all 61 host checks passed` (fifteen for the sign-in —
+  to end on 2026-11-01: `all 61 host checks passed`, as the suite stood then — it
+  is 103 now that the probe order has its own checks (fifteen for the sign-in —
   nine for `SpotifyLink`'s parser, six for the address it builds, including a `+`
   escaped as `%2B` rather than a space), `BUILD SUCCESSFUL`, v2 signature,
   `zipalign -c 4`, 165,242 bytes on the merged tree (149,494 for the sign-in
@@ -541,10 +544,10 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **165,242 bytes** on 2026-11-01, the rebuild carrying two bundled sketches, the
+  **166,042 bytes** on 2026-11-01, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
-  app and the mirror. Quote the size to the nearest kB (~161 kB), never as a
-  checksum.
+  app, the mirror and the three-step probe. Quote the size to the nearest kB
+  (~162 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set — now including
   `INTERNET`, the one outbound request to the deck —
@@ -578,6 +581,43 @@ Identical to the sketch, checked against its `onWrite` handlers:
   `MainActivity.applySystemBarInsets` pads the header and tab bar by the system
   bar insets **on 35 and above only**; below that the window still fits the bars
   and the padding would be doubled.
+
+## Probe order: the loader, then BOOT + RESET, then the wirings
+
+The 31 October and 1 November logs made one thing plain: every pulse was followed
+by `boot:0x13 (SPI_FAST_FLASH_BOOT)`, so EN reset the chip and IO0 was high as it
+left reset. The four-wiring sweep never addressed that — all four wirings drive
+EN, so a board whose reset pair reaches nothing fails four times the same way,
+which is what "552 B out, 0 B in" looked like on every round of every wiring.
+
+PROBE and FLASH now walk three steps instead:
+
+1. **Listen, touching nothing.** Packets only, which is all a chip already in its
+   loader needs. If it answers, no reset and no wiring took part.
+2. **BOOT + RESET by hand.** The log asks for BOOT held, RESET tapped, then BOOT
+   released, and sends nothing for 20 s while it polls. The strap is a finger's and
+   the reset is the board's own button, so the adapter's EN and IO0 legs are out of
+   the circuit entirely — the one entry path a broken reset pair cannot break.
+3. **The old four-wiring sweep**, unchanged, as a fallback for a board whose
+   buttons cannot be reached.
+
+`Sweep.phases` is 0 when step 1 or 2 answered, so the status line says
+`BOOT + RESET · no wiring needed` instead of naming a wiring that never ran, and
+the failure message counts BOOT + RESET before the wirings.
+
+FLASH calls the same three steps before it writes: entering the loader is the hard
+part, and it does not get easier because an image is waiting. The confirm dialog
+says to keep the board in reach for the buttons.
+
+The host checks cover the new order — an awake loader taken with no line changed,
+a step-2 answer after three silent packets credited to the hand rather than to a
+wiring, and a silent board still reporting all four wirings at the end. **None of
+the three steps has run on a phone since the change**; the last hardware run is
+the one recorded above, before it.
+
+`./toolchain.sh` passed end to end after the change on 2026-11-01: `all 103 host
+checks passed`, `BUILD SUCCESSFUL`, v2 signature, `zipalign -c 4`, both bundled
+sketches in sync, **166,042 bytes** in `dist/`.
 
 ## Not verified
 

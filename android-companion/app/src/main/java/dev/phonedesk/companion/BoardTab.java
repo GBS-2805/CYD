@@ -923,8 +923,10 @@ final class BoardTab extends ScrollView {
 
         TextView hint = Ui.text(activity,
                 "PROBE reads the chip ID and MAC, then restarts the board into its firmware. "
-                        + "RESTART BOARD boots the firmware that is already there. SYNC ONLY "
-                        + "sends one packet with no reset, for a chip already in its loader.",
+                        + "It listens first, then asks for BOOT + RESET, and only then "
+                        + "pulses the reset lines itself. RESTART BOARD boots the firmware "
+                        + "that is already there. SYNC ONLY sends one packet with no reset, "
+                        + "for a chip already in its loader.",
                 11, Ui.DIM);
         hint.setPadding(0, Ui.dp(activity, 6), 0, 0);
         hint.setLineSpacing(Ui.dp(activity, 2), 1f);
@@ -966,9 +968,11 @@ final class BoardTab extends ScrollView {
         card.addView(swapped);
 
         TextView sweepNote = Ui.text(activity,
-                "PROBE sweeps four wirings by itself — normal and swapped lines, each"
-                        + " with the reset driven here and with EN pulsed while BOOT is"
-                        + " held — and stops at the first that answers.", 11, Ui.DIM);
+                "PROBE works in three steps: it listens with nothing touched, then asks"
+                        + " for BOOT held and RESET tapped, then falls back to four wirings"
+                        + " of its own — normal and swapped lines, each with the reset"
+                        + " driven here and with EN pulsed while BOOT is held. FLASH walks"
+                        + " the same three steps before it writes.", 11, Ui.DIM);
         sweepNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
         sweepNote.setLineSpacing(Ui.dp(activity, 2), 1f);
         card.addView(sweepNote);
@@ -1184,7 +1188,7 @@ final class BoardTab extends ScrollView {
         if (!claimPortOrSay("probe")) return;
         usbProbing = true;
         final String label = describe(device);
-        setUsbStatus("Probing " + label + " · 4 wirings…", Ui.ACCENT);
+        setUsbStatus("Probing " + label + " · listening for the loader…", Ui.ACCENT);
 
         final UsbManager manager = (UsbManager) activity.getSystemService(Context.USB_SERVICE);
         new Thread(() -> {
@@ -1200,7 +1204,8 @@ final class BoardTab extends ScrollView {
             try {
                 port.open();
                 opened = true;
-                trace("port opened, line coding set; four wirings queued");
+                trace("port opened, line coding set; step 1 listens with no line"
+                        + " touched");
                 sweep = rom.connectAll();
                 final EspRom.Detected detected = sweep.detected;
                 message = detected.chip + " bootloader found · MAC " + detected.mac
@@ -1248,8 +1253,12 @@ final class BoardTab extends ScrollView {
         }, "usb-probe").start();
     }
 
-    /** Names the wiring that answered, so the status line is the whole result. */
+    /**
+     * Names the step that entered the loader, so the status line is the whole result.
+     * Zero phases means the chip answered before any wiring was tried.
+     */
     private static String describeWiring(EspRom.Sweep sweep) {
+        if (sweep.phases == 0) return "BOOT + RESET · no wiring needed";
         return (sweep.swapped ? "Lines swapped" : "Lines normal")
                 + " · " + (sweep.manual
                 ? "EN pulsed with BOOT held" : "reset driven by the app")
@@ -1328,8 +1337,9 @@ final class BoardTab extends ScrollView {
         new AlertDialog.Builder(activity)
                 .setTitle("Flash " + entry.name)
                 .setMessage(Ui.size(image.length) + " at 0x0, after erasing " + eraseKb
-                        + " kB, then checked by MD5.\n\n0x0 expects a merged image. Do not "
-                        + "unplug while it runs.")
+                        + " kB, then checked by MD5.\n\nKeep the board in reach: it asks "
+                        + "for BOOT held and RESET tapped to enter its loader.\n\n0x0 "
+                        + "expects a merged image. Do not unplug while it runs.")
                 .setPositiveButton("FLASH",
                         (dialog, which) -> startFlash(device, entry.name, image))
                 .setNegativeButton("Cancel", null)
@@ -1356,12 +1366,15 @@ final class BoardTab extends ScrollView {
             final UsbSerialCh340 port = new UsbSerialCh340(manager, device);
             final EspRom rom = new EspRom(port);
             rom.setTrace(BoardTab.this::trace);
-            rom.setSwappedLines(swappedLines);
             trace("== FLASH " + name + " · " + Ui.size(image.length) + " ==");
             try {
                 port.open();
                 trace("port opened");
-                rom.connect();
+                // The same three steps PROBE walks. Entering the loader is the hard
+                // part and it does not get easier because an image is waiting, so
+                // FLASH asks for BOOT + RESET too instead of pulsing blind.
+                final EspRom.Sweep sweep = rom.connectAll();
+                trace("loader found: " + describeWiring(sweep));
                 rom.flash(0, image, this::reportProgress);
                 message = name + " written and verified. The board rebooted into it.";
                 color = Ui.GOOD;

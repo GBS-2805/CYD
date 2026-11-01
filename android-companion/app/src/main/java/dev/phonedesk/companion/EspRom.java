@@ -135,6 +135,12 @@ final class EspRom {
     private int roundsWithBytes;
     /** How long a hand gets to reach BOOT during a sweep's manual phases. */
     private int bootHoldLeadMs = 2500;
+    /**
+     * How long step 2 gives a hand to hold BOOT and tap RESET. Long enough to find
+     * the buttons on a board already in hand, short enough that a probe at a bench
+     * does not feel stuck. The tests zero it.
+     */
+    private int handResetMs = 20000;
 
     EspRom(UsbSerialCh340 port) {
         this.port = port;
@@ -168,24 +174,91 @@ final class EspRom {
     }
 
     /**
-     * The whole probe in one press: the four wirings a silent board can hide behind.
+     * The whole probe in one press, in the order that asks the least of the reset
+     * wiring first.
      *
-     * Each phase is exactly the one-shot handshake this class already ran — normal
-     * or swapped control lines, each with the reset driven from here or with EN
-     * pulsed while BOOT is held by hand — because {@link #connect()} reads
-     * swapControl and manualReset rather than being told which one to use. Trying a
-     * crosswired adapter used to mean flipping a toggle, pressing PROBE, waiting out
-     * a silent sweep and flipping it back; the sweep does that four times and stops
-     * at the first phase that syncs.
+     * Step 1 sends packets with no line touched, which is all a chip already in its
+     * loader needs. Step 2 asks for BOOT held and the board's own RESET tapped: the
+     * strap is a finger's, so EN, IO0 and their polarity take no part, and a board
+     * whose reset pair reaches nothing can still be entered. Step 3 is the four-way
+     * sweep of the app's own reset, kept for a board whose buttons cannot be reached
+     * — it is a fallback now, not the first thing a press does.
      *
-     * A bridge that refuses to take bytes is fatal to every phase, so WriteFailure
-     * is rethrown instead of being retried three more times.
+     * Each sweep phase is exactly the one-shot handshake this class already ran,
+     * because {@link #connect()} reads swapControl and manualReset rather than being
+     * told which one to use. A bridge that refuses to take bytes is fatal to every
+     * step, so WriteFailure is rethrown instead of being retried.
      */
     Sweep connectAll() throws IOException {
+        connected = false;
+        swapControl = false;
+        manualReset = false;
+        roundsSeen = 0;
+        roundsWithBytes = 0;
+        bannerSeen = false;
+        flashBootMode = "";
+        downloadBoot = false;
+
+        log("probe: 3 steps — an awake loader, BOOT + RESET by hand, then the app's"
+                + " own reset.");
+        if (quietSync(QUIET_SYNC_ATTEMPTS)) {
+            log("  step 1 answered: the chip was already sitting in its loader, so no"
+                    + " reset and no wiring took part");
+            return new Sweep(identify("none"), false, false, 0);
+        }
+        log("  step 1 got no answer: a chip running its firmware ignores packets, which"
+                + " says nothing yet about the cable");
+        if (handReset()) return new Sweep(identify("none"), false, false, 0);
+        return sweepWirings();
+    }
+
+    /**
+     * Step 2: the board's own buttons.
+     *
+     * Hold BOOT, tap RESET, let go of BOOT: the chip leaves reset with IO0 held low
+     * by a finger, so the ROM starts in download mode and answers the next packet.
+     * Nothing on the adapter moves, which is what makes this the one path that
+     * survives a reset pair reaching nothing — every wiring in the fallback sweep
+     * still drives EN, so all four fail the same way on that board.
+     */
+    private boolean handReset() throws IOException {
+        log("  step 2: hold the board's BOOT button down, tap its RESET, then let go of"
+                + " BOOT.");
+        log("   nothing is sent and no line moves for " + (handResetMs / 1000)
+                + " s, because a chip in the loader answers a packet on its own");
+        final long deadline = System.currentTimeMillis() + handResetMs;
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                if (quietSync(QUIET_SYNC_ATTEMPTS)) {
+                    log("   step 2 answered: BOOT + RESET put the chip in its loader and"
+                            + " the adapter's EN and IO0 legs were never used");
+                    return true;
+                }
+            } catch (WriteFailure e) {
+                throw e;   // the bridge refusing bytes is not the board staying silent
+            } catch (IOException e) {
+                // Silent so far; keep listening until the window closes.
+            }
+            sleep(250);
+        }
+        log("   step 2 got no answer in " + (handResetMs / 1000) + " s: either the"
+                + " buttons were not pressed, or the packets are not reaching the chip");
+        return false;
+    }
+
+    /**
+     * Step 3: the app's own reset, once per wiring.
+     *
+     * This is what used to run first. It still covers an adapter whose DTR/RTS pair
+     * is crosswired, and it is the only path left when the buttons cannot be reached,
+     * but it cannot help a board whose reset pair reaches nothing: all four wirings
+     * drive EN, so all four fail the same way.
+     */
+    private Sweep sweepWirings() throws IOException {
         IOException last = null;
         int phase = 0;
-        log("sweep: 4 wirings in one press, stopping at the first that answers."
-                + " Hold BOOT down from the moment this log reaches wiring 3.");
+        log("  step 3: the app's own reset, 4 wirings, stopping at the first that"
+                + " answers.");
         for (boolean swap : new boolean[]{false, true}) {
             for (boolean manual : new boolean[]{false, true}) {
                 swapControl = swap;
@@ -215,8 +288,9 @@ final class EspRom {
                 }
             }
         }
-        throw new IOException("no answer from the bootloader on any of the 4 wirings"
-                + " (normal and swapped lines, app reset and BOOT held by hand); last: "
+        throw new IOException("no answer from the bootloader after BOOT + RESET by hand"
+                + " and on any of the 4 wirings (normal and swapped lines, app reset and"
+                + " EN pulsed with BOOT held); last: "
                 + (last == null ? "no attempt ran" : last.getMessage()));
     }
 
@@ -230,12 +304,21 @@ final class EspRom {
         bootHoldLeadMs = millis;
     }
 
+    /** How long step 2 waits for BOOT + RESET; the tests zero it. */
+    void setHandResetWait(int millis) {
+        handResetMs = millis;
+    }
+
     /** Which of the four wirings answered, so the tab can persist it. */
     static final class Sweep {
         final Detected detected;
         final boolean swapped;
         final boolean manual;
-        /** 1 means the first wiring worked; 4 means only the last one did. */
+        /**
+         * 0 means the chip answered before any wiring was tried — an awake loader or a
+         * hand on BOOT and RESET. 1 means the first wiring worked; 4 means only the
+         * last one did.
+         */
         final int phases;
 
         Sweep(Detected detected, boolean swapped, boolean manual, int phases) {
@@ -461,6 +544,15 @@ final class EspRom {
             throw new IOException(message);
         }
 
+        return identify(silent.toString());
+    }
+
+    /**
+     * The tail of every successful entry: confirm the chip, read its MAC and mark the
+     * session synced. Steps 1 and 2 of {@link #connectAll()} arrive here without
+     * passing through connect(), so the check lives in one place rather than twice.
+     */
+    private Detected identify(String triedBauds) throws IOException {
         final int magic = readRegister(CHIP_DETECT_MAGIC);
         log(String.format(Locale.US, "chip magic 0x%08x", magic));
         if (magic != ESP32_MAGIC) {
@@ -476,7 +568,7 @@ final class EspRom {
         }
         log("MAC " + mac);
         connected = true;
-        return new Detected("ESP32", mac, baud, silent.toString());
+        return new Detected("ESP32", mac, baud, triedBauds);
     }
 
     /** Which rate answered, so the UI can say so when it was not the default. */
