@@ -121,7 +121,11 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   `arduino-cli` in it (`~/.arduino-cyd-3`, `~/.arduino-cyd` or `$ARDUINO_HOME`)
   is a half-finished install, and that refuses the commit and prints three ways
   out — finish the install, point `ARDUINO_CLI` at a compiler, or accept the gap
-  with `HEADROOM_ALLOW_MISSING_TOOLCHAIN=1` for that one commit.
+  with `HEADROOM_ALLOW_MISSING_TOOLCHAIN=1` for that one commit. A merge runs
+  the same script through
+  [`pre-merge-commit`](.githooks/pre-merge-commit), because git runs no
+  `pre-commit` for the commit it makes at the end of a merge; a fast-forward
+  creates no commit and so checks nothing.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
