@@ -177,6 +177,41 @@ The script is the same one the phone deck ships and shares its install root, so
 a machine that can build one can build both. It uses the **default partition
 scheme**; see the measurement below for why that is enough.
 
+## Flash it — from a computer, or from the phone
+
+Both decks are ordinary Arduino sketches and both travel on the phone: the app
+bundles this one too (`check_widget_assets.py` prints `2 widgets bundled, every
+copy matches`, with this sketch at md5 `eca02e93…`), so it can be pulled from the
+same shelf as its sibling.
+
+From a computer, `toolchain.sh` has already compiled it:
+
+```bash
+source ~/.arduino-cyd/env.sh
+arduino-cli upload --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 spotify_deck_cyd24R
+```
+
+From the phone, with an OTG adapter and a USB **data** cable:
+
+1. **PROJECTS** → the **Spotify Deck** card → **COPY DROID**, then paste into a
+   new ArduinoDroid sketch. If no such card is there, **IMPORT** the `.ino` from
+   wherever you put it and open it from the flash shelf instead.
+2. Keep it one tab named exactly `spotify_deck_cyd24R.ino`, and add no `.h`
+   files: only the `.ino` is compiled.
+3. Board **ESP32 Dev Module**; install only Adafruit GFX, Adafruit ILI9341 and
+   XPT2046_Touchscreen. **ArduinoBLE must not be installed.**
+4. Upload from ArduinoDroid. That is measured, not assumed: on 2026-10-31 the
+   same phone, OTG adapter, cable and board flashed successfully from
+   ArduinoDroid. The handshake that never synced that day belonged to the
+   companion app's own uploader, so it says nothing about this one. A computer
+   over the same cable is the fallback when the phone's upload will not take.
+5. Nothing needs typing before a flash: no credentials live in the sketch, so the
+   first boot draws the SETUP card and raises the `Spotify Deck` access point.
+
+There is no image to merge and no offset to set — this is a sketch upload, not a
+factory `.bin`. Uploading a different partition scheme later re-partitions the
+board under the other deck too.
+
 ## Measured, and not
 
 A clean build in this repo on **2026-10-31** with `arduino-cli` 1.5.2-rc.1, core
