@@ -30,6 +30,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 FQBN = "esp32:esp32:esp32"
 
+# A deck that has outgrown the default scheme says so here, and the ceiling still
+# comes from the compiler rather than this table: with huge_app it prints
+# 3,145,728, so the same floors are applied to a bigger slot. Only the Spotify
+# deck is listed, because Bluetooth does not fit beside WiFi, TLS and its setup
+# server in 1,310,720 bytes.
+PARTITION = {"spotify_deck_cyd24R": "PartitionScheme=huge_app"}
+
+
+def fqbn_for(folder):
+    extra = PARTITION.get(folder.name)
+    return f"{FQBN}:{extra}" if extra else FQBN
+
 FLASH_RE = re.compile(
     r"Sketch uses (\d+) bytes \((\d+)%\) of program storage space\. "
     r"Maximum is (\d+) bytes"
@@ -53,7 +65,7 @@ def find_sketches(wanted):
 
 def compile_sketch(cli, folder, timeout):
     return subprocess.run(
-        [cli, "compile", "--fqbn", FQBN, str(folder)],
+        [cli, "compile", "--fqbn", fqbn_for(folder), str(folder)],
         capture_output=True,
         text=True,
         timeout=timeout,
@@ -125,13 +137,17 @@ def main():
     failures = 0
     checked = 0
 
+    # The slot column is wider than it looks: huge_app prints 3,145,728, and at
+    # nine characters it used to run straight into the free column beside it.
     print(
-        f"{'deck':30s}{'flash':>10s}{'slot':>10s}{'free':>9s}"
-        f"{'globals':>9s}{'ram free':>10s}  status"
+        f"{'deck':30s}{'flash':>10s}{'slot':>11s}{'free':>11s}"
+        f"{'globals':>11s}{'ram free':>12s}  status"
     )
     for folder in find_sketches(args.decks):
         checked += 1
-        blank = f"{folder.name:30s}{'':>10s}{'':>10s}{'':>9s}{'':>9s}{'':>10s}  "
+        blank = (
+            f"{folder.name:30s}{'':>10s}{'':>11s}{'':>11s}{'':>11s}{'':>12s}  "
+        )
         try:
             done = compile_sketch(cli, folder, args.timeout)
         except subprocess.TimeoutExpired:
@@ -179,8 +195,8 @@ def main():
             status = f"ok ({percent}% flash, {globals_used:,} B globals)"
 
         print(
-            f"{folder.name:30s}{used:>10,}{slot:>10,}{flash_free:>9,}"
-            f"{globals_used:>9,}{ram_free:>10,}  {status}"
+            f"{folder.name:30s}{used:>10,}{slot:>11,}{flash_free:>11,}"
+            f"{globals_used:>11,}{ram_free:>12,}  {status}"
         )
         if done.returncode != 0:
             for line in output.strip().splitlines()[-3:]:

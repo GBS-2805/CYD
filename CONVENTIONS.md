@@ -262,10 +262,16 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
   efuse MAC, and let the first phone to connect claim it.
 * Keep every name the widget has ever advertised in the app's `nameMatch`, or
   boards flashed before a rename stop being found.
-* Service and characteristic UUIDs are per deck, never reused across decks:
-  every board tag of one deck speaks the same service, so one phone drives
-  whichever board is flashed, and `nameMatch` keeps every name a tag has ever
-  advertised.
+* Service and characteristic UUIDs are per deck, never reused across decks, with
+  one deliberate exception: the **Phone Link** service (`6f2d0001-…` and its six
+  characteristics) is spoken by every deck that talks to the companion app,
+  because the app has one scan and one implementation of it. That is what lets one
+  phone drive whichever BLE deck is flashed. What stays per deck is the identity
+  document — widget, name, role, board — and the advertised name, which is what
+  `nameMatch` reads.
+* A deck that speaks the service must expose **all** of time, battery and notice,
+  not just the ones it draws: the app refuses a link to a server missing any of
+  them, and a refusal looks exactly like a dead chip on the glass.
 * Nothing here pairs in the phone's Bluetooth settings: these are GATT
   peripherals, not keyboards. A design that makes Android treat the board as an
   input device gets the link dropped.
@@ -380,8 +386,12 @@ the front page needs no second navigation.
   and nothing asks the user to make a developer app: the companion app reads the
   phone's media session (already permitted by the notification access it needs for
   notifications) and writes one line — `state|position|duration|title|artist|album`
-  — down the link at 1 Hz. The deck draws what it was told and cannot control
-  playback, so its now-playing page has no transport buttons. This is also why the
+  — down the link at 1 Hz. The deck draws what it was told and never changes
+  playback itself. A deck with a transport row makes a chip a **request**: it
+  raises a notify on `6f2d0007-…` and the phone runs the key against its own
+  session, so the lit chip means the round trip, not the outcome, and the next
+  mirror line is what proves it. A deck with no phone linked keeps the Web API
+  path, where the chip really is a command. This is also why the
   two decks differ: the WiFi deck signs itself in and can play on its own, and a
   Bluetooth deck shows the phone's own player instead. Cost of the mirror: one
   characteristic, ~120 bytes of RAM, and an optional dependency on a phone in the

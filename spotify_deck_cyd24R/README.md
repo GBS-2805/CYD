@@ -1,10 +1,19 @@
 # Spotify Deck
 
-The second deck, and the first one that is not a Bluetooth peripheral. It has no
-companion app and no phone link: it joins your WiFi, signs in to Spotify with a
-refresh token, asks the Web API what is playing every three seconds, and draws
-the answer. The three chips under the track send **previous**, **play/pause** and
-**next** back to whichever device on the account is active.
+The second deck, and the only one that is both things at once. It joins your
+WiFi, signs in to Spotify with a refresh token, asks the Web API what is playing
+every three seconds, and draws the answer — **and** it is a Bluetooth peripheral
+that reads the phone's own media session, so the same page works with no sign-in
+at all. A linked phone wins: it is what the screen shows and what the chips ask.
+The three chips under the track send **previous**, **play/pause** and **next** —
+to the phone when one is linked, otherwise to whichever device on the account is
+active.
+
+This deck needs `PartitionScheme=huge_app`. Bluetooth does not fit beside WiFi,
+mbedTLS and the setup server in the default 1,310,720-byte app slot: the linked
+image is 1,878,581-1,878,629 bytes, 142 % of that slot and 59 % of this one. Flashing the
+phone deck afterwards with the default scheme re-partitions the board back, so
+each upload has to carry the scheme its own sketch was built for.
 
 It is the same board as its sibling — **ESP32-2432S024R**, 2.4" resistive CYD —
 and the same palette: two monochrome themes of twelve slots each. `THEME_INDEX =
@@ -29,6 +38,9 @@ person reads says **Spotify Deck**.
 4. A **Spotify developer app** for the Client ID. No client secret, and no
    refresh token minted elsewhere: the deck mints its own from its own page.
 
+None of the four is needed for the Bluetooth path below: that needs a phone in the
+room with the companion app running, and nothing else at all.
+
 ### The Spotify app (once, from the phone)
 
 At <https://developer.spotify.com/dashboard>, **Create app**, then under Settings
@@ -47,6 +59,39 @@ custom scheme is still accepted (`com.example://callback` "can still be used as
 before", Spotify, February 2025) and it is the only kind of redirect a browser
 will hand to an app, which is what makes the one-tap path possible. Leave the
 client secret alone: the page signs in with PKCE (S256), which does not use one.
+
+## The phone link, which needs none of the above
+
+With no client id, no refresh token and no WiFi, the deck still boots into this
+same player page: it advertises `<name> <TAG>` with the **Phone Link** service the
+phone deck speaks, and the companion app writes what the phone is playing into it
+once a second. That is the whole mirror — the deck draws it, extrapolates the bar
+between lines, and shows `PHONE` in the header instead of `WIFI`.
+
+| Characteristic | Direction | What this deck does with it |
+| --- | --- | --- |
+| `6f2d0002-…` time | phone → deck | accepted and dropped: this page has no clock |
+| `6f2d0003-…` battery | phone → deck | stored; a low battery is the app's own business, not drawn yet |
+| `6f2d0004-…` notice | phone → deck | accepted and dropped: there is no notice card here |
+| `6f2d0005-…` identity | deck → phone | the same document `/deck.json` answers, with `"link":"ble"` |
+| `6f2d0006-…` now playing | phone → deck | the mirror line, `state\|position\|duration\|title\|artist\|album` |
+| `6f2d0007-…` command | deck → phone | **notify**: `<serial>\|prev`, `<serial>\|toggle`, `<serial>\|next` |
+
+The first three exist because the app will not hold a link to a service that is
+missing them, not because this page draws them. The last two are the useful pair.
+
+**A chip is a request, never a change of state.** The deck has no player of its
+own, so a tap raises a notify and lights the chip; the phone runs the key against
+its live session and the next mirror line is what clears the light. Nothing here
+writes a play state it cannot verify, which is why the page never lies about what
+is playing. With no phone linked the chips fall back to Spotify's Web API, which
+is the older path and still what a signed-in deck uses.
+
+Latency, and what is left of it: the deck asks for a **7.5–15 ms** connection
+interval with no slave latency when a phone connects
+(`updateConnParams(remote_bda, 6, 12, 0, 400)`) against the stack's 30–50 ms
+default — a request the phone may ignore. The phone's own cadence is the floor:
+one line a second means up to a second of staleness by design.
 
 ## Pairing, and signing in from the app
 
@@ -313,12 +358,20 @@ sketch from a desktop on 2026-10-31.
 ### Headroom
 
 Measured here on 2026-11-01 with [`../check_headroom.py`](../check_headroom.py),
-core **3.3.12**, default partition scheme:
+core **3.3.12**, `PartitionScheme=huge_app` — the scheme this deck now needs, and
+which `check_headroom.py` knows about per deck so the ceiling still comes from the
+compiler:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,125,781 | **184,939** | 1,310,720 (85 % used) |
-| DRAM | 53,636 globals | **274,044** | 327,680 |
+| flash | 1,878,581-1,878,629 | **1,267,099** | 3,145,728 (59 % used) |
+| DRAM | 69,092 globals | **258,588** | 327,680 |
+
+Without Bluetooth the same sketch was 1,125,781 bytes on the default scheme; the
+link costs **about 753 kB** of flash and 15,456 B of globals, which is Bluedroid, not
+this sketch's own code. On the default scheme the linked build reads 142 % and
+will not link at all — that is the measurement that forced `huge_app`, and
+[`toolchain.sh`](toolchain.sh) now pins it.
 
 The check refuses a deck that overflows, that drops under **64 KiB** of free flash
 or that leaves under **160 KiB** of DRAM — the last floor is just over the
@@ -350,12 +403,13 @@ sourcing a toolchain.
   [the build note](../CONVENTIONS.md#build)); 3.3.12 is what `toolchain.sh` pins
   now, so that is where the release numbers come from, and 2.0.17 is kept as the
   A/B build rather than the shipping one.
-* **It still fits on 3.3.12, on about a third of the slack:** 1,125,781 bytes
-  against the 1,310,720-byte app slot the default scheme gives leaves
-  **184,939 B (14 %)** free, where 2.0.17 leaves 343,307 B (26 %). `default.csv`
-  sizes `app0` and `app1` at 1,310,720 each, so a wireless update faces the same
-  ceiling; under `huge_app` the same build reads 36 % — a bigger room, not
-  smaller code.
+* **It needs `huge_app` now, and that is the scheme `toolchain.sh` pins.**
+  Without Bluetooth the 3.3.12 build was 1,125,781 bytes (85 % of the
+  1,310,720-byte default slot); with the link it is 1,878,581-1,878,629 bytes, the same build
+  twice with 48 B between the runs, which is **142 %** of that slot and **59 %** of `huge_app`'s 3,145,728. `default.csv`
+  sizes `app0` and `app1` at 1,310,720 each, so on the default scheme this deck no
+  longer links at all — not a tighter fit, a refusal. Uploading it re-partitions
+  the board, and flashing the phone deck afterwards puts the default scheme back.
 * Seven warnings, all accounted for above.
 * The bundled copy in `app/src/main/assets/widgets/spotify_deck_cyd24R/` matches
   this folder byte for byte after `:app:syncWidgets`, and
@@ -366,6 +420,12 @@ sourcing a toolchain.
 **Unverified — only the board can settle these.** No sketch in this repo has
 been flashed, so all of the following are still assumptions:
 
+* **The whole Bluetooth path is new and has never run.** No phone has connected to
+  this deck, no mirror line has been parsed on the board, and no notify has reached
+  a phone — the companion app has not been taught the command characteristic yet,
+  so a chip logs `[cmd] 3|toggle`, lights, and waits for an answer that does not
+  come. `PartitionScheme=huge_app` has also never been flashed to this board, and
+  the setup server has never run beside the Bluetooth stack.
 * The access point, the setup page on a real phone, and whether that phone keeps
   mobile data for the Spotify tab while it is joined to the deck.
 * The S256 challenge as Spotify receives it, the code exchange, and the pinned
@@ -417,6 +477,11 @@ been flashed, so all of the following are still assumptions:
   own address in `state`, the field Spotify echoes back untouched; the app makes
   one request to `http://<deck-ip>/code?redir=app&code=...&json=1` and asks for a
   one-line answer, and the browser only takes over when that request gets none.
+* **A partition scheme belongs to the flash, not to the sketch.** A board carries
+  one table at a time, so a deck built for `huge_app` and a deck built for the
+  default both work — but only in the order they were flashed. This is why
+  `toolchain.sh` pins the scheme instead of leaving it to the flag of the day, and
+  why `check_headroom.py` holds a per-deck scheme rather than one global FQBN.
   That is why the APK now asks for INTERNET and cleartext: one outbound request to
   a LAN address, where the browser used to make it. Nothing secret rides in
   `state` — a forged one can only aim a code at the wrong LAN address, where the

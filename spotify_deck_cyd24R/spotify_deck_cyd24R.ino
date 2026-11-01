@@ -55,6 +55,15 @@
 #include <mbedtls/base64.h>  // PKCE: SHA-256 digest, then base64url
 #include <mbedtls/md.h>
 
+// Bluetooth, from the core (Bluedroid) — never ArduinoBLE, whose BLEDevice.h
+// shadows these headers and turns the build into a wall of errors. This deck is
+// still a WiFi client; the phone in the room is now a second source, because the
+// Spotify Web API wants a developer app and that door is shut.
+#include <BLEDevice.h>
+#include <BLE2902.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
 #include <XPT2046_Touchscreen.h>
@@ -474,7 +483,13 @@ static NowPlaying live;
 static bool liveReady = false;
 static portMUX_TYPE snapMux = portMUX_INITIALIZER_UNLOCKED;
 
+// Defined with the Bluetooth link below. A linked phone is the source of truth
+// while it is there: it is the player the buttons on this glass actually move,
+// so the network task must not overwrite what it just said.
+static bool mirroredFresh(uint32_t withinMs);
+
 static void publishNowPlaying(const NowPlaying &n) {
+  if (mirroredFresh(5000)) return;
   portENTER_CRITICAL(&snapMux);
   live = n;
   liveReady = true;
@@ -2286,6 +2301,97 @@ static void drawSetupLink() {
                 stations, static_cast<unsigned>(setupConnections));
 }
 
+// ---------------------------------------------------------- bluetooth link ---
+// This deck speaks the Phone Link service its sibling speaks, so one companion
+// app drives whichever board is flashed: it writes time, battery and notices, and
+// it writes what the phone is playing. That mirror is the point — it is the one
+// source of music that needs no client id.
+//
+// One thing goes the other way. A transport chip raises a notify on the command
+// characteristic and the phone answers it against its own player. The deck never
+// changes playback itself: a chip is a request, and the mirror line that comes
+// back is the proof the phone took it.
+
+static constexpr char LINK_SERVICE[] = "6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10";
+static constexpr char LINK_TIME[] = "6f2d0002-9a3c-4b57-9d21-6a1e0c4f8b10";
+static constexpr char LINK_BATTERY[] = "6f2d0003-9a3c-4b57-9d21-6a1e0c4f8b10";
+static constexpr char LINK_NOTICE[] = "6f2d0004-9a3c-4b57-9d21-6a1e0c4f8b10";
+static constexpr char LINK_IDENTITY[] = "6f2d0005-9a3c-4b57-9d21-6a1e0c4f8b10";
+static constexpr char LINK_NOW[] = "6f2d0006-9a3c-4b57-9d21-6a1e0c4f8b10";
+static constexpr char LINK_CMD[] = "6f2d0007-9a3c-4b57-9d21-6a1e0c4f8b10";
+
+static volatile bool linkConnected = false;
+static volatile uint32_t linkMirrorMs = 0;
+static volatile uint8_t linkBatteryPct = 0;
+static volatile bool linkCharging = false;
+// Which chip was asked, and when. Lit for the round trip; the next full redraw
+// clears it, and the mirror line that moved is what proves the phone answered.
+static volatile uint8_t linkChip = 0;
+static volatile uint32_t linkChipMs = 0;
+
+static bool mirroredFresh(uint32_t withinMs) {
+  if (!linkConnected) return false;
+  const uint32_t at = linkMirrorMs;
+  return at != 0 && millis() - at < withinMs;
+}
+
+// One field of the mirror line, copied and cut on a UTF-8 boundary. A `|` cannot
+// reach here: the split happens first, so a stray one only shortens a field.
+static void copyField(const char *from, char *to, size_t cap) {
+  if (to == nullptr || cap == 0) return;
+  to[0] = '\0';
+  if (from == nullptr) return;
+  size_t n = strlen(from);
+  if (n >= cap) {
+    n = cap - 1;
+    while (n > 0 && (static_cast<unsigned char>(from[n]) & 0xC0) == 0x80) --n;
+  }
+  memcpy(to, from, n);
+  to[n] = '\0';
+}
+
+// The phone's line: `state|position|duration|title|artist|album`, all seconds.
+// Anything unreadable is zero or empty rather than a guess, so a bad line shows
+// `--:--` instead of a duration the deck invented.
+static void applyMirrorLine(const char *line) {
+  if (line == nullptr || *line == '\0') return;
+
+  char buf[184];
+  copyField(line, buf, sizeof(buf));
+
+  char *field[6] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+  uint8_t count = 0;
+  field[count++] = buf;
+  for (char *p = buf; *p != '\0' && count < 6; ++p) {
+    if (*p == '|') {
+      *p = '\0';
+      field[count++] = p + 1;
+    }
+  }
+  if (count < 3) return;
+
+  NowPlaying n;
+  memset(&n, 0, sizeof(n));
+  n.ready = true;
+  n.playing = strcmp(field[0], "play") == 0;
+  n.updatedMs = millis();
+  if (strcmp(field[0], "stop") != 0) {
+    n.progressMs = static_cast<uint32_t>(strtoul(field[1], nullptr, 10)) * 1000UL;
+    n.durationMs = static_cast<uint32_t>(strtoul(field[2], nullptr, 10)) * 1000UL;
+    if (count > 3) copyField(field[3], n.title, sizeof(n.title));
+    if (count > 4) copyField(field[4], n.artist, sizeof(n.artist));
+  }
+  // The footer names what is playing it. The mirror does not say which app, but it
+  // does say it is the phone, and a blank there would read as a broken deck.
+  copyField("phone", n.device, sizeof(n.device));
+
+  linkMirrorMs = millis();
+  portENTER_CRITICAL(&snapMux);
+  live = n;
+  liveReady = true;
+  portEXIT_CRITICAL(&snapMux);
+}
+
 // --------------------------------------------------------------- now page ---
 
 static const Rect PREV_BTN = {8, 152, 96, 52};
@@ -2326,9 +2432,15 @@ static void drawSetupChip(bool lit) {
 static void drawHeader() {
   tft.fillRect(0, 0, SCREEN_W, 32, C_BG);
   drawTextAt("SPOTIFY DECK", 12, 10, 2, C_TEXT, C_BG);
-  const bool up = WiFi.status() == WL_CONNECTED;
-  drawTextRight(up ? "WIFI" : "NO WIFI", SCREEN_W - 12, 13, 1,
-                up ? C_DIM : C_PINK, C_BG);
+  // A linked phone is the thing that can actually play, so it is what the header
+  // reports; WiFi is the older path and only worth a word when it is all there is.
+  if (linkConnected) {
+    drawTextRight("PHONE", SCREEN_W - 12, 13, 1, C_DIM, C_BG);
+  } else {
+    const bool up = WiFi.status() == WL_CONNECTED;
+    drawTextRight(up ? "WIFI" : "NO LINK", SCREEN_W - 12, 13, 1,
+                  up ? C_DIM : C_PINK, C_BG);
+  }
   tft.drawFastHLine(0, 31, SCREEN_W, C_EDGE);
 }
 
@@ -2376,9 +2488,13 @@ static void drawNow() {
              C_TILE);
   drawProgress(n);
 
-  drawChip(PREV_BTN, "|<<", 2, false);
+  // A chip asked of the phone stays lit until the next redraw, exactly as on the
+  // phone deck: the light is the round trip, not the outcome. PLAY is always filled
+  // because it is this page's one action on the WiFi path.
+  const bool waiting = linkConnected && linkChipMs != 0 && millis() - linkChipMs < 4000;
+  drawChip(PREV_BTN, "|<<", 2, waiting && linkChip == CMD_PREV);
   drawChip(PLAY_BTN, n.playing ? "PAUSE" : "PLAY", 2, true);
-  drawChip(NEXT_BTN, ">>|", 2, false);
+  drawChip(NEXT_BTN, ">>|", 2, waiting && linkChip == CMD_NEXT);
 
   tft.fillRect(0, 204, SCREEN_W, 36, C_BG);
   drawTextAt(n.device[0] ? n.device : "no output device", 12, 210, 1, C_DIM,
@@ -2393,6 +2509,147 @@ static void drawNow() {
     drawTextAt("hold to change it", 12, 224, 1, C_DIM, C_BG);
   }
   drawSetupChip(setupChipLit);
+}
+
+// ------------------------------------------------------- link characteristics ---
+// The service the companion app insists on before it holds a link: time, battery
+// and notices are what the phone deck draws with. This deck shows the battery in
+// its footer, wraps no clock and has no notice card, so those two are accepted and
+// dropped rather than drawn — the app does not care what the board does with them,
+// only that the characteristic is there.
+
+class LinkTimeCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *c) override { (void)c; }
+};
+
+class LinkBatteryCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *c) override {
+    const uint8_t *raw = c->getData();
+    if (raw == nullptr || c->getLength() < 1) return;
+    linkBatteryPct = raw[0] > 100 ? 100 : raw[0];
+    linkCharging = c->getLength() > 1 && raw[1] != 0;
+  }
+};
+
+class LinkNoticeCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *c) override { (void)c; }
+};
+
+class LinkNowCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *c) override {
+    const uint8_t *raw = c->getData();
+    const size_t len = c->getLength();
+    if (raw == nullptr || len == 0) return;
+    char line[184];
+    const size_t n = len < sizeof(line) - 1 ? len : sizeof(line) - 1;
+    memcpy(line, raw, n);
+    line[n] = '\0';
+    applyMirrorLine(line);
+  }
+};
+
+static BLECharacteristic *linkCommandChar = nullptr;
+static uint32_t linkSerial = 0;
+
+class LinkServerCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer *server, esp_ble_gatts_cb_param_t *param) override {
+    linkConnected = true;
+    linkChip = 0;
+    linkChipMs = 0;
+    // 7.5–15 ms with no slave latency, so a tap does not wait three connection
+    // intervals to reach the phone. The phone may grant more; this is a request.
+    server->updateConnParams(param->connect.remote_bda, 6, 12, 0, 400);
+    Serial.println("[link] phone connected");
+  }
+
+  void onDisconnect(BLEServer *server) override {
+    (void)server;
+    linkConnected = false;
+    linkChip = 0;
+    // Bluedroid stops advertising when a phone connects and never resumes it, so
+    // without this the deck is invisible to the next scan once a phone walks off.
+    BLEDevice::startAdvertising();
+    Serial.println("[link] phone gone, advertising again");
+  }
+};
+
+// The same document a network deck answers on /deck.json, minus the fields that
+// only mean something on a network. The app's DeckIdentity parses either.
+static void buildLinkIdentity(char *out, size_t cap) {
+  snprintf(out, cap,
+           "{\"id\":\"%s\",\"widget\":\"%s\",\"tag\":\"%s\","
+           "\"name\":\"%s\",\"role\":\"%s\",\"board\":\"%s\","
+           "\"link\":\"ble\"}",
+           deckId().c_str(), DECK_WIDGET, deckTag, DECK_NAME, DECK_ROLE, DECK_BOARD);
+}
+
+static void startBluetooth() {
+  // The advertised name is what the app's scan matches on, so it starts with the
+  // deck's name; the tag on the end is the half of the id that cannot move.
+  char name[28];
+  snprintf(name, sizeof(name), "%s %s", DECK_NAME, deckTag);
+  BLEDevice::init(name);
+  BLEDevice::setMTU(185);
+
+  BLEServer *server = BLEDevice::createServer();
+  server->setCallbacks(new LinkServerCallbacks());
+  BLEService *service = server->createService(LINK_SERVICE);
+
+  const uint32_t write = BLECharacteristic::PROPERTY_WRITE;
+  BLECharacteristic *time = service->createCharacteristic(LINK_TIME, write);
+  time->setCallbacks(new LinkTimeCallbacks());
+  BLECharacteristic *battery = service->createCharacteristic(LINK_BATTERY, write);
+  battery->setCallbacks(new LinkBatteryCallbacks());
+  BLECharacteristic *notice = service->createCharacteristic(LINK_NOTICE, write);
+  notice->setCallbacks(new LinkNoticeCallbacks());
+  BLECharacteristic *now = service->createCharacteristic(LINK_NOW, write);
+  now->setCallbacks(new LinkNowCallbacks());
+
+  char document[192];
+  buildLinkIdentity(document, sizeof(document));
+  BLECharacteristic *identity =
+      service->createCharacteristic(LINK_IDENTITY, BLECharacteristic::PROPERTY_READ);
+  identity->setValue(reinterpret_cast<uint8_t *>(document), strlen(document));
+
+  // Deck to phone, the only direction this board talks back on.
+  linkCommandChar =
+      service->createCharacteristic(LINK_CMD, BLECharacteristic::PROPERTY_NOTIFY);
+  linkCommandChar->addDescriptor(new BLE2902());
+
+  service->start();
+
+  BLEAdvertising *advertising = BLEDevice::getAdvertising();
+  advertising->addServiceUUID(LINK_SERVICE);
+  advertising->setScanResponse(true);
+  advertising->setMinPreferred(0x06);
+  advertising->setMaxPreferred(0x12);
+  BLEDevice::startAdvertising();
+  Serial.printf("[link] advertising as %s\n", name);
+}
+
+// Ask the phone to do something. False means no phone is listening, so a caller
+// signed in to Spotify can fall back to the Web API instead.
+static bool sendLinkCommand(const char *action) {
+  if (!linkConnected || linkCommandChar == nullptr) return false;
+
+  char line[20];
+  snprintf(line, sizeof(line), "%lu|%s", static_cast<unsigned long>(++linkSerial),
+           action);
+  linkCommandChar->setValue(reinterpret_cast<uint8_t *>(line), strlen(line));
+  linkCommandChar->notify();
+
+  uint8_t chip = 0;
+  if (strcmp(action, "prev") == 0) {
+    chip = CMD_PREV;
+  } else if (strcmp(action, "next") == 0) {
+    chip = CMD_NEXT;
+  }
+  linkChip = chip;
+  linkChipMs = millis();
+  if (chip == CMD_PREV) drawChip(PREV_BTN, "|<<", 2, true);
+  else if (chip == CMD_NEXT) drawChip(NEXT_BTN, ">>|", 2, true);
+  Serial.printf("[cmd] %s\n", line);
+  return true;
 }
 
 // ------------------------------------------------------------- calibration ---
@@ -2648,14 +2905,24 @@ void setup() {
     return;
   }
 
-  if (!credsComplete()) {
-    startSetupWizard();
-    return;
-  }
+  // Bluetooth comes up either way, and before the credential test: a phone in the
+  // room is a player this deck can show and drive with no client id at all, which
+  // is the only path that works while Spotify's developer apps are closed.
+  startBluetooth();
 
   Serial.printf("[id] Spotify Deck, esp32 // %08lx\n",
                 static_cast<unsigned long>(ESP.getEfuseMac()));
   Serial.printf("[id] %s\n", deckId().c_str());
+
+  if (!credsComplete()) {
+    // No sign-in is a state this deck can live in now: the page is the phone's
+    // player on better glass. Holding the footer chip still opens the wizard, and
+    // so does `setup` on the monitor, which is how credentials are added later.
+    Serial.println("[id] no credentials: running off the phone's session");
+    drawNow();
+    return;
+  }
+
   drawNow();
   ensureNetTask();
 }
@@ -2676,9 +2943,13 @@ void loop() {
   if (setupActive) return;
 
   // Identity first: it is one accept() on a socket that is usually idle, and it
-  // is what lets the app tell this deck from another one on the same network.
-  ensureIdServer();
-  pumpIdServer();
+  // is what lets the app tell this deck from another one on the same network. A
+  // deck running off the phone's session has no network, so there is nothing to
+  // answer on and starting it would only take a socket from the stack.
+  if (WiFi.status() == WL_CONNECTED) {
+    ensureIdServer();
+    pumpIdServer();
+  }
 
   int x = 0, y = 0;
   const bool down = readTouch(x, y);
@@ -2800,12 +3071,14 @@ void loop() {
       drawSetupChip(false);
     } else if (now - lastActionMs > 180) {
       lastActionMs = now;
+      // Whichever source is live takes the tap. A linked phone is the player, so
+      // ask it; a signed-in deck with no phone falls back to Spotify's Web API.
       if (pressedTarget == TARGET_PREV) {
-        queueCommand(CMD_PREV);
+        if (!sendLinkCommand("prev")) queueCommand(CMD_PREV);
       } else if (pressedTarget == TARGET_TOGGLE) {
-        queueCommand(CMD_TOGGLE);
+        if (!sendLinkCommand("toggle")) queueCommand(CMD_TOGGLE);
       } else if (pressedTarget == TARGET_NEXT) {
-        queueCommand(CMD_NEXT);
+        if (!sendLinkCommand("next")) queueCommand(CMD_NEXT);
       }
     }
     pressedTarget = TARGET_NONE;
