@@ -51,6 +51,18 @@ python3 check_widget_assets.py
 push it back, or work on top of `main` here, so the two copies do not drift. If
 they do, the sketches are the truth and the app copy is the stale one.
 
+## The app now carries two decks
+
+`syncWidgets` copies every `*/widget.json` beside `android-companion/`, so both
+decks travel: `assets/widgets/phone_deck_cyd24R/` and
+`assets/widgets/spotify_deck_cyd24R/`. `check_widget_assets.py` prints
+`2 widgets bundled, every copy matches` (phone deck md5 `496952d5…`, Spotify
+`eca02e93…`, both on 2026-11-01), and that is the check to run after either
+sketch changes — a passing `assembleDebug` says nothing about which copies went
+into the APK. The app's own docs described one bundled widget and a folder name
+from before the rename; that side is the app chat's to keep current, and what
+this tree has to get right is that a second descriptor now exists.
+
 ## After a documentation-only deck change
 
 The widget `README.md` files and `CONVENTIONS.md` are sketch-side docs.

@@ -169,8 +169,8 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   Spotify deck's whole job is TLS to a third party — an unpatched TLS stack
   holding OAuth tokens is the argument that matters here, not flash. 3.3.12
   ships mbedTLS **3.6.6**, an LTS with fixes promised until at least March 2027;
-  Espressif's own 2.0.x support ended in July 2024; and neither deck has ever
-  been flashed, so today is the cheapest this migration will ever be — both
+  Espressif's own 2.0.x support ended in July 2024; and no flash of either deck
+  has been confirmed, so today is the cheapest this migration will ever be — both
   already link clean on both cores. The price is **155 kB** in the WiFi deck
   (343 kB → 188 kB of its app slot) and ~3 kB of RAM; the Bluetooth deck pays
   2.4 kB. Reverse only for a measured reason: if the WiFi deck runs out of flash,
@@ -196,8 +196,11 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   the phone per round. Keep the two apart: a deck flashes from the phone today,
   and the app's USB flasher is the thing that cannot write a board until its
   packets arrive. A computer over the same cable is the fallback, and it is also
-  the test that separates the app's transmit path from the bridge. Do not
-  re-litigate either without a new measurement.
+  the test that separates the app's transmit path from the bridge. That record
+  does not name the image that flashed — no log of the session survives in either
+  tree — so it proves the phone, the adapter and the board are up to a flash;
+  it does not prove that either deck has run. Do not re-litigate either without a
+  new measurement.
 
 ## Palette
 
