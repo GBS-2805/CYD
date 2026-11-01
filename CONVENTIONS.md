@@ -146,8 +146,14 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   on a machine with no toolchain; the second is the measurement you will quote.
   Without the `source` line the second exits 2 saying it found no `arduino-cli`,
   because it will not guess a compiler — that is why the line is written down
-  instead of remembered. Both together took **18 s** here, on core 3.3.12 with
-  the build cache warm.
+  instead of remembered. The `source` line is enough on its own because `env.sh`
+  also exports `ARDUINO_DIRECTORIES_DATA`, `_DOWNLOADS` and `_USER`: an
+  `arduino-cli` given no `--config-file` falls back to `~/.arduino15` rather than
+  the root it came from, so on a machine that keeps 2.0.17 beside 3.3.12 it would
+  silently build the wrong core and report 73 % where the release reads 85 %.
+  Both together took **18 s** here, on core 3.3.12 with the build cache warm; on
+  2026-11-01 `check_headroom.py` over both decks read 1,165,062 B (145,658 B free)
+  and 1,123,145 B (187,575 B free), exit 0.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows

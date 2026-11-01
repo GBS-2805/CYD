@@ -359,7 +359,7 @@ core **3.3.12**, default partition scheme:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,165,174 | **145,546** | 1,310,720 (88 % used) |
+| flash | 1,165,062 | **145,658** | 1,310,720 (88 % used) |
 | DRAM | 45,060 globals | **282,620** | 327,680 |
 
 The check refuses a deck that overflows, that drops under **64 KiB** of free flash
@@ -379,13 +379,13 @@ from the repo root, after sourcing a toolchain.
   (88 %) with 41,436 bytes of RAM (12 %), measured on 2026-10-30; the spread is
   the build root, so read it as 1,162.8 kB. It is the A/B build now, not the
   default — `toolchain.sh` pins 3.3.12.
-* Core **3.3.12** links it at 1,165,174 bytes (88 %) with 45,060 bytes of RAM
-  (13 %), `EXIT=0` under `--warnings all`, re-measured on 2026-10-31. An earlier
+* Core **3.3.12** links it at 1,165,062 bytes (88 %) with 45,060 bytes of RAM
+  (13 %), `EXIT=0` under `--warnings all`, re-measured on 2026-11-01. An earlier
   3.3.12 build on a shorter path reported 1,163,930 / 45,004, so 3.x is
   path-sensitive too — 1,164–1,165 kB, not a fixed count.
 * The bundled copy matches byte for byte after `:app:syncWidgets`;
   `check_widget_assets.py` prints `2 widgets bundled, every copy matches`
-  (this sketch md5 `496952d5…`, the Spotify one `eca02e93…`).
+  (this sketch md5 `496952d5…`, the Spotify one `3683285a…`).
 * Core 3.x costs this sketch ~2.4 kB of flash and ~3.6 kB of RAM over 2.0.17 —
   nothing like the Spotify deck's 155 kB gap, which is that sketch's network
   stack rather than the core (see the build note in

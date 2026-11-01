@@ -75,7 +75,7 @@ level, and the READMEs are how the next deck edit finds its numbers.
 
 The one way these docs can go stale in the app is if an app-side document quotes
 a deck's flash use. Say which core: the same Spotify sketch is 967,413 B on
-2.0.17 and 1,122,249 B on 3.3.12 — 73 % against 85 % of the 1,310,720-byte app
+2.0.17 and 1,123,145 B on 3.3.12 — 73 % against 85 % of the 1,310,720-byte app
 slot. The deck READMEs hold the measured figures and the verified/unverified
 split, so point at them instead of copying numbers out.
 
@@ -84,5 +84,6 @@ split, so point at them instead of copying numbers out.
 The deck `toolchain.sh` files pin `esp32:esp32@3.3.12`; 2.0.17 stays available as
 the A/B build in its own install root. No app file names a core, so there is
 nothing to change in the app — but any deck size quoted in app docs now means the
-3.3.12 build unless it says otherwise: 1,122,249 B for Spotify (85 % of the app
-slot) and 1,165,174 B for the phone deck (88 %).
+3.3.12 build unless it says otherwise: 1,123,145 B for Spotify (85 % of the app
+slot) and 1,165,062 B for the phone deck (88 %), as `check_headroom.py` read both
+of them on 2026-11-01.

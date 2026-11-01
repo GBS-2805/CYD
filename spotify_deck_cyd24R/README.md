@@ -292,7 +292,7 @@ core **3.3.12**, default partition scheme:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,123,241 | **187,479** | 1,310,720 (85 % used) |
+| flash | 1,123,145 | **187,575** | 1,310,720 (85 % used) |
 | DRAM | 53,572 globals | **274,108** | 327,680 |
 
 The check refuses a deck that overflows, that drops under **64 KiB** of free flash
@@ -311,18 +311,19 @@ sourcing a toolchain.
 * The committed sketch links under the documented core **2.0.17** at 967,413
   bytes (73 %), the measurement above. Re-measured on 2026-10-31 with
   `arduino-cli` 1.5.2-rc.1, core **3.3.12** links the committed file at
-  1,123,241 bytes (85 %) with 53,572 bytes of globals (16 %), `EXIT=0` under
-  `--warnings all` (1,122,249 before the app callback path, so the app path costs
-  **992 B**: 212 B for the second redirect URI and the `state` field, 780 B for the
-  one-line answer the app now reads); a comment-only edit links to exactly the same size, so the
+  1,123,145 bytes (85 %) with 53,572 bytes of globals (16 %), `EXIT=0` under
+  `--warnings all`. That is 96 B below the 1,123,241 an earlier root measured, with
+  the globals identical, and the app callback path is **992 B** of it — 212 B for
+  the second redirect URI and the `state` field, 780 B for the one-line answer the
+  app now reads; a comment-only edit links to exactly the same size, so the
   figure is a stable build rather than a stale build path. The two cores differ
   by ~155 kB, which is the WiFi stack as IDF 5 links it rather than mbedTLS (see
   [the build note](../CONVENTIONS.md#build)); 3.3.12 is what `toolchain.sh` pins
   now, so that is where the release numbers come from, and 2.0.17 is kept as the
   A/B build rather than the shipping one.
-* **It still fits on 3.3.12, on about a third of the slack:** 1,123,241 bytes
+* **It still fits on 3.3.12, on about a third of the slack:** 1,123,145 bytes
   against the 1,310,720-byte app slot the default scheme gives leaves
-  **187,479 B (14 %)** free, where 2.0.17 leaves 343,307 B (26 %). `default.csv`
+  **187,575 B (14 %)** free, where 2.0.17 leaves 343,307 B (26 %). `default.csv`
   sizes `app0` and `app1` at 1,310,720 each, so a wireless update faces the same
   ceiling; under `huge_app` the same build reads 36 % — a bigger room, not
   smaller code.
