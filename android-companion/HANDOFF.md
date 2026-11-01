@@ -474,9 +474,9 @@ Identical to the sketch, checked against its `onWrite` handlers:
   APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-10-31 after the sketch
-  header change and the probe work — **143,954 bytes** on the file in `dist/` as
-  measured on 2026-11-01, against the 112,473 that the same work produced before
-  the second widget joined it.
+  header change, the probe work and the drawer rename — **146,414 bytes** on the
+  file in `dist/` as measured on 2026-11-01, against the 112,473 that the same
+  work produced before the second widget joined it.
   The earlier 128,924-byte APK unpacked to the same six entries with the same
   uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
   the archive was written, not in the code: both are `zipalign -c 4` clean and
@@ -506,8 +506,9 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **143,954 bytes** on 2026-11-01, the 31 October rebuild carrying two bundled
-  sketches. Quote the size to the nearest kB (~140 kB), never as a checksum.
+  **146,414 bytes** on 2026-11-01, the rebuild carrying two bundled sketches and
+  the renamed drawer. Quote the size to the nearest kB (~145 kB), never as a
+  checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set,
   `application-icon: 'res/BW.xml'` (resource names are shortened) and
