@@ -321,6 +321,24 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
 * The Android app's Java belongs to the app's own chat and worktree. This tree
   gets sketch and asset copies only; check `git status` before assuming the files
   you see are yours.
+* **Another chat's work reaches this tree by merge, never by copy.** Each chat is
+  a worktree on its own `freebuff/<id>` branch, so a commit made over there
+  leaves `main` green and these numbers true for the tree that printed them, and
+  nothing else notices the two disagree. [`check_branches.py`](check_branches.py)
+  names the branches carrying commits `main` does not have yet, with the worktree
+  that has one checked out; it reads refs and blobs and never a worktree, so it
+  answers even for a tree this chat cannot open. Look at it before believing a doc
+  that seems stale, and merge rather than hand-editing the numbers, because the
+  other branch has usually already re-measured them. It judges content, not just
+  commits: a branch whose changed files are the same bytes `main` already has — a
+  folder renamed here, work rebased over — is reported as nothing to fold, and
+  one whose patches are all upstream drops out the same way, so the list stays
+  what a merge would actually add. The branch on it today is
+  `app/phone-deck-build`, 87 commits back: 21 of its paths carry bytes `main` has
+  no copy of, and they live under `cyd_phone_deck/`, a folder this tree renamed
+  away. The check names that folder instead of guessing, because merging it would
+  bring the folder back — read the paths before merging one, and prefer the branch
+  that measured the numbers.
 * Nothing is pushed or deployed without being asked. The repo stays private.
 * Numbers in docs are one board's measurements, not a contract. Say which.
 * Never document a step as working because it should. The failed handshake is

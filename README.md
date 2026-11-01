@@ -12,6 +12,12 @@ compiles the decks and fails one that no longer fits its partition;
 [`selftest_headroom.py`](selftest_headroom.py) proves the check's own refusals in
 about a second, with no toolchain installed.
 
+Each chat works on its own branch in its own worktree, so
+[`check_branches.py`](check_branches.py) names the branches holding work `main`
+does not have — commits and bytes, no compile — and drops the ones whose content
+it already has, which makes it the list to merge from before trusting a number
+here.
+
 | Project | Folder | What it is | Read |
 | --- | --- | --- | --- |
 | **Phone Deck** | [`phone_deck_cyd24R/`](phone_deck_cyd24R) | ESP32-2432S024R (2.4" CYD) phone dashboard: clock, battery and notifications | [README](phone_deck_cyd24R/README.md) |
