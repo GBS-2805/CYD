@@ -135,6 +135,19 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   a deck are re-checked in about a second on a machine with no toolchain. The
   decks themselves only ever walk the passing path; the overflow path was proved
   once with a 1.4 MB throwaway sketch, and that is not a test anyone can rerun.
+* **Before you change a sketch, run both.** From the repo root:
+
+  ```bash
+  python3 selftest_headroom.py                           # the refusals, ~1 s
+  source ~/.arduino-cyd-3/env.sh && ./check_headroom.py  # the decks, ~17 s warm
+  ```
+
+  The first says the check still refuses what it should, in about a second and
+  on a machine with no toolchain; the second is the measurement you will quote.
+  Without the `source` line the second exits 2 saying it found no `arduino-cli`,
+  because it will not guess a compiler — that is why the line is written down
+  instead of remembered. Both together took **18 s** here, on core 3.3.12 with
+  the build cache warm.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
