@@ -164,7 +164,10 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   silently build the wrong core and report 73 % where the release reads 85 %.
   Both together took **18 s** here, on core 3.3.12 with the build cache warm; on
   2026-11-01, after the mirror, `check_headroom.py` over both decks read
-  1,168,314 B (142,406 B free) and 1,125,781 B (184,939 B free), exit 0.
+  1,168,314 B (142,406 B free) and 1,125,781 B (184,939 B free), exit 0. A second
+  install root read 1,168,170 B (142,550 B free) and 1,125,669 B (185,051 B free)
+  for the same two sketches — 144 B and 112 B lower with the globals identical,
+  which is the build-root sensitivity above rather than drift in the sketches.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
