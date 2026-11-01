@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+#
+# Compile the decks a commit touches and refuse the commit if one no longer fits.
+#
+#   git config core.hooksPath .githooks     once per clone, from the repo root
+#   git commit --no-verify                  the deliberate escape hatch
+#   HEADROOM_MIN_FREE_KB=200 git commit …   tighten a floor for one commit
+#
+# Only a staged <folder>/<folder>.ino counts, so the copies the app syncs into
+# android-companion/app/src/main/assets/ never trigger a compile, and a docs-only
+# commit returns immediately. A machine without arduino-cli says so and lets the
+# commit through rather than blocking work it cannot check.
+set -uo pipefail
+
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+cd "$root" || exit 0
+
+decks=()
+while IFS= read -r path; do
+  [ -n "$path" ] || continue
+  dir="${path%%/*}"
+  [ "$path" = "$dir/$dir.ino" ] || continue   # nested paths are asset copies
+  [ -f "$dir/$dir.ino" ] || continue          # a deleted sketch has nothing to build
+  decks+=("$dir")
+done < <(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ "${#decks[@]}" -eq 0 ]; then
+  exit 0
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "headroom: no python3, so the check did NOT run" >&2
+  exit 0
+fi
+
+cli="${ARDUINO_CLI:-}"
+if [ -z "$cli" ]; then
+  for candidate in "${ARDUINO_HOME:+$ARDUINO_HOME/bin/arduino-cli}" \
+                   "$HOME/.arduino-cyd-3/bin/arduino-cli" \
+                   "$HOME/.arduino-cyd/bin/arduino-cli" \
+                   "$(command -v arduino-cli 2>/dev/null || true)"; do
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+      cli="$candidate"
+      break
+    fi
+  done
+fi
+
+if [ -z "$cli" ]; then
+  echo "headroom: no arduino-cli found (source ~/.arduino-cyd-3/env.sh), so the check did NOT run" >&2
+  exit 0
+fi
+
+args=(--arduino-cli "$cli")
+[ -n "${HEADROOM_MIN_FREE_KB:-}" ] && args+=(--min-free-kb "$HEADROOM_MIN_FREE_KB")
+[ -n "${HEADROOM_MIN_RAM_KB:-}" ] && args+=(--min-free-ram-kb "$HEADROOM_MIN_RAM_KB")
+
+if ! python3 "$root/check_headroom.py" "${args[@]}" "${decks[@]}"; then
+  echo "headroom: commit refused; see CONVENTIONS.md#build" >&2
+  exit 1
+fi
+exit 0
