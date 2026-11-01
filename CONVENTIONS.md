@@ -128,6 +128,13 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   creates no commit and so checks nothing. A refused merge is left staged rather
   than undone — git prints `Not committing merge` — so finishing it with
   `git commit` runs the gate again.
+* **The gate's refusals are tested without a compiler.**
+  [`selftest_headroom.py`](selftest_headroom.py) hands `check_headroom.py` a
+  stand-in that prints canned `Sketch uses` lines, so an overflow, a tight floor,
+  a DRAM floor, a build that died before printing a size and a folder that is not
+  a deck are re-checked in about a second on a machine with no toolchain. The
+  decks themselves only ever walk the passing path; the overflow path was proved
+  once with a 1.4 MB throwaway sketch, and that is not a test anyone can rerun.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
