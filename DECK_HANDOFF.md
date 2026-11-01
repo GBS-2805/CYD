@@ -57,7 +57,7 @@ they do, the sketches are the truth and the app copy is the stale one.
 decks travel: `assets/widgets/phone_deck_cyd24R/` and
 `assets/widgets/spotify_deck_cyd24R/`. `check_widget_assets.py` prints
 `2 widgets bundled, every copy matches` (phone deck md5 `496952d5…`, Spotify
-`eca02e93…`, both on 2026-11-01), and that is the check to run after either
+`3683285a…`, both on 2026-11-01), and that is the check to run after either
 sketch changes — a passing `assembleDebug` says nothing about which copies went
 into the APK. The app's own docs described one bundled widget and a folder name
 from before the rename; that side is the app chat's to keep current, and what
