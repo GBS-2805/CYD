@@ -244,8 +244,8 @@ change and the greedy wrap truncating where it intends to. The default warning
 level hides both sets, and an incremental rebuild can also report a stale,
 smaller link — these numbers come from a fresh build path.
 
-**Nothing here has run on the board.** No sketch has been flashed and no request
-has ever left this chip. Specifically unverified: the access point and the setup
+**Nothing here has run on the board.** No flash of this sketch has been confirmed
+and no request has ever left this chip. Specifically unverified: the access point and the setup
 page on a real phone (including whether the phone keeps mobile data for the
 Spotify tab while joined to the deck), the S256 challenge as Spotify receives it,
 the code exchange and its pinned-certificate handshake to
