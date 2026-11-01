@@ -350,6 +350,25 @@ A compile in this repo, on 2026-10-30, with `arduino-cli` 1.5.2-rc.1:
 Core 3.x costs 1–2.4 kB of flash and 3.6 kB of RAM for this sketch, depending on
 the build path.
 
+### Headroom
+
+Measured here on 2026-11-01 with [`../check_headroom.py`](../check_headroom.py),
+core **3.3.12**, default partition scheme:
+
+| | used | free | ceiling |
+| --- | --- | --- | --- |
+| flash | 1,165,174 | **145,546** | 1,310,720 (88 % used) |
+| DRAM | 45,060 globals | **282,620** | 327,680 |
+
+The check refuses a deck that overflows, that drops under **64 KiB** of free flash
+or that leaves under **160 KiB** of DRAM — the last floor is just over the
+153,600 B a full 320x240 RGB565 framebuffer needs. So this deck has one
+framebuffer's worth of slack and 129 kB besides, and a single addition larger
+than about **142 KiB** overflows the slot: a 1,400,000-byte const table measured
+1,668,748 B (127 %), which is the overflow the refusal names rather than a bare
+`compile failed`. Re-measure with `python3 ../check_headroom.py phone_deck_cyd24R`
+from the repo root, after sourcing a toolchain.
+
 ### At a glance
 
 **Verified here** — none of this needs hardware:
