@@ -145,7 +145,7 @@ def main():
         output = done.stdout + done.stderr
         flash = FLASH_RE.search(output)
         ram = RAM_RE.search(output)
-        if done.returncode != 0 or not flash or not ram:
+        if not flash or not ram:
             print(f"{blank}compile failed")
             for line in output.strip().splitlines()[-8:]:
                 print(f"    {line}")
@@ -160,6 +160,10 @@ def main():
         ram_free = int(ram.group(2))
 
         problems = []
+        if done.returncode != 0:
+            # A link that fails still prints the size it could not place, so read
+            # the numbers and say what happened instead of a bare "compile failed".
+            problems.append("build failed")
         if flash_free < 0:
             problems.append(f"flash OVER by {-flash_free:,} B - this deck needs huge_app")
         elif flash_free < min_flash:
@@ -178,6 +182,9 @@ def main():
             f"{folder.name:30s}{used:>10,}{slot:>10,}{flash_free:>9,}"
             f"{globals_used:>9,}{ram_free:>10,}  {status}"
         )
+        if done.returncode != 0:
+            for line in output.strip().splitlines()[-3:]:
+                print(f"    {line}")
 
     if not checked:
         print("error: no sketch folders found", file=sys.stderr)

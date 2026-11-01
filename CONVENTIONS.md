@@ -125,7 +125,9 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   the same script through
   [`pre-merge-commit`](.githooks/pre-merge-commit), because git runs no
   `pre-commit` for the commit it makes at the end of a merge; a fast-forward
-  creates no commit and so checks nothing.
+  creates no commit and so checks nothing. A refused merge is left staged rather
+  than undone — git prints `Not committing merge` — so finishing it with
+  `git commit` runs the gate again.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
