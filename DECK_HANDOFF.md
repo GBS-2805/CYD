@@ -56,8 +56,8 @@ they do, the sketches are the truth and the app copy is the stale one.
 `syncWidgets` copies every `*/widget.json` beside `android-companion/`, so both
 decks travel: `assets/widgets/phone_deck_cyd24R/` and
 `assets/widgets/spotify_deck_cyd24R/`. `check_widget_assets.py` prints
-`2 widgets bundled, every copy matches` (phone deck md5 `496952d5…`, Spotify
-`3683285a…`, both on 2026-11-01), and that is the check to run after either
+`2 widgets bundled, every copy matches` (phone deck md5 `62c7e6c3…`, Spotify
+`00bb1560…`, both on 2026-11-01), and that is the check to run after either
 sketch changes — a passing `assembleDebug` says nothing about which copies went
 into the APK. The app's own docs described one bundled widget and a folder name
 from before the rename; that side is the app chat's to keep current, and what
@@ -75,7 +75,7 @@ level, and the READMEs are how the next deck edit finds its numbers.
 
 The one way these docs can go stale in the app is if an app-side document quotes
 a deck's flash use. Say which core: the same Spotify sketch is 967,413 B on
-2.0.17 and 1,123,145 B on 3.3.12 — 73 % against 85 % of the 1,310,720-byte app
+2.0.17 and 1,125,781 B on 3.3.12 — 73 % against 85 % of the 1,310,720-byte app
 slot. The deck READMEs hold the measured figures and the verified/unverified
 split, so point at them instead of copying numbers out.
 
@@ -84,6 +84,6 @@ split, so point at them instead of copying numbers out.
 The deck `toolchain.sh` files pin `esp32:esp32@3.3.12`; 2.0.17 stays available as
 the A/B build in its own install root. No app file names a core, so there is
 nothing to change in the app — but any deck size quoted in app docs now means the
-3.3.12 build unless it says otherwise: 1,123,145 B for Spotify (85 % of the app
-slot) and 1,165,062 B for the phone deck (88 %), as `check_headroom.py` read both
+3.3.12 build unless it says otherwise: 1,125,781 B for Spotify (85 % of the app
+slot) and 1,168,314 B for the phone deck (89 %), as `check_headroom.py` read both
 of them on 2026-11-01.

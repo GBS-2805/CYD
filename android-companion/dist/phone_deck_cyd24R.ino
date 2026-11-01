@@ -187,8 +187,8 @@ struct TouchMapping {
 };
 
 // The front page comes first: everything else is opened from it.
-enum Screen : uint8_t { SCR_HOME, SCR_BOARD, SCR_DETAIL, SCR_SETTINGS, SCR_THEME,
-                       SCR_CAL };
+enum Screen : uint8_t { SCR_HOME, SCR_BOARD, SCR_DETAIL, SCR_NOW, SCR_SETTINGS,
+                       SCR_THEME, SCR_CAL };
 
 // Where the wall clock came from. A phone-supplied time beats a notification
 // date, because the date is only as fresh as the last notification.
@@ -209,6 +209,25 @@ struct Notice {
   time_t at;  // 0 when the phone did not say
 };
 
+// What the phone is playing, mirrored. The deck never talks to Spotify: the
+// companion app reads the phone's own media session and writes one line down the
+// link, so there is no client id, no browser and no token anywhere here. The
+// buffers match what NowPacket.java caps its fields to.
+static constexpr size_t NOW_TITLE = 48;
+static constexpr size_t NOW_ARTIST = 32;
+static constexpr size_t NOW_ALBUM = 32;
+
+struct NowTrack {
+  bool valid;         // a line has arrived since the link came up
+  bool playing;
+  uint32_t position;  // seconds, at the moment the line arrived
+  uint32_t duration;  // seconds, 0 when the phone did not say
+  uint32_t at;        // millis() when it arrived
+  char title[NOW_TITLE];
+  char artist[NOW_ARTIST];
+  char album[NOW_ALBUM];
+};
+
 enum EventType : uint8_t {
   EVT_LINK_ON,
   EVT_LINK_OFF,
@@ -216,11 +235,13 @@ enum EventType : uint8_t {
   EVT_NOTICE_GONE,
   EVT_BATTERY,
   EVT_TIME,
+  EVT_NOW,
 };
 
 struct UiEvent {
   uint8_t type;
   Notice notice;
+  NowTrack now;
   uint32_t uid;
   int16_t battery;
   uint8_t charging;
@@ -471,6 +492,26 @@ static time_t parseAncsDate(const char *text, size_t len) {
 Notice notices[NOTICE_MAX];
 int noticeCount = 0;
 
+// One track, not a history: the phone rewrites this whenever the song or the
+// state changes, and a stop clears it. Millis are used rather than a clock so the
+// progress bar keeps moving between writes without asking the phone again.
+static NowTrack nowTrack;
+
+static uint32_t nowPosition() {
+  if (!nowTrack.valid) return 0;
+  uint32_t seconds = nowTrack.position;
+  if (nowTrack.playing) seconds += (millis() - nowTrack.at) / 1000;
+  if (nowTrack.duration > 0 && seconds > nowTrack.duration) seconds = nowTrack.duration;
+  return seconds;
+}
+
+// m:ss, which is what every player prints. No hours: a mirrored track will not
+// reach one, and the deck has the room for a time, not a lecture.
+static void formatClock(uint32_t seconds, char *out, size_t outLen) {
+  snprintf(out, outLen, "%u:%02u", static_cast<unsigned>(seconds / 60),
+           static_cast<unsigned>(seconds % 60));
+}
+
 static const char *CATEGORY_LABEL[13] = {
     "OTHER", "CALL",   "MISSED", "VOICEMAIL", "SOCIAL", "SCHEDULE", "EMAIL",
     "NEWS",  "HEALTH", "FINANCE", "LOCATION", "MEDIA", "OTHER"};
@@ -643,6 +684,25 @@ static void initIdentity() {
 // the link at a time, and an Android central's resolvable private address rotates,
 // so a stored address must never be able to lock the owner's own phone out. That
 // is what left a real board saying OFFLINE while a phone was connected.
+// The identity document: the same keys a network deck answers /deck.json with,
+// minus the network fields a Bluetooth deck has none of (ip, setup, signed). It
+// is written once at boot into a read-only characteristic. Nothing here is a
+// secret - no token, no password - so a phone can ask any nearby board who it is
+// before it links, and the app keys its records by `id` instead of by address:
+// a re-flash keeps the row, a second board of the same widget is a second row,
+// and the MAC stays what it is, the address that connection happens over.
+//
+// It is longer than the 20 bytes a default ATT MTU carries, so a reader has to
+// ask for a larger MTU first; a truncated read names no widget, and the app then
+// falls back to the address rather than inventing an id.
+static void buildDeckIdentity(char *out, size_t outLen) {
+  snprintf(out, outLen,
+           "{\"id\":\"phone_deck_cyd24R-%s\",\"widget\":\"phone_deck_cyd24R\","
+           "\"tag\":\"%s\",\"name\":\"Phone Deck\",\"role\":\"phone\","
+           "\"board\":\"2432S024R\",\"link\":\"ble\"}",
+           DEVICE_TAG, DEVICE_TAG);
+}
+
 static void rememberPeer(const uint8_t bda[6]) {
   if (ownerKnown && memcmp(ownerBda, bda, sizeof(ownerBda)) == 0) return;
   memcpy(ownerBda, bda, sizeof(ownerBda));
@@ -685,6 +745,14 @@ static BLEUUID UUID_LINK_SERVICE("6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10");
 static BLEUUID UUID_LINK_TIME("6f2d0002-9a3c-4b57-9d21-6a1e0c4f8b10");
 static BLEUUID UUID_LINK_BATTERY("6f2d0003-9a3c-4b57-9d21-6a1e0c4f8b10");
 static BLEUUID UUID_LINK_NOTICE("6f2d0004-9a3c-4b57-9d21-6a1e0c4f8b10");
+
+// The identity document, read-only. A network deck serves the same keys at
+// GET /deck.json, so one reader in the app understands either kind of deck.
+static BLEUUID UUID_LINK_IDENTITY("6f2d0005-9a3c-4b57-9d21-6a1e0c4f8b10");
+
+// What the phone is playing. One write, one line, display only: the deck has no
+// way to ask Spotify anything by itself, so nothing here is a transport button.
+static BLEUUID UUID_LINK_NOW("6f2d0006-9a3c-4b57-9d21-6a1e0c4f8b10");
 
 // Apple's ANCS UUID in little-endian byte order, used as the 128-bit service
 // solicitation in the advertising packet. This is what makes an iPhone offer
@@ -1154,6 +1222,53 @@ class LinkNoticeCallbacks : public BLECharacteristicCallbacks {
   }
 };
 
+// "<state>|<position>|<duration>|<title>|<artist>|<album>", seconds without a
+// unit and `play` / `pause` / `stop`. The app replaces any '|' inside the text
+// with '/', so splitting on it here is safe; a missing tail is empty, and a line
+// this parser cannot read at all is dropped rather than guessed at.
+class LinkNowCallbacks : public BLECharacteristicCallbacks {
+ public:
+  void onWrite(BLECharacteristic *characteristic) override {
+    if (!peerAllowed) return;
+    const auto value = characteristic->getValue();
+    if (value.length() == 0) return;
+    char buf[192];
+    snprintf(buf, sizeof(buf), "%s", value.c_str());
+
+    char *field[6] = {buf, nullptr, nullptr, nullptr, nullptr, nullptr};
+    for (int i = 1; i < 6; ++i) {
+      field[i] = strchr(field[i - 1], '|');
+      if (field[i] == nullptr) break;
+      *field[i]++ = '\0';
+    }
+    if (field[1] == nullptr) return;  // no position: not this shape at all
+
+    // `stop` is what the phone sends when nothing is playing, and it clears the
+    // mirror instead of leaving the last song on screen forever.
+    const bool stop = strncmp(field[0], "stop", 4) == 0;
+    UiEvent ev = {};
+    ev.type = EVT_NOW;
+    ev.now.valid = !stop;
+    ev.now.playing = strncmp(field[0], "play", 4) == 0;
+    ev.now.position = nowSeconds(field[1]);
+    ev.now.duration = field[2] != nullptr ? nowSeconds(field[2]) : 0;
+    snprintf(ev.now.title, sizeof(ev.now.title), "%s", field[3] != nullptr ? field[3] : "");
+    snprintf(ev.now.artist, sizeof(ev.now.artist), "%s", field[4] != nullptr ? field[4] : "");
+    snprintf(ev.now.album, sizeof(ev.now.album), "%s", field[5] != nullptr ? field[5] : "");
+    ev.now.at = millis();
+    pushEvent(ev);
+  }
+
+ private:
+  // A day is longer than any track, so anything past it is a broken line rather
+  // than a number worth keeping.
+  static uint32_t nowSeconds(const char *text) {
+    if (text == nullptr) return 0;
+    const unsigned long value = strtoul(text, nullptr, 10);
+    return static_cast<uint32_t>(value > 86400UL ? 86400UL : value);
+  }
+};
+
 static void startPhoneLink(BLEServer *server) {
   BLEService *service = server->createService(UUID_LINK_SERVICE);
 
@@ -1168,6 +1283,20 @@ static void startPhoneLink(BLEServer *server) {
   BLECharacteristic *notice = service->createCharacteristic(
       UUID_LINK_NOTICE, BLECharacteristic::PROPERTY_WRITE);
   notice->setCallbacks(new LinkNoticeCallbacks());
+
+  // What is playing on the phone, mirrored. Missing from a deck flashed before
+  // it existed, so the app treats it as optional.
+  BLECharacteristic *nowPlaying = service->createCharacteristic(
+      UUID_LINK_NOW, BLECharacteristic::PROPERTY_WRITE);
+  nowPlaying->setCallbacks(new LinkNowCallbacks());
+
+  // Who this board is. Written once: the tag cannot change without a re-flash,
+  // and a read-only characteristic is all a reader needs.
+  char document[192];
+  buildDeckIdentity(document, sizeof(document));
+  BLECharacteristic *identity = service->createCharacteristic(
+      UUID_LINK_IDENTITY, BLECharacteristic::PROPERTY_READ);
+  identity->setValue(reinterpret_cast<uint8_t *>(document), strlen(document));
 
   service->start();
 }
@@ -1259,6 +1388,12 @@ static const Rect NOTIF_ROW[3] = {{8, 134, 304, 32}, {8, 168, 304, 32},
 
 static const Rect DETAIL_DISMISS = {12, 202, 148, 30};
 static const Rect DETAIL_BACK = {168, 202, 140, 30};
+
+// The date line inside the status card while a track is live, and the button that
+// leaves the now-playing page. The strip is 196 px wide because the phone's
+// battery block starts at 244.
+static const Rect NOW_STRIP = {20, 96, 196, 16};
+static const Rect NOW_BACK = {8, 202, 304, 30};
 
 // Half the brightness card each. Two 54px chips were pushed to the card's outer
 // edges, where the panel's x mapping is least linear: "-" landed, "+" did not.
@@ -1457,10 +1592,26 @@ static void drawStatusCard() {
              parts.tm_mday, MONTHS[parts.tm_mon], clockSourceLabel());
     drawTextAt(hhmm, r.x + 12, r.y + 24, 4, C_TEXT, C_TILE);
     drawTextAt(seconds, r.x + 134, r.y + 36, 1, C_ACCENT, C_TILE);
-    drawTextAt(date, r.x + 12, r.y + 60, 1, C_DIM, C_TILE);
+    if (!nowTrack.valid) drawTextAt(date, r.x + 12, r.y + 60, 1, C_DIM, C_TILE);
   } else {
     drawTextAt("--:--", r.x + 12, r.y + 24, 4, C_DIM, C_TILE);
-    drawTextAt("no time yet  //  waiting", r.x + 12, r.y + 60, 1, C_DIM, C_TILE);
+    if (!nowTrack.valid) {
+      drawTextAt("no time yet  //  waiting", r.x + 12, r.y + 60, 1, C_DIM, C_TILE);
+    }
+  }
+
+  // The card's last line is the one thing on the board that is not about the
+  // phone: what it is playing. It replaces the date while a track is live and
+  // opens the now-playing page on a tap.
+  if (nowTrack.valid) {
+    char elapsed[8], total[10], title[24], line[64];
+    formatClock(nowPosition(), elapsed, sizeof(elapsed));
+    if (nowTrack.duration > 0) formatClock(nowTrack.duration, total, sizeof(total));
+    else snprintf(total, sizeof(total), "--:--");
+    fitText(title, sizeof(title), nowTrack.title[0] != '\0' ? nowTrack.title : "(untitled)", 18);
+    snprintf(line, sizeof(line), "%s %s %s  %s", nowTrack.playing ? ">>" : "||",
+             elapsed, total, title);
+    drawTextAt(line, r.x + 12, r.y + 60, 1, C_ACCENT, C_TILE);
   }
 
   const int battX = r.x + 236;
@@ -1721,6 +1872,63 @@ static void drawWrappedText(const char *text, int x, int y, int width,
   if (used > 0 && lines < maxLines) {
     drawTextAt(line, x, y + lines * lineHeight, size, fg, bg);
   }
+}
+
+// The mirrored track: one card, a progress bar, and no transport buttons. A pause
+// here would be a promise the deck cannot keep on its own, so the page says where
+// the controls live instead of pretending to have them.
+static void drawNow() {
+  screen = SCR_NOW;
+  tft.fillScreen(C_BG);
+  drawHeader();
+
+  tft.fillRoundRect(8, 40, 304, 96, CORNER_CARD, C_TILE);
+  tft.drawRoundRect(8, 40, 304, 96, CORNER_CARD, C_EDGE);
+  drawTextAt("02 // NOW PLAYING", 20, 46, 1, C_DIM, C_TILE);
+
+  if (!nowTrack.valid) {
+    drawTextAt("nothing playing", 20, 68, 2, C_DIM, C_TILE);
+    drawTextAt(phoneLinked() ? "start something on the phone"
+                             : "link the phone to mirror it",
+               20, 96, 1, C_DIM, C_TILE);
+  } else {
+    drawWrappedText(nowTrack.title[0] != '\0' ? nowTrack.title : "(untitled)",
+                    20, 62, 280, 2, C_TEXT, C_TILE, 2);
+    // Artist and album get a line each rather than sharing a baseline: an artist
+    // is 32 characters and an album 32 more, and the two would meet in the
+    // middle of the card.
+    drawTextAt(nowTrack.artist[0] != '\0' ? nowTrack.artist : "unknown artist",
+               20, 104, 1, nowTrack.playing ? C_ACCENT : C_DIM, C_TILE);
+    if (nowTrack.album[0] != '\0') {
+      char album[48];
+      fitText(album, sizeof(album), nowTrack.album, 44);
+      drawTextAt(album, 20, 118, 1, C_DIM, C_TILE);
+    }
+  }
+
+  const Rect bar = {8, 146, 304, 10};
+  tft.drawRoundRect(bar.x, bar.y, bar.w, bar.h, 5, C_EDGE);
+  const uint32_t position = nowPosition();
+  if (nowTrack.valid && nowTrack.duration > 0) {
+    int fill = static_cast<int>((bar.w - 4) * position / nowTrack.duration);
+    if (fill < 0) fill = 0;
+    if (fill > bar.w - 4) fill = bar.w - 4;
+    if (fill > 0) tft.fillRoundRect(bar.x + 2, bar.y + 2, fill, bar.h - 4, 3, C_ACCENT);
+  }
+
+  char elapsed[8], total[8];
+  formatClock(position, elapsed, sizeof(elapsed));
+  if (nowTrack.valid && nowTrack.duration > 0) formatClock(nowTrack.duration, total, sizeof(total));
+  else snprintf(total, sizeof(total), "--:--");
+  drawTextAt(elapsed, 10, 160, 1, C_DIM, C_BG);
+  drawTextRight(total, SCREEN_W - 10, 160, 1, C_DIM, C_BG);
+
+  drawTextAt(nowTrack.valid && nowTrack.playing
+                 ? "PLAYING // MIRRORED FROM THE PHONE"
+                 : "PAUSED // MIRRORED FROM THE PHONE",
+             10, 178, 1, nowTrack.valid && nowTrack.playing ? C_ACCENT : C_DIM, C_BG);
+
+  drawButton(NOW_BACK, "BACK", 2, false);
 }
 
 static uint32_t detailUid = 0;
@@ -2042,10 +2250,22 @@ static void applyUiEvent(const UiEvent &ev) {
   switch (ev.type) {
     case EVT_LINK_ON:
     case EVT_LINK_OFF:
+      // A lost link ends the mirror with it: the phone is the only thing that
+      // knows what is playing, so a title left on screen would be a lie.
+      if (ev.type == EVT_LINK_OFF) nowTrack = NowTrack();
       if (screen == SCR_BOARD) {
         drawHeader();
         drawNoticeRow(0);  // the empty-state hint depends on the link
+        drawStatusCard();
+      } else if (screen == SCR_NOW) {
+        drawNow();
       }
+      break;
+
+    case EVT_NOW:
+      nowTrack = ev.now;
+      if (screen == SCR_BOARD) drawStatusCard();
+      else if (screen == SCR_NOW) drawNow();
       break;
 
     case EVT_NOTICE:
@@ -2118,6 +2338,7 @@ static void processUiEvents() {
 static constexpr int TARGET_NONE = -1;
 static constexpr int TARGET_GEAR = -2;
 static constexpr int TARGET_BACK = -3;
+static constexpr int TARGET_NOW = -4;
 
 bool wasTouched = false;
 bool ignoreTouchUntilRelease = false;
@@ -2129,6 +2350,9 @@ int pressedTarget = TARGET_NONE;
 static int targetAt(int x, int y) {
   if (insideHeaderBack(x, y)) return TARGET_BACK;
   if (inside(x, y, GEAR_BTN)) return TARGET_GEAR;
+  // Only while a track is live: the strip is the date line otherwise, and a date
+  // that opens a media page is a trap.
+  if (nowTrack.valid && inside(x, y, NOW_STRIP)) return TARGET_NOW;
   for (int i = 0; i < 3 && i < noticeCount; ++i) {
     if (inside(x, y, NOTIF_ROW[i])) return i;
   }
@@ -2248,6 +2472,28 @@ void loop() {
     return;
   }
 
+  // ------------------------------------------------------------------ now ---
+  if (screen == SCR_NOW) {
+    // The progress bar moves on its own between writes, so the page is redrawn
+    // when the second changes rather than on every loop.
+    static int nowDrawnSecond = -1;
+    const int second = static_cast<int>(nowPosition());
+    if (second != nowDrawnSecond) {
+      nowDrawnSecond = second;
+      drawNow();
+    }
+    if (down && !wasTouched) {
+      touchStartMs = now;
+      if (now - lastActionMs > 150) {
+        lastActionMs = now;
+        drawBoard();
+      }
+    }
+    wasTouched = down;
+    delay(10);
+    return;
+  }
+
   // --------------------------------------------------------------- settings --
   if (screen == SCR_SETTINGS) {
     if (down && !wasTouched) {
@@ -2297,6 +2543,18 @@ void loop() {
   } else if (lastClockValid) {
     lastClockValid = false;
     drawStatusCard();
+  }
+
+  // The mirrored strip moves on its own between writes, and it has to keep
+  // moving when the clock is not set yet, which is the one case the block above
+  // does not redraw every second.
+  static int lastMirrorSecond = -1;
+  if (nowTrack.valid) {
+    const int second = static_cast<int>(nowPosition());
+    if (second != lastMirrorSecond) {
+      lastMirrorSecond = second;
+      drawStatusCard();
+    }
   }
 
   if (down && !wasTouched) {
@@ -2350,6 +2608,8 @@ void loop() {
         openSettings();
       } else if (pressedTarget == TARGET_BACK) {
         drawHome();
+      } else if (pressedTarget == TARGET_NOW) {
+        drawNow();
       } else if (pressedTarget >= 0 && pressedUid != 0) {
         openDetail(pressedUid);
       }

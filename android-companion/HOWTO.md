@@ -43,23 +43,26 @@ range or bonding problem, not a UI problem. See Troubleshooting.
 
 ## Put the deck sketch into ArduinoDroid
 
-The bundled sketch is the one in this repo. Pick whichever route suits you.
+Both bundled sketches are the ones in this repo — `phone_deck_cyd24R.ino` and
+`spotify_deck_cyd24R.ino`. Pick whichever route suits you.
 
 **Clipboard route (fastest):**
 
-1. **BOARDS** → on the ESP32 Phone_Widget card, tap **COPY DROID**.
+1. **BOARDS** → on the **Phone Deck** card (or **Spotify Deck**, for the other
+   sketch), tap **COPY DROID**.
 2. Open ArduinoDroid, create or open a sketch, select the whole editor and paste.
 3. Compile and upload.
 
 **File route (keeps a real file):**
 
-1. **BOARDS** → on the ESP32 Phone_Widget card, tap **SAVE**.
+1. **BOARDS** → on the **Phone Deck** card, tap **SAVE**.
 2. The file lands in `Downloads/phone_deck_cyd24R.ino` (Android 10+).
 3. In ArduinoDroid, open the sketch through its file browser.
 
-ArduinoDroid must see the sketch as a **single tab** named exactly
-`phone_deck_cyd24R.ino`. The sketch is deliberately one file; splitting it fails
-with `deck_types.h: No such file or directory`.
+ArduinoDroid must see the sketch as a **single tab** named exactly after its
+folder — `phone_deck_cyd24R.ino` or `spotify_deck_cyd24R.ino`. Each sketch is
+deliberately one file; splitting one fails with
+`deck_types.h: No such file or directory`.
 
 ## Install Marauder, Bruce or Launcher on the CYD
 
@@ -97,7 +100,7 @@ needs exactly the same three libraries:
 
 ### Install them without retyping the names
 
-**BOARDS → ESP32 Phone_Widget → LIBRARIES** has an **INSTALL** button for each library.
+**BOARDS → Phone Deck → LIBRARIES** has an **INSTALL** button for each library.
 One tap copies that exact name and opens ArduinoDroid's library list.
 
 1. Tap **INSTALL** next to **Adafruit GFX Library**.
@@ -227,7 +230,7 @@ sketch inside the APK against the file its descriptor names
 
 The size is not byte-stable: two builds of the same sources differ by a dozen
 bytes because the dex files carry build-time data. Treat the printed number as
-"about 150 kB", not as a checksum.
+"about 160 kB", not as a checksum.
 
 ## Flash an image from the phone over USB
 

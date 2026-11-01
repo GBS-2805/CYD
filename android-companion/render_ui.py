@@ -594,7 +594,10 @@ def main(argv):
             sys.stderr.write("unknown screen %r\n" % name)
             return 2
         path = os.path.join(OUT, name + ".png")
-        SCREENS[name]().save(path)
+        # optimize=True is lossless and about 3% smaller on these flat-colour
+        # screens; the render is a review artifact, so there is no reason to
+        # commit the bytes a default save leaves behind.
+        SCREENS[name]().save(path, optimize=True)
         print("%-14s %s" % (name, os.path.relpath(path)))
     return 0
 

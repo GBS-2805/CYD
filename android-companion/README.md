@@ -74,8 +74,10 @@ links it needs.
   the older `FirmwareNotes` store is carried over.
 - **TARGET BOARD** is a pull-down that drives the `FILES / <code>` header and the
   RECIPE text; `BoardCatalog` is where further boards get added.
-- The **ESP32 Phone_Widget** card is this repo's firmware, marked `INSIDE APP` —
-  the title is `name` in `phone_deck_cyd24R/widget.json`. It keeps **COPY DROID**
+- The **Phone Deck** card is this repo's firmware, marked `INSIDE APP` — the
+  title is `name` in `phone_deck_cyd24R/widget.json`, the spoken form
+  `Phone Deck · 2.4" CYD (resistive)`, never an identifier in Java. **Spotify
+  Deck** is the same card for the other widget. It keeps **COPY DROID**
   (whole sketch to the clipboard), **SAVE** (to Downloads) and the **LIBRARIES**
   card, whose **INSTALL** buttons copy a library name and open ArduinoDroid's
   library screen. The APK bundles the Spotify deck as well
@@ -189,6 +191,8 @@ ROM protocol: SLIP framing, sync, register reads, `FLASH_BEGIN`/`FLASH_DATA`/
 | Time | `6f2d0002-…` | 7 bytes: year−2000, month 1–12, day, hour, minute, second, weekday (the deck ignores the weekday but requires the byte) |
 | Battery | `6f2d0003-…` | 2 bytes: percent 0–100, then `1` while charging or full |
 | Notification | `6f2d0004-…` | UTF-8 `App\|Title\|Text`, truncated to 120 bytes |
+| Identity | `6f2d0005-…` | **read** — the deck's one line of JSON, parsed by `DeckIdentity`; a network deck answers the same document at `GET /deck.json` |
+| Now playing | `6f2d0006-…` | UTF-8 `state\|position\|duration\|title\|artist\|album`, whole seconds, state `play`/`pause`/`stop`, written once a second while something plays |
 
 Service UUID is `6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10`; full UUIDs are in
 [`DeckService.java`](app/src/main/java/dev/phonedesk/companion/DeckService.java).
@@ -196,6 +200,14 @@ Service UUID is `6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10`; full UUIDs are in
 Time and battery are pushed on connect and then every 30 seconds. Notifications
 are pushed as they arrive; duplicates within 5 seconds are dropped, and group
 summaries and quiet ongoing items are skipped.
+
+**Now playing is a mirror, not a login.** `NowPlaying` reads the phone's own media
+session — through the notification access the app already needs — and `NowPacket`
+writes one line a second, so nothing here talks to Spotify and no account is
+involved. The three text fields are clamped to 47, 31 and 31 bytes and any `|`
+becomes `/`, because the characteristic splits on it. The deck draws what it is
+told and cannot control playback, which is why its now-playing page has no
+transport buttons.
 
 **Which apps get through is the user's choice.** SETTINGS lists every launchable app
 with a checkbox, and the first **SAVE** turns filtering on: after that only the
@@ -241,7 +253,7 @@ through Gradle; a raw `javac` build produces an APK-less class check and the
 BOARDS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
-[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (150 kB,
+[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (161 kB,
 package `dev.phonedesk.companion`, debug-signed). Install it with
 `adb install -r dist/PhoneDeckBridge-debug.apk`, or copy it to the phone and open
 it with "install unknown apps" allowed.

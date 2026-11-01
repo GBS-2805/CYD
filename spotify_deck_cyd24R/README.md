@@ -231,7 +231,7 @@ scheme**; see the measurement below for why that is enough.
 
 Both decks are ordinary Arduino sketches and both travel on the phone: the app
 bundles this one too (`check_widget_assets.py` prints `2 widgets bundled, every
-copy matches`, with this sketch at md5 `3683285a…`), so it can be pulled from the
+copy matches`, with this sketch at md5 `00bb1560…`), so it can be pulled from the
 same shelf as its sibling.
 
 From a computer, `toolchain.sh` has already compiled it:
@@ -317,8 +317,8 @@ core **3.3.12**, default partition scheme:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,123,145 | **187,575** | 1,310,720 (85 % used) |
-| DRAM | 53,572 globals | **274,108** | 327,680 |
+| flash | 1,125,781 | **184,939** | 1,310,720 (85 % used) |
+| DRAM | 53,636 globals | **274,044** | 327,680 |
 
 The check refuses a deck that overflows, that drops under **64 KiB** of free flash
 or that leaves under **160 KiB** of DRAM — the last floor is just over the
@@ -334,21 +334,25 @@ sourcing a toolchain.
 **Verified here** — none of this needs hardware:
 
 * The committed sketch links under the documented core **2.0.17** at 967,413
-  bytes (73 %), the measurement above. Re-measured on 2026-10-31 with
-  `arduino-cli` 1.5.2-rc.1, core **3.3.12** links the committed file at
-  1,123,145 bytes (85 %) with 53,572 bytes of globals (16 %), `EXIT=0` under
-  `--warnings all`. That is 96 B below the 1,123,241 an earlier root measured, with
-  the globals identical, and the app callback path is **992 B** of it — 212 B for
+  bytes (73 %), the measurement above, taken before the deck grew its
+  `/deck.json` identity. 2.0.17 has not been re-measured since, so quote that as
+  the pre-identity figure and not as the current size.
+* Re-measured on 2026-11-01 with `arduino-cli` 1.5.2-rc.1, core **3.3.12** links
+  the committed file at 1,125,781 bytes (85 %) with 53,636 bytes of globals
+  (16 %), `EXIT=0` under `--warnings all`. That is 2,540 B above the 1,123,241 an
+  earlier root measured, and the difference is not the build path: a comment-only
+  edit links to exactly the same size, while the identity characteristic the
+  sketch gained since moves it by kilobytes. Read the figure as 1,123–1,126 kB
+  rather than a fixed count. The app callback path is **992 B** of it — 212 B for
   the second redirect URI and the `state` field, 780 B for the one-line answer the
-  app now reads; a comment-only edit links to exactly the same size, so the
-  figure is a stable build rather than a stale build path. The two cores differ
+  app now reads. The two cores differ
   by ~155 kB, which is the WiFi stack as IDF 5 links it rather than mbedTLS (see
   [the build note](../CONVENTIONS.md#build)); 3.3.12 is what `toolchain.sh` pins
   now, so that is where the release numbers come from, and 2.0.17 is kept as the
   A/B build rather than the shipping one.
-* **It still fits on 3.3.12, on about a third of the slack:** 1,123,145 bytes
+* **It still fits on 3.3.12, on about a third of the slack:** 1,125,781 bytes
   against the 1,310,720-byte app slot the default scheme gives leaves
-  **187,575 B (14 %)** free, where 2.0.17 leaves 343,307 B (26 %). `default.csv`
+  **184,939 B (14 %)** free, where 2.0.17 leaves 343,307 B (26 %). `default.csv`
   sizes `app0` and `app1` at 1,310,720 each, so a wireless update faces the same
   ceiling; under `huge_app` the same build reads 36 % — a bigger room, not
   smaller code.
@@ -538,7 +542,7 @@ libraries to install and the library to refuse. The app's Gradle task walks ever
 `*/widget.json` beside `android-companion/` and copies the descriptor and its
 sketch into `app/src/main/assets/widgets/<id>/` at build time, so
 `check_widget_assets.py` in the repo root must report both copies in sync — it
-does, for this widget, from a `:app:syncWidgets` run on 2026-10-31.
+does, for this widget, from a `:app:syncWidgets` run on 2026-11-01.
 
 There is **no `ble` block**: this deck has no Bluetooth link to find, so the
 app's scan side has nothing to look for. Turning the descriptor into a project

@@ -9,17 +9,24 @@ A single-module Android app in Java, **no AndroidX and no third-party
 libraries**, so Gradle resolves only the Android Gradle Plugin. Package
 `dev.phonedesk.companion`, `minSdk` 26, `targetSdk` 35.
 
-Four tabs, hosted by `MainActivity`:
+The drawer (`DrawerHome`) is the front page and `MainActivity` hosts it:
 
 | File | Role |
 | --- | --- |
-| `MainActivity.java` | Header pill, bottom tab bar, 1 s refresh loop, permissions, SAF result |
+| `MainActivity.java` | Header pill, drawer host, 1 s refresh loop, permissions, SAF result |
+| `DrawerHome.java` | The front page: `PAIRED`, `BOARDS`, `SERIAL`, and the gear that opens `SETUP` |
 | `DecksTab.java` | Live monitor: link telemetry, nearby scan results, saved decks |
 | `ProjectsTab.java` | Notebook: status chips, project cards, deck libraries, recipes |
 | `BoardTab.java` | Target picker, USB probe/restart, imported images, flashing, serial monitor |
 | `SetupTab.java` | Notification access, Bluetooth, battery settings, start/stop |
 | `DeckService.java` | Foreground service: scan, GATT link, write queue, snapshot API |
 | `DeckStore.java` | SharedPreferences: known decks and the preferred MAC |
+| `DeckIdentity.java` | Parses the deck's one-line identity JSON, from BLE or `/deck.json` |
+| `DeckRegistry.java` | One record per board: id, widget, tag, address, state, age |
+| `LanDeck.java` | A network deck: `/deck.json`, its authorize URL, the code hand-off |
+| `NowPlaying.java` | Reads the phone's media session for the mirror |
+| `NowPacket.java` | Builds and clamps the now-playing line |
+| `NoticeFilter.java` | Per-app notification allowlist, one boolean per package |
 | `FlashLibrary.java` | Asset + app-storage files (binary-safe), import, MediaStore save |
 | `FirmwareCatalog.java` | Links to Marauder / Bruce / Launcher installers; no bundled binaries |
 | `UsbSerialCh340.java` | CH340 driver: claim, init writes, baud divisor, flow control, DTR/RTS |
@@ -56,10 +63,11 @@ reason to add a resource pipeline.
 
 ## Firmware files
 
-- **Two surfaces, one store.** The bundled sketch appears on the **ESP32
-  Phone_Widget** card in BOARDS — the title is `name` in the project's
-  `widget.json`, not a string in the app; imported `.ino`/`.bin` files appear under
-  **IMAGES** on BOARD, which is also the only place with COPY / SAVE / FLASH.
+- **Two surfaces, one store.** Both bundled sketches appear as cards in BOARDS —
+  **Phone Deck** and **Spotify Deck**, each titled by `name` in its own
+  `widget.json`, not by a string in the app; imported `.ino`/`.bin` files appear
+  under **IMAGES** on BOARD, which is also the only place with COPY / SAVE /
+  FLASH.
   `FlashLibrary` backs both.
 - **A text sketch is never flashable.** The APK carries ArduinoDroid source, not a
   compiled `.bin`, so the write path runs on imported images only.
@@ -408,10 +416,10 @@ URL and a flashing note. Decisions behind it:
 - The app is **Off-site** (`android:label`, header title). The package stays
   `dev.phonedesk.companion` and the APK stays `dist/PhoneDeckBridge-debug.apk`, so
   an upgrade replaces the installed copy instead of sitting beside it.
-- Four tabs: **PAIRED** (live link), **BOARDS** (the notebook: status chips,
-  cards, deck libraries), **BOARD** (target picker, USB probe/restart, images,
-  flashing and the serial monitor) and **SETUP** (permissions, bridge switch,
-  last crash).
+- Three drawer sections: **PAIRED** (live link), **BOARDS** (the notebook: status
+  chips, cards, deck libraries) and **SERIAL** (target picker, USB probe/restart,
+  images, flashing and the serial monitor), with **SETUP** behind the gear in the
+  top bar (permissions, bridge switch, last crash).
 - `BoardTab` owns every call that touches the ESP32: `UsbSerialCh340`, `EspRom`,
   the USB permission receiver and the flash progress. The project shelf never
   opens the port, which is what lets each tab keep a single job.
@@ -431,6 +439,9 @@ Identical to the sketch, checked against its `onWrite` handlers:
 - Battery `6f2d0003-…` — percent, then `1` while charging or full
 - Notification `6f2d0004-…` — `App|Title|Text`, UTF-8, clamped to 120 bytes
   (the sketch buffers 160)
+- Identity `6f2d0005-…` — read only: the one-line JSON `DeckIdentity` parses
+- Now playing `6f2d0006-…` — `state|position|duration|title|artist|album`, whole
+  seconds, written once a second from `NowPacket`; `stop` clears the card
 
 ## Design decisions
 
@@ -469,16 +480,18 @@ Identical to the sketch, checked against its `onWrite` handlers:
 - The last `javac 17` type check against the Android 14 (API 34) framework
   classes (`android-all`) covered the pre-split sources: 9 files, 22 classes, only
   deprecation notes from the pre-Android-13 `setValue`/`setWriteType` path.
-  **That check predates the four-tab split.** The current 19 sources are covered
-  by `gradle assembleDebug` instead, which is what produced the shipped APK.
+  **That check predates the split into sections.** The current 28 sources are
+  covered by `gradle assembleDebug` instead, which is what produced the shipped
+  APK.
 - Every relative Markdown link across the repo resolves.
 - `gradle assembleDebug` (Gradle 8.7, AGP 8.6.1, SDK 35, JDK 17) builds a debug
   APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-10-31 after the sketch
   header change, the probe work, the drawer's rework and the deck's sign-in —
-  **151,794 bytes** on the file in `dist/` as measured on 2026-11-01, against the
-  112,473 that the same work produced before the second widget joined it. The two
+  **165,242 bytes** on the file in `dist/` as measured on 2026-11-01 after the
+  mirror, against the 112,473 that the same work produced before the second
+  widget joined it. The two
   halves were measured on their own branches the same day before they met —
   146,290 bytes for the drawer alone, 149,494 for the sign-in alone — and this
   figure is the tree that has both.
@@ -489,7 +502,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   sketches they name are inside the APK, `assets/widgets/phone_deck_cyd24R/` and
   `assets/widgets/spotify_deck_cyd24R/`, and `check_widget_assets.py` in the repo
   root compares those copies with `../<folder>/<sketch>.ino` byte for byte (phone
-  deck md5 `496952d5…`, Spotify `3683285a…` — `eca02e93…` before the callback
+  deck md5 `62c7e6c3…`, Spotify `00bb1560…` — `eca02e93…` before the callback
   change and `49f29bcb…` before the one-line answer — both in sync on 2026-11-01).
 - **The Spotify deck's sign-in finishes here.** `SpotifyCallbackActivity` is
   exported for `phonedesk://spotify-callback`, and `aapt2 dump xmltree` on the
@@ -504,7 +517,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   to end on 2026-11-01: `all 61 host checks passed` (fifteen for the sign-in —
   nine for `SpotifyLink`'s parser, six for the address it builds, including a `+`
   escaped as `%2B` rather than a space), `BUILD SUCCESSFUL`, v2 signature,
-  `zipalign -c 4`, 151,794 bytes on the merged tree (149,494 for the sign-in
+  `zipalign -c 4`, 165,242 bytes on the merged tree (149,494 for the sign-in
   alone, before the drawer's rework joined it). **Nothing has run on a phone**, so the chooser
   gesture, the request to a real deck and the fallback are unverified.
 - `./toolchain.sh` ran end to end from an **empty install root**
@@ -528,9 +541,10 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **151,794 bytes** on 2026-11-01, the rebuild carrying two bundled sketches, the
-  drawer that names boards rather than projects, and the sign-in that finishes in
-  the app. Quote the size to the nearest kB (~152 kB), never as a checksum.
+  **165,242 bytes** on 2026-11-01, the rebuild carrying two bundled sketches, the
+  drawer that names boards rather than projects, the sign-in that finishes in the
+  app and the mirror. Quote the size to the nearest kB (~161 kB), never as a
+  checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set — now including
   `INTERNET`, the one outbound request to the deck —

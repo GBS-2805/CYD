@@ -16,9 +16,17 @@ controller or bridge gets its own section here first.
   board it runs on — see [Naming](#naming-topic_deck_board) below.
 * One sketch, one tab, **no extra headers**. A pasted `.ino` cannot see a header
   beside it.
-* Each folder has **one** `README.md`: what it is, how to flash it, the traps, and
-  what is verified. No `HOWTO.md`, no `HANDOFF.md` — a task that needs steps gets
-  them in that README.
+* Each **widget** folder has one `README.md`: what it is, how to flash it, the
+  traps, and what is verified. No `HOWTO.md`, no `HANDOFF.md`, no `DECK_HANDOFF.md`
+  inside one — a task that needs steps gets them in that README. The app folder is
+  the one exception, because it carries three documents with three audiences and
+  one `README.md` holding all of them was unreadable:
+  [`android-companion/README.md`](android-companion/README.md) is the product and
+  its build, [`HOWTO.md`](android-companion/HOWTO.md) is the step-by-step a person
+  follows on the phone, and [`HANDOFF.md`](android-companion/HANDOFF.md) is the
+  state behind the code — what exists, what is verified, what is not. The root
+  keeps [`DECK_HANDOFF.md`](DECK_HANDOFF.md) for the same reason: the deck-to-app
+  hand-off crosses both trees, so it belongs to neither folder.
 * Add the row to the [root README](README.md) table in the same change.
 * Widgets bundled into the APK also carry [`widget.json`](phone_deck_cyd24R/widget.json)
   (`schema: 1`, with `id`, `name`, `sketch`, `board`, `tagline`, `body`, `notes`,
@@ -74,11 +82,11 @@ sketch and the descriptor `id`, which always move together:
   still proves nothing, because `esp32:esp32:esp32` defaults to `PSRAM=disabled`.
   Read the marking, never a product listing.
 * **Budget for 4 MB of flash and no PSRAM.** The default partition scheme gives
-  the app 1,310,720 bytes and the deck takes ~1,162,800 of them (88% as reported
-  by the compiler). DRAM is 327,680 bytes with ~300 kB of heap free at boot once
-  the display and touch drivers are up; a 320x240 RGB565 framebuffer is 153,600,
-  so there is room for one, not two. Treat "it fits" as a measurement from
-  `Sketch uses ...`, never an assumption.
+  the app 1,310,720 bytes and the deck takes ~1,168,300 of them (89 % as reported
+  by the compiler, after the mirror). DRAM is 327,680 bytes with ~300 kB of heap
+  free at boot once the display and touch drivers are up; a 320x240 RGB565
+  framebuffer is 153,600, so there is room for one, not two. Treat "it fits" as a
+  measurement from `Sketch uses ...`, never an assumption.
 * **A control that ignores taps is usually a stale mapping, not a bad control.**
   The deck's `+` chip took no taps while `-` worked and a recalibration fixed it.
   Keep targets at least ~40 px on the short side, clear of the outer 8 px, with a
@@ -100,7 +108,10 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   sketches, exit 0: phone deck 1,165,222 B (88 %) / 45,060 B globals, Spotify
   1,122,281 B (85 %) / 53,572 B globals. Those are 48 B and 32 B above the same
   sketches built straight through `arduino-cli` from another path — the build-root
-  sensitivity above, not a different toolchain.
+  sensitivity above, not a different toolchain. The mirror has since moved the
+  phone deck to 1,168,314 B (89 %) / 45,244 B globals and the Spotify deck to
+  1,125,781 B (85 %) / 53,636 B globals, as [`check_headroom.py`](check_headroom.py)
+  read both of them on 2026-11-01.
 * **The margin is checked, not assumed.** [`check_headroom.py`](check_headroom.py)
   compiles each deck with the deck FQBN and reads the compiler's own `Maximum is
   …` figures, so both ceilings — 1,310,720 B of flash and 327,680 B of DRAM —
@@ -152,8 +163,8 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   the root it came from, so on a machine that keeps 2.0.17 beside 3.3.12 it would
   silently build the wrong core and report 73 % where the release reads 85 %.
   Both together took **18 s** here, on core 3.3.12 with the build cache warm; on
-  2026-11-01 `check_headroom.py` over both decks read 1,165,062 B (145,658 B free)
-  and 1,123,145 B (187,575 B free), exit 0.
+  2026-11-01, after the mirror, `check_headroom.py` over both decks read
+  1,168,314 B (142,406 B free) and 1,125,781 B (184,939 B free), exit 0.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
@@ -178,11 +189,11 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   Espressif's own 2.0.x support ended in July 2024; and no flash of either deck
   has been confirmed, so today is the cheapest this migration will ever be — both
   already link clean on both cores. The price is **155 kB** in the WiFi deck
-  (343 kB → 188 kB of its app slot) and ~3 kB of RAM; the Bluetooth deck pays
+  (343 kB → 185 kB of its app slot) and ~3 kB of RAM; the Bluetooth deck pays
   2.4 kB. Reverse only for a measured reason: if the WiFi deck runs out of flash,
   use `huge_app` (3 MB slot, 36 % used today) rather than an unsupported TLS
   stack. **Still unmeasured: heap during the TLS handshake on 3.x** — the first
-  thing to watch when the Spotify deck reaches hardware, since 53,572 B of
+  thing to watch when the Spotify deck reaches hardware, since 53,636 B of
   globals leaves 274 kB and mbedTLS 3.x is the larger consumer.
 * Libraries, and only these unless the widget genuinely needs more: `Adafruit GFX
   Library`, `Adafruit ILI9341`, `XPT2046_Touchscreen`.
