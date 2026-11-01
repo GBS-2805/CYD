@@ -6,6 +6,9 @@
 #   ./toolchain.sh --setup-only     install without compiling
 #   ARDUINO_HOME=/opt/cyd ./toolchain.sh        install somewhere else
 #
+# A root that already holds 2.0.17 (the old default, ~/.arduino-cyd) needs
+# a fresh one for the default: ARDUINO_HOME=~/.arduino-cyd-3 ./toolchain.sh
+#
 # Everything lives under one directory and nothing touches a global Arduino
 # config, so this is safe to re-run and safe to delete. Idempotent: an
 # arduino-cli, core and libraries already present are reused, which is what
@@ -15,8 +18,9 @@
 #   source ~/.arduino-cyd/env.sh
 #
 # One core version per install root, because the compiler picks the newest
-# installed platform. Keep 2.x and 3.x apart when measuring both:
-#   ARDUINO_HOME=~/.arduino-cyd-3 ARDUINO_CORE=esp32:esp32@3.3.12 ./toolchain.sh
+# installed platform. The default is core 3.x; keep 2.0.17 in its own root when
+# you want the old core for an A/B measurement:
+#   ARDUINO_HOME=~/.arduino-cyd-2 ARDUINO_CORE=esp32:esp32@2.0.17 ./toolchain.sh
 #
 set -euo pipefail
 
@@ -24,7 +28,7 @@ ROOT="${ARDUINO_HOME:-$HOME/.arduino-cyd}"
 # "latest" by default: the 1.5.2 line was only ever published as a release
 # candidate, so a pinned 1.5.2 URL 404s and silently falls back anyway.
 CLI_VERSION="${ARDUINO_CLI_VERSION:-latest}"
-CORE="${ARDUINO_CORE:-esp32:esp32@2.0.17}"
+CORE="${ARDUINO_CORE:-esp32:esp32@3.3.12}"
 FQBN="${ARDUINO_FQBN:-esp32:esp32:esp32}"
 LIBS=("Adafruit GFX Library" "Adafruit ILI9341" "XPT2046_Touchscreen")
 

@@ -347,15 +347,17 @@ A compile in this repo, on 2026-10-30, with `arduino-cli` 1.5.2-rc.1:
 **core 2.0.17** 1,162,797–1,162,813 B (**88 %** flash) and 41,436 B (12 % RAM);
 **core 3.3.12** 1,163,930 B (88 %) and 45,004 B (13 %). The 2.x figure moves by
 ~16 bytes with the build root, so read it as 1,162.8 kB rather than a fixed count.
-Core 3.x costs ~1 kB of flash and 3.6 kB of RAM for this sketch.
+Core 3.x costs 1–2.4 kB of flash and 3.6 kB of RAM for this sketch, depending on
+the build path.
 
 ### At a glance
 
 **Verified here** — none of this needs hardware:
 
-* Core **2.0.17**, the version `toolchain.sh` pins, links the committed sketch at
-  1,162,797–1,162,813 bytes (88 %) with 41,436 bytes of RAM (12 %), measured on
-  2026-10-30; the spread is the build root, so read it as 1,162.8 kB.
+* Core **2.0.17** links the committed sketch at 1,162,797–1,162,813 bytes
+  (88 %) with 41,436 bytes of RAM (12 %), measured on 2026-10-30; the spread is
+  the build root, so read it as 1,162.8 kB. It is the A/B build now, not the
+  default — `toolchain.sh` pins 3.3.12.
 * Core **3.3.12** links it at 1,165,174 bytes (88 %) with 45,060 bytes of RAM
   (13 %), `EXIT=0` under `--warnings all`, re-measured on 2026-10-31. An earlier
   3.3.12 build on a shorter path reported 1,163,930 / 45,004, so 3.x is

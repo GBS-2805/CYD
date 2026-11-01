@@ -6,6 +6,9 @@
 #   ./toolchain.sh --setup-only     install without compiling
 #   ARDUINO_HOME=/opt/cyd ./toolchain.sh        install somewhere else
 #
+# A root that already holds 2.0.17 (the old default, ~/.arduino-cyd) needs
+# a fresh one for the default: ARDUINO_HOME=~/.arduino-cyd-3 ./toolchain.sh
+#
 # Everything lives under one directory and nothing touches a global Arduino
 # config, so this is safe to re-run and safe to delete. Idempotent: an
 # arduino-cli, core and libraries already present are reused, which is what
@@ -20,13 +23,14 @@
 #   source ~/.arduino-cyd/env.sh
 #
 # The default partition scheme is used, and it fits: WiFi, the setup web server,
-# mbedTLS, HTTPClient and the two pinned roots come to 967,413 bytes of the
-# 1,310,720 the default scheme gives the app (73%), 197 kB less than the phone
-# deck's Bluetooth build (1,164,489 bytes measured on the same machine).
-# huge_app also compiles (30% of 3 MB) if you want the
-# headroom; if you change the scheme, flash the phone deck with the same one,
-# because uploading a different scheme re-partitions the board under both
-# sketches.
+# mbedTLS, HTTPClient and the two pinned roots come to 1,122,249 bytes of the
+# 1,310,720 the default scheme gives the app (85%), leaving 188 kB. The same
+# sketch on core 2.0.17 is 967,413 bytes (73%), so the newer core costs this deck
+# 155 kB - the WiFi stack as IDF 5 links it, not mbedTLS. If that gets tight,
+# huge_app gives 3 MB (36% used); going back to 2.0.17 instead means shipping
+# mbedTLS 2.28, which is out of support. If you change the scheme, flash the
+# phone deck with the same one, because uploading a different scheme
+# re-partitions the board under both sketches.
 #
 set -euo pipefail
 
@@ -34,7 +38,7 @@ ROOT="${ARDUINO_HOME:-$HOME/.arduino-cyd}"
 # "latest" by default: the 1.5.2 line was only ever published as a release
 # candidate, so a pinned 1.5.2 URL 404s and silently falls back anyway.
 CLI_VERSION="${ARDUINO_CLI_VERSION:-latest}"
-CORE="${ARDUINO_CORE:-esp32:esp32@2.0.17}"
+CORE="${ARDUINO_CORE:-esp32:esp32@3.3.12}"
 FQBN="${ARDUINO_FQBN:-esp32:esp32:esp32}"
 LIBS=("Adafruit GFX Library" "Adafruit ILI9341" "XPT2046_Touchscreen")
 
