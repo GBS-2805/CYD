@@ -3,3 +3,10 @@
 # a widget folder, because the tooling is shared by every widget.
 __pycache__/
 *.pyc
+
+# Scratch in artifacts/: a descriptor patch that applies neither forward nor
+# backward against this tree, and an icon candidate nothing references (the real
+# launcher icon is vector XML in res/). The renders beside them are committed;
+# these two belong to no build and no doc, so the tree stays clean without them.
+artifacts/*.diff
+artifacts/launcher-icon.png
