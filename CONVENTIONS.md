@@ -187,10 +187,17 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   assembling a toolchain per chat; it is idempotent and keeps everything under one
   `ARDUINO_HOME`.
 * Report what actually ran. "Compiles" means a compile exited 0 in this repo.
-* **Flashing needs a computer with a cable.** Upload over USB-OTG from the phone
-  does not work on this board: the ROM bootloader answered no sync at 115200,
+* **Flashing from the phone is ArduinoDroid's job, not the app's.** On
+  2026-10-31 the same phone, OTG adapter, cable and board flashed successfully
+  from ArduinoDroid, which is the measurement that matters for the sketch: copy
+  it into ArduinoDroid and upload from there. What failed the same day was the
+  companion app's *own* uploader — its ROM handshake got no sync at 115200,
   57600, 230400, 460800 or 74880 baud in either DTR/RTS polarity while 552 B left
-  the phone per round. Do not re-litigate that without a new measurement.
+  the phone per round. Keep the two apart: a deck flashes from the phone today,
+  and the app's USB flasher is the thing that cannot write a board until its
+  packets arrive. A computer over the same cable is the fallback, and it is also
+  the test that separates the app's transmit path from the bridge. Do not
+  re-litigate either without a new measurement.
 
 ## Palette
 
@@ -251,9 +258,10 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
   you see are yours.
 * Nothing is pushed or deployed without being asked. The repo stays private.
 * Numbers in docs are one board's measurements, not a contract. Say which.
-* Never document a step as working because it should. The OTG upload is recorded
-  as broken with the baud rates and byte counts tried; that record is what stops
-  the next attempt from repeating it.
+* Never document a step as working because it should. The failed handshake is
+  recorded with the baud rates and byte counts tried — including which handshake
+  failed: the app's, not ArduinoDroid's — and that precision is what stops the
+  next attempt from retreating to a cable it does not need.
 
 ## Adding a widget
 

@@ -155,13 +155,15 @@ upload that will not sync, not a step.
    `.ino` is compiled.
 3. Board **ESP32 Dev Module**; install only Adafruit GFX, Adafruit ILI9341 and
    XPT2046_Touchscreen. **ArduinoBLE must not be installed.**
-4. Compiling on the phone works; **uploading over USB-OTG does not**. The CH340
-   opens and the phone can drive DTR/RTS, but the ESP32 ROM bootloader never
-   answered a sync at **115200, 57600, 230400, 460800 or 74880** baud in either
-   polarity, while 552 B left the phone per attempt — the send path works, the
-   handshake does not. ArduinoDroid's upload is that same handshake, so it fails
-   the same way, and the companion app cannot reflash the deck either. The flash
-   needs a cable to a computer.
+4. **Upload from ArduinoDroid**, with an OTG adapter and a USB **data** cable.
+   That is measured, not assumed: on 2026-10-31 the same phone, adapter, cable and
+   board flashed successfully from ArduinoDroid, so the CH340, the cable and the
+   board's reset circuit are all known good. What failed that day was the
+   companion app's *own* uploader, whose ROM handshake drew no sync at **115200,
+   57600, 230400, 460800 or 74880** baud in either DTR/RTS polarity while 552 B
+   left the phone per attempt. That is the app's bug, not the board's, and it is
+   no reason to walk the deck to a computer. A computer over the same cable is the
+   fallback when the phone's handshake will not take.
 
 ## widget.json: how the app finds this widget
 
