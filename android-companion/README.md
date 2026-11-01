@@ -31,6 +31,26 @@ from guesswork: `linked 4m 12s · -62 dBm · 18 packets · 5 notices`.
 - The header pill reads `LINKED`, `SCANNING` or `IDLE`, and the monitor refreshes
   once a second. RSSI is polled from the live link every 10 s.
 
+## The Spotify deck's sign-in
+
+The only thing here that is not a tab: `SpotifyCallbackActivity` is opened by
+Android when Spotify redirects the deck's sign-in to
+`phonedesk://spotify-callback?code=...&state=...`. It reads the code out of that
+link, sends it to the deck at `http://<deck>/code?redir=app&code=...&json=1`, and
+shows what the deck answered — the deck holds the PKCE verifier, does the
+exchange and reboots into the player.
+
+That request is the app's **only** network use, and it is why the APK now asks
+for `INTERNET` and allows cleartext HTTP: the deck is a bare LAN address serving
+plain HTTP with no certificate, and it gets that address over DHCP, so there is
+nothing narrower to allow. When no answer comes back — deck asleep, phone on
+mobile data — the activity falls back to opening the same address in the phone's
+browser, which needs no answer from the app and is how this worked before.
+Spotify's plain-HTTP redirect is a loopback literal, and a browser
+will never hand `http://127.0.0.1` to another app, which is the whole reason the
+custom scheme exists. Without this app the deck still works: its setup page
+falls back to copying the address out of the browser bar.
+
 ## The project shelf
 
 **BOARDS** is the notebook: every project is a card with a status, a log and the
@@ -204,9 +224,9 @@ adb install -r dist/PhoneDeckBridge-debug.apk
 reuses Gradle's build directory. The first run downloads about 1 GB and needs
 `curl` and `unzip`. It runs the host tests below before Gradle, then checks the
 signature, the 4-byte alignment, the manifest, the bundled sketch and the launcher
-icon, refuses an APK that asks for `INTERNET`, is `debuggable`, targets anything
-but 35 or ships without an icon, and prints the size and SHA-256 of what it copied
-to `dist/`.
+icon, requires `INTERNET` and cleartext (the sign-in hand-off is one request to
+the deck), refuses an APK that is `debuggable`, targets anything but 35 or ships
+without an icon, and prints the size and SHA-256 of what it copied to `dist/`.
 
 Android Studio still works: open the `android-companion` folder (Ladybug or
 newer), let it sync, and run the `app` configuration.
@@ -221,7 +241,7 @@ through Gradle; a raw `javac` build produces an APK-less class check and the
 BOARDS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
-[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (145 kB,
+[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (150 kB,
 package `dev.phonedesk.companion`, debug-signed). Install it with
 `adb install -r dist/PhoneDeckBridge-debug.apk`, or copy it to the phone and open
 it with "install unknown apps" allowed.
@@ -245,11 +265,14 @@ line coding and the ROM's willingness to answer are hardware facts.
 
 The APK is meant to be installable by other people, so the build checks what a
 listing checks and fails rather than warns: `targetSdk` must be 35, the APK must
-carry a launcher icon, it must not request `android.permission.INTERNET`, and it
-must not be `debuggable`. The last one is not paperwork — notification access plus
-a debuggable process means any machine with adb can attach to the code that reads
-message text, so `build.gradle` sets `debuggable false` on the debug type for
-exactly that reason.
+carry a launcher icon, it must request `android.permission.INTERNET` (the sign-in
+hand-off cannot work without it) and allow cleartext HTTP (the deck serves plain
+HTTP), and it must not be `debuggable`. The last one is not paperwork —
+notification access plus a debuggable process means any machine with adb can
+attach to the code that reads message text, so `build.gradle` sets `debuggable
+false` on the debug type for exactly that reason. INTERNET is the one permission
+here that took a property away: the app can reach the network now, and the deck's
+own address is the only host it ever calls.
 
 The APK is still signed with the debug certificate, which only affects updates: a
 build made on a different machine carries a different key, so it will not install

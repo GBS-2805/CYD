@@ -1312,15 +1312,26 @@ static void pumpSetupWizard() {
 //   GET  /net      the form, even when a client id is already stored
 //   POST /save     store the network and the client id, join the network
 //   GET  /spotify  join state, the Spotify link and the paste box
-//   GET  /auth     302 to Spotify with a fresh S256 challenge
+//   GET  /auth     302 to Spotify with a fresh S256 challenge (app=1: app scheme)
 //   POST /code     exchange the pasted code, store the token, reboot
+//   GET  /code     the same exchange for the app, which hands its code back;
+//                  &json=1 asks for a one-line answer instead of a page
+//                  through the phone's browser instead of opening a socket
 //
 // The access point is open on purpose: the page is where the credentials are
 // typed, it exists only while the deck is in setup, and it never renders a
 // stored password or token back.
 
 static constexpr char WEB_AP_SSID[] = "Spotify Deck";
-static constexpr char OAUTH_REDIRECT[] = "http://127.0.0.1:8080/callback";
+// Two redirect URIs, because they answer different questions. A loopback literal
+// is the only plain-HTTP address Spotify still accepts, and it is what the paste
+// path uses: the browser lands on the phone itself and its bar holds the address
+// to copy. A custom scheme is the one redirect a browser can hand to an app,
+// which is what turns the app path into one tap; Spotify's February 2025 note
+// keeps custom schemes working, and the dashboard lists this one beside the
+// loopback one.
+static constexpr char OAUTH_REDIRECT_PASTE[] = "http://127.0.0.1:8080/callback";
+static constexpr char OAUTH_REDIRECT_APP[] = "phonedesk://spotify-callback";
 static constexpr char OAUTH_SCOPES[] =
     "user-read-playback-state user-modify-playback-state "
     "user-read-currently-playing";
@@ -1540,9 +1551,11 @@ static void sendNetworkPage(WiFiClient &client) {
   client.print(F("<input type=submit value=\"Save and join WiFi\"></form>"));
   client.print(F("<p class=small>2.4 GHz only &mdash; the ESP32 has no 5 GHz "
                  "radio. The client id is on developer.spotify.com/dashboard: "
-                 "create an app, then add "
-                 "<b>http://127.0.0.1:8080/callback</b> as its redirect URI. No "
-                 "client secret is needed.</p>"));
+                 "create an app, then add both "
+                 "<b>http://127.0.0.1:8080/callback</b> and "
+                 "<b>phonedesk://spotify-callback</b> as redirect URIs &mdash; "
+                 "the second is the one the app catches. No client secret is "
+                 "needed.</p>"));
   client.print(F("<form method=post action=/wipe>"
                  "<input type=submit class=danger "
                  "value=\"Forget the stored WiFi and token\"></form>"));
@@ -1564,10 +1577,18 @@ static void sendSignInPage(WiFiClient &client) {
     client.print(F("<p>wifi <b>connected</b> "));
     client.print(WiFi.localIP().toString());
     client.print(F("</p>"));
-    client.print(F("<a class=go href=/auth target=_blank rel=noopener>"
-                   "Open Spotify sign-in</a>"));
-    client.print(F("<p class=small>Approve the request. The page that opens is "
-                   "<b>127.0.0.1:8080</b> and will fail to load &mdash; that is "
+    client.print(F("<a class=go href='/auth?app=1'>Sign in with the app</a>"));
+    client.print(F("<p class=small>Approve the request on Spotify's page and the "
+                   "app finishes setup for you: it catches the reply and hands "
+                   "the code to the deck, so there is nothing to copy. Its "
+                   "redirect URI <b>phonedesk://spotify-callback</b> has to be "
+                   "listed for the app in the Spotify dashboard, beside "
+                   "<b>http://127.0.0.1:8080/callback</b>.</p>"));
+    client.print(F("<a class=go style=\"background:#fff;color:#111;"
+                   "border:1px solid #111\" href=/auth target=_blank "
+                   "rel=noopener>or sign in in the browser</a>"));
+    client.print(F("<p class=small>Without the app the page that opens is "
+                   "<b>127.0.0.1:8080</b> and fails to load &mdash; that is "
                    "expected. Copy its address out of the browser bar and paste "
                    "it below.</p>"));
     client.print(F("<form method=post action=/code>"
@@ -1611,7 +1632,8 @@ static void sendMessagePage(WiFiClient &client, const char *heading,
 // The one request the board makes on the user's behalf. Its own socket, because
 // the poller owns the other one, and it pins the token host's root the same way
 // refreshAccessToken() does.
-static bool exchangeCode(const String &code, String &detail) {
+static bool exchangeCode(const String &code, const char *redirectUri,
+                         String &detail) {
   if (!clockGood()) {
     detail =
         "the deck's clock is not set yet, and a certificate check needs the date. "
@@ -1634,7 +1656,7 @@ static bool exchangeCode(const String &code, String &detail) {
   String body = "grant_type=authorization_code&code=";
   body += urlEncode(code);
   body += "&redirect_uri=";
-  body += urlEncode(OAUTH_REDIRECT);
+  body += urlEncode(redirectUri);
   body += "&client_id=";
   body += creds.clientId;
   if (pkceVerifier.length() > 0) {
@@ -1719,20 +1741,49 @@ static void handleWebSave(WiFiClient &client, const String &body) {
                  "Content-Length: 0\r\nConnection: close\r\n\r\n"));
 }
 
-static void handleWebCode(WiFiClient &client, const String &body) {
+// The app asks for a one-line answer (`json=1`) instead of a page, so it can say
+// what happened and close: `signed-in` means the token is stored, `refused: ...`
+// is the reason it is not. A browser gets the page it always got, which is also
+// what the app falls back to when no answer arrives at all.
+static void codeReply(WiFiClient &client, bool plainReply, const char *heading,
+                      const String &text, bool bad) {
+  if (!plainReply) {
+    if (!bad) {
+      sendDonePage(client);
+      return;
+    }
+    sendMessagePage(client, heading, text, true);
+    return;
+  }
+  const String body =
+      bad ? String(F("refused: ")) + text + "\n" : String(F("signed-in\n"));
+  client.print(F("HTTP/1.1 "));
+  client.print(bad ? F("409 Conflict") : F("200 OK"));
+  client.print(F("\r\nContent-Type: text/plain; charset=utf-8\r\n"
+                 "Cache-Control: no-store\r\nContent-Length: "));
+  client.print(body.length());
+  client.print(F("\r\nConnection: close\r\n\r\n"));
+  client.print(body);
+}
+
+// `fields` is a form body or a query string; the two have the same shape, and
+// the app path arrives as a query string: the app makes that one request itself
+// now, and the browser is only the fallback when the deck does not answer.
+static void handleWebCode(WiFiClient &client, const String &fields,
+                          bool appRedirect, bool plainReply) {
   char pasted[1024];
-  if (!formField(body, "code", pasted, sizeof(pasted)) || pasted[0] == '\0') {
-    sendMessagePage(client, "Nothing pasted",
-                    "Paste the whole address the browser landed on, or just its "
-                    "code= value.",
-                    true);
+  if (!formField(fields, "code", pasted, sizeof(pasted)) || pasted[0] == '\0') {
+    codeReply(client, plainReply, "Nothing pasted",
+              "Paste the whole address the browser landed on, or just its "
+              "code= value.",
+              true);
     return;
   }
   if (WiFi.status() != WL_CONNECTED) {
-    sendMessagePage(client, "Not on WiFi yet",
-                    "The deck has to be on your network before it can exchange "
-                    "the code. Wait for the sign-in page to say connected.",
-                    true);
+    codeReply(client, plainReply, "Not on WiFi yet",
+              "The deck has to be on your network before it can exchange the "
+              "code. Wait for the sign-in page to say connected.",
+              true);
     return;
   }
 
@@ -1749,23 +1800,24 @@ static void handleWebCode(WiFiClient &client, const String &body) {
   }
   code.trim();
   if (code.length() < 8) {
-    sendMessagePage(client, "That is not a code",
-                    "It should look like AQ... and be hundreds of characters "
-                    "long.",
-                    true);
+    codeReply(client, plainReply, "That is not a code",
+              "It should look like AQ... and be hundreds of characters long.",
+              true);
     return;
   }
 
   String detail;
-  if (!exchangeCode(code, detail)) {
-    sendMessagePage(client, "Spotify said no", detail, true);
+  const char *redirectUri =
+      appRedirect ? OAUTH_REDIRECT_APP : OAUTH_REDIRECT_PASTE;
+  if (!exchangeCode(code, redirectUri, detail)) {
+    codeReply(client, plainReply, "Spotify said no", detail, true);
     return;
   }
   // One code, one verifier: a second paste must start a fresh challenge rather
   // than reuse the pair that already worked.
   pkceVerifier = "";
   clearVerifier();
-  sendDonePage(client);
+  codeReply(client, plainReply, "", "", false);
   setupRebootMs = millis() + 1500;
 }
 
@@ -1783,7 +1835,7 @@ static void handleWebWipe(WiFiClient &client) {
   setupRebootMs = millis() + 1500;
 }
 
-static void handleWebAuth(WiFiClient &client) {
+static void handleWebAuth(WiFiClient &client, bool appRedirect) {
   if (creds.clientId[0] == '\0') {
     sendMessagePage(client, "No client id",
                     "Save the network and the client id on the first page first.",
@@ -1802,10 +1854,18 @@ static void handleWebAuth(WiFiClient &client) {
     return;
   }
 
+  const char *redirectUri =
+      appRedirect ? OAUTH_REDIRECT_APP : OAUTH_REDIRECT_PASTE;
   String url = "https://accounts.spotify.com/authorize?response_type=code&client_id=";
   url += urlEncode(creds.clientId);
   url += "&redirect_uri=";
-  url += urlEncode(OAUTH_REDIRECT);
+  url += urlEncode(redirectUri);
+  // A custom scheme carries no address, so the app has to be told where the deck
+  // is, and state is the one field Spotify echoes back untouched. Nothing secret
+  // rides here: the PKCE verifier stays on the board, so a forged state can only
+  // aim a code at the wrong LAN address, where it fails.
+  url += "&state=";
+  url += urlEncode(WiFi.localIP().toString());
   url += "&scope=";
   url += urlEncode(OAUTH_SCOPES);
   url += "&code_challenge_method=S256&code_challenge=";
@@ -1854,8 +1914,12 @@ static void handleWebRequest(WiFiClient &client) {
   }
   const String method = requestLine.substring(0, firstSpace);
   String path = requestLine.substring(firstSpace + 1, secondSpace);
-  const int query = path.indexOf('?');
-  if (query >= 0) path = path.substring(0, query);
+  String query;
+  const int queryAt = path.indexOf('?');
+  if (queryAt >= 0) {
+    query = path.substring(queryAt + 1);
+    path.remove(queryAt);
+  }
 
   // /where is a page polling itself every few seconds; counting it would turn
   // the card's diagnostic line into a counter of that poll.
@@ -1888,14 +1952,29 @@ static void handleWebRequest(WiFiClient &client) {
 
   Serial.printf("[setup] %s %s\n", method.c_str(), path.c_str());
 
+  char flag[8];
+  flag[0] = '\0';
+  const bool appRedirect =
+      formField(query, "app", flag, sizeof(flag)) && flag[0] == '1';
+  const bool appCode = formField(query, "redir", flag, sizeof(flag)) &&
+                       strcmp(flag, "app") == 0;
+  const bool plainReply =
+      formField(query, "json", flag, sizeof(flag)) && flag[0] == '1';
+
   if (method == "POST" && path == "/save") {
     handleWebSave(client, body);
   } else if (method == "POST" && path == "/code") {
-    handleWebCode(client, body);
+    handleWebCode(client, body, false, false);
+  } else if (method == "GET" && path == "/code") {
+    // A GET that changes state, deliberately: the code is single-use, so a
+    // replayed load only earns a second `invalid_grant`. The app asks for a
+    // one-line answer (`json=1`) so it can report the result and close; a browser
+    // loading the same address — the fallback — still gets the page.
+    handleWebCode(client, query, appCode, plainReply);
   } else if (method == "POST" && path == "/wipe") {
     handleWebWipe(client);
   } else if (method == "GET" && path == "/auth") {
-    handleWebAuth(client);
+    handleWebAuth(client, appRedirect);
   } else if (method == "GET" && path == "/net") {
     sendNetworkPage(client);
   } else if (method == "GET" && path == "/spotify") {

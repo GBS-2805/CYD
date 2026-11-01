@@ -209,11 +209,16 @@ printf '%s\n' "$BADGING" | grep -E '^package:|^sdkVersion|^targetSdkVersion' || 
 printf '%s\n' "$BADGING" | grep -q "name='dev.phonedesk.companion'" \
   || fail "package is not dev.phonedesk.companion"
 
-# Two properties this build is supposed to keep, checked instead of assumed: the
-# app must not be able to reach a network, and the debugger must not attach to a
-# process holding notification access.
+# Properties this build is supposed to keep, checked instead of assumed. INTERNET
+# is now expected: the Spotify hand-off is one request to the deck's own address,
+# and cleartext has to be allowed for it because the board serves plain HTTP with
+# no certificate. The debugger still must not attach to a process holding
+# notification access.
 printf '%s\n' "$BADGING" | grep -q 'android.permission.INTERNET' \
-  && fail "the APK requests INTERNET; this app is meant to stay offline"
+  || fail "the APK cannot reach the deck; the sign-in hand-off needs INTERNET"
+"$BT/aapt2" dump xmltree "$APK" --file AndroidManifest.xml \
+  | grep -q 'usesCleartextTraffic.*true' \
+  || fail "cleartext is not allowed, so http://<deck>/code would fail at runtime"
 printf '%s\n' "$BADGING" | grep -q 'application-debuggable' \
   && fail "the APK is debuggable; notification access must not be attachable"
 

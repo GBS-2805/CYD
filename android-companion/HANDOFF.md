@@ -30,6 +30,8 @@ Four tabs, hosted by `MainActivity`:
 | `Ui.java` | Palette, rounded cards, buttons, duration/size formatting |
 | `Actions.java` | Shared toast, clipboard, link and save helpers |
 | `CrashLog.java` | Uncaught-exception handler and the LAST CRASH reader |
+| `SpotifyCallbackActivity.java` | Catches `phonedesk://spotify-callback` and hands the code to the deck through the browser |
+| `SpotifyLink.java` | Pure parser for that link — code, and the deck address in `state`; host-tested |
 
 The UI is built programmatically — no `res/layout`, no `R` class. That is what
 lets `javac` type-check the whole app here; keep it that way unless there is a
@@ -474,9 +476,12 @@ Identical to the sketch, checked against its `onWrite` handlers:
   APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-10-31 after the sketch
-  header change, the probe work and the drawer's rework — **146,290 bytes** on
-  the file in `dist/` as measured on 2026-11-01, against the 112,473 that the same
-  work produced before the second widget joined it.
+  header change, the probe work, the drawer's rework and the deck's sign-in —
+  **151,794 bytes** on the file in `dist/` as measured on 2026-11-01, against the
+  112,473 that the same work produced before the second widget joined it. The two
+  halves were measured on their own branches the same day before they met —
+  146,290 bytes for the drawer alone, 149,494 for the sign-in alone — and this
+  figure is the tree that has both.
   The earlier 128,924-byte APK unpacked to the same six entries with the same
   uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
   the archive was written, not in the code: both are `zipalign -c 4` clean and
@@ -484,7 +489,24 @@ Identical to the sketch, checked against its `onWrite` handlers:
   sketches they name are inside the APK, `assets/widgets/phone_deck_cyd24R/` and
   `assets/widgets/spotify_deck_cyd24R/`, and `check_widget_assets.py` in the repo
   root compares those copies with `../<folder>/<sketch>.ino` byte for byte (phone
-  deck md5 `496952d5…`, Spotify `eca02e93…`, both in sync on 2026-11-01).
+  deck md5 `496952d5…`, Spotify `3683285a…` — `eca02e93…` before the callback
+  change and `49f29bcb…` before the one-line answer — both in sync on 2026-11-01).
+- **The Spotify deck's sign-in finishes here.** `SpotifyCallbackActivity` is
+  exported for `phonedesk://spotify-callback`, and `aapt2 dump xmltree` on the
+  shipped APK shows the VIEW/DEFAULT/BROWSABLE filter with scheme `phonedesk` and
+  host `spotify-callback`. It now makes the deck's one request itself —
+  `http://<deck>/code?redir=app&code=…&json=1` — on a worker thread with a 5 s
+  connect and a 30 s read timeout, and shows the deck's answer; a 409 is reported
+  as a refusal and silence falls back to the browser. That made `INTERNET` and
+  cleartext real requirements, so `toolchain.sh` now fails a build that lacks
+  either instead of failing a build that has `INTERNET`, and its `aapt2 dump
+  xmltree` check is what enforces the cleartext flag. `./toolchain.sh` passed end
+  to end on 2026-11-01: `all 61 host checks passed` (fifteen for the sign-in —
+  nine for `SpotifyLink`'s parser, six for the address it builds, including a `+`
+  escaped as `%2B` rather than a space), `BUILD SUCCESSFUL`, v2 signature,
+  `zipalign -c 4`, 151,794 bytes on the merged tree (149,494 for the sign-in
+  alone, before the drawer's rework joined it). **Nothing has run on a phone**, so the chooser
+  gesture, the request to a real deck and the fallback are unverified.
 - `./toolchain.sh` ran end to end from an **empty install root**
   (`OFFSITE_HOME=/tmp/offsite-fresh`) on 2026-10-30: it downloaded Temurin JDK
   17.0.21, Gradle 8.7, commandline-tools 11076708, then platform 34 and
@@ -506,13 +528,15 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **146,290 bytes** on 2026-11-01, the rebuild carrying two bundled sketches and
-  the drawer that names boards rather than projects. Quote the size to the nearest kB (~145 kB), never as a
-  checksum.
+  **151,794 bytes** on 2026-11-01, the rebuild carrying two bundled sketches, the
+  drawer that names boards rather than projects, and the sign-in that finishes in
+  the app. Quote the size to the nearest kB (~152 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
-  minSdk 26, targetSdk 35, the expected permission set,
+  minSdk 26, targetSdk 35, the expected permission set — now including
+  `INTERNET`, the one outbound request to the deck —
   `application-icon: 'res/BW.xml'` (resource names are shortened) and
-  `MainActivity` as the launchable activity.
+  `MainActivity` as the launchable activity. `SpotifyCallbackActivity` is the
+  only other exported component and its filter is the custom-scheme one.
 - **The build now assumes someone else may install it.** It ships an icon, a
   per-app notification allowlist and a `targetSdk 35` target. `toolchain.sh`
   installs platform 35 and build-tools 35.0.0 and asserts the two things a listing
