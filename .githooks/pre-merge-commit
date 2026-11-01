@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#
+# The same headroom check, for the commit git makes when it finishes a merge.
+#
+#   git merge --no-verify     bypasses this too
+#
+# git runs no pre-commit hook for a merge, so a branch could bring a sketch past
+# its partition without the gate ever looking. By the time this runs the merge
+# result is already in the index, so the staged-sketch test in pre-commit sees
+# exactly the files the merge changes -- no second copy of the logic. A fast
+# forward creates no commit and checks nothing; `git merge --squash` leaves the
+# commit to `git commit`, which runs pre-commit as usual.
+hook_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || exit 0
+exec "$hook_dir/pre-commit"
