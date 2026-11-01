@@ -126,8 +126,11 @@ URL and a flashing note. Decisions behind it:
 - **No images in the APK.** Marauder, Bruce and Launcher are GPL releases that
   change constantly; bundling them would mean shipping their source and licences
   and going stale within weeks.
-- **No in-app flashing.** The ESP32 is programmed over UART, not BLE. The app can
-  only open installers and store `.bin` files for a PC-side esptool run.
+- **No third-party in-app flashing.** The ESP32 is programmed over UART, not BLE.
+  The BOARD tab's flasher takes imported merged `.bin` files and never opens the
+  installers' images; Marauder, Bruce and Launcher are flashed by their own
+  installers or a PC-side esptool run. The decks are the exception only in that
+  they reach the board as ArduinoDroid source over the same cable.
 - **Board support was checked against the 2432S024R specifically**, not the
   generic "CYD" label, because the 2.8" 2432S028 uses different panel and touch
   pins. Evidence: Fr4nkFletcher's Marauder fork states "Add support for Guition
@@ -471,34 +474,40 @@ Identical to the sketch, checked against its `onWrite` handlers:
   APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-10-31 after the sketch
-  header change and the probe work **112,473 bytes** after the icon, the app
-  allowlist, the edge-to-edge padding and the four-wiring sweep.
+  header change and the probe work — **143,954 bytes** on the file in `dist/` as
+  measured on 2026-11-01, against the 112,473 that the same work produced before
+  the second widget joined it.
   The earlier 128,924-byte APK unpacked to the same six entries with the same
   uncompressed sizes (211,027 vs 211,019 bytes), so the 31 kB difference is in how
   the archive was written, not in the code: both are `zipalign -c 4` clean and
-  verify with the same v2 signature. `syncWidgets` ran:
-  `assets/widgets/phone_deck/cyd_phone_deck.ino` is inside the APK with its
-  descriptor, and its MD5 matches `../cyd_phone_deck/cyd_phone_deck.ino`.
+  verify with the same v2 signature. `syncWidgets` ran: both descriptors and the
+  sketches they name are inside the APK, `assets/widgets/phone_deck_cyd24R/` and
+  `assets/widgets/spotify_deck_cyd24R/`, and `check_widget_assets.py` in the repo
+  root compares those copies with `../<folder>/<sketch>.ino` byte for byte (phone
+  deck md5 `496952d5…`, Spotify `eca02e93…`, both in sync on 2026-11-01).
 - `./toolchain.sh` ran end to end from an **empty install root**
   (`OFFSITE_HOME=/tmp/offsite-fresh`) on 2026-10-30: it downloaded Temurin JDK
   17.0.21, Gradle 8.7, commandline-tools 11076708, then platform 34 and
   build-tools 34.0.0, and finished in under a minute. Build ran 35 tasks with
   `clean`, and the script's own checks passed: signature, `zipalign -c 4`,
   package `dev.phonedesk.companion`, minSdk 26, targetSdk 34 (35 now), and the
-  `phone_deck/cyd_phone_deck.ino` MD5 equal to the repo file.
+  bundled sketch's MD5 equal to the repo file. That run predates the rename to
+  `phone_deck_cyd24R/` and the second widget, which is why it names one sketch.
 - **Bundled content is now a property of the descriptors, not of a list in the
-  build.** The shipped APK carries one widget, `assets/widgets/phone_deck/`
-  (descriptor plus sketch); adding `cyd_board_check` to a build under the previous
-  list-based task was what proved two sketches could coexist, and that experiment
-  is historical. What is general is the mechanism: a folder with a descriptor and
-  a sketch, nothing to edit in Java or Gradle.
+  build.** The shipped APK carries **two** widgets,
+  `assets/widgets/phone_deck_cyd24R/` and `assets/widgets/spotify_deck_cyd24R/`,
+  each a descriptor plus its sketch; adding `cyd_board_check` to a build under the
+  previous list-based task was what proved two sketches could coexist, and that
+  experiment is historical. What is general is the mechanism: a folder with a
+  descriptor and a sketch, nothing to edit in Java or Gradle.
 - A fresh-toolchain run of unchanged sources produced **97,769 bytes** against
   the then-committed 97,757, so the APK is *not* byte-reproducible: dex files embed
   build-time data. The probe changes shipped **99,533 bytes**, the flash-shelf
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
-  and edge-to-edge work **112,473 bytes**; `dist/` holds that last artifact. Quote
-  the size to the nearest kB (~110 kB), never as a checksum.
+  and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
+  **143,954 bytes** on 2026-11-01, the 31 October rebuild carrying two bundled
+  sketches. Quote the size to the nearest kB (~140 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set,
   `application-icon: 'res/BW.xml'` (resource names are shortened) and
@@ -535,8 +544,9 @@ Identical to the sketch, checked against its `onWrite` handlers:
 
 - The **release** build type is unrun, and the shipped APK is debug-signed with
   the throwaway Android debug keystore rather than a key you control.
-- **Nothing has run on a phone**: tabs, SAF import, MediaStore save, clipboard,
-  RSSI polling and the monitor layout are all unproven.
+- **Only the USB probe has run on a phone** (two probes, Android 17, CH340
+  `1a86:7523`): tabs, SAF import, MediaStore save, clipboard, RSSI polling and the
+  monitor layout are all unproven.
 - No second CYD was available, so pinned-deck behaviour is untested against two
   boards.
 

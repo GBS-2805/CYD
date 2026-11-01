@@ -86,12 +86,13 @@ files can be kept in the app and saved to Downloads when you need them on a PC.
 **Launcher** is worth installing once if you switch firmwares often: after one
 flash it boots other `.bin` files from SD or OTA, so you stop reflashing over USB.
 
-**Libraries in ArduinoDroid.** Only the deck is an ArduinoDroid build. It needs
-exactly three libraries:
+**Libraries in ArduinoDroid.** Only the two decks are ArduinoDroid builds. Each
+needs exactly the same three libraries:
 
 | Sketch | Libraries | Never install |
 | --- | --- | --- |
-| Deck (`phone_deck_cyd24R.ino`) | Adafruit GFX Library, Adafruit ILI9341, XPT2046_Touchscreen | ArduinoBLE |
+| Phone Deck (`phone_deck_cyd24R.ino`) | Adafruit GFX Library, Adafruit ILI9341, XPT2046_Touchscreen | ArduinoBLE |
+| Spotify Deck (`spotify_deck_cyd24R.ino`) | the same three | ArduinoBLE |
 | Marauder / Bruce / Launcher | none — flash the prebuilt image | — |
 
 ### Install them without retyping the names
@@ -158,8 +159,8 @@ python -m esptool --chip esp32 --baud 921600 write_flash 0x0 <merged-2432S024R>.
 PlatformIO C++ projects: Bruce alone pins about forty libraries and the sources
 run to tens of thousands of lines. There is no ArduinoDroid-pasteable form of
 them, and an app that offered one would be pasting a sketch that cannot compile.
-The deck is the only firmware here that is ArduinoDroid source, which is why its
-button reads **COPY DROID** and the others read **COPY RECIPE**.
+The two decks are the only firmware here that is ArduinoDroid source, which is why
+their buttons read **COPY DROID** and the others read **COPY RECIPE**.
 
 **No computer at hand?** Flash **Launcher** over USB once, then install other
 firmwares from the phone: put the `.bin` on the CYD's SD card, or upload it through
@@ -226,18 +227,25 @@ sketch inside the APK against the file its descriptor names
 
 The size is not byte-stable: two builds of the same sources differ by a dozen
 bytes because the dex files carry build-time data. Treat the printed number as
-"about 100 kB", not as a checksum.
+"about 140 kB", not as a checksum.
 
-## Flash the deck from the phone over USB
+## Flash an image from the phone over USB
 
 1. Connect the CYD with an OTG adapter and a USB **data** cable, with the right
    board chosen under **TARGET BOARD** (only the 2432S024R is listed today).
 2. **BOARD → PROBE USB**, accept Android's permission prompt.
    A working link reports `ESP32 bootloader found · MAC …`, fills **PROBE LOG**
    with each handshake step, then restarts the board into its firmware.
-3. Import the image you want under **IMPORT A FILE** (a **merged** `.bin`).4. Tap **FLASH** on that entry, read the confirmation, and accept. The card shows
+3. Import the image you want under **IMPORT A FILE** (a **merged** `.bin`).
+4. Tap **FLASH** on that entry, read the confirmation, and accept. The card shows
 erase, block-write and MD5 progress; the board reboots into the new image at
 the end.
+
+A deck sketch never takes this path: the APK carries its `.ino`, not a compiled
+image, so a deck goes to the board from ArduinoDroid over the same cable. This
+flasher is for merged images of other firmware, and its handshake has not yet
+synced on this board — read [HANDOFF.md](HANDOFF.md) before trusting it with a
+board you care about.
 
 **PROBE LOG** under the USB buttons holds the last 80 lines of the last probes
 and flashes: the port opening, every rate tried, the bytes that arrived, the chip
@@ -337,8 +345,8 @@ tell a partial write from a wrong file without flashing again.
 silence is not a fault by itself. Confirm the rate matches the sketch, then tap
 **RESTART + WATCH**: a board that says anything at all says it at boot. Nothing
 at 115200 or 74880 points at the cable, the adapter, or the sketch's baud rather
-than at the app. Nothing here has run on a phone yet, so treat the counters as
-unmeasured rather than as expected values.
+than at the app. The USB probe has run on a phone; this monitor has not, so treat
+the counters as unmeasured rather than as expected values.
 
 ## Troubleshooting
 
