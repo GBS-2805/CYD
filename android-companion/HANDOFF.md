@@ -499,6 +499,16 @@ Identical to the sketch, checked against its `onWrite` handlers:
   **4.2 s** through `./check.sh --selftest`, and the pre-commit hook runs it when a
   `check_*.py` or `selftest_*.py` is staged. That is the gap it closes: the three
   newest docs refusals were found by a reader, because nothing had ever run them.
+- **The committed tree builds on its own.** Measured on 2026-11-02: `git archive
+  HEAD` into an empty directory plus a fresh `git init` — no built assets, no
+  `.build_figures.json`, nothing in `dist/` the commit does not hold — passed the
+  fast gate, compiled all 30 sources (**126 host checks**), and `toolchain.sh`
+  built the APK to **177,214 bytes**, sha256 beginning `dd5b475f`; the gate was green
+  afterwards, widget bundles and recorded bytes included. The docs step took
+  **123 s** on that first run and ~1 s after, because `.build_figures.json` is a
+  local cache: a fresh tree pays for both compiles once. A `git clone` of this
+  worktree cannot be made on this host — git refuses a linked worktree as dubious
+  ownership — so the export carries the same committed bytes by another route.
 - **A deck's tap now reaches the phone's player.** `DeckService` finds
   `6f2d0007-…` on the link, subscribes with `setCharacteristicNotification` and a
   CCCD write queued beside the other GATT operations, and both
