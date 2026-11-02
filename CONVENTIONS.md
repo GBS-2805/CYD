@@ -417,9 +417,13 @@ other mention of it in this repo is a pointer back here.
   commits: a branch whose changed files are the same bytes `main` already has — a
   folder renamed here, work rebased over — is reported as nothing to fold, and
   one whose patches are all upstream drops out the same way, so the list stays
-  what a merge would actually add. The branch on it today is
-  `app/phone-deck-build`, 87 commits back: 21 of its paths carry bytes `main` has
-  no copy of, and they live under `cyd_phone_deck/`, a folder this tree renamed
+  what a merge would actually add. What it said on 2026-11-02: one branch,
+  `freebuff/60e73bbb…`, 10 commits past `origin/main` and 9 behind it, with 11
+  paths `origin/main` has no bytes for — and this chat merged it, which is where
+  the Spotify header rewrite arrived. `origin/main` still lags because nothing in
+  either tree is pushed. Read the paths before merging anyway: an older branch can
+  *look* like work and be a downgrade, which is what `app/phone-deck-build` was at
+  87 commits back, 21 paths under `cyd_phone_deck/`, a folder this tree renamed
   away. The check names that folder instead of guessing, because merging it would
   bring the folder back — read the paths before merging one, and prefer the branch
   that measured the numbers.

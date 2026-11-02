@@ -493,7 +493,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
 - The last `javac 17` type check against the Android 14 (API 34) framework
   classes (`android-all`) covered the pre-split sources: 9 files, 22 classes, only
   deprecation notes from the pre-Android-13 `setValue`/`setWriteType` path.
-  **That check predates the split into sections.** The current 28 sources are
+  **That check predates the split into sections.** The current 30 sources are
   covered by `gradle assembleDebug` instead, which is what produced the shipped
   APK.
 - Every relative Markdown link across the repo resolves.
@@ -537,8 +537,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
   either instead of failing a build that has `INTERNET`, and its `aapt2 dump
   xmltree` check is what enforces the cleartext flag. `./toolchain.sh` passed end
   to end on 2026-11-01: `all 61 host checks passed`, as the suite stood then — it
-  is 117 now that the probe order, the buttons' wiring and the remembered rate have
-  their own checks (fifteen for the sign-in —
+  is 126 now that the probe order, the buttons' wiring, the remembered rate and
+  the deck's tap path have their own checks (fifteen for the sign-in —
   nine for `SpotifyLink`'s parser, six for the address it builds, including a `+`
   escaped as `%2B` rather than a space), `BUILD SUCCESSFUL`, v2 signature,
   `zipalign -c 4`, 165,242 bytes on the merged tree (149,494 for the sign-in
@@ -660,12 +660,13 @@ adapter cannot hear—and the other four rates still follow if it stops answerin
 so a stale value costs one attempt rather than the probe. Before this the rate was
 printed in the status line and dropped.
 
-`./toolchain.sh` passed end to end on 2026-11-02 with the header mark in place and
-the buttons still feeding the sweep with the rate remembered: `all 117 host checks
-passed`, `BUILD SUCCESSFUL in 19s`, v2 signature, `zipalign -c 4`, both bundled
-sketches in sync, **176,858 bytes** in `dist/` — 2,028 bytes above the build before, which is the tap path: `LinkCommand`,
-the subscription and its descriptor write in the queue. The sketch did not
-move in this rebuild.
+`./toolchain.sh` passed end to end on 2026-11-02 with the header mark in place, the
+buttons still feeding the sweep with the rate remembered, and the tap path wired:
+`all 126 host checks passed` (117 before those nine), `BUILD SUCCESSFUL`, v2
+signature, `zipalign -c 4`, both bundled sketches in sync, **176,858 bytes** in
+`dist/` — 2,028 bytes above the build before, which is the tap path: `LinkCommand`,
+the subscription and its descriptor write in the queue. The sketch did not move in
+this rebuild.
 
 ## Not verified
 
