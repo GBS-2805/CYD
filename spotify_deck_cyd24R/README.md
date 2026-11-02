@@ -365,14 +365,14 @@ sketch from a desktop on 2026-10-31.
 
 ### Headroom
 
-Measured here on 2026-11-01 with [`../check_headroom.py`](../check_headroom.py),
+Measured here on 2026-11-02 with [`../check_docs.py`](../check_docs.py) `--refresh`,
 core **3.3.12**, `PartitionScheme=huge_app` — the scheme this deck now needs, and
 which `check_headroom.py` knows about per deck so the ceiling still comes from the
 compiler:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,878,645 | **1,267,083** | 3,145,728 (59 % used) |
+| flash | 1,878,661 | **1,267,067** | 3,145,728 (59 % used) |
 | DRAM | 69,092 globals | **258,588** | 327,680 |
 
 Without Bluetooth the same sketch was 1,125,781 bytes on the default scheme; the

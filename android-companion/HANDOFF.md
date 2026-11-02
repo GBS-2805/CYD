@@ -575,7 +575,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   branch, and the APK in `dist/` was rebuilt against it. That sketch also
   **compiles here**, measured on 2026-11-02 once `~/.arduino-cyd/env.sh` was
   sourced — `check_docs.py`'s gate built it on the `huge_app` partition and read
-  1,878,645 B with 69,092 B of globals, beside the phone deck's unchanged
+  1,878,661 B with 69,092 B of globals, beside the phone deck's unchanged
   1,168,314 B / 45,244 B. Neither board has run it.
 - **The Spotify deck's sign-in finishes here.** `SpotifyCallbackActivity` is
   exported for `phonedesk://spotify-callback`, and `aapt2 dump xmltree` on the
