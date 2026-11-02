@@ -195,8 +195,8 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
 * **Before you change a sketch, run both.** From the repo root:
 
   ```bash
-  python3 selftest_headroom.py                           # the refusals, ~1 s
-  source ~/.arduino-cyd-3/env.sh && ./check_headroom.py  # the decks, ~17 s warm
+  python3 selftest_headroom.py                                    # the refusals, ~1 s
+  source /tmp/arduino-cyd-3/env.sh && ./check_headroom.py         # the decks, ~17 s warm
   ```
 
   The first says the check still refuses what it should, in about a second and
@@ -214,6 +214,42 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   install root read 1,168,170 B (142,550 B free) and 1,125,669 B (185,051 B free)
   for the same two sketches — 144 B and 112 B lower with the globals identical,
   which is the build-root sensitivity above rather than drift in the sketches.
+* **The root is not at the path this file used to name.** On 2026-11-02 the deck
+  toolchain on this VM was at **`/tmp/arduino-cyd-3`** — `bin/arduino-cli`,
+  `env.sh`, core **3.3.12** — while `~/.arduino-cyd-3`, which the command above
+  named until now, does not exist here. So a bare `check_headroom.py` exits 2 with
+  `no arduino-cli found`, and that is a **misplaced root, not a broken install**:
+  source the `env.sh` that exists. `/tmp` is wiped between sessions, so the root is
+  furniture, not state — a session that finds no `arduino-cli` re-provisions it with
+  [`phone_deck_cyd24R/toolchain.sh`](phone_deck_cyd24R/toolchain.sh) instead of
+  concluding the decks cannot be checked.
+* **What the root has to hold, and what it does not.** Measured on 2026-11-02:
+  **7.8 G** installed, **3.3 G** after dropping the toolchains for chips this board
+  is not — `esp-rv32` (2.1 G, RISC-V: C3/C5/C6/H2/P4), the eight other
+  `esp32*-libs` (2.3 G), both `gdb`s (247 M) and `openocd-esp32` (11 M), 4.6 G of
+  silicon that is not on the desk — and **1.6 G** once the 1.7 G `staging/` of
+  downloaded archives goes with it, because `packages/` already holds what was
+  unpacked out of them. What stays: `esp-x32` (1.1 G, the Xtensa compiler),
+  `esp32-libs` (184 M), `esptool_py`, `mkspiffs`, `mklittlefs`. Both decks then
+  built **cold**, exit 0, printing the same figures the run before the trim
+  printed, and again on a second run, so the trim is a measurement rather than an
+  assumption. A re-provision downloads those 3.3 G into whatever room the VM has;
+  this disk was at 94 % used before the cleanups on that date and 58 % after.
+* **A second root is only worth a second core.** `~/.arduino-cyd` held **3.3.12**
+  too, so it was a copy rather than an A/B root: 6.1 G of it, and 4.6 G of that the
+  same chip toolchains the trim above removes. Cut the same way it is **1.6 G**, and
+  it still compiles both decks — proved by running `check_headroom.py` from that
+  root's own `env.sh`, exit 0.
+* **The 2.0.17 root takes the same cut, once its Python can see `serial`.** On
+  2026-11-02 `~/.arduino15` went from 2.4 G to **1.2G** — `riscv32-esp-elf-gcc`
+  (662 M), the ESP32-S2 and S3 compilers (413 M between them), the two `gdb`s and
+  `openocd` — and both decks still built on **2.0.17** from it, exit 0. One trap on
+  the way: that root's `esptool_py` is 4.5.1, which imports `serial`, and only the
+  3.3.12 root ships it, in `pylibs/`. Without
+  `PYTHONPATH=<3.3.12 root>/pylibs` every compile dies on
+  `ModuleNotFoundError: No module named 'serial'` before a sketch is touched, which
+  reads like a broken toolchain and is not — so an A/B measurement needs that path
+  set, or it is measuring the interpreter rather than the core.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
