@@ -572,9 +572,11 @@ than navigation, so it hangs off the gear at the outer end of the top bar, past
 the link pill. The bottom tab bar is gone on purpose, because a drawer that *is*
 the front page needs no second navigation.
 
-* **The top bar opens with the owner's mark, on the band.** `TopBar` puts
-  `R.drawable.logo_mark` at the leading edge of the row every screen sits under, and
-  `DrawerHome` no longer draws it: the band is the light ground the artwork was drawn
+* **The top bar carries the owner's mark, centred on the band.** `TopBar` puts
+  `R.drawable.logo_mark` on the centre line of the row every screen sits under —
+  the crumb's half of the spare width and the pill's half are the same weight, so a
+  fixed-width mark between them cannot drift off centre whatever either of them
+  says — and `DrawerHome` no longer draws it: the band is the light ground the artwork was drawn
   on, so the file needs no plate behind it and the ghost is the band itself showing
   through the C. The artwork is **one black spiral** — the C — with the ghost sitting
   in the gap between its turns, so every white pixel in the file is canvas and the
@@ -583,17 +585,18 @@ the front page needs no second navigation.
   first two kept a white notch beside the shoulder or a white plate behind the whole
   mark, and both shipped here before a reader rejected them. On the field it was also
   a black mark on blue, which is the third reason it belongs on the band. It ships as
-  one PNG per density, `mdpi` 36px through `xxxhdpi` 144px, written by
+  one PNG per density, `mdpi` 26px through `xxxhdpi` 104px, written by
   [`artifacts/logo_icon.py`](artifacts/logo_icon.py) from the file's four `d` strings
   unchanged: a raster because clearing a background is a boundary in the render
   rather than arithmetic on the path, and five exact sizes because one bitmap
-  rescaled by the framework is resampled on the device. The eyes are 7.5% of the
-  artwork's width — 2.7px at mdpi, 7.4px on a 2.75x phone — so the mdpi capture is
+  rescaled by the framework is resampled on the device. The eyes are about 8% of
+  the artwork's width — 2px at mdpi, 6px on a 2.75x phone — so the mdpi capture is
   the harshest view of them, and it is the view to check before calling them missing.
-  It is the tallest thing in that row, so the bar's vertical padding is equal above
-  and below — 10dp each — and the mark is centred on the band; `Ui.row()` centres
-  the crumb, the pill and the gear against it. The wordmark below takes back the air
-  the mark used to hold.
+  At 26dp the mark is deliberately shorter than the pill's 27dp: the pill sets the
+  bar's height, so the header is as tall as the link state and no taller, and the
+  bar's vertical padding is equal above and below so the mark, the crumb, the pill
+  and the gear all sit on one centre line. The wordmark below takes back the air the
+  mark used to hold.
 
 * **Iconography is drawables, not characters.** The gear and the two chevrons are
   the places where a glyph was standing in for an icon, and both were a gamble on

@@ -39,20 +39,6 @@ final class TopBar {
         bar.setPadding(Ui.dp(context, 18), Ui.dp(context, 10), Ui.dp(context, 18),
                 Ui.dp(context, 10));
 
-        // The owner's mark leads the bar, on the band's own ground. That ground is
-        // the white the artwork was drawn on, so the PNG is the file's ink alone and
-        // the ghost is the band showing through the C — no plate behind it and
-        // nothing recoloured. It is centred on the band rather than lifted to an
-        // edge, and it sits here rather than above the wordmark because a mark
-        // belongs in the chrome, and every screen already carries this row.
-        logo = new ImageView(context);
-        logo.setImageResource(R.drawable.logo_mark);
-        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(
-                Ui.dp(context, 36), Ui.dp(context, 37));
-        logoParams.gravity = android.view.Gravity.CENTER_VERTICAL;
-        logoParams.rightMargin = Ui.dp(context, 12);
-        bar.addView(logo, logoParams);
-
         crumbText = Ui.text(context, "OFF-SITE", 12, Ui.BAND_DIM);
         crumbText.setLetterSpacing(0.12f);
         crumbText.setPadding(0, Ui.dp(context, 6), Ui.dp(context, 12), Ui.dp(context, 6));
@@ -73,13 +59,32 @@ final class TopBar {
         bar.addView(crumb, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
+        // The owner's mark sits on the bar's centre line, on the band's own ground.
+        // That ground is the white the artwork was drawn on, so the PNG is the file's
+        // ink alone and the ghost is the band showing through the C — no plate behind
+        // it and nothing recoloured. The crumb's half of the spare width and the
+        // pill's half are the same weight, so the fixed-width mark between them can
+        // only land on the screen's centre whatever the crumb and the pill say.
+        logo = new ImageView(context);
+        logo.setImageResource(R.drawable.logo_mark);
+        // 26dp is the ink's own box at that width, and it is deliberately shorter
+        // than the pill's 27dp: the pill sets the bar's height, so the header is as
+        // tall as the link state and no taller. Below about 24dp the eyes fall under
+        // 2px at mdpi, which is this artwork's own limit. The margins are equal so
+        // they cannot pull the mark off the centre line.
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(
+                Ui.dp(context, 26), Ui.dp(context, 26));
+        logoParams.gravity = android.view.Gravity.CENTER_VERTICAL;
+        logoParams.leftMargin = Ui.dp(context, 12);
+        logoParams.rightMargin = Ui.dp(context, 12);
+        bar.addView(logo, logoParams);
+
         pill = Ui.text(context, "IDLE", 11, Ui.BAND_DIM);
         pill.setLetterSpacing(0.14f);
         pill.setTypeface(Typeface.DEFAULT_BOLD);
         pill.setBackground(Ui.rounded(context, 0, Ui.BAND_RULE, 9));
         pill.setPadding(Ui.dp(context, 12), Ui.dp(context, 6), Ui.dp(context, 12),
                 Ui.dp(context, 6));
-        bar.addView(pill);
 
         // The gear is a shape now, not a character. U+2699 with the text-presentation
         // selector asked the monospace face for a glyph it may not carry — a thinner
@@ -93,7 +98,16 @@ final class TopBar {
         LinearLayout.LayoutParams gearParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         gearParams.leftMargin = Ui.dp(context, 10);
-        bar.addView(gear, gearParams);
+        // The pill and the gear keep their own row, pinned to the outer edge of the
+        // bar's right half: the link state is still the last thing before the screen
+        // edge and the gear is still outside it. The row takes as much of the spare
+        // width as the crumb does, which is what holds the mark on the centre line.
+        LinearLayout outer = Ui.row(context);
+        outer.setGravity(android.view.Gravity.END);
+        outer.addView(pill);
+        outer.addView(gear, gearParams);
+        bar.addView(outer, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
     }
 
     /**

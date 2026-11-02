@@ -37,7 +37,8 @@ RES = os.path.join(ROOT, "android-companion", "app", "src", "main", "res")
 
 CANVAS = 108.0          # the adaptive-icon canvas, in dp
 SAFE = 72.0             # what every launcher mask is guaranteed to show
-MARK_DP = 36.0          # the top bar draws the mark this wide
+MARK_DP = 26.0          # the top bar draws the mark this wide: the ink's own box,
+                        # and shorter than the 27dp pill that sets the bar's height
 DENSITIES = ((1.0, "mdpi"), (1.5, "hdpi"), (2.0, "xhdpi"),
              (3.0, "xxhdpi"), (4.0, "xxxhdpi"))
 INK = "#000000"         # the logo's own ink
@@ -445,8 +446,8 @@ def palette(name, fallback):
 def compare():
     """One picture to link: the file, and the bar's mark at three densities.
 
-    The eyes are 7.5% of the artwork's width, so at the bar's 36dp they are 2.7px at
-    mdpi and 7.4px on a 2.75x phone. Showing all three is the honest way to say "the
+    The eyes are 8% of the artwork's width, so at the bar's 26dp they are 2px at
+    mdpi and 6px on a 2.75x phone. Showing all three is the honest way to say "the
     eyes are there": a single mdpi frame is a downscale, and a downscale of a thin
     dark shape on white is not evidence that the shape is missing.
     """
@@ -472,8 +473,10 @@ def compare():
     # band is the grey standing in for the white ground the file was drawn on.
     draw.rounded_rectangle([306, 20, 990, 152], radius=12, fill=band)
 
-    drawn = [(36, "36dp at mdpi: 35px"), (72, "2x: 72px"),
-             (99, "xxhdpi: what the phone shows")]
+    mark = int(round(MARK_DP))
+    drawn = [(mark, "%ddp at mdpi: %dpx" % (mark, mark)),
+             (mark * 2, "2x: %dpx" % (mark * 2)),
+             (int(round(mark * 2.75)), "2.75x: what the phone shows")]
     for column, (px, label) in enumerate(drawn):
         x = 320 + column * 226
         image = mark_cut(px)
@@ -483,7 +486,7 @@ def compare():
     for line, text in enumerate([
             "the bar's mark: the same file's ink alone, so the ghost is the band",
             "showing through the C and its eyes and mouth are the file's own ink.",
-            "The eyes are 7.5% of the artwork's width: 2.7px at mdpi, 7.4px on a",
+            "The eyes are 8% of the artwork's width: 2px at mdpi, 6px on a",
             "2.75x phone - mdpi is the harshest view of them."]):
         draw.text((320, 330 + line * 24), text, fill=dim, font=caption)
 

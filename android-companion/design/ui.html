@@ -106,11 +106,14 @@ figcaption span { color: #6d6d6d; }
 .bar { display: flex; align-items: center;
        padding: var(--bar-top) var(--bar-side) var(--bar-bottom);
        background: var(--band); color: var(--ink); }
-/* the owner's mark — TopBar(): the file's ink alone, on the band it was drawn on */
-.logo { width: 36px; height: 37px; margin-right: 12px; display: block; }
+/* the owner's mark — TopBar(): the file's ink alone, on the band it was drawn on,
+   on the bar's centre line: the crumb and the right-hand group take equal halves
+   of the spare width */
+.logo { width: 26px; height: 26px; margin: 0 12px; display: block; }
 .crumb { flex: 1; font-size: 12px; letter-spacing: .12em; color: var(--band-dim);
          padding: 6px 12px 6px 0; }
 .bar--section .crumb { color: var(--ink); }        /* showSection(): INK       */
+.right { flex: 1; display: flex; align-items: center; justify-content: flex-end; }
 .pill { font-size: 11px; letter-spacing: .14em; font-weight: 700;
         color: var(--band-dim); background: none;
         border: 1px solid var(--band-rule); border-radius: var(--r-pill);
@@ -242,12 +245,14 @@ figcaption span { color: #6d6d6d; }
      ====================================================================== -->
 <figure>
   <div class="screen">
-    <!-- MainActivity.buildTopBar(): mark, crumb, pill, gear at the outer edge -->
+    <!-- TopBar: the crumb, the mark on the centre line, the pill and the gear -->
     <div class="bar">
-      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
       <div class="crumb">OFF-SITE</div>
-      <div class="pill">IDLE</div>
-      <div class="gear">&#9881;&#65038;</div>
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
+      <div class="right">
+        <div class="pill">IDLE</div>
+        <div class="gear">&#9881;&#65038;</div>
+      </div>
     </div>
 
     <!-- DrawerHome.build() -->
@@ -289,10 +294,12 @@ figcaption span { color: #6d6d6d; }
 <figure>
   <div class="screen">
     <div class="bar">
-      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
       <div class="crumb">OFF-SITE</div>
-      <div class="pill">IDLE</div>
-      <div class="gear">&#9881;&#65038;</div>
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
+      <div class="right">
+        <div class="pill">IDLE</div>
+        <div class="gear">&#9881;&#65038;</div>
+      </div>
     </div>
 
     <div class="drawer">
@@ -344,8 +351,11 @@ figcaption span { color: #6d6d6d; }
   <div class="screen">
     <div class="bar bar--section">
       <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
-      <div class="pill">IDLE</div>
-      <div class="gear">&#9881;&#65038;</div>
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
+      <div class="right">
+        <div class="pill">IDLE</div>
+        <div class="gear">&#9881;&#65038;</div>
+      </div>
     </div>
 
     <div class="body">
@@ -460,8 +470,11 @@ figcaption span { color: #6d6d6d; }
   <div class="screen">
     <div class="bar bar--section">
       <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
-      <div class="pill">IDLE</div>
-      <div class="gear">&#9881;&#65038;</div>
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
+      <div class="right">
+        <div class="pill">IDLE</div>
+        <div class="gear">&#9881;&#65038;</div>
+      </div>
     </div>
 
     <div class="body">
@@ -589,8 +602,11 @@ figcaption span { color: #6d6d6d; }
   <div class="screen">
     <div class="bar bar--section">
       <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
-      <div class="pill">IDLE</div>
-      <div class="gear">&#9881;&#65038;</div>
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
+      <div class="right">
+        <div class="pill">IDLE</div>
+        <div class="gear">&#9881;&#65038;</div>
+      </div>
     </div>
 
     <div class="body">
@@ -648,8 +664,11 @@ figcaption span { color: #6d6d6d; }
   <div class="screen">
     <div class="bar bar--section bar--settings">
       <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
-      <div class="pill">IDLE</div>
-      <div class="gear">&#9881;&#65038;</div>
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
+      <div class="right">
+        <div class="pill">IDLE</div>
+        <div class="gear">&#9881;&#65038;</div>
+      </div>
     </div>
 
     <div class="body">
@@ -710,8 +729,11 @@ figcaption span { color: #6d6d6d; }
   <div class="screen">
     <div class="bar bar--section">
       <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
-      <div class="pill pill--live">LINKED</div>
-      <div class="gear">&#9881;&#65038;</div>
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
+      <div class="right">
+        <div class="pill pill--live">LINKED</div>
+        <div class="gear">&#9881;&#65038;</div>
+      </div>
     </div>
 
     <div class="body">
@@ -784,7 +806,7 @@ figcaption span { color: #6d6d6d; }
 <table>
   <tr><th>Here</th><th>In the app</th></tr>
   <tr><td>.screen</td><td>one full screen, 393 × 852 dp</td></tr>
-  <tr><td>.bar / .logo / .crumb / .pill / .gear</td><td>TopBar, showSection — the mark leads the bar</td></tr>
+  <tr><td>.bar / .logo / .crumb / .pill / .gear</td><td>TopBar, showSection — the mark on the bar's centre line</td></tr>
   <tr><td>.drawer / .wordmark / .status-line</td><td>DrawerHome.build</td></tr>
   <tr><td>.menu-row</td><td>DrawerHome.menuRow</td></tr>
   <tr><td>.board-row</td><td>DrawerHome.boardRow (a board in the drawer, opening the shelf)</td></tr>

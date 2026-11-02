@@ -15,7 +15,7 @@ The drawer (`DrawerHome`) is the front page and `MainActivity` hosts it:
 | --- | --- |
 | `MainActivity.java` | Header pill, drawer host, 1 s refresh loop, permissions, SAF result |
 | `DrawerHome.java` | The front page: `PAIRED`, `BOARDS`, `SERIAL`, and the gear that opens `SETUP` |
-| `TopBar.java` | The mark, the crumb, the link pill and the gear: one row, built by `TopBar` so the render host can measure it |
+| `TopBar.java` | The crumb, the centred mark, the link pill and the gear: one row, built by `TopBar` so the render host can measure it |
 | `DecksTab.java` | Live monitor: link telemetry, nearby scan results, saved decks |
 | `ProjectsTab.java` | Notebook: status chips, project cards, deck libraries, recipes |
 | `BoardTab.java` | Target picker, USB probe/restart, imported images, flashing, serial monitor |
@@ -645,14 +645,16 @@ Identical to the sketch, checked against its `onWrite` handlers:
   removed: the artwork is one black spiral, the ghost sits in the gap between its
   turns, so every white pixel is canvas and the mark is the ink alone — the band
   fills the gap and the ghost reads as its absence, eyes and mouth still ink. It
-  leads `TopBar`, before the crumb, because the band is the light ground the file was
-  drawn on and the field is not; `DrawerHome` stopped drawing it above the wordmark
+  sits on `TopBar`'s centre line, between the crumb and the pill, because the band is
+  the light ground the file was drawn on and the field is not — the crumb and the
+  pill's group take equal halves of the spare width, which is what holds it there; `DrawerHome` stopped drawing it above the wordmark
   and gave that air back. Keying the white from the border left a white notch beside
   the mark's shoulder, keeping the white the ink encloses left a white plate behind
   the whole mark, and drawing it on the field left a black mark on blue: all three
   shipped here and all three were rejected by the owner looking at them. The eyes are
-  7.5% of the artwork's width — 2.7px at mdpi, 7.4px on a 2.75x phone — so the mdpi
-  capture is the harshest view. The monochrome variant is those same four subpaths with `evenOdd`,
+  about 8% of the artwork's width — 2px at mdpi, 6px on a 2.75x phone — so the mdpi
+  capture is the harshest view. At 26dp the mark is shorter than the pill's 27dp, so
+  the pill sets the bar's height and the header is only as tall as the link state. The monochrome variant is those same four subpaths with `evenOdd`,
   folded into one shape so the ghost and its marks survive being flattened to one
   tint. There is no bitmap density bucket, which is safe here only because
   `minSdk` is 26 — every device this installs on supports adaptive icons.
