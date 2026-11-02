@@ -740,9 +740,20 @@ rebuild.
 The same command ran again after the mark was centred at 26dp, from a `clean`:
 `all 152 host checks passed`, `BUILD SUCCESSFUL in 18s` with
 `compileDebugJavaWithJavac` actually running, v2 signature, `zipalign -c 4` clean,
-both bundled sketches byte-identical to the repo, and `dist/` rewritten to the size
-recorded above. Nothing was installed afterwards — no phone and no board has seen
-this build.
+both bundled sketches byte-identical to the repo, all five mark densities matched
+inside the APK, and `dist/` rewritten to the size recorded above. Nothing was
+installed afterwards — no phone and no board has seen this build.
+
+**The mark's five densities are now a checked property of the archive.** AGP
+shortens resource paths, so the mark lands as `res/-S.png` rather than
+`res/drawable-mdpi/logo_mark.png` and a `grep` for the name finds nothing — which
+is exactly how this went wrong: a reader who checks that way concludes the mark is
+missing when it is there, and neither of us notices a stale density. The step
+reads every `res/*.png` out of the APK, hashes it, and requires each of the tree's
+five files to be among those hashes, naming the density and its byte count when one
+is absent. Run as a copy of that block over a copy of the APK whose mdpi entry was
+swapped for the hdpi one, it refuses: `error: drawable-mdpi/logo_mark.png (796
+bytes) is not in the APK`; over the real archive it prints all five and exits 0.
 
 ## Where the renders live
 

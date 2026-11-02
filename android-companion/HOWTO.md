@@ -226,6 +226,7 @@ sketch inside the APK against the file its descriptor names
 | `Java compile was UP-TO-DATE` | something restored a build directory; drop `--no-clean` |
 | `<id>/<sketch> is stale` | `syncWidgets` did not run — check that the folder's `widget.json` names an existing sketch |
 | `the APK carries no assets/widgets/…` | the descriptor exists but the build skipped the task; build through Gradle |
+| `drawable-<density>/logo_mark.png (N bytes) is not in the APK` | the archive holds a different mark: rebuild from a `clean`, and check that `artifacts/logo_icon.py` wrote all five densities |
 | `apksigner rejected the APK` | the `Android Debug` keystore in `~/.android` is missing or unreadable |
 
 The size is not byte-stable: two builds of the same sources differ by a dozen

@@ -589,7 +589,10 @@ the front page needs no second navigation.
   [`artifacts/logo_icon.py`](artifacts/logo_icon.py) from the file's four `d` strings
   unchanged: a raster because clearing a background is a boundary in the render
   rather than arithmetic on the path, and five exact sizes because one bitmap
-  rescaled by the framework is resampled on the device. The eyes are about 8% of
+  rescaled by the framework is resampled on the device. The archive is checked
+  rather than assumed: `./toolchain.sh` hashes every `res/*.png` in the built APK
+  and requires each of the five to be among them, by content because AGP shortens
+  resource paths and a grep for the name finds nothing. The eyes are about 8% of
   the artwork's width — 2px at mdpi, 6px on a 2.75x phone — so the mdpi capture is
   the harshest view of them, and it is the view to check before calling them missing.
   At 26dp the mark is deliberately shorter than the pill's 27dp: the pill sets the

@@ -257,6 +257,30 @@ done
 [ "$SEEN" -eq 1 ] || fail "no */widget.json beside $HERE; nothing to verify"
 rm -rf "$TMP"
 
+say "verify the bar's mark ships at every density"
+# AGP shortens resource paths — the launcher icon lands as res/BW.xml — so the
+# entries are not named logo_mark and a grep for the name proves nothing. Match the
+# archive's PNGs by content instead: the five densities are the whole res/*.png
+# list, because the mark is the only raster in the app. What this catches is a
+# density left behind at an older size, or a build that shipped a bitmap the tree
+# no longer holds — both of which look like "the mark is there" to a reader.
+MARK_TMP="$(mktemp -d)"
+unzip -qq -o "$APK" 'res/*' -d "$MARK_TMP" || fail "could not read res/ out of the APK"
+find "$MARK_TMP/res" -name '*.png' -print > "$MARK_TMP/pngs" 2>/dev/null || true
+[ -s "$MARK_TMP/pngs" ] || fail "the APK holds no PNG under res/; the bar's mark did not ship"
+: > "$MARK_TMP/apk.md5"
+while IFS= read -r png; do md5of "$png" >> "$MARK_TMP/apk.md5"; done < "$MARK_TMP/pngs"
+for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+  SRC="$HERE/app/src/main/res/drawable-$density/logo_mark.png"
+  [ -f "$SRC" ] || fail "no drawable-$density/logo_mark.png beside $HERE"
+  WANT="$(md5of "$SRC")"
+  BYTES="$(wc -c < "$SRC" | tr -d ' ')"
+  grep -qx "$WANT" "$MARK_TMP/apk.md5" \
+    || fail "drawable-$density/logo_mark.png ($BYTES bytes) is not in the APK; the build shipped a different mark"
+  printf '  %s/logo_mark.png  %s bytes  %s\n' "$density" "$BYTES" "$WANT"
+done
+rm -rf "$MARK_TMP"
+
 # ---------------------------------------------------------------- ship it -----
 
 mkdir -p "$(dirname "$DIST")"
