@@ -1232,7 +1232,7 @@ static void startSetupWizard() {
   setupSawCR = false;
   startWebSetup();
   drawSetup();
-  Serial.println("\n[setup] Spotify Deck needs WiFi and a Spotify account.");
+  Serial.println("\n[setup] optional: WiFi and a Spotify account, so the deck can fetch music itself.");
   Serial.println("[setup] Phone: join \"Spotify Deck\" and open http://192.168.4.1");
   Serial.println("[setup] or type each answer here and press Enter, one at a time.");
   printSetupPrompt();

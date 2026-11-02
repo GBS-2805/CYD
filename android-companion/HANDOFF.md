@@ -505,8 +505,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
   deck md5 `62c7e6c3…`, Spotify `f234b68b…` — `00bb1560…` before the Bluetooth
   link, `eca02e93…` before the callback change and `49f29bcb…` before the one-line
   answer — both in sync on 2026-11-01). The Spotify sketch grew a rewritten header
-  comment on 2026-11-02 and is now `3009ced7…` in the tree and beside this file's
-  assets, which compiles to the same 1,878,629 bytes; the APK inspected above
+  comment on 2026-11-02 and is now `3b17f04a…` in the tree and beside this file's
+  assets, which compiles to the same 1,878,661 bytes; the APK inspected above
   still carries `f234b68b…`, so a rebuild is what makes that claim true again.
 - **The Spotify deck's sign-in finishes here.** `SpotifyCallbackActivity` is
   exported for `phonedesk://spotify-callback`, and `aapt2 dump xmltree` on the

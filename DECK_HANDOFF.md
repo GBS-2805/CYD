@@ -57,7 +57,7 @@ they do, the sketches are the truth and the app copy is the stale one.
 decks travel: `assets/widgets/phone_deck_cyd24R/` and
 `assets/widgets/spotify_deck_cyd24R/`. `check_widget_assets.py` prints
 `2 widgets bundled, every copy matches` (phone deck md5 `62c7e6c3…` on
-2026-11-01, Spotify `3009ced7…` on 2026-11-02 after its header was rewritten;
+2026-11-01, Spotify `3b17f04a…` on 2026-11-02 after its header was rewritten;
 `f234b68b…` before that rewrite), and that is the check to run after either
 sketch changes — a passing `assembleDebug` says nothing about which copies went
 into the APK. The app's own docs described one bundled widget and a folder name
@@ -86,5 +86,5 @@ The deck `toolchain.sh` files pin `esp32:esp32@3.3.12`; 2.0.17 stays available a
 the A/B build in its own install root. No app file names a core, so there is
 nothing to change in the app — but any deck size quoted in app docs now means the
 3.3.12 build unless it says otherwise: 1,168,314 B for the phone deck on the
-default scheme (89 %) and 1,878,581-1,878,629 B for the Spotify deck on `huge_app` (59 %),
+default scheme (89 %) and 1,878,613-1,878,661 B for the Spotify deck on `huge_app` (59 %),
 as `check_headroom.py` read both of them on 2026-11-01 with the link in place.
