@@ -10,3 +10,7 @@ __pycache__/
 # these two belong to no build and no doc, so the tree stays clean without them.
 artifacts/*.diff
 artifacts/launcher-icon.png
+
+# check_docs.py's last measurement of each deck: local, machine-specific,
+# and discarded the moment a sketch or the compiler changes.
+.build_figures.json

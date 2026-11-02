@@ -25,6 +25,15 @@ somebody renamed describes a tree that no longer exists, and no number check can
 see it. So every `](path)` in a doc has to resolve from that doc's own folder;
 anchors and URLs are skipped.
 
+A cached measurement keeps the commit gate cheap. Building both decks costs most
+of a minute and a commit that only edits prose cannot change a size, so the last
+figures are written to `.build_figures.json` beside the repo and reused only while
+that deck's sketch hashes the same **and** the compiler behind it is unchanged —
+the CLI version and every installed core, asked of `arduino-cli` itself. Anything
+unknown means a build, never a guess. `--refresh` ignores the file, and every run
+names which decks came from it, so a cached figure is never dressed up as a fresh
+one.
+
 One rule more, the one that matters most: each widget's README has to carry its
 own deck's current size, globals and md5. That is the page a person reads before
 flashing, so a stale triple there is the bug this exists for.
@@ -41,10 +50,12 @@ one refuses a doc that describes last week's build.
 """
 import argparse
 import hashlib
+import json
 import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -96,6 +107,69 @@ MIN_SIZE = 1000000
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 
 
+# The last measurement of each deck, so a commit that edits prose rebuilds
+# nothing. Garbage in this file means a build, never a wrong answer.
+CACHE = ROOT / ".build_figures.json"
+
+
+def toolchain_fingerprint(cli):
+    """What a cached figure stays true across: this CLI and these cores.
+
+    An empty dict means unknown, and unknown means rebuild: a size measured under
+    a different core is a size that no longer exists, which is exactly what this
+    check exists to stop passing quietly.
+    """
+    stamp = {}
+    try:
+        done = subprocess.run(
+            [cli, "version"], capture_output=True, text=True, timeout=30
+        )
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    lines = (done.stdout or done.stderr).strip().splitlines()
+    if not lines:
+        return {}
+    stamp["cli"] = lines[0]
+    try:
+        done = subprocess.run(
+            [cli, "core", "list", "--format", "json"],
+            capture_output=True, text=True, timeout=120,
+        )
+        cores = []
+        for entry in json.loads(done.stdout or "[]"):
+            if isinstance(entry, dict):
+                cores.append("%s %s" % (entry.get("id"), entry.get("installed")))
+            else:
+                cores.append(str(entry))
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return {}
+    if not cores:
+        return {}
+    stamp["cores"] = json.dumps(cores, sort_keys=True)
+    return stamp
+
+
+def load_cache():
+    try:
+        data = json.loads(CACHE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_cache(cache):
+    try:
+        CACHE.write_text(
+            json.dumps(cache, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+    except OSError as exc:
+        print(
+            "note: could not write %s (%s); the next run rebuilds"
+            % (shown(CACHE), exc),
+            file=sys.stderr,
+        )
+
+
 def md5(path):
     return hashlib.md5(path.read_bytes()).hexdigest()
 
@@ -134,8 +208,28 @@ def docs():
                 yield path
 
 
-def measure(cli, folder, timeout):
-    """Compile one deck and return what the compiler said, or None."""
+def measure(cli, folder, timeout, cache=None, fingerprint=None):
+    """Compile one deck, or take its last measurement, and return the figures."""
+    sketch = folder / (folder.name + ".ino")
+    digest = md5(sketch)
+    if cache is not None and fingerprint:
+        entry = cache.get(folder.name)
+        if (
+            isinstance(entry, dict)
+            and entry.get("md5") == digest
+            and entry.get("fingerprint") == fingerprint
+            and entry.get("fqbn") == headroom.fqbn_for(folder)
+            and all(isinstance(entry.get(k), int) for k in ("used", "slot", "globals"))
+        ):
+            return {
+                "folder": folder,
+                "md5": digest,
+                "used": entry["used"],
+                "slot": entry["slot"],
+                "globals": entry["globals"],
+                "built": False,
+            }
+
     try:
         done = headroom.compile_sketch(cli, folder, timeout)
     except subprocess.TimeoutExpired:
@@ -160,14 +254,25 @@ def measure(cli, folder, timeout):
             print("    " + line, file=sys.stderr)
         return None
 
-    sketch = folder / (folder.name + ".ino")
-    return {
+    deck = {
         "folder": folder,
-        "md5": md5(sketch),
+        "md5": digest,
         "used": int(flash.group(1)),
         "slot": int(flash.group(3)),
         "globals": int(ram.group(1)),
+        "built": True,
     }
+    if cache is not None and fingerprint:
+        cache[folder.name] = {
+            "md5": digest,
+            "fingerprint": fingerprint,
+            "fqbn": headroom.fqbn_for(folder),
+            "used": deck["used"],
+            "slot": deck["slot"],
+            "globals": deck["globals"],
+            "measured": time.strftime("%Y-%m-%d"),
+        }
+    return deck
 
 
 def allowed_sizes(built):
@@ -203,6 +308,11 @@ def main():
         metavar="SECONDS",
         help="per-compile timeout (default: 600)",
     )
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="ignore .build_figures.json and rebuild every deck",
+    )
     args = parser.parse_args()
 
     cli = args.arduino_cli or shutil.which("arduino-cli")
@@ -214,26 +324,33 @@ def main():
         )
         return 2
 
+    cache = {} if args.refresh else load_cache()
+    fingerprint = {} if args.refresh else toolchain_fingerprint(cli)
     built = []
     for folder in headroom.find_sketches(args.decks):
-        deck = measure(cli, folder, args.timeout)
+        deck = measure(cli, folder, args.timeout, cache, fingerprint)
         if deck is None:
             return 1
         built.append(deck)
+    if any(deck["built"] for deck in built):
+        save_cache(cache)
+
     if not built:
         print("error: no sketch folders found", file=sys.stderr)
         return 2
 
-    print("%-24s %-9s %-10s %-11s %s" % ("deck", "md5", "flash", "globals", "slot"))
+    print("%-24s %-9s %-10s %-11s %-10s %s"
+        % ("deck", "md5", "flash", "globals", "slot", "from"))
     for deck in built:
         print(
-            "%-24s %-9s %-10s %-11s %s"
+            "%-24s %-9s %-10s %-11s %-10s %s"
             % (
                 deck["folder"].name,
                 deck["md5"][:8],
                 "{:,}".format(deck["used"]),
                 "{:,}".format(deck["globals"]),
                 "{:,}".format(deck["slot"]),
+                "built" if deck["built"] else "cache",
             )
         )
 
@@ -305,6 +422,14 @@ def main():
             file=sys.stderr,
         )
         return 1
+
+    rebuilt = sum(1 for deck in built if deck["built"])
+    if rebuilt < len(built):
+        print(
+            "%d of %d deck(s) came from %s, unchanged since it was measured; "
+            "--refresh rebuilds."
+            % (len(built) - rebuilt, len(built), shown(CACHE))
+        )
 
     print(
         "\n%d doc%s, every quoted number is today's and every link resolves"

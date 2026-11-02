@@ -125,7 +125,11 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   sketch md5 is not one of today's builds — the drift that twice left a README
   describing last week's sketch — or when a relative link names a file that is
   gone. It also requires each widget README to carry its
-  own deck's current size, globals and md5. A past build may stay in the prose,
+  own deck's current size, globals and md5. It keeps its last measurement in a
+  gitignored `.build_figures.json` and reuses it only while that deck's sketch,
+  its FQBN and the compiler behind it are all unchanged, so a prose-only commit
+  costs a second instead of a minute; `--refresh` rebuilds anyway, and every run
+  names the decks that came from the file. A past build may stay in the prose,
   but only by name in that file's `HISTORICAL` table, next to the reason.
 * **Quote the run, not a range.** A figure names the run it came from and is what
   that run printed. When two builds of one sketch disagree — a pre-commit compile
@@ -147,7 +151,10 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   commit if one fails, so a sketch cannot grow past its partition unnoticed.
   A staged `.md` runs `check_docs.py` in the same pass, so a doc quoting a build
   that no longer exists, or linking to a file that is gone, is refused before it
-  lands. A commit with neither a sketch nor a doc returns immediately; the
+  lands. That check reads its cache when neither a sketch nor the toolchain
+  moved, so a docs-only commit is quick and still refuses a figure from a build
+  that no longer exists. A commit with neither a sketch nor a doc returns
+  immediately; the
   app's synced asset copies are
   ignored, and `git commit --no-verify` is the deliberate escape hatch. It needs
   `git config core.hooksPath .githooks` once per clone. A machine with no deck

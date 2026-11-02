@@ -54,8 +54,10 @@ names, and deletes anything under there no descriptor claims; `WidgetCatalog`
 reads the built copy at runtime and the app's `toolchain.sh` reads the sketch
 back out of the built APK. So an edited sketch that never went through
 `:app:syncWidgets` ships the *old* file in the *new* APK: the change is in the
-repo, green in a build, and absent from the board. Nothing enforces the sync
-step — `check_widget_assets.py` is what makes the drift loud, naming both md5s
+repo, green in a build, and absent from the board. Nothing at commit time enforces
+the sync step; the app's `toolchain.sh` does at build time, because it reads the
+sketch back out of the finished APK and refuses a mismatch. `check_widget_assets.py`
+is the cheaper alarm, naming both md5s in a second without Gradle,
 and `OUT OF SYNC`, so run it after every sketch edit and before any release.
 
 ## Fallback: file-level, when the histories have diverged
