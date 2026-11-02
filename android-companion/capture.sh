@@ -53,4 +53,9 @@ for file in "${frames[@]}"; do printf '  %-24s %s\n' "$(basename "$file")" \
 if [ "$INSTALL" -eq 1 ]; then
   cp "${frames[@]}" "$HERE/../artifacts/renders/"
   python3 "$HERE/../artifacts/render_scroll.py"
+  # The rendered bundle the site serves is rebuilt here, not remembered: a capture
+  # that installed frames and left the published copy behind is how the owner ends
+  # up reviewing last week's screen. Putting it online is still a separate step
+  # that has to be asked for — this only keeps the files current.
+  python3 "$HERE/../artifacts/publish_renders.py"
 fi

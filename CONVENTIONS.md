@@ -548,7 +548,7 @@ the front page needs no second navigation.
   copies the committed frames into `artifacts/site/public/` with a gallery page, and
   that bundle is deployed as the static site below. So the step after a capture is
   `python3 artifacts/publish_renders.py`, then the deploy, then one *labelled* link
-  per touched screen — `[Home, the drawer](https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/home.png)`. Publishing the renders
+  per touched screen — `[Home, the drawer](https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/home.png)`. Publishing the renders
   is part of shipping them; publishing the code still needs asking. "It compiles"
   says nothing about what a page looks like, and a change nobody looked at is a
   change to be undone later. A change that alters something which is not one of

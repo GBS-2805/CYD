@@ -728,16 +728,19 @@ opens nothing:
 
 | What | Where |
 | --- | --- |
-| Gallery | https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/ |
-| One screen | https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/home.png — likewise `home-open`, `projects`, `projects-open`, `paired`, `serial`, `settings` |
-| The strip | https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/chat-sheet.jpg |
+| Gallery | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/ |
+| One screen | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/home.png — likewise `home-open`, `projects`, `projects-open`, `paired`, `serial`, `settings` |
+| The strip | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/chat-sheet.jpg |
+| Preview copy | https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/ — the same bundle, deployed first and kept for a second look |
 | Bundle source | [`artifacts/site/`](../artifacts/site/) (`worker.js`, `manifest.json`), built by [`artifacts/publish_renders.py`](../artifacts/publish_renders.py) into the gitignored `artifacts/site/public/` |
-| Site | Freebuff Sites `3f6c1a9e-8b47-4d2c-9f11-5a7e2c4d8b60`, **preview** environment, published |
+| Site | Freebuff Sites `3f6c1a9e-8b47-4d2c-9f11-5a7e2c4d8b60` — **production published**, preview published beside it |
 
 The worker serves `env.ASSETS` and 404s everything else: there is no route, no state and
 no secret on it, and the bundle is a copy of pixels git already holds, so the site cannot
 show a screen the app no longer draws. `public/` is ignored by git — the frames beside it
-are the source. Nothing in the app reads this host.
+are the source. Nothing in the app reads this host. `capture.sh` rebuilds the bundle every
+time it installs frames, so the files the site serves cannot lag a capture; deploying them
+is a separate step, and publishing still needs asking.
 
 ## Not verified
 
