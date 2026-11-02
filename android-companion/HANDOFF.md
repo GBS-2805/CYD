@@ -15,7 +15,7 @@ The drawer (`DrawerHome`) is the front page and `MainActivity` hosts it:
 | --- | --- |
 | `MainActivity.java` | Header pill, drawer host, 1 s refresh loop, permissions, SAF result |
 | `DrawerHome.java` | The front page: `PAIRED`, `BOARDS`, `SERIAL`, and the gear that opens `SETUP` |
-| `TopBar.java` | The crumb, the link pill and the gear: one row, built by `TopBar` so the render host can measure it |
+| `TopBar.java` | The mark, the crumb, the link pill and the gear: one row, built by `TopBar` so the render host can measure it |
 | `DecksTab.java` | Live monitor: link telemetry, nearby scan results, saved decks |
 | `ProjectsTab.java` | Notebook: status chips, project cards, deck libraries, recipes |
 | `BoardTab.java` | Target picker, USB probe/restart, imported images, flashing, serial monitor |
@@ -617,11 +617,11 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **180,126 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
+  **182,238 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
-  app, the mirror, the three-step probe, the owner's logo as the icon, and the same
-  ghost again above the drawer's wordmark. Quote the size to the nearest kB
-  (~170 kB), never as a checksum.
+  app, the mirror, the three-step probe, the owner's logo as the icon, the same G
+  again above the drawer's wordmark, and the gear and chevrons drawn as shapes. Quote the size to the nearest kB
+  (~180 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set — now including
   `INTERNET`, the one outbound request to the deck —
@@ -637,10 +637,23 @@ Identical to the sketch, checked against its `onWrite` handlers:
   `ic_launcher_foreground.xml` holds the artwork's four path strings verbatim
   (Android pathData is SVG's grammar) inside a `<group>` that only scales and
   centres them to the 72dp safe zone, so a launcher mask can crop the disc's outer
-  edge but never the mouth. The logo draws the ghost as a *hole* in one black
-  contour, which is why `ic_launcher_background` is the white the ghost is cut out
-  of rather than the app's black. The monochrome variant is those same four
-  subpaths with `evenOdd`, so the eyes and mouth survive being flattened to one
+  edge but never the ghost inside it. The artwork is black ink on a white ground: a
+  disc with the ghost cut out of it, and the ghost's eyes and mouth back in ink, so
+  `ic_launcher_background` is that white ground rather than the app's black — the
+  ghost only reads as a ghost against it. The bar's `logo_mark` is not that vector
+  but a PNG per density, cut from the same file with the canvas's background
+  removed: the artwork is one black spiral, the ghost sits in the gap between its
+  turns, so every white pixel is canvas and the mark is the ink alone — the band
+  fills the gap and the ghost reads as its absence, eyes and mouth still ink. It
+  leads `TopBar`, before the crumb, because the band is the light ground the file was
+  drawn on and the field is not; `DrawerHome` stopped drawing it above the wordmark
+  and gave that air back. Keying the white from the border left a white notch beside
+  the mark's shoulder, keeping the white the ink encloses left a white plate behind
+  the whole mark, and drawing it on the field left a black mark on blue: all three
+  shipped here and all three were rejected by the owner looking at them. The eyes are
+  7.5% of the artwork's width — 2.7px at mdpi, 7.4px on a 2.75x phone — so the mdpi
+  capture is the harshest view. The monochrome variant is those same four subpaths with `evenOdd`,
+  folded into one shape so the ghost and its marks survive being flattened to one
   tint. There is no bitmap density bucket, which is safe here only because
   `minSdk` is 26 — every device this installs on supports adaptive icons.
 - `NoticeFilter` answers the oldest objection to this app: notification access

@@ -572,12 +572,28 @@ than navigation, so it hangs off the gear at the outer end of the top bar, past
 the link pill. The bottom tab bar is gone on purpose, because a drawer that *is*
 the front page needs no second navigation.
 
-* **The front page opens with the owner's mark.** `DrawerHome` draws
-  `R.drawable.logo_mark` above the wordmark: the launcher icon's own four path
-  strings, in the artwork's viewBox rather than the launcher's 108dp canvas, as one
-  even-odd path so the eyes and the mouth are holes. Both the vector and the
-  renderer's copy come from [`artifacts/logo_icon.py`](artifacts/logo_icon.py)  and the SVG beside it — one geometry, not a redraw — and the 60dp of air the wordmark
-  used to carry is what pays for the mark.
+* **The top bar opens with the owner's mark, on the band.** `TopBar` puts
+  `R.drawable.logo_mark` at the leading edge of the row every screen sits under, and
+  `DrawerHome` no longer draws it: the band is the light ground the artwork was drawn
+  on, so the file needs no plate behind it and the ghost is the band itself showing
+  through the C. The artwork is **one black spiral** — the C — with the ghost sitting
+  in the gap between its turns, so every white pixel in the file is canvas and the
+  mark is the ink and nothing else. Keying that white, flooding it from the border or
+  outlining the disc are three ways to invent a boundary the file does not have; the
+  first two kept a white notch beside the shoulder or a white plate behind the whole
+  mark, and both shipped here before a reader rejected them. On the field it was also
+  a black mark on blue, which is the third reason it belongs on the band. It ships as
+  one PNG per density, `mdpi` 36px through `xxxhdpi` 144px, written by
+  [`artifacts/logo_icon.py`](artifacts/logo_icon.py) from the file's four `d` strings
+  unchanged: a raster because clearing a background is a boundary in the render
+  rather than arithmetic on the path, and five exact sizes because one bitmap
+  rescaled by the framework is resampled on the device. The eyes are 7.5% of the
+  artwork's width — 2.7px at mdpi, 7.4px on a 2.75x phone — so the mdpi capture is
+  the harshest view of them, and it is the view to check before calling them missing.
+  It is the tallest thing in that row, so the bar's vertical padding is equal above
+  and below — 10dp each — and the mark is centred on the band; `Ui.row()` centres
+  the crumb, the pill and the gear against it. The wordmark below takes back the air
+  the mark used to hold.
 
 * **Iconography is drawables, not characters.** The gear and the two chevrons are
   the places where a glyph was standing in for an icon, and both were a gamble on
@@ -638,7 +654,10 @@ the front page needs no second navigation.
   that bundle is deployed as the static site below. So the step after a capture is
   `python3 artifacts/publish_renders.py`, then the deploy, then one *labelled* link
   per touched screen — `[Home, the drawer](https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/home.png)`. Publishing the renders
-  is part of shipping them; publishing the code still needs asking. "It compiles"
+  is part of shipping them; publishing the code still needs asking. The fast gate
+  itself draws the seven frames whenever a staged file could move a pixel — the
+  app's Java, its resources or the capture — so a commit cannot leave them behind;
+  posting the link is the one step no checker can do for you. "It compiles"
   says nothing about what a page looks like, and a change nobody looked at is a
   change to be undone later. A change that alters something which is not one of
   those seven screens — the launcher icon, a design page, `dist/index.html`, the

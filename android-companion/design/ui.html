@@ -46,7 +46,7 @@
           "Liberation Mono", monospace;
 
   /* screen metrics */
-  --bar-top: 14px;  --bar-side: 18px;  --bar-bottom: 8px;   /* MainActivity.buildTopBar */
+  --bar-top: 10px;  --bar-side: 18px;  --bar-bottom: 10px;  /* TopBar: centred on the mark */
   --body-side: 16px; --body-top: 8px;  --body-bottom: 24px; /* section bodies          */
   --drawer-side: 18px; --drawer-bottom: 28px;               /* DrawerHome body padding */
 }
@@ -106,6 +106,8 @@ figcaption span { color: #6d6d6d; }
 .bar { display: flex; align-items: center;
        padding: var(--bar-top) var(--bar-side) var(--bar-bottom);
        background: var(--band); color: var(--ink); }
+/* the owner's mark — TopBar(): the file's ink alone, on the band it was drawn on */
+.logo { width: 36px; height: 37px; margin-right: 12px; display: block; }
 .crumb { flex: 1; font-size: 12px; letter-spacing: .12em; color: var(--band-dim);
          padding: 6px 12px 6px 0; }
 .bar--section .crumb { color: var(--ink); }        /* showSection(): INK       */
@@ -122,7 +124,7 @@ figcaption span { color: #6d6d6d; }
 /* --- drawer front page — DrawerHome --------------------------------------- */
 .drawer { padding: var(--body-top) var(--drawer-side) var(--drawer-bottom); }
 .wordmark { font-size: 34px; font-weight: 700; letter-spacing: .06em;
-            text-align: center; padding-top: 60px; }
+            text-align: center; padding-top: 24px; }   /* the mark moved to the bar */
 .status-line { font-size: 10px; letter-spacing: .16em; color: var(--dim);
                text-align: center; padding-top: 10px; }
 .menu-row { display: flex; align-items: center; justify-content: space-between;
@@ -240,8 +242,9 @@ figcaption span { color: #6d6d6d; }
      ====================================================================== -->
 <figure>
   <div class="screen">
-    <!-- MainActivity.buildTopBar(): crumb, pill, gear at the outer edge -->
+    <!-- MainActivity.buildTopBar(): mark, crumb, pill, gear at the outer edge -->
     <div class="bar">
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
       <div class="crumb">OFF-SITE</div>
       <div class="pill">IDLE</div>
       <div class="gear">&#9881;&#65038;</div>
@@ -286,6 +289,7 @@ figcaption span { color: #6d6d6d; }
 <figure>
   <div class="screen">
     <div class="bar">
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
       <div class="crumb">OFF-SITE</div>
       <div class="pill">IDLE</div>
       <div class="gear">&#9881;&#65038;</div>
@@ -780,7 +784,7 @@ figcaption span { color: #6d6d6d; }
 <table>
   <tr><th>Here</th><th>In the app</th></tr>
   <tr><td>.screen</td><td>one full screen, 393 × 852 dp</td></tr>
-  <tr><td>.bar / .crumb / .pill / .gear</td><td>MainActivity.buildTopBar, showSection</td></tr>
+  <tr><td>.bar / .logo / .crumb / .pill / .gear</td><td>TopBar, showSection — the mark leads the bar</td></tr>
   <tr><td>.drawer / .wordmark / .status-line</td><td>DrawerHome.build</td></tr>
   <tr><td>.menu-row</td><td>DrawerHome.menuRow</td></tr>
   <tr><td>.board-row</td><td>DrawerHome.boardRow (a board in the drawer, opening the shelf)</td></tr>

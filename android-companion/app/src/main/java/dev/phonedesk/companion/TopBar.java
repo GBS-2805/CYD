@@ -24,6 +24,7 @@ final class TopBar {
     final TextView crumbText;
     final TextView pill;
     final ImageView gear;
+    final ImageView logo;
     private final ImageView back;
 
     TopBar(Context context) {
@@ -31,8 +32,26 @@ final class TopBar {
         // The sheet's light band, so the chrome is one surface and the field below
         // it is the app. Every ink in this bar is black or a black wash.
         bar.setBackgroundColor(Ui.BAND);
-        bar.setPadding(Ui.dp(context, 18), Ui.dp(context, 14), Ui.dp(context, 18),
-                Ui.dp(context, 8));
+        // The mark is the tallest thing in this row, so it sets the bar's height and
+        // the vertical padding is what places it: equal above and below keeps it
+        // centred on the band instead of hanging from a deeper top edge. Ui.row()
+        // centres the crumb, the pill and the gear against it.
+        bar.setPadding(Ui.dp(context, 18), Ui.dp(context, 10), Ui.dp(context, 18),
+                Ui.dp(context, 10));
+
+        // The owner's mark leads the bar, on the band's own ground. That ground is
+        // the white the artwork was drawn on, so the PNG is the file's ink alone and
+        // the ghost is the band showing through the C — no plate behind it and
+        // nothing recoloured. It is centred on the band rather than lifted to an
+        // edge, and it sits here rather than above the wordmark because a mark
+        // belongs in the chrome, and every screen already carries this row.
+        logo = new ImageView(context);
+        logo.setImageResource(R.drawable.logo_mark);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(
+                Ui.dp(context, 36), Ui.dp(context, 37));
+        logoParams.gravity = android.view.Gravity.CENTER_VERTICAL;
+        logoParams.rightMargin = Ui.dp(context, 12);
+        bar.addView(logo, logoParams);
 
         crumbText = Ui.text(context, "OFF-SITE", 12, Ui.BAND_DIM);
         crumbText.setLetterSpacing(0.12f);

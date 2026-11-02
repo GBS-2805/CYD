@@ -113,6 +113,12 @@ def main():
     if sheet.is_file():
         shutil.copyfile(sheet, PUBLIC / sheet.name)
 
+    # The logo sheet is drawn by `logo_icon.py` beside the drawable it shows, so it
+    # cannot describe a mark the app stopped drawing. Copied here, not remembered.
+    logo = HERE / "logo-compare.png"
+    if logo.is_file():
+        shutil.copyfile(logo, PUBLIC / logo.name)
+
     (PUBLIC / "index.html").write_text(PAGE.format(figures="\n".join(figures)))
 
     files = sorted(p.name for p in PUBLIC.iterdir())

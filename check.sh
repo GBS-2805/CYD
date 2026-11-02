@@ -15,8 +15,9 @@
 # make it refuse.
 #
 # Fast:  docs (figures, links, prose, the recorded APK bytes), widget assets, the
-#        index (no source file left outside it), the host tests, and the branch list
-#        as a note.
+#        index (no source file left outside it), the host tests, the branch list as
+#        a note, and the seven render captures whenever a staged file could move a
+#        pixel.
 # Full:  the above, plus deck headroom on both cores, the seven render captures,
 #        and the APK build with its signature, alignment and bundled-sketch checks.
 #
@@ -134,6 +135,28 @@ else
   say "host tests" "no javac, so the host suite did NOT run"
 fi
 report "branches" python3 check_branches.py
+
+# A commit that can change a pixel has to leave a picture of it behind, and a rule
+# nobody runs is a paragraph. The fast gate draws the frames whenever the staged
+# files could move one — the app's Java, its resources, or the capture itself —
+# and says plainly when it did not. That is why the renders stopped arriving: they
+# were a --full step, and the pre-commit hook runs the fast gate.
+ui_staged () {
+  git diff --cached --name-only --diff-filter=ACMR \
+    -- 'android-companion/app/src/main/java' 'android-companion/app/src/main/res' \
+       'android-companion/capture.sh' | grep -q .
+}
+if [ "$full" -eq 1 ]; then
+  : # drawn below, staged or not
+elif ui_staged; then
+  if command -v gradle >/dev/null 2>&1 || [ -f "$HOME/.android-offsite/env.sh" ]; then
+    step "renders" 'renders current' python3 check_renders.py
+  else
+    say "renders" "a UI file is staged and there is no capture toolchain, so frames were NOT drawn"
+  fi
+else
+  say "renders" "no UI file staged, so the frames were not redrawn"
+fi
 
 if [ "$full" -eq 1 ]; then
   step "headroom" 'deck\(s\) fit'       python3 check_headroom.py "${cli_args[@]}"
