@@ -60,6 +60,7 @@ public final class HostTests {
         UsbSerialCh340.clock = CLOCK;
         framingRoundTrip();
         bondAdvice();
+        noticeText();
         syncChecksum();
         handshakeIntoDownloadMode();
         quietSyncUsesNoControlLines();
@@ -821,6 +822,28 @@ public final class HostTests {
         check("a bonding phone is still asked to pair rather than have its bond dropped",
                 BondAdvice.forFailure(BondAdvice.ERROR, BondAdvice.BOND_BONDING)
                         .equals(BondAdvice.NONE));
+    }
+
+    private static void noticeText() {
+        NoticeText plain = NoticeText.from("Mail", "Subject", null, "Body", null, null, null);
+        check("title and text are used when an app sets them",
+                plain.title.equals("Subject") && plain.body.equals("Body"));
+
+        NoticeText ticking = NoticeText.from("Chat", null, null, null, null, "3 new", null);
+        check("an app that only sets a ticker still says something",
+                ticking.title.equals("3 new") && ticking.body.isEmpty());
+
+        NoticeText inbox = NoticeText.from("Chat", null, null, null, "2 unread",
+                null, Arrays.asList("first line", "second"));
+        check("a sub-text and an inbox line fill in for the missing body",
+                inbox.body.equals("2 unread"));
+
+        NoticeText named = NoticeText.from("Wallet", null, null, null, null, null, null);
+        check("a custom layout with nothing readable still names the app",
+                named.title.equals("Wallet") && !named.empty());
+
+        check("nothing at all is still nothing, not an empty post",
+                NoticeText.from(null, null, null, null, null, null, null).empty());
     }
 
     private static void check(String name, boolean ok) {

@@ -151,7 +151,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   installs a virtual clock and the stub port advances it, so a check that runs the
   real probe against a silent board still tries all five wirings and both windows
   without waiting for them. Measured on 2026-11-02: 179 s before the seam, 1.45 s
-  after, the same 126 checks then, 130 now. The seam exists because the alternative — a shorter
+  after, the same 126 checks then, 135 now. The seam exists because the alternative — a shorter
   window in the test — would test a different probe.
 * **That check runs on commit.** [`.githooks/pre-commit`](.githooks/pre-commit)
   runs the whole fast gate — [`check.sh`](check.sh) — on every commit, so no

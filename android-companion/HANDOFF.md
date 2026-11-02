@@ -484,7 +484,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   deadline and every pause reads the clock, `test.sh` installs a virtual one and
   the stub port advances it, so the two checks that ran the real probe against a
   silent board — 57 s each — still try all five wirings and both windows. Measured
-  on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 130 now green then, 130 now. `./check.sh`
+  on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 135 now green then, 135 now. `./check.sh`
   runs the fast set, `./check.sh --full` the release set.
 - **The checkers' refusals are tested too, without a compiler.** Five
   `selftest_*.py` files build a throwaway repo — a stand-in `arduino-cli`, a
@@ -502,8 +502,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
 - **The committed tree builds on its own.** Measured on 2026-11-02: `git archive
   HEAD` into an empty directory plus a fresh `git init` — no built assets, no
   `.build_figures.json`, nothing in `dist/` the commit does not hold — passed the
-  fast gate, compiled all 31 sources (**130 host checks**), and `toolchain.sh`
-  built the APK to **178,630 bytes**, sha256 beginning `dd5b475f`; the gate was green
+  fast gate, compiled all 32 sources (**135 host checks**), and `toolchain.sh`
+  built the APK to **179,114 bytes**, sha256 beginning `dd5b475f`; the gate was green
   afterwards, widget bundles and recorded bytes included. The docs step took
   **123 s** on that first run and ~1 s after, because `.build_figures.json` is a
   local cache: a fresh tree pays for both compiles once. A `git clone` of this
@@ -525,13 +525,13 @@ Identical to the sketch, checked against its `onWrite` handlers:
   Java, so `test.sh` covers the parser: the sketch's 20-byte buffer, the three
   actions, a positive uint32 serial, and a repeated serial counting as one tap.
   `NowPlaying.run` then presses the key on the session it is already mirroring.
-  `test.sh` reads **all 130 host checks passed**, nine of them new; the APK
-  rebuilt to **178,630 bytes**. **Nothing has run on a phone or a board**, so
+  `test.sh` reads **all 135 host checks passed**, nine of them new; the APK
+  rebuilt to **179,114 bytes**. **Nothing has run on a phone or a board**, so
   whether a chip's notify arrives and moves playback is unverified end to end.
 - The last `javac 17` type check against the Android 14 (API 34) framework
   classes (`android-all`) covered the pre-split sources: 9 files, 22 classes, only
   deprecation notes from the pre-Android-13 `setValue`/`setWriteType` path.
-  **That check predates the split into sections.** The current 31 sources are
+  **That check predates the split into sections.** The current 32 sources are
   covered by `gradle assembleDebug` instead, which is what produced the shipped
   APK.
 - Every relative Markdown link across the repo resolves.
@@ -541,7 +541,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the artifact in `dist/` now is the one rebuilt on 2026-11-02 after the drawer
   gained the owner's mark above its wordmark, which followed the sketch header
   change, the probe work, the drawer's rework and the deck's sign-in —
-  **178,630 bytes** on the file in
+  **179,114 bytes** on the file in
   `dist/`, against the 112,473 that the same work produced before the second
   widget joined it. The two
   halves were measured on their own branches the same day before they met —
@@ -603,7 +603,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **178,630 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
+  **179,114 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror, the three-step probe, the owner's logo as the icon, and the same
   ghost again above the drawer's wordmark. Quote the size to the nearest kB
@@ -700,8 +700,8 @@ printed in the status line and dropped.
 
 `./toolchain.sh` passed end to end on 2026-11-02 with the header mark in place, the
 buttons still feeding the sweep with the rate remembered, and the tap path wired:
-`all 130 host checks passed` (117 before those nine), `BUILD SUCCESSFUL`, v2
-signature, `zipalign -c 4`, both bundled sketches in sync, **178,630 bytes** in
+`all 135 host checks passed` (117 before those nine), `BUILD SUCCESSFUL`, v2
+signature, `zipalign -c 4`, both bundled sketches in sync, **179,114 bytes** in
 `dist/` — 356 bytes above the build before, which is the clock seam: `EspRom.Clock` and the
 pause it routes, with the probe's logic untouched. The sketch did not move in this
 rebuild.
@@ -734,8 +734,49 @@ rebuild.
   this app's own exemption (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, with the
   permission in the manifest) and falls back to the list, then to system settings.
   **Unverified on a phone.**
-- **Empty notification text**: apps with fully custom layouts may post no title
-  or text extras, and are skipped.
+- **Empty notification text**: apps with fully custom layouts used to vanish,
+  because neither `EXTRA_TITLE` nor `EXTRA_TEXT` was set. `NoticeText` now falls
+  back through `EXTRA_BIG_TEXT`, `EXTRA_SUB_TEXT`, an inbox's first line and the
+  ticker, and finally to the app's own name; five host checks hold the order.
+  **Unverified on a phone**: the listener has not run since.
+
+## Proving it on hardware
+
+Nothing below has been run. It is the order that produces evidence instead of an
+impression, and each step names the line to look for. Write down the deck's tag,
+the APK's SHA and the exact line you saw: a step without a line is not a result,
+and the deck is readable by everyone in the room, so a step that shows a private
+message is also a finding.
+
+1. **Flash the deck.** ArduinoDroid, with the sketch pasted from COPY (or the
+   app's Flash tab once its uploader's handshake works). The phone deck takes the
+   default partition; the Spotify deck needs `huge_app`, and each upload must
+   carry the scheme its own sketch was built for.
+2. **Link.** BOARDS, then the board's row. Expect `Connecting to <name>`,
+   `Discovering services`, then `Linked to <label>` once the identity document is
+   read, with the card's `packet <age>` staying under five seconds. A link with no
+   identity read files the deck under its MAC instead — still a pass, but say so.
+3. **Mirror.** Post a notification from an allowlisted app. The deck's notice panel
+   should show it within a second and the app's `notices` count should rise. An app
+   with a custom layout should now show at least its own name.
+4. **Tap round trip** — the one thing never tested end to end. Tap play/pause on
+   the deck. The subscription is written at link time, so
+   `commands: subscription refused (n)` in the log means no chip can ever work; the
+   notify is parsed as `<serial>|<action>` and the phone's media session gets the
+   key. **The evidence is the deck's next mirror line changing, not the chip
+   lighting**: the chip means the notify arrived.
+5. **Stale bond.** With a bond left by an older build, connect. Expect
+   `Stale pairing forgotten, retrying` and a link within a few seconds.
+   `Stale pairing could not be removed` means the reflective `removeBond` is
+   refused on this Android build — note the version and forget the entry in
+   Settings by hand.
+6. **Insufficient authentication.** A write that lands before a bond shows
+   `Pairing to write` and one system pairing prompt. If writes are still refused
+   afterwards, the `pair` branch was right and the bond is not completing.
+7. **Battery.** SETTINGS, then BATTERY SETTINGS, should raise the system exemption
+   dialog for Off-site rather than a list to search. Grant it, leave the bridge
+   running overnight, and read the card's packet age in the morning: a stopped
+   service shows as a link that died hours ago.
 
 ## Obvious next work
 
