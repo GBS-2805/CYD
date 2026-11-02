@@ -14,7 +14,8 @@
 # make it refuse.
 #
 # Fast:  docs (figures, links, prose, the recorded APK bytes), widget assets, the
-#        host tests, and the branch list as a note.
+#        index (no source file left outside it), the host tests, and the branch list
+#        as a note.
 # Full:  the above, plus deck headroom, the seven render captures, and the APK
 #        build with its signature, alignment and bundled-sketch checks.
 #
@@ -84,8 +85,24 @@ if [ "${1:-}" = "--selftest" ]; then
   exit 0
 fi
 
+# A file the tree needs but the index never got. Every commit here stages tracked
+# files (`git add -u`), which cannot pick up a brand-new one: LinkCommand.java was
+# referenced by two tracked classes and still spent a day outside the tree, so a
+# clone would not have compiled the app this worktree builds.
+tracked_step () {
+  local loose
+  loose=$(git ls-files --others --exclude-standard -- '*.java' '*.ino' '*.py' '*.sh' '*.md' '*.json')
+  if [ -n "$loose" ]; then
+    echo "$loose" | sed 's/^/  - /'
+    echo "these source files are not in the index, so a clone would not have them"
+    return 1
+  fi
+  echo "every source file is in the index"
+}
+
 step "docs"       'docs, '              python3 check_docs.py "${cli_args[@]}"
 step "widgets"    'widgets bundled'     python3 check_widget_assets.py
+step "tracked"    'index'             tracked_step
 step "host tests" 'host checks'         bash android-companion/test.sh
 report "branches" python3 check_branches.py
 

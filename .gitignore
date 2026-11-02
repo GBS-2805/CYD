@@ -23,3 +23,4 @@ artifacts/renders/seven-screens.png
 # check_docs.py's last measurement of each deck: local, machine-specific,
 # and discarded the moment a sketch or the compiler changes.
 .build_figures.json
+.scratch/

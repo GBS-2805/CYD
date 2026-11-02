@@ -421,8 +421,11 @@ other mention of it in this repo is a pointer back here.
   commit must pass — docs (figures, links, prose), widget assets, the host tests,
   and the branch list as a note rather than a failure — and `./check.sh --full`
   adds deck headroom, the seven render captures and the APK build, and
-  `./check.sh --selftest` runs the three change-the-checker gates in about two
-  seconds. The individual
+  `./check.sh --selftest` runs the five change-the-checker gates in about four
+  seconds. It also refuses a source file that is in the worktree but not in the
+  index: every commit here stages tracked files, which cannot pick up a new one,
+  and `LinkCommand.java` was referenced by two tracked classes for a day while a
+  clone of the branch would not have compiled. The individual
   checkers keep their names because the pre-commit hook calls two of them with
   staged paths; nothing else needs six remembered invocations, and a round that
   runs one command cannot skip a step by forgetting it.
