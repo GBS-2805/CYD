@@ -5,8 +5,24 @@ A deck change reaches the APK by moving the commit, never by editing the app.
 
 ## Preferred: cherry-pick the commit
 
-Both chats are worktrees of one repository on the same machine, so the commit is
-already reachable — no push required.
+Both chats are worktrees of one repository: `git worktree list` names this tree
+and the app's side by side under one bare repo, so a commit made here is already
+in the object store the app tree reads and `git cherry-pick <sha>` in that tree
+works with nothing pushed. A push is a publish, not a hand-off — `CONVENTIONS.md`
+says nothing goes out unless it is asked for — so the hand-off is a SHA, and it
+has to be the right one:
+
+```bash
+git show <sha>:spotify_deck_cyd24R/spotify_deck_cyd24R.ino | md5sum
+```
+
+must print the md5 that deck's README quotes today, or the pick carries an older
+sketch and the APK is built from it. `check_widget_assets.py` cannot catch that
+one: it compares the bundled copies with the sketches in *its own* tree, and a
+stale tree agrees with itself. Push-and-merge is the same hand-off for trees that
+are separate clones rather than worktrees, where the commit really is unreachable
+until it is published — a different route to the same commit, not a different
+gate.
 
 ```bash
 git cherry-pick <sha>                 # the deck commit from this branch
@@ -24,6 +40,11 @@ has to move the folder, the `.ino` and the `id` in one commit.
 Then build the APK as usual. `check_widget_assets.py` printing
 `N widgets bundled, every copy matches` is the check that the copies agree — a
 bare "BUILD SUCCESSFUL" only means Gradle ran.
+
+That is the whole re-gate on the app side: its host tests, `:app:syncWidgets`,
+`check_widget_assets.py`, then `toolchain.sh`, whose own check reads the sketch
+back out of the finished APK. A commit that touches no sketch needs none of it —
+see *After a documentation-only deck change* below.
 
 That asset tree is **generated output and gitignored**: `android-companion/.gitignore`
 lists `app/src/main/assets/widgets/`, so nothing there is ever committed and a
@@ -49,9 +70,12 @@ python3 check_widget_assets.py
 
 ## Keep one line
 
-`main` holds its own copies of both decks. Pick a change into the app tree and
-push it back, or work on top of `main` here, so the two copies do not drift. If
-they do, the sketches are the truth and the app copy is the stale one.
+`main` holds its own copies of both decks. Pick a change into the app tree, or
+work on top of `main` here, so the two copies do not drift. If they do, the
+sketches are the truth and the app copy is the stale one. Pushing either side
+back to `origin` is a publish and waits to be asked for, which is the other half
+of why the hand-off is a commit SHA: the loop closes locally, and `origin` is
+where the trees meet, not how they talk.
 
 ## The app now carries two decks
 
