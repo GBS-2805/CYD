@@ -480,6 +480,40 @@ other mention of it in this repo is a pointer back here.
   failed: the app's, not ArduinoDroid's — and that precision is what stops the
   next attempt from retreating to a cable it does not need.
 
+### The render pipeline, as it stands
+
+One command per stage, and each one is checked rather than assumed:
+
+| Stage | Command | Cost on 2026-11-02 |
+| --- | --- | --- |
+| Capture, install, rebuild the tall sheet and the site bundle | `android-companion/capture.sh` | 12 s warm (21 s cold) |
+| Verify the committed frames still match the app | inside `./check.sh --full` | 9.7 s |
+| Put them online | deploy `artifacts/site/manifest.json` | seconds, and asked for |
+
+* **The capture runs the app, not a drawing.** `CaptureTest` builds `TopBar` and each
+  screen, measures at 393 dp, lays them out and draws with Android's renderer; a state
+  reached by tapping is reached by tapping, and the clock and the link snapshot are
+  frozen so a frame reads the same on every run. Seven frames, `artifacts/renders/`.
+* **The gate captures again on purpose.** `check_renders.py` does not trust the PNGs a
+  previous command installed; it draws them again and compares pixels, which is why
+  "current" means something. That is the one duplicate in the loop and it stays.
+* **Side effects are declared, not worked around.** The test writes PNGs as a side
+  effect, so Gradle cannot see its output disappear; the test tasks say they are never
+  up to date (`app/build.gradle`) instead of every compile being re-run by
+  `--rerun-tasks`. The daemon is kept and its JDK passed explicitly.
+* **The published page is a scroll, not a contact sheet.** `publish_renders.py` stacks
+  the seven at phone width with a hairline and one caption between them, so dragging
+  down walks the app; the strip (`chat-sheet.jpg`) exists for a single message, not for
+  reading. The addresses are recorded in
+  [`android-companion/HANDOFF.md`](android-companion/HANDOFF.md#where-the-renders-live).
+* **An emulator is not the upgrade it sounds like.** It would answer a different
+  question — a device screenshot with the phone's fonts and status bar — while the
+  layout arithmetic is already the app's own; and on this machine it is not even
+  runnable (no `kvm` group, no emulator package, no system image). What captures cannot
+  show is behaviour: touch, ripples, scroll physics, the states behind code a JVM cannot
+  reach. That is the phone's job, and
+  [`HANDOFF.md`](android-companion/HANDOFF.md) keeps that list honest.
+
 ## App UI
 
 The app is a drawer (`DrawerHome`) with three rows: `PAIRED` (the row that

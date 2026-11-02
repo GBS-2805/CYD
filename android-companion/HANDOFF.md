@@ -728,7 +728,7 @@ opens nothing:
 
 | What | Where |
 | --- | --- |
-| Gallery | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/ |
+| Gallery (a scroll, one screen under the next) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/ |
 | One screen | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/home.png — likewise `home-open`, `projects`, `projects-open`, `paired`, `serial`, `settings` |
 | The strip | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/chat-sheet.jpg |
 | Preview copy | https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/ — the same bundle, deployed first and kept for a second look |
