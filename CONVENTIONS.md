@@ -476,6 +476,19 @@ the front page needs no second navigation.
   `tokens.json`'s `screens` maps each frame to one — so a change that redraws a
   screen regenerates that render and commits it with the code and the page. A
   render is metric-accurate, not a device screenshot — say which.
+* **Metric-accurate means measured, not estimated.** Every line height comes from
+  the face the renderer loads — `line(sp)` is that TTF's own ascent plus descent —
+  and every wrap from the advance it measures for `M`, because Android lays a
+  `TextView` out on its font metrics too. No line-height multiplier and no em-width
+  is assumed anywhere in the renderer: the `1.45` and the `0.6 em` that used to be
+  there were guesses, and a guess inside a gate is a gate that lies. Geometry still
+  comes from the app's dp numbers, transcribed from the Java — this renderer does
+  not lay views out, so a screen whose flow moved has to be re-transcribed, and
+  [`check_renders.py`](check_renders.py) proves the PNG matches the renderer rather
+  than Android. What it can prove is that the picture is reviewable:
+  [`check_render_fit.py`](check_render_fit.py) audits every run the renderer paints
+  and fails when one crosses the canvas edge or lands on another run, so run it in
+  the same change that redraws them.
   [`check_renders.py`](check_renders.py) is what keeps the gate loud: it redraws
   every screen and fails when a committed PNG no longer matches the picture the
   app draws, comparing pixels rather than timestamps because git stores no mtime.

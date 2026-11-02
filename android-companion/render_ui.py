@@ -94,17 +94,40 @@ def font(sp, bold=False):
     return _fonts[key]
 
 
+def line(sp, bold=False):
+    """One line's height in dp, from the face's own ascent and descent.
+
+    Android lays a `TextView` out on its font metrics, so this asks the TTF for the
+    same numbers instead of assuming a multiplier: the 1.45 that used to sit in
+    every block here was a guess, and a guess inside a gate is a gate that lies.
+    """
+    ascent, descent = font(sp, bold).getmetrics()
+    return (ascent + descent) / float(SCALE)
+
+
 class Screen:
     """A 393 x 852 dp canvas with the card, text and button primitives."""
+
+    #: every canvas the current build has made, so check_render_fit.py can audit
+    #: them all — `projects()` builds two, a tall one and the bar pasted over it.
+    instances = []
 
     def __init__(self, height_dp=H_DP):
         self.image = Image.new("RGB", (px(W_DP), px(height_dp)), BG)
         self.draw = ImageDraw.Draw(self.image)
+        self.height_dp = height_dp
+        #: (x, y, w, h, text) for every run painted, filled by text()
+        self.runs = []
+        Screen.instances.append(self)
 
     # -- primitives --------------------------------------------------------
 
-    def text(self, x, y, value, sp, color, bold=False, spacing=0.0):
+    def text(self, x, y, value, sp, color, bold=False, spacing=0.0, clipped=False):
+        """One run of text. `clipped` marks a run inside a scroller, where running
+        off the edge is the app's own behaviour and not a layout fault."""
         face = font(sp, bold)
+        self.runs.append((x, y, self.width(value, sp, bold, spacing), line(sp, bold),
+                          value, clipped))
         if not spacing:
             self.draw.text((px(x), px(y)), value, font=face, fill=color)
             return
@@ -121,9 +144,14 @@ class Screen:
         return width
 
     def logo(self, cx, y, width_dp, color=TEXT):
-        """The owner's mark, centred on `cx`: the same ghost the launcher icon is cut around."""
+        """The owner's mark, centred on `cx`: the same ghost the launcher icon is cut around.
+
+        Returns the height it drew, in dp, from the artwork's own aspect ratio, so a
+        caller places what is under it without repeating that number.
+        """
         image = logo_icon.mark_image(px(width_dp), color)
         self.image.paste(image, (int(round(px(cx) - image.width / 2.0)), px(y)), image)
+        return image.height / float(SCALE)
 
     def centered(self, y, value, sp, color, bold=False, spacing=0.0):
         self.text((W_DP - self.width(value, sp, bold, spacing)) / 2.0, y,
@@ -147,9 +175,9 @@ class Screen:
                   label, sp, BG if primary else TEXT)
 
     def paragraph(self, x, y, value, sp, color, max_w, leading=2):
-        for line in wrap(value, sp, max_w):
-            self.text(x, y, line, sp, color)
-            y += sp * 1.45 + leading
+        for text_line in wrap(value, sp, max_w):
+            self.text(x, y, text_line, sp, color)
+            y += line(sp) + leading
         return y
 
     # -- chrome ------------------------------------------------------------
@@ -187,18 +215,22 @@ class Screen:
 
     def section_title(self, title, subtitle):
         self.text(16, 56, title, 20, TEXT)
-        y = 56 + 20 * 1.45 + 4
+        y = 56 + line(20) + 4
         self.text(16, y, subtitle, 12, DIM)
-        return y + 12 * 1.45 + 4
+        return y + line(12) + 4
 
     def section_label(self, y, label):
         self.text(16, y + 18, label, 12, DIM, spacing=0.14)
-        return y + 18 + 12 * 1.45 + 8
+        return y + 18 + line(12) + 8
 
 
 def wrap(value, sp, max_w):
-    """Monospace wrap: every glyph advances the same 0.6 em, like the real face."""
-    per_char = sp * 0.6
+    """Monospace wrap, on the advance the face actually uses.
+
+    Every glyph advances the same width, so one measurement of `M` is the whole
+    story — and measuring it beats assuming 0.6 em, which is what this used to do.
+    """
+    per_char = font(sp).getlength("M") / float(SCALE)
     limit = max(8, int(max_w / per_char))
     lines, current = [], ""
     for word in value.split():
@@ -215,7 +247,7 @@ def wrap(value, sp, max_w):
 
 def para_h(value, sp, max_w, leading=2):
     """Height of {@link Screen.paragraph}: wrapped lines at the same leading."""
-    return len(wrap(value, sp, max_w)) * (sp * 1.45 + leading)
+    return len(wrap(value, sp, max_w)) * (line(sp) + leading)
 
 
 # --- screens ---------------------------------------------------------------
@@ -225,10 +257,10 @@ def home(open_projects=False):
     s.top_bar("OFF-SITE")
     # DrawerHome.build() opens with the owner's mark and puts the wordmark 8dp
     # under it: the air the wordmark used to carry is what pays for the mark.
-    s.logo(W_DP / 2.0, 52, 36)
-    wordmark_y = 52 + 37 + 8
+    mark_h = s.logo(W_DP / 2.0, 52, 36)
+    wordmark_y = 52 + mark_h + 8
     s.centered(wordmark_y, "[OFF-SITE]", 34, TEXT, bold=True, spacing=0.06)
-    s.centered(wordmark_y + 34 * 1.45 + 10, "IDLE \u00b7 BRIDGE STOPPED", 10, DIM,
+    s.centered(wordmark_y + line(34) + 10, "IDLE \u00b7 BRIDGE STOPPED", 10, DIM,
                spacing=0.16)
 
     # SETTINGS is not here: it hangs off the gear in the top bar.
@@ -261,7 +293,7 @@ def drawer_panel(s, y):
     """
     x, w = 18 + 4, W_DP - 36 - 4
     y += 6                              # Ui.space(row, 6): the row's top margin
-    h = 6 + 13 * 1.45 + 6
+    h = 6 + line(13) + 6
     # stroke 0 in the Java, so the fill is its own outline here.
     s.card(x, y, w, h, 8, CARD, CARD)
     s.text(x + 8, y + 6, "2.4\" CYD (RESISTIVE)", 13, TEXT)
@@ -281,10 +313,10 @@ def projects(open_first=False):
     # longer leads with the section name: the title says it and the bar carries
     # the way back. Mirrors ProjectsTab.build().
     s.text(16, 56, "BOARDS", 20, TEXT)
-    s.text(16, 56 + 20 * 1.45 + 4, "2.4\" CYD (RESISTIVE)", 10, DIM, spacing=0.12)
-    subtitle_y = 56 + 20 * 1.45 + 4 + 10 * 1.45 + 6
+    s.text(16, 56 + line(20) + 4, "2.4\" CYD (RESISTIVE)", 10, DIM, spacing=0.12)
+    subtitle_y = 56 + line(20) + 4 + line(10) + 6
     s.text(16, subtitle_y, "Alphabetical. Tap a name for its notes.", 12, DIM)
-    y = subtitle_y + 12 * 1.45 + 4
+    y = subtitle_y + line(12) + 4
 
     y = s.section_label(y, "LIBRARIES NEEDED")
     # Disclaimer card: hint, the banned library, one button per name, then Droid.
@@ -323,6 +355,9 @@ def projects(open_first=False):
     y += 14 + 36 + 10
 
     # Status chips.
+    # Status chips: a HorizontalScrollView in the app, so the row is as wide as its
+    # chips need and the last one is reached by scrolling. `clipped=True` says so,
+    # which is the one case where running past the canvas is not a fault.
     x = 16
     for label, on in (("ALL 5", True), ("WANT TO TRY 0", False),
                       ("FLASHED 0", False), ("WORKING 2", False),
@@ -330,7 +365,8 @@ def projects(open_first=False):
         w = s.width(label, 10, bold=True, spacing=0.1) + 18
         s.card(x, y + 10, w, 22, 8, ACCENT if on else CARD_HI,
                ACCENT if on else EDGE)
-        s.text(x + 9, y + 13, label, 10, BG if on else DIM, bold=True, spacing=0.1)
+        s.text(x + 9, y + 13, label, 10, BG if on else DIM, bold=True, spacing=0.1,
+               clipped=True)
         x += w + 6
     y += 10 + 22 + 4
 
@@ -355,16 +391,21 @@ def projects(open_first=False):
         open_card = open_first and name.startswith("Spotify Deck")
         if open_card:
             open_top = y
-        head_h = 12 + 10 * 1.45 + 6 + 16 * 1.45 + 12
+        # ProjectsTab puts the name in its own TextView under the header row — kind,
+        # status and the fold glyph — so it wraps at the card's width instead of
+        # sharing a line with the `+`.
+        name_lines = wrap(name, 16, W_DP - 60)
+        name_y = y + 12 + 16 + 6
+        head_h = 12 + 16 + 6 + len(name_lines) * line(16) + 12
         if open_card:
-            head_h += 2 * (12 * 1.45 + 2) + 8         # body, two short lines
-            head_h += 4 + 10 * 1.45 + 8               # DECK label
-            head_h += 13 * 1.45 + 2 + 11 * 1.45        # the deck's name and detail
+            head_h += 2 * (line(12) + 2) + 8         # body, two short lines
+            head_h += 4 + line(10) + 8               # DECK label
+            head_h += line(13) + 2 + line(11)        # the deck's name and detail
             head_h += 8 + 35                           # SIGN IN / FORGET
             head_h += 10 + 35                          # PAIR A DECK
-            head_h += 8 + 2 * (11 * 1.45 + 2)          # the tag hint, two lines
-            head_h += 6 + 2 * (11 * 1.45 + 2)          # needs, two lines
-            head_h += 4 + 11 * 1.45 + 2                # the log line
+            head_h += 8 + 2 * (line(11) + 2)          # the tag hint, two lines
+            head_h += 6 + 2 * (line(11) + 2)          # needs, two lines
+            head_h += 4 + line(11) + 2                # the log line
             head_h += 8 + 35 + 8 + 35 + 12             # both action rows
         s.card(16, y, W_DP - 32, head_h)
         tx = 30
@@ -374,20 +415,21 @@ def projects(open_first=False):
         s.text(tx + kind_w + 8, y + 14, status, 10,
                GOOD if status == "WORKING" else VIOLET, bold=True, spacing=0.12)
         s.right(W_DP - 30, y + 12, "-" if open_card else "+", 16, DIM)
-        s.text(30, y + 12 + 10 * 1.45 + 6, name, 16, TEXT)
+        for offset, name_line in enumerate(name_lines):
+            s.text(30, name_y + offset * line(16), name_line, 16, TEXT)
 
         if open_card:
-            inner = y + 12 + 10 * 1.45 + 6 + 16 * 1.45 + 6
+            inner = name_y + len(name_lines) * line(16) + 6
             inner = s.paragraph(30, inner, body, 12, DIM, W_DP - 60)
             # ProjectsTab.deckCard(): a paired board is two lines and then its own
             # row of buttons, because two buttons beside a name clip the detail.
             s.text(30, inner + 4, "DECK", 10, DIM, spacing=0.14)
-            row_y = inner + 4 + 10 * 1.45 + 8
+            row_y = inner + 4 + line(10) + 8
             s.text(30, row_y, "Spotify Deck \u00b7 A1B2C3", 13, TEXT)
-            s.text(30, row_y + 13 * 1.45 + 2,
+            s.text(30, row_y + line(13) + 2,
                    "A1B2C3  \u00b7  192.168.1.50  \u00b7  signed in  \u00b7  4m ago",
                    11, GOOD)
-            button_y = row_y + 13 * 1.45 + 2 + 11 * 1.45 + 8
+            button_y = row_y + line(13) + 2 + line(11) + 8
             s.button(30, button_y, s.width("SIGN IN", 13) + 28, "SIGN IN")
             s.button(30 + s.width("SIGN IN", 13) + 36, button_y,
                      s.width("FORGET", 13) + 28, "FORGET")
@@ -429,13 +471,13 @@ def deck_row(s, y, name, detail, action, primary=False):
     x, w, pad = 16, W_DP - 32, 14
     reserve = 44 if action == "LINKED" else 62
     lines = wrap(detail, 12, w - 2 * pad - reserve)
-    h = 10 + 15 * 1.45 + 2 + len(lines) * 12 * 1.45 + 10
+    h = 10 + line(15) + 2 + len(lines) * line(12) + 10
     s.card(x, y + 8, w, h, 12)
     s.text(x + pad, y + 8 + 10, name, 15, TEXT)
-    line_y = y + 8 + 10 + 15 * 1.45 + 2
-    for line in lines:
-        s.text(x + pad, line_y, line, 12, DIM)
-        line_y += 12 * 1.45
+    line_y = y + 8 + 10 + line(15) + 2
+    for text_line in lines:
+        s.text(x + pad, line_y, text_line, 12, DIM)
+        line_y += line(12)
     if action == "LINKED":
         s.right(x + w - pad, y + 8 + 10, "LINKED", 11, GOOD, bold=True)
     else:
@@ -465,31 +507,31 @@ def paired():
     status_text = "Linked to Phone Deck A1B2C3"
     live_lines = wrap(live_text, 14, inner)
     status_lines = wrap(status_text, 12, inner)
-    card_h = (12 + 11 * 1.45 + 6
-              + len(live_lines) * (14 * 1.45 + 2) + 4
-              + len(status_lines) * 12 * 1.45 + 12)
+    card_h = (12 + line(11) + 6
+              + len(live_lines) * (line(14) + 2) + 4
+              + len(status_lines) * line(12) + 12)
     s.card(x, y, w, card_h)
     s.text(x + 14, y + 12, "BRIDGE ACTIVE", 11, GOOD, spacing=0.14)
-    line_y = y + 12 + 11 * 1.45 + 6
-    for line in live_lines:
-        s.text(x + 14, line_y, line, 14, TEXT)
-        line_y += 14 * 1.45 + 2
+    line_y = y + 12 + line(11) + 6
+    for text_line in live_lines:
+        s.text(x + 14, line_y, text_line, 14, TEXT)
+        line_y += line(14) + 2
     line_y += 4
-    for line in status_lines:
-        s.text(x + 14, line_y, line, 12, DIM)
-        line_y += 12 * 1.45
+    for text_line in status_lines:
+        s.text(x + 14, line_y, text_line, 12, DIM)
+        line_y += line(12)
     y += card_h + 10
 
     # The linked board: its name, then tag, address and the last packet it took.
     detail = "A1B2C3 \u00b7 24:0A:C4:11:22:33 \u00b7 packet 2s ago"
     lines = wrap(detail, 12, inner)
-    linked_h = 12 + 18 * 1.45 + 4 + len(lines) * 12 * 1.45 + 12
+    linked_h = 12 + line(18) + 4 + len(lines) * line(12) + 12
     s.card(x, y, w, linked_h)
     s.text(x + 14, y + 12, "Phone Deck A1B2C3", 18, TEXT)
-    line_y = y + 12 + 18 * 1.45 + 4
-    for line in lines:
-        s.text(x + 14, line_y, line, 12, DIM)
-        line_y += 12 * 1.45
+    line_y = y + 12 + line(18) + 4
+    for text_line in lines:
+        s.text(x + 14, line_y, text_line, 12, DIM)
+        line_y += line(12)
     y += linked_h
 
     y = s.section_label(y, "NEARBY")
