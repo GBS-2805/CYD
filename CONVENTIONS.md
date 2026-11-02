@@ -542,7 +542,14 @@ the front page needs no second navigation.
   nothing anywhere but here. What arrives is a *label* wrapped around a public
   URL, and the host has to still be serving it when he taps. **The link is a
   gate, not a courtesy: nothing is pushed or published
-  until the owner has a link to a viewable render of what changed.** "It compiles"
+  until the owner has a link to a viewable render of what changed.** And that link
+  is a real `https` address: a chat client cannot open
+  `artifacts/renders/home.png`, so [`artifacts/publish_renders.py`](artifacts/publish_renders.py)
+  copies the committed frames into `artifacts/site/public/` with a gallery page, and
+  that bundle is deployed as the static site below. So the step after a capture is
+  `python3 artifacts/publish_renders.py`, then the deploy, then one *labelled* link
+  per touched screen — `[Home, the drawer](https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/home.png)`. Publishing the renders
+  is part of shipping them; publishing the code still needs asking. "It compiles"
   says nothing about what a page looks like, and a change nobody looked at is a
   change to be undone later. A change that alters something which is not one of
   those seven screens — the launcher icon, a design page, `dist/index.html`, the

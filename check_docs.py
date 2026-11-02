@@ -104,6 +104,11 @@ HISTORICAL_MD5 = {
 # A path segment is a branch id — `freebuff/e9252a57…` — not a sketch.
 MD5_SHORT = re.compile(r"(?<![0-9a-f/])([0-9a-f]{8})\u2026")
 MD5_LONG = re.compile(r"(?<![0-9a-f])([0-9a-f]{32})(?![0-9a-f])")
+# A URL is not a sketch. The render host's subdomain is a 32-hex run —
+# `site-c4870019b7c74299bae95043c45330f8.freebuff.page` — so scanning a doc for
+# hashes without blanking its URLs first fails the tree that publishes its own
+# renders. That happened; this is the fix, and selftest_docs.py pins it.
+URL = re.compile(r"\S*://\S+")
 # Grouped thousands, then a floor: 1,878,661 is a flash size, 967,413 is a
 # baseline note and 45,244 is a globals count, and only the first is this
 # check's business.
@@ -457,7 +462,7 @@ def main():
                     "%s:%d quotes %s, which is not a size any deck builds to now"
                     % (shown(path), number, match.group(1))
                 )
-            for match in MD5_SHORT.finditer(line):
+            for match in MD5_SHORT.finditer(URL.sub(" ", line)):
                 digest = match.group(1)
                 if digest in hashes or digest in HISTORICAL_MD5:
                     continue
@@ -465,7 +470,7 @@ def main():
                     "%s:%d quotes md5 %s\u2026, which is not a sketch here now"
                     % (shown(path), number, digest)
                 )
-            for match in MD5_LONG.finditer(line):
+            for match in MD5_LONG.finditer(URL.sub(" ", line)):
                 digest = match.group(1)
                 if digest in full_hashes or digest[:8] in HISTORICAL_MD5:
                     continue

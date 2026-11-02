@@ -720,6 +720,25 @@ signature, `zipalign -c 4`, both bundled sketches in sync, **180,126 bytes** in
 pause it routes, with the probe's logic untouched. The sketch did not move in this
 rebuild.
 
+## Where the renders live
+
+The seven frames and the chat strip are published as a static site, because a link a
+person can tap is what the render rule in `CONVENTIONS.md` asks for and a workspace path
+opens nothing:
+
+| What | Where |
+| --- | --- |
+| Gallery | https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/ |
+| One screen | https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/home.png — likewise `home-open`, `projects`, `projects-open`, `paired`, `serial`, `settings` |
+| The strip | https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/chat-sheet.jpg |
+| Bundle source | [`artifacts/site/`](../artifacts/site/) (`worker.js`, `manifest.json`), built by [`artifacts/publish_renders.py`](../artifacts/publish_renders.py) into the gitignored `artifacts/site/public/` |
+| Site | Freebuff Sites `3f6c1a9e-8b47-4d2c-9f11-5a7e2c4d8b60`, **preview** environment, published |
+
+The worker serves `env.ASSETS` and 404s everything else: there is no route, no state and
+no secret on it, and the bundle is a copy of pixels git already holds, so the site cannot
+show a screen the app no longer draws. `public/` is ignored by git — the frames beside it
+are the source. Nothing in the app reads this host.
+
 ## Not verified
 
 - The **release** build type is unrun, and the shipped APK is debug-signed with

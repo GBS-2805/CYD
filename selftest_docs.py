@@ -144,6 +144,13 @@ CASES = [
         forbids=["  - "],
     ),
     dict(
+        name="a hex run inside a URL is a hostname, not an md5",
+        mutate=append_readme("\nRenders: https://site-c4870019b7c74299bae95043c45330f8"
+                             ".freebuff.page/home.png\n"),
+        want_code=0,
+        forbids=["  - "],
+    ),
+    dict(
         name="a backticked file this tree does not hold is refused",
         mutate=append_readme("\n`Missing.java` is not here any more.\n"),
         want_code=1,

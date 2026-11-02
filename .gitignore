@@ -24,3 +24,7 @@ artifacts/renders/seven-screens.png
 # and discarded the moment a sketch or the compiler changes.
 .build_figures.json
 .scratch/
+
+# The published render bundle: copied from artifacts/renders/ by
+# publish_renders.py on every build, so it is output, not a second copy.
+artifacts/site/public/
