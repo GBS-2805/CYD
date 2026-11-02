@@ -448,10 +448,16 @@ the front page needs no second navigation.
 * **Every UI change ships a render, and the render is linked before anything
   ships.** Draw the screens it touches with `android-companion/render_ui.py`, which
   reads its colours and metrics from `Ui.java`, and keep the PNGs in
-  `artifacts/renders/`. Then *show* them: a clickable link into this workspace —
-  `[home](artifacts/renders/home.png)` — for every screen the change touched, and
-  only those, with `![home](…)` beside it when one is worth eyeballing in the
-  reply. **The link is a gate, not a courtesy: nothing is pushed or published
+  `artifacts/renders/`. Then *show* them: put each PNG somewhere that serves the
+  bytes over public `https` and post it as a labelled link —
+  `[Home, the drawer](https://host/abc.png)` — for every screen the change
+  touched, and only those. **Shape matters as much as the file.** The owner reads
+  this chat on a phone, and that client renders neither Markdown images nor bare
+  URLs: `![home](…)` and a naked `https://…` on its own line both arrive as
+  letters on a screen, and a workspace path is worse still, because it opens
+  nothing anywhere but here. What arrives is a *label* wrapped around a public
+  URL, and the host has to still be serving it when he taps. **The link is a
+  gate, not a courtesy: nothing is pushed or published
   until the owner has a link to a viewable render of what changed.** "It compiles"
   says nothing about what a page looks like, and a change nobody looked at is a
   change to be undone later. A change that alters something which is not one of
