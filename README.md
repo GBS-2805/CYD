@@ -12,6 +12,12 @@ compiles the decks and fails one that no longer fits its partition;
 [`selftest_headroom.py`](selftest_headroom.py) proves the check's own refusals in
 about a second, with no toolchain installed.
 
+A screen change is verified by [`check_renders.py`](check_renders.py), which draws
+every screen again with [`android-companion/render_ui.py`](android-companion/render_ui.py)
+and fails when a committed PNG in `artifacts/renders/` no longer matches, so a
+forgotten regeneration cannot pass as a reviewed change. It compares pixels, not
+timestamps: git stores no mtime, so a clone stamps every file with the same time.
+
 Each chat works on its own branch in its own worktree — who owns what is
 [`## The two chats`](CONVENTIONS.md#the-two-chats) — so
 [`check_branches.py`](check_branches.py) names the branches holding work `main`

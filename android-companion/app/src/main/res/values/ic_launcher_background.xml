@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Ui.BG: the same black the app paints behind every tab. -->
-    <color name="ic_launcher_background">#000000</color>
+    <!-- The logo's ground. Its single black contour carries the ghost as a
+         hole, so white here is what the ghost is drawn as. -->
+    <color name="ic_launcher_background">#FFFFFF</color>
 </resources>

@@ -445,16 +445,26 @@ the front page needs no second navigation.
   address the deck printed. `SIGN IN` fetches the deck's own authorize URL and
   opens it, so the custom scheme still returns into this app; a deck that is
   signed in and out of setup says so instead of asking a page it does not serve.
-* **Every UI change ships a render, embedded in the chat.** Draw the screens it
-  touches with `android-companion/render_ui.py`, which reads its colours and
-  metrics from `Ui.java`, and keep the PNGs in `artifacts/renders/`. Then *show*
-  them: every changed screen goes into the reply as an inline image
-  (`![home](artifacts/renders/home.png)`), not as a file link, so the render is one
-  scroll away instead of a hunt through the tree. Link — or skip — only the
-  screens the change did not touch. The PNGs are the page's own images —
+* **Every UI change ships a render, and the render is linked before anything
+  ships.** Draw the screens it touches with `android-companion/render_ui.py`, which
+  reads its colours and metrics from `Ui.java`, and keep the PNGs in
+  `artifacts/renders/`. Then *show* them: a clickable link into this workspace —
+  `[home](artifacts/renders/home.png)` — for every screen the change touched, and
+  only those, with `![home](…)` beside it when one is worth eyeballing in the
+  reply. **The link is a gate, not a courtesy: nothing is pushed or published
+  until the owner has a link to a viewable render of what changed.** "It compiles"
+  says nothing about what a page looks like, and a change nobody looked at is a
+  change to be undone later. A change that alters something which is not one of
+  those seven screens — the launcher icon, a design page, `dist/index.html`, the
+  app's own copy in `artifacts/` — gets a sheet of its own under `artifacts/` and
+  the same link, because the rule is "what a user sees ships with its picture",
+  not "the renderer's seven frames". The PNGs are the page's own images —
   `tokens.json`'s `screens` maps each frame to one — so a change that redraws a
   screen regenerates that render and commits it with the code and the page. A
   render is metric-accurate, not a device screenshot — say which.
+  [`check_renders.py`](check_renders.py) is what keeps the gate loud: it redraws
+  every screen and fails when a committed PNG no longer matches the picture the
+  app draws, comparing pixels rather than timestamps because git stores no mtime.
 * **Music is mirrored, not fetched.** Nothing on this board holds a Spotify token
   and nothing asks the user to make a developer app: the companion app reads the
   phone's media session (already permitted by the notification access it needs for

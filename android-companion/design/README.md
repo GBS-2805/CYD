@@ -45,8 +45,8 @@ Try things. Nothing here can break the app.
 1. Edit `ui.html` (and `tokens.json` if it is only numbers).
 2. Say what changed in the chat, in words. Prose plus the file is enough; I read
    the diff too.
-3. I change the Java, rebuild, and regenerate the renders — which are then
-   **embedded inline in the chat**, every screen that moved, per the rule in
+3. I change the Java, rebuild, and regenerate the renders — every screen that
+   moved, **linked in the chat before anything ships**, per the rule in
    `CONVENTIONS.md`.
 4. If a render disagrees with this file, the render is what the phone does and this
    file gets corrected. They are not allowed to drift apart.

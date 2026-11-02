@@ -491,7 +491,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-11-01 after the probe
   order changed, which followed the sketch header change, the probe work, the
-  drawer's rework and the deck's sign-in — **171,094 bytes** on the file in
+  drawer's rework and the deck's sign-in — **172,646 bytes** on the file in
   `dist/`, against the 112,473 that the same work produced before the second
   widget joined it. The two
   halves were measured on their own branches the same day before they met —
@@ -546,10 +546,10 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **171,094 bytes** on 2026-11-01, the rebuild carrying two bundled sketches, the
+  **172,646 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
-  app, the mirror and the three-step probe. Quote the size to the nearest kB
-  (~167 kB), never as a checksum.
+  app, the mirror, the three-step probe and the owner's logo as the icon. Quote the size to the nearest kB
+  (~168 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set — now including
   `INTERNET`, the one outbound request to the deck —
@@ -561,9 +561,15 @@ Identical to the sketch, checked against its `onWrite` handlers:
   installs platform 35 and build-tools 35.0.0 and asserts the two things a listing
   checks first: `targetSdkVersion:'35'`, and a non-empty `application-icon`.
   AGP moved 8.5.2 → 8.6.1 for it, which still runs on Gradle 8.7.
-- The icon is one adaptive vector: background `#000000`, foreground drawing the
-  deck as a screen with three lines of log, plus a monochrome variant for themed
-  icons. There is no bitmap density bucket, which is safe here only because
+- The icon is one adaptive vector carrying the owner's own logo, not a redraw:
+  `ic_launcher_foreground.xml` holds the artwork's four path strings verbatim
+  (Android pathData is SVG's grammar) inside a `<group>` that only scales and
+  centres them to the 72dp safe zone, so a launcher mask can crop the disc's outer
+  edge but never the mouth. The logo draws the ghost as a *hole* in one black
+  contour, which is why `ic_launcher_background` is the white the ghost is cut out
+  of rather than the app's black. The monochrome variant is those same four
+  subpaths with `evenOdd`, so the eyes and mouth survive being flattened to one
+  tint. There is no bitmap density bucket, which is safe here only because
   `minSdk` is 26 — every device this installs on supports adaptive icons.
 - `NoticeFilter` answers the oldest objection to this app: notification access
   exposes everything. It stores one boolean per package and filters in
@@ -637,7 +643,7 @@ printed in the status line and dropped.
 `./toolchain.sh` passed end to end on 2026-11-01 with the buttons feeding the
 sweep and the rate remembered: `all 117 host checks passed` — four for the wiring
 order, four for the rate — `BUILD SUCCESSFUL`, v2 signature, `zipalign -c 4`,
-both bundled sketches in sync, **171,094 bytes** in `dist/`.
+both bundled sketches in sync, **172,646 bytes** in `dist/`.
 
 ## Not verified
 

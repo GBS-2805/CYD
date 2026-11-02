@@ -3,9 +3,10 @@
 
 Every colour and metric here is copied from `Ui.java` and the tab that draws the
 screen, so a render is a check on the layout as written rather than an idea of
-it. They are review artifacts: written under `artifacts/renders/`, embedded in the
-reply as inline images so they can be read without opening a file manager, then
-regenerated on the next change and never committed.
+it. They are review artifacts: written under `artifacts/renders/`, linked in the
+reply before a change ships, regenerated on the next change and committed with
+the code that moved them. `../check_renders.py` compares a committed PNG against
+what this draws today, so a forgotten regeneration fails instead of passing.
 
     python3 render_ui.py              draw every screen
     python3 render_ui.py home         draw one (home, home-open, projects,
