@@ -276,7 +276,7 @@ scheme**; see the measurement below for why that is enough.
 
 Both decks are ordinary Arduino sketches and both travel on the phone: the app
 bundles this one too (`check_widget_assets.py` prints `2 widgets bundled, every
-copy matches`, with this sketch at md5 `00bb1560…`), so it can be pulled from the
+copy matches`, with this sketch at md5 `f234b68b…`), so it can be pulled from the
 same shelf as its sibling.
 
 From a computer, `toolchain.sh` has already compiled it:

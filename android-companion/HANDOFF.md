@@ -491,7 +491,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-11-01 after the probe
   order changed, which followed the sketch header change, the probe work, the
-  drawer's rework and the deck's sign-in — **167,234 bytes** on the file in
+  drawer's rework and the deck's sign-in — **171,094 bytes** on the file in
   `dist/`, against the 112,473 that the same work produced before the second
   widget joined it. The two
   halves were measured on their own branches the same day before they met —
@@ -546,10 +546,10 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **167,234 bytes** on 2026-11-01, the rebuild carrying two bundled sketches, the
+  **171,094 bytes** on 2026-11-01, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror and the three-step probe. Quote the size to the nearest kB
-  (~163 kB), never as a checksum.
+  (~167 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set — now including
   `INTERNET`, the one outbound request to the deck —
@@ -637,7 +637,7 @@ printed in the status line and dropped.
 `./toolchain.sh` passed end to end on 2026-11-01 with the buttons feeding the
 sweep and the rate remembered: `all 117 host checks passed` — four for the wiring
 order, four for the rate — `BUILD SUCCESSFUL`, v2 signature, `zipalign -c 4`,
-both bundled sketches in sync, **167,234 bytes** in `dist/`.
+both bundled sketches in sync, **171,094 bytes** in `dist/`.
 
 ## Not verified
 
