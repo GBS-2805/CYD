@@ -51,18 +51,28 @@ NOTES = {
 
 
 def colours():
-    """The app's palette, read out of `Ui.java` so this file cannot disagree with it."""
-    wanted = {"BG": "BG", "EDGE": "EDGE", "TEXT": "TEXT", "DIM": "DIM"}
+    """The app's palette, read out of `Ui.java` so this file cannot disagree with it.
+
+    Constants are ARGB: `0xFFD9D9D9` is opaque, `0xA3D9D9D9` is the band grey at
+    64 %. A translucent ink is composited over the ground here, because a caption
+    strip is a painted rectangle and the app's own draw does the same blend.
+    """
+    wanted = {"BG", "EDGE", "TEXT", "DIM"}
     found = {}
     with open(UI, encoding="utf-8") as handle:
-        for name, hexes in re.findall(
-                r"static final int (\w+) = 0xFF([0-9A-Fa-f]{6});", handle.read()):
+        for name, argb in re.findall(
+                r"static final int (\w+) = 0x([0-9A-Fa-f]{8});", handle.read()):
             if name in wanted:
-                found[name] = tuple(int(hexes[i:i + 2], 16) for i in (0, 2, 4))
+                alpha = int(argb[0:2], 16) / 255.0
+                rgb = tuple(int(argb[i:i + 2], 16) for i in (2, 4, 6))
+                found[name] = (alpha, rgb)
     missing = set(wanted) - set(found)
     if missing:
         raise SystemExit("Ui.java no longer defines %s" % ", ".join(sorted(missing)))
-    return found
+    ground = found["BG"][1]
+    return {name: tuple(round(alpha * channel + (1.0 - alpha) * base)
+                        for channel, base in zip(rgb, ground))
+            for name, (alpha, rgb) in found.items()}
 
 
 def font(px, bold=False, mono=False):

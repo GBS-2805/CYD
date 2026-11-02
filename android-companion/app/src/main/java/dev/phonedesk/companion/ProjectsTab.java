@@ -335,7 +335,7 @@ final class ProjectsTab extends ScrollView {
 
     private void addChip(LinearLayout row, String label, int filter) {
         final boolean on = activeFilter == filter;
-        TextView chip = Ui.text(activity, label, 10, on ? Ui.BG : Ui.DIM);
+        TextView chip = Ui.text(activity, label, 10, on ? Ui.INK : Ui.DIM);
         chip.setLetterSpacing(0.1f);
         chip.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         chip.setBackground(Ui.rounded(activity, on ? Ui.ACCENT : Ui.CARD_HI,

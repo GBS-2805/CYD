@@ -24,19 +24,22 @@ final class TopBar {
 
     TopBar(Context context) {
         bar = Ui.row(context);
+        // The sheet's light band, so the chrome is one surface and the field below
+        // it is the app. Every ink in this bar is black or a black wash.
+        bar.setBackgroundColor(Ui.BAND);
         bar.setPadding(Ui.dp(context, 18), Ui.dp(context, 14), Ui.dp(context, 18),
                 Ui.dp(context, 8));
 
-        crumb = Ui.text(context, "OFF-SITE", 12, Ui.DIM);
+        crumb = Ui.text(context, "OFF-SITE", 12, Ui.BAND_DIM);
         crumb.setLetterSpacing(0.12f);
         crumb.setPadding(0, Ui.dp(context, 6), Ui.dp(context, 12), Ui.dp(context, 6));
         bar.addView(crumb, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        pill = Ui.text(context, "IDLE", 11, Ui.DIM);
+        pill = Ui.text(context, "IDLE", 11, Ui.BAND_DIM);
         pill.setLetterSpacing(0.14f);
         pill.setTypeface(Typeface.DEFAULT_BOLD);
-        pill.setBackground(Ui.rounded(context, Ui.CARD, Ui.EDGE, 9));
+        pill.setBackground(Ui.rounded(context, 0, Ui.BAND_RULE, 9));
         pill.setPadding(Ui.dp(context, 12), Ui.dp(context, 6), Ui.dp(context, 12),
                 Ui.dp(context, 6));
         bar.addView(pill);
@@ -45,7 +48,7 @@ final class TopBar {
         // would arrive in colour on a monochrome screen. It sits outside the pill,
         // hard against the screen edge, so it reads as chrome rather than as part
         // of the link state the pill reports.
-        gear = Ui.text(context, "\u2699\uFE0E", 15, Ui.DIM);
+        gear = Ui.text(context, "\u2699\uFE0E", 15, Ui.BAND_DIM);
         gear.setGravity(Gravity.CENTER);
         gear.setPadding(Ui.dp(context, 10), Ui.dp(context, 4), Ui.dp(context, 2),
                 Ui.dp(context, 4));
@@ -62,21 +65,27 @@ final class TopBar {
      */
     void showSection(int index) {
         crumb.setText(index == MainActivity.HOME ? "OFF-SITE" : "\u2039  OFF-SITE");
-        crumb.setTextColor(index == MainActivity.HOME ? Ui.DIM : Ui.TEXT);
-        gear.setTextColor(index == MainActivity.SECTION_SETTINGS ? Ui.TEXT : Ui.DIM);
+        crumb.setTextColor(index == MainActivity.HOME ? Ui.BAND_DIM : Ui.INK);
+        gear.setTextColor(index == MainActivity.SECTION_SETTINGS ? Ui.INK : Ui.BAND_DIM);
     }
 
     /** The pill reports the link, and says IDLE when the bridge is not running. */
     void showLink(DeckService.Snapshot snapshot, boolean running) {
+        // The live pill is the one filled shape on the band: black with the band's
+        // grey on it, which is the sheet's .pill.live turned round for a light bar.
+        Context where = pill.getContext();
         if (snapshot.linked) {
             pill.setText("LINKED");
-            pill.setTextColor(Ui.GOOD);
+            pill.setTextColor(Ui.BAND);
+            pill.setBackground(Ui.rounded(where, Ui.INK, Ui.INK, 9));
         } else if (running) {
             pill.setText("SCANNING");
-            pill.setTextColor(Ui.ACCENT);
+            pill.setTextColor(Ui.INK);
+            pill.setBackground(Ui.rounded(where, 0, Ui.BAND_RULE, 9));
         } else {
             pill.setText("IDLE");
-            pill.setTextColor(Ui.DIM);
+            pill.setTextColor(Ui.BAND_DIM);
+            pill.setBackground(Ui.rounded(where, 0, Ui.BAND_RULE, 9));
         }
     }
 }

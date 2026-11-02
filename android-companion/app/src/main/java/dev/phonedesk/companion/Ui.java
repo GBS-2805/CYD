@@ -17,23 +17,25 @@ import android.widget.TextView;
  */
 final class Ui {
 
-    // The deck's INK palette (phone_deck_cyd24R.ino, THEMES[1]) slot for slot: black
-    // ground, #0e0e0e panels, #333333 hairlines, white ink, and a grey ramp where
-    // the coloured build had blue, violet, pink and green. The names keep their
-    // old jobs — ACCENT for the link and a primary button, PINK for the one
-    // destructive action and an error, VIOLET for a section tag, GOOD for success
-    // — so on a monochrome screen they separate by luminance instead of hue, the
-    // same way batteryColor() does on the deck.
-    static final int BG = 0xFF000000;
-    static final int CARD = 0xFF0E0E0E;
-    static final int CARD_HI = 0xFF1C1C1C;
-    static final int EDGE = 0xFF333333;
-    static final int TEXT = 0xFFFFFFFF;
-    static final int DIM = 0xFF8C8C8C;
-    static final int ACCENT = 0xFFFFFFFF;
-    static final int VIOLET = 0xFF707070;
-    static final int PINK = 0xFFD4D4D4;
-    static final int GOOD = 0xFFA0A0A0;
+    // The compress palette: a #3f4e96 field, a #d9d9d9 band and black ink on it,
+    // taken from the sheet the owner pasted. Hue is gone, so the band grey's own
+    // alpha steps do the work the INK theme's ramp did: .78 GOOD, .64 DIM, .48
+    // VIOLET, .26 EDGE, with PINK the single value brighter than the band. The
+    // names keep their jobs, so a screen does not care which theme is in force.
+    static final int BG = 0xFF3F4E96;          // the page field, and a card's fill
+    static final int CARD = 0xFF3F4E96;        // a cell: the field, hairline only
+    static final int CARD_HI = 0x29000000;     // rgba(0,0,0,.16) wash: chips, fields
+    static final int EDGE = 0x42D9D9D9;        // the band grey at 26 %
+    static final int TEXT = 0xFFD9D9D9;
+    static final int DIM = 0xA3D9D9D9;         // 64 %
+    static final int ACCENT = 0xFFD9D9D9;      // a fill, with INK on it
+    static final int VIOLET = 0x7AD9D9D9;      // 48 %
+    static final int PINK = 0xFFE8E8E8;        // the one ink above the band
+    static final int GOOD = 0xC7D9D9D9;        // 78 %
+    static final int BAND = 0xFFD9D9D9;        // the header bar, and a live pill's text
+    static final int INK = 0xFF000000;         // ink on the band
+    static final int BAND_DIM = 0x80000000;    // rgba(0,0,0,.5) hints on the band
+    static final int BAND_RULE = 0x24000000;   // rgba(0,0,0,.14) a rule on the band
 
     private Ui() {
     }
@@ -97,7 +99,7 @@ final class Ui {
         button.setAllCaps(false);
         button.setTypeface(Typeface.MONOSPACE);
         button.setTextSize(13);
-        button.setTextColor(primary ? Ui.BG : Ui.TEXT);
+        button.setTextColor(primary ? Ui.INK : Ui.TEXT);
         button.setBackground(rounded(context, primary ? ACCENT : CARD_HI,
                 primary ? ACCENT : EDGE, 10));
         button.setMinHeight(0);

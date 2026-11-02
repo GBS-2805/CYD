@@ -13,17 +13,22 @@
    a variable here, say so in the handoff, and the Java gets that value.
    =========================================================================== */
 :root {
-  /* palette — Ui.BG … Ui.GOOD, the deck's INK theme slot for slot */
-  --bg:      #000000;   /* Ui.BG       screen ground              */
-  --card:    #0e0e0e;   /* Ui.CARD     card fill, pill fill       */
-  --card-hi: #1c1c1c;   /* Ui.CARD_HI  secondary action, chip off */
-  --edge:    #333333;   /* Ui.EDGE     1dp hairline               */
-  --text:    #ffffff;   /* Ui.TEXT     primary ink                */
-  --dim:     #8c8c8c;   /* Ui.DIM      secondary ink, hints        */
-  --accent:  #ffffff;   /* Ui.ACCENT   link state, primary action  */
-  --violet:  #707070;   /* Ui.VIOLET   a section tag               */
-  --pink:    #d4d4d4;   /* Ui.PINK     destructive, error          */
-  --good:    #a0a0a0;   /* Ui.GOOD     success                     */
+  /* palette — Ui.BG … Ui.GOOD, the compress sheet: a field, a band, black ink,
+     and the band grey's own alpha steps where a ramp used to be */
+  --bg:      #3f4e96;   /* Ui.BG       the page field             */
+  --card:    #3f4e96;   /* Ui.CARD     a cell: field + hairline    */
+  --card-hi: rgba(0, 0, 0, .16);   /* Ui.CARD_HI  a wash: chips, fields */
+  --edge:    rgba(217, 217, 217, .26); /* Ui.EDGE  1dp hairline      */
+  --text:    #d9d9d9;   /* Ui.TEXT     primary ink                */
+  --dim:     rgba(217, 217, 217, .64); /* Ui.DIM    secondary ink   */
+  --accent:  #d9d9d9;   /* Ui.ACCENT   link state, primary action  */
+  --violet:  rgba(217, 217, 217, .48); /* Ui.VIOLET a section tag   */
+  --pink:    #e8e8e8;   /* Ui.PINK     destructive, error          */
+  --good:    rgba(217, 217, 217, .78); /* Ui.GOOD   success         */
+  --band:      #d9d9d9;                 /* Ui.BAND      the header bar */
+  --ink:       #000000;                 /* Ui.INK       ink on the band */
+  --band-dim:  rgba(0, 0, 0, .5);       /* Ui.BAND_DIM  hints on the band */
+  --band-rule: rgba(0, 0, 0, .14);      /* Ui.BAND_RULE a rule on the band */
 
   /* radii, in dp — Ui.rounded(Context, fill, stroke, radiusDp) */
   --r-card:   14px;     /* Ui.card()                                  */
@@ -96,17 +101,20 @@ figcaption span { color: #6d6d6d; }
 
 /* --- top bar — MainActivity.buildTopBar() --------------------------------- */
 .bar { display: flex; align-items: center;
-       padding: var(--bar-top) var(--bar-side) var(--bar-bottom); }
-.crumb { flex: 1; font-size: 12px; letter-spacing: .12em; color: var(--dim);
+       padding: var(--bar-top) var(--bar-side) var(--bar-bottom);
+       background: var(--band); color: var(--ink); }
+.crumb { flex: 1; font-size: 12px; letter-spacing: .12em; color: var(--band-dim);
          padding: 6px 12px 6px 0; }
-.bar--section .crumb { color: var(--text); }       /* showSection(): TEXT      */
+.bar--section .crumb { color: var(--ink); }        /* showSection(): INK       */
 .pill { font-size: 11px; letter-spacing: .14em; font-weight: 700;
-        color: var(--dim); background: var(--card);
-        border: 1px solid var(--edge); border-radius: var(--r-pill);
+        color: var(--band-dim); background: none;
+        border: 1px solid var(--band-rule); border-radius: var(--r-pill);
         padding: 6px 12px; white-space: nowrap; }
-.gear { font-size: 15px; line-height: 1; color: var(--dim);
+/* the linked pill — TopBar.showLink(): the one filled shape on the band */
+.pill--live { background: var(--ink); border-color: var(--ink); color: var(--band); }
+.gear { font-size: 15px; line-height: 1; color: var(--band-dim);
         padding: 4px 2px 4px 10px; margin-left: 10px; }
-.bar--settings .gear { color: var(--text); }        /* gear lit on SETTINGS     */
+.bar--settings .gear { color: var(--ink); }         /* gear lit on SETTINGS     */
 
 /* --- drawer front page — DrawerHome --------------------------------------- */
 .drawer { padding: var(--body-top) var(--drawer-side) var(--drawer-bottom); }
@@ -149,7 +157,7 @@ figcaption span { color: #6d6d6d; }
          background: var(--card-hi); border: 1px solid var(--edge);
          border-radius: var(--r-field); color: var(--dim); padding: 5px 9px;
          white-space: nowrap; }
-.chip--on { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.chip--on { background: var(--accent); border-color: var(--accent); color: var(--ink); }
 
 /* spacing utilities, each one a Ui.space(context, view, n) in the Java */
 .mt-4 { margin-top: 4px; }  .mt-6 { margin-top: 6px; }   .mt-8 { margin-top: 8px; }
@@ -178,7 +186,7 @@ figcaption span { color: #6d6d6d; }
           border-radius: var(--r-action); color: var(--text);
           padding: 8px 14px; line-height: 1.2; text-align: center; }
 .action--primary { background: var(--accent); border-color: var(--accent);
-                   color: var(--bg); }
+                   color: var(--ink); }
 .action--dim { color: var(--dim); }
 .action--full { display: block; width: 100%; }
 /* two copy buttons a row — ProjectsTab.librariesCard(); 11sp so the longest
@@ -695,7 +703,7 @@ figcaption span { color: #6d6d6d; }
   <div class="screen">
     <div class="bar bar--section">
       <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
-      <div class="pill">LINKED</div>
+      <div class="pill pill--live">LINKED</div>
       <div class="gear">&#9881;&#65038;</div>
     </div>
 

@@ -198,7 +198,7 @@ final class DrawerHome extends ScrollView {
         LinearLayout row = Ui.row(activity);
         row.setPadding(Ui.dp(activity, 8), Ui.dp(activity, 6),
                 Ui.dp(activity, 8), Ui.dp(activity, 6));
-        row.setBackground(Ui.rounded(activity, Ui.CARD, 0, 8));
+        row.setBackground(Ui.rounded(activity, Ui.CARD_HI, 0, 8));
 
         TextView name = Ui.text(activity, label.toUpperCase(Locale.US), 13, Ui.TEXT);
         row.addView(name, new LinearLayout.LayoutParams(0,

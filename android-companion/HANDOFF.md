@@ -317,12 +317,17 @@ URL and a flashing note. Decisions behind it:
   `ets Jul 29 2019 12:21:46` because the boot-mode line sat past the 32nd byte;
   the ROM's date and `boot:0x13` versus `boot:0x3` are what identify the chip and
   whether IO0 took effect.
-- **Theme**: the deck's INK palette, copied into `Ui` slot for slot — `#000000`
-  ground, `#0e0e0e` panels, `#1c1c1c` lifted panels, `#333333` hairlines, white
-  ink, and a grey ramp where the coloured build had blue, violet, pink and green.
-  `Ui.PINK` for an error and `Ui.GOOD` for success now differ by luminance, not
-  hue, exactly as `batteryColor()` separates the three battery states on the deck.
-  Monospace for every text and button (`Ui.text` / `Ui.action`).
+- **Theme**: the compress sheet the owner pasted — `#3f4e96` as the field every
+  screen sits on, `#d9d9d9` as the band the top bar and every primary action use,
+  black as the ink on that band, and the band grey's own alpha steps where the INK
+  theme kept a ramp: `GOOD` .78, `DIM` .64, `VIOLET` .48, `EDGE` .26, with `PINK`
+  the single value above the band at `#e8e8e8`, so a status still separates by
+  luminance rather than hue. A card is a **hairline cell on the field** now
+  (`Ui.CARD` is the field), which is how the sheet draws its grid; the surfaces
+  that need a fill of their own — a secondary action, a chip off, the search
+  field, the drawer's board row — use `Ui.CARD_HI`, a 16 % black wash. The live
+  pill is the one filled shape on the band: black fill, band-grey text.
+  Monospace did not move: the deck is a terminal, so the font stayed.
 - **Probe always restores the board.** `probeUsb()` calls `hardReset()` in both
   paths, success and failure, because leaving the ESP32 in download mode is
   exactly the black-screen-with-red-LED state a user reads as a brick. The same
@@ -503,7 +508,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   HEAD` into an empty directory plus a fresh `git init` — no built assets, no
   `.build_figures.json`, nothing in `dist/` the commit does not hold — passed the
   fast gate, compiled all 32 sources (**135 host checks**), and `toolchain.sh`
-  built the APK to **179,114 bytes**, sha256 beginning `dd5b475f`; the gate was green
+  built the APK to **179,250 bytes**, sha256 beginning `dd5b475f`; the gate was green
   afterwards, widget bundles and recorded bytes included. The docs step took
   **123 s** on that first run and ~1 s after, because `.build_figures.json` is a
   local cache: a fresh tree pays for both compiles once. A `git clone` of this
@@ -526,7 +531,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   actions, a positive uint32 serial, and a repeated serial counting as one tap.
   `NowPlaying.run` then presses the key on the session it is already mirroring.
   `test.sh` reads **all 135 host checks passed**, nine of them new; the APK
-  rebuilt to **179,114 bytes**. **Nothing has run on a phone or a board**, so
+  rebuilt to **179,250 bytes**. **Nothing has run on a phone or a board**, so
   whether a chip's notify arrives and moves playback is unverified end to end.
 - The last `javac 17` type check against the Android 14 (API 34) framework
   classes (`android-all`) covered the pre-split sources: 9 files, 22 classes, only
@@ -541,7 +546,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the artifact in `dist/` now is the one rebuilt on 2026-11-02 after the drawer
   gained the owner's mark above its wordmark, which followed the sketch header
   change, the probe work, the drawer's rework and the deck's sign-in —
-  **179,114 bytes** on the file in
+  **179,250 bytes** on the file in
   `dist/`, against the 112,473 that the same work produced before the second
   widget joined it. The two
   halves were measured on their own branches the same day before they met —
@@ -603,7 +608,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **179,114 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
+  **179,250 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror, the three-step probe, the owner's logo as the icon, and the same
   ghost again above the drawer's wordmark. Quote the size to the nearest kB
@@ -701,7 +706,7 @@ printed in the status line and dropped.
 `./toolchain.sh` passed end to end on 2026-11-02 with the header mark in place, the
 buttons still feeding the sweep with the rate remembered, and the tap path wired:
 `all 135 host checks passed` (117 before those nine), `BUILD SUCCESSFUL`, v2
-signature, `zipalign -c 4`, both bundled sketches in sync, **179,114 bytes** in
+signature, `zipalign -c 4`, both bundled sketches in sync, **179,250 bytes** in
 `dist/` — 356 bytes above the build before, which is the clock seam: `EspRom.Clock` and the
 pause it routes, with the probe's logic untouched. The sketch did not move in this
 rebuild.
