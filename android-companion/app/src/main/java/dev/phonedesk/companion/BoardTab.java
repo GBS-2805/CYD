@@ -970,9 +970,10 @@ final class BoardTab extends ScrollView {
         TextView sweepNote = Ui.text(activity,
                 "PROBE works in three steps: it listens with nothing touched, then asks"
                         + " for BOOT held and RESET tapped, then falls back to four wirings"
-                        + " of its own — normal and swapped lines, each with the reset"
-                        + " driven here and with EN pulsed while BOOT is held. FLASH walks"
-                        + " the same three steps before it writes.", 11, Ui.DIM);
+                        + " of its own, starting with the one the two buttons select —"
+                        + " normal and swapped lines, each with the reset driven here and"
+                        + " with EN pulsed while BOOT is held. FLASH walks the same three"
+                        + " steps before it writes.", 11, Ui.DIM);
         sweepNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
         sweepNote.setLineSpacing(Ui.dp(activity, 2), 1f);
         card.addView(sweepNote);
@@ -980,9 +981,10 @@ final class BoardTab extends ScrollView {
         if (swappedLines) {
             TextView swapNote = Ui.text(activity,
                     "DTR drives EN and RTS drives IO0 instead of the other way round. PROBE"
-                            + " tries this by itself and sets the button to whichever wiring"
-                            + " answered; set it by hand only to force FLASH or RESTART onto"
-                            + " swapped lines.", 11, Ui.ACCENT);
+                            + " tries this wiring first and sets the button to whichever one"
+                            + " answered, so this button is the sweep's starting point, not a"
+                            + " leftover: hand it on to send PROBE, FLASH and RESTART to"
+                            + " swapped lines first.", 11, Ui.ACCENT);
             swapNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
             swapNote.setLineSpacing(Ui.dp(activity, 2), 1f);
             card.addView(swapNote);
@@ -991,8 +993,9 @@ final class BoardTab extends ScrollView {
         if (manualReset) {
             TextView manualNote = Ui.text(activity,
                     "EN pulse, IO0 held high: FLASH and RESTART leave the strap to the"
-                            + " BOOT button, so hold it while they run. PROBE tries this"
-                            + " mode by itself as its last two wirings.", 11, Ui.ACCENT);
+                            + " BOOT button, so hold it while they run. PROBE tries this mode"
+                            + " first, then its other three wirings, and leaves the button on"
+                            + " whichever one answered.", 11, Ui.ACCENT);
             manualNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
             manualNote.setLineSpacing(Ui.dp(activity, 2), 1f);
             card.addView(manualNote);
@@ -1197,6 +1200,10 @@ final class BoardTab extends ScrollView {
             final UsbSerialCh340 port = new UsbSerialCh340(manager, device);
             final EspRom rom = new EspRom(port);
             rom.setTrace(BoardTab.this::trace);
+            // The buttons are step 3's first choice, not a setting the sweep overrides:
+            // a board that answered on swapped lines last time starts there again.
+            rom.setSwappedLines(swappedLines);
+            rom.setManualReset(manualReset);
             trace("== PROBE " + label + " · Android " + Build.VERSION.RELEASE
                     + " · " + device.getInterfaceCount() + " interface(s) ==");
             boolean opened = false;
@@ -1366,6 +1373,8 @@ final class BoardTab extends ScrollView {
             final UsbSerialCh340 port = new UsbSerialCh340(manager, device);
             final EspRom rom = new EspRom(port);
             rom.setTrace(BoardTab.this::trace);
+            rom.setSwappedLines(swappedLines);
+            rom.setManualReset(manualReset);
             trace("== FLASH " + name + " · " + Ui.size(image.length) + " ==");
             try {
                 port.open();

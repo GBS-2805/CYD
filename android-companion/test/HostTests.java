@@ -17,7 +17,8 @@ import java.util.List;
  * checksum, the handshake reaches download mode and reads the MAC, a reply with
  * the wrong opcode is skipped, a refused write is blamed on the bridge rather
  * than the board, a silent board fails, flash refuses a session that never synced,
- * and a hand on BOOT and RESET is tried before any wiring is.
+ * a hand on BOOT and RESET is tried before any wiring is, and the wiring the serial
+ * card's buttons name is the first one the fallback sweep tries.
  */
 public final class HostTests {
 
@@ -46,6 +47,7 @@ public final class HostTests {
         sweepStopsAtFirstAnswer();
         handResetComesBeforeAnyWiring();
         sweepTriesEveryWiring();
+        preferredWiringGoesFirst();
         flashBootNamesTheStrap();
         downloadBootAsksForASecondHost();
         spotifyCallbackLink();
@@ -271,6 +273,35 @@ public final class HostTests {
         check("step 2 is credited, not a wiring", joined(trace).contains("step 2 answered"));
         check("step 2 is credited before any wiring", !joined(trace).contains("wiring 1/4"));
         check("the hand path moves no control line", port.control.isEmpty());
+    }
+
+    /**
+     * The two buttons on the serial card are the sweep's starting point: whichever
+     * wiring they name is phase 1, so a board found by hand is not walked past three
+     * wirings that already failed. All four are still tried.
+     */
+    private static void preferredWiringGoesFirst() throws Exception {
+        final UsbSerialCh340 port = new UsbSerialCh340();
+        port.refuseRates = true;   // only the order matters here
+        final EspRom rom = new EspRom(port);
+        rom.setBootHoldLeadIn(0);
+        rom.setHandResetWait(0);
+        rom.setSwappedLines(true);
+        rom.setManualReset(true);
+        final List<String> trace = new ArrayList<>();
+        rom.setTrace(trace::add);
+        try {
+            rom.connectAll();
+            check("a silent board fails even with a wiring selected", false);
+        } catch (IOException e) {
+            final String log = joined(trace);
+            check("the log names the wiring the buttons select",
+                    log.contains("the buttons select lines swapped, EN pulsed with BOOT held"));
+            check("the selected wiring is tried first",
+                    log.contains("wiring 1/4: lines swapped, EN pulsed with BOOT held"));
+            check("the other three still run", log.contains("wiring 4/4"));
+            check("every wiring is still counted", e.getMessage().contains("4 wirings"));
+        }
     }
 
     /** A board that never answers must say all four were tried, not one. */

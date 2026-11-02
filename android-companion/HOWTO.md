@@ -321,6 +321,8 @@ try another cable, and confirm the phone supports USB host mode.
 6. Still nothing? Set **LINES: SWAPPED** and probe again. That drives EN on DTR
    and IO0 on RTS, which is what an adapter with a reversed pair needs; without
    it the reset is released with IO0 high and the ROM never runs, at any rate.
+   PROBE and FLASH try the wiring the buttons select first and the other three
+   after it, so this chooses where the fallback starts rather than skipping it.
 
 **MD5 mismatch after writing**: something interfered with the link (a hub, a
 charge-only cable, an unplugged board). Re-flash; the board boots whatever it

@@ -491,7 +491,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-11-01 after the probe
   order changed, which followed the sketch header change, the probe work, the
-  drawer's rework and the deck's sign-in — **166,042 bytes** on the file in
+  drawer's rework and the deck's sign-in — **166,334 bytes** on the file in
   `dist/`, against the 112,473 that the same work produced before the second
   widget joined it. The two
   halves were measured on their own branches the same day before they met —
@@ -517,7 +517,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   either instead of failing a build that has `INTERNET`, and its `aapt2 dump
   xmltree` check is what enforces the cleartext flag. `./toolchain.sh` passed end
   to end on 2026-11-01: `all 61 host checks passed`, as the suite stood then — it
-  is 103 now that the probe order has its own checks (fifteen for the sign-in —
+  is 107 now that the probe order and the buttons' wiring have their own checks (fifteen for the sign-in —
   nine for `SpotifyLink`'s parser, six for the address it builds, including a `+`
   escaped as `%2B` rather than a space), `BUILD SUCCESSFUL`, v2 signature,
   `zipalign -c 4`, 165,242 bytes on the merged tree (149,494 for the sign-in
@@ -544,7 +544,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **166,042 bytes** on 2026-11-01, the rebuild carrying two bundled sketches, the
+  **166,334 bytes** on 2026-11-01, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror and the three-step probe. Quote the size to the nearest kB
   (~162 kB), never as a checksum.
@@ -605,6 +605,14 @@ PROBE and FLASH now walk three steps instead:
 `BOOT + RESET · no wiring needed` instead of naming a wiring that never ran, and
 the failure message counts BOOT + RESET before the wirings.
 
+**MANUAL BOOT and LINES: SWAPPED are step 3's starting point**, not a setting the
+sweep overrides. Whichever wiring those two buttons name is tried first and the
+other three follow, and PROBE and FLASH both read them — before this, `connectAll()`
+cleared both flags and the buttons changed nothing about a probe. The log says
+which wiring the buttons selected before the sweep starts, and PROBE still adopts
+the wiring that answered, so the button a board taught the app survives into the
+next press.
+
 FLASH calls the same three steps before it writes: entering the loader is the hard
 part, and it does not get easier because an image is waiting. The confirm dialog
 says to keep the board in reach for the buttons.
@@ -615,9 +623,10 @@ wiring, and a silent board still reporting all four wirings at the end. **None o
 the three steps has run on a phone since the change**; the last hardware run is
 the one recorded above, before it.
 
-`./toolchain.sh` passed end to end after the change on 2026-11-01: `all 103 host
-checks passed`, `BUILD SUCCESSFUL`, v2 signature, `zipalign -c 4`, both bundled
-sketches in sync, **166,042 bytes** in `dist/`.
+`./toolchain.sh` passed end to end on 2026-11-01 with the buttons feeding the
+sweep too: `all 107 host checks passed` — four of them for the order — `BUILD
+SUCCESSFUL`, v2 signature, `zipalign -c 4`, both bundled sketches in sync,
+**166,334 bytes** in `dist/`.
 
 ## Not verified
 

@@ -188,19 +188,31 @@ final class EspRom {
      * because {@link #connect()} reads swapControl and manualReset rather than being
      * told which one to use. A bridge that refuses to take bytes is fatal to every
      * step, so WriteFailure is rethrown instead of being retried.
+     *
+     * The wiring already selected through {@link #setSwappedLines} and
+     * {@link #setManualReset} is step 3's first attempt and the other three follow, so
+     * the two buttons on the serial card choose the order instead of being overridden
+     * by it: a board that answered on swapped lines does not sit through the normal
+     * ones again.
      */
     Sweep connectAll() throws IOException {
         connected = false;
-        swapControl = false;
-        manualReset = false;
         roundsSeen = 0;
         roundsWithBytes = 0;
         bannerSeen = false;
         flashBootMode = "";
         downloadBoot = false;
+        // The buttons' choice, kept rather than cleared: it decides which wiring
+        // step 3 starts with.
+        final boolean preferSwap = swapControl;
+        final boolean preferManual = manualReset;
 
         log("probe: 3 steps — an awake loader, BOOT + RESET by hand, then the app's"
                 + " own reset.");
+        if (preferSwap || preferManual) {
+            log("  the buttons select " + wiringName(preferSwap, preferManual)
+                    + ", so step 3 tries that first");
+        }
         if (quietSync(QUIET_SYNC_ATTEMPTS)) {
             log("  step 1 answered: the chip was already sitting in its loader, so no"
                     + " reset and no wiring took part");
@@ -209,7 +221,7 @@ final class EspRom {
         log("  step 1 got no answer: a chip running its firmware ignores packets, which"
                 + " says nothing yet about the cable");
         if (handReset()) return new Sweep(identify("none"), false, false, 0);
-        return sweepWirings();
+        return sweepWirings(preferSwap, preferManual);
     }
 
     /**
@@ -247,20 +259,25 @@ final class EspRom {
     }
 
     /**
-     * Step 3: the app's own reset, once per wiring.
+     * Step 3: the app's own reset, once per wiring, the selected one first.
      *
      * This is what used to run first. It still covers an adapter whose DTR/RTS pair
      * is crosswired, and it is the only path left when the buttons cannot be reached,
      * but it cannot help a board whose reset pair reaches nothing: all four wirings
      * drive EN, so all four fail the same way.
+     *
+     * The order starts at whichever wiring the serial card's two buttons name, so a
+     * hand-set or probe-adopted wiring is not walked past three times first.
      */
-    private Sweep sweepWirings() throws IOException {
+    private Sweep sweepWirings(boolean preferSwap, boolean preferManual)
+            throws IOException {
         IOException last = null;
         int phase = 0;
-        log("  step 3: the app's own reset, 4 wirings, stopping at the first that"
+        log("  step 3: the app's own reset, 4 wirings starting with "
+                + wiringName(preferSwap, preferManual) + ", stopping at the first that"
                 + " answers.");
-        for (boolean swap : new boolean[]{false, true}) {
-            for (boolean manual : new boolean[]{false, true}) {
+        for (boolean swap : swapOrder(preferSwap)) {
+            for (boolean manual : manualOrder(preferSwap, preferManual, swap)) {
                 swapControl = swap;
                 manualReset = manual;
                 ++phase;
@@ -297,6 +314,22 @@ final class EspRom {
     private static String wiringName(boolean swap, boolean manual) {
         return (swap ? "lines swapped" : "lines normal")
                 + (manual ? ", EN pulsed with BOOT held" : ", reset driven by the app");
+    }
+
+    /** The swap values, the selected one first, so it becomes phase 1. */
+    private static boolean[] swapOrder(boolean preferSwap) {
+        return preferSwap ? new boolean[]{true, false} : new boolean[]{false, true};
+    }
+
+    /**
+     * The manual values for one swap value: the selected one first when this is also
+     * the selected swap value, canonical otherwise. Together the two arrays put the
+     * selected wiring at phase 1 and keep all four in the sweep.
+     */
+    private static boolean[] manualOrder(boolean preferSwap, boolean preferManual,
+            boolean swap) {
+        if (swap != preferSwap) return new boolean[]{false, true};
+        return preferManual ? new boolean[]{true, false} : new boolean[]{false, true};
     }
 
     /** How long the manual phases wait for a finger on BOOT; the tests zero it. */
