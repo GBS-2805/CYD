@@ -36,6 +36,11 @@ import java.util.List;
  *
  * Frames are the full height of what the screen builds, not a viewport, so a
  * scrolled-away row is in the picture and a screen that grows stays visible.
+ *
+ * One fixture is not something a tap can reach: PAIRED is drawn against a linked-deck
+ * snapshot the test supplies, because a JVM has no radio and no board to talk to. The
+ * card, the rows and every string in that frame are still {@code DecksTab}'s own
+ * build() — the test hands it a link, not a layout.
  */
 @RunWith(RobolectricTestRunner.class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -45,7 +50,12 @@ public final class CaptureTest {
     private static final int WIDTH = 393;
 
 
+    private static final String DECK_MAC = "A4:CF:12:8B:3D:6E";
+    private static final String DECK_TAG = "8B3D6E";
+    private static final String DECK_ID = "phone_deck_cyd24R-" + DECK_TAG;
+
     private Activity host;
+    private long now;
 
     @Test
     public void capturesEveryScreen() throws Exception {
@@ -53,11 +63,15 @@ public final class CaptureTest {
         // so without this the frame says a different number every run and the gate
         // flakes on pixels that are not a change.
         host = Robolectric.buildActivity(Activity.class).setup().get();
+        // One instant for every fixture, so each printed age is a function of these
+        // offsets and reads the same today and next week.
+        now = System.currentTimeMillis();
         pinAges();
+        pinDeck();
 
         capture("home", MainActivity.HOME, drawer(), null);
         capture("home-open", MainActivity.HOME, drawer(), "BOARDS");
-        capture("paired", MainActivity.SECTION_DECKS, new DecksTab(host), null);
+        capture("paired", MainActivity.SECTION_DECKS, new DecksTab(host, this::linked), null);
         capture("projects", MainActivity.SECTION_PROJECTS, new ProjectsTab(host), null);
         capture("projects-open", MainActivity.SECTION_PROJECTS, new ProjectsTab(host),
                 firstName());
@@ -77,9 +91,41 @@ public final class CaptureTest {
      */
     private void pinAges() {
         List<ProjectStore.Project> projects = ProjectStore.all(host);
-        long now = System.currentTimeMillis();
         for (ProjectStore.Project project : projects) project.updatedMs = now - 3_600_000L;
         ProjectStore.save(host, projects);
+    }
+
+    /**
+     * The deck PAIRED is drawn against: a board that published its document, linked
+     * two hours ago, one packet an hour ago, and the same board advertising nearby so
+     * the row carries its LINKED badge. The ages are offsets from {@link #now}, which
+     * is why this frame says the same thing on every run.
+     */
+    private DeckService.Snapshot linked() {
+        DeckService.Snapshot snapshot = new DeckService.Snapshot();
+        snapshot.running = true;
+        snapshot.linked = true;
+        snapshot.status = "Linked to Phone Deck " + DECK_TAG;
+        snapshot.deviceName = "Phone Deck " + DECK_TAG;
+        snapshot.deviceMac = DECK_MAC;
+        snapshot.deviceId = DECK_ID;
+        snapshot.deviceTag = DECK_TAG;
+        snapshot.rssi = -61;
+        snapshot.writes = 214;
+        snapshot.notices = 3;
+        snapshot.connectedAtMs = now - 7_200_000L;
+        snapshot.lastWriteMs = now - 3_600_000L;
+        snapshot.nearby.add(new DeckService.Nearby(DECK_MAC, snapshot.deviceName, -61,
+                now - 3_600_000L));
+        return snapshot;
+    }
+
+    /** The saved-deck row the same board would leave behind, a day old and steady. */
+    private void pinDeck() {
+        DeckStore.rememberAt(host, DeckIdentity.parse("{\"id\":\"" + DECK_ID
+                        + "\",\"widget\":\"phone_deck_cyd24R\",\"tag\":\"" + DECK_TAG
+                        + "\",\"name\":\"Phone Deck " + DECK_TAG + "\"}"),
+                DECK_MAC, "Phone Deck", now - 86_400_000L);
     }
 
     private DrawerHome drawer() {

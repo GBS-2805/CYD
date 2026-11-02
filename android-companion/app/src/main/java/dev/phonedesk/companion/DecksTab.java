@@ -9,6 +9,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * Live monitor for CYD decks: what is linked, how healthy the link is, what is
@@ -18,12 +19,23 @@ final class DecksTab extends ScrollView {
 
     private final Activity activity;
     private final LinearLayout body;
+    private final Supplier<DeckService.Snapshot> source;
     private String signature = "";
     private TextView liveLine;
 
     DecksTab(Activity activity) {
+        this(activity, DeckService::snapshot);
+    }
+
+    /**
+     * The monitor asks for its state instead of reaching for the running service, so a
+     * capture can draw a linked deck with no radio behind it. The app always takes the
+     * one-argument constructor above.
+     */
+    DecksTab(Activity activity, Supplier<DeckService.Snapshot> source) {
         super(activity);
         this.activity = activity;
+        this.source = source;
         setBackgroundColor(Ui.BG);
         body = Ui.column(activity);
         body.setPadding(Ui.dp(activity, 16), Ui.dp(activity, 8),
@@ -32,7 +44,7 @@ final class DecksTab extends ScrollView {
     }
 
     void refresh() {
-        DeckService.Snapshot snapshot = DeckService.snapshot();
+        DeckService.Snapshot snapshot = source.get();
         List<DeckStore.Known> known = DeckStore.all(activity);
         String structural = structural(snapshot, known);
         if (!structural.equals(signature)) {

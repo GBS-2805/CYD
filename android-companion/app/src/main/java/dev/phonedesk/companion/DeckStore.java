@@ -67,6 +67,15 @@ final class DeckStore {
      * itself the next time each board links.
      */
     static void remember(Context context, DeckIdentity identity, String mac, String fallbackName) {
+        rememberAt(context, identity, mac, fallbackName, System.currentTimeMillis());
+    }
+
+    /**
+     * The same write at a known instant. A capture pins the row's age this way, so the
+     * frame reads "1d ago" on every run instead of aging between them.
+     */
+    static void rememberAt(Context context, DeckIdentity identity, String mac,
+                           String fallbackName, long seenMs) {
         if (mac == null || mac.isEmpty()) return;
         final String id = identity != null && identity.usable() ? identity.id : "";
         final String key = id.isEmpty() ? mac : id;
@@ -81,7 +90,7 @@ final class DeckStore {
         edit.remove("m:" + mac);
         edit.putString("d:" + key, (identity == null ? "" : identity.widget) + SEP
                 + (identity == null ? "" : identity.tag) + SEP
-                + label + SEP + mac + SEP + System.currentTimeMillis());
+                + label + SEP + mac + SEP + seenMs);
         edit.apply();
     }
 

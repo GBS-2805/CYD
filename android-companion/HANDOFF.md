@@ -493,7 +493,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the artifact in `dist/` now is the one rebuilt on 2026-11-02 after the drawer
   gained the owner's mark above its wordmark, which followed the sketch header
   change, the probe work, the drawer's rework and the deck's sign-in —
-  **174,286 bytes** on the file in
+  **174,506 bytes** on the file in
   `dist/`, against the 112,473 that the same work produced before the second
   widget joined it. The two
   halves were measured on their own branches the same day before they met —
@@ -548,7 +548,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **174,286 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
+  **174,506 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror, the three-step probe, the owner's logo as the icon, and the same
   ghost again above the drawer's wordmark. Quote the size to the nearest kB
@@ -646,7 +646,10 @@ printed in the status line and dropped.
 `./toolchain.sh` passed end to end on 2026-11-02 with the header mark in place and
 the buttons still feeding the sweep with the rate remembered: `all 117 host checks
 passed`, `BUILD SUCCESSFUL in 19s`, v2 signature, `zipalign -c 4`, both bundled
-sketches in sync, **174,286 bytes** in `dist/`.
+sketches in sync, **174,506 bytes** in `dist/` — 220 bytes above the build before
+it, which is the dex moving under an unchanged screen set: `DecksTab` now takes
+its state through a constructor argument and `DeckStore` grew a dated overload
+for the capture, and neither changes what the app does.
 
 ## Not verified
 
