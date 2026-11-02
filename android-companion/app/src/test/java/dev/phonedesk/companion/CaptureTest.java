@@ -38,9 +38,12 @@ import java.util.List;
  * scrolled-away row is in the picture and a screen that grows stays visible.
  *
  * One fixture is not something a tap can reach: PAIRED is drawn against a linked-deck
- * snapshot the test supplies, because a JVM has no radio and no board to talk to. The
- * card, the rows and every string in that frame are still {@code DecksTab}'s own
- * build() — the test hands it a link, not a layout.
+ * snapshot the test supplies, because a JVM has no radio and no board to talk to. That
+ * snapshot goes to the bar as well, because {@code MainActivity} pushes one into it
+ * every second — without the same call here the bar said IDLE above a screen that said
+ * linked, which is a state the phone cannot reach. The card, the rows, the pill and
+ * every string are still {@code DecksTab}'s and {@code TopBar}'s own code: the test
+ * hands them a link, not a layout.
  */
 @RunWith(RobolectricTestRunner.class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -71,7 +74,8 @@ public final class CaptureTest {
 
         capture("home", MainActivity.HOME, drawer(), null);
         capture("home-open", MainActivity.HOME, drawer(), "BOARDS");
-        capture("paired", MainActivity.SECTION_DECKS, new DecksTab(host, this::linked), null);
+        capture("paired", MainActivity.SECTION_DECKS, new DecksTab(host, this::linked), null,
+                linked());
         capture("projects", MainActivity.SECTION_PROJECTS, new ProjectsTab(host), null);
         capture("projects-open", MainActivity.SECTION_PROJECTS, new ProjectsTab(host),
                 firstName());
@@ -144,11 +148,21 @@ public final class CaptureTest {
      * stacks them, optionally tapped, then drawn and written out.
      */
     private void capture(String name, int section, View screen, String tap) throws Exception {
+        capture(name, section, screen, tap, null);
+    }
+
+    /** As above, with the link state the bar is drawn against; null is a stopped bridge. */
+    private void capture(String name, int section, View screen, String tap,
+                         DeckService.Snapshot link) throws Exception {
         LinearLayout root = Ui.column(host);
         root.setBackgroundColor(Ui.BG);
 
         TopBar bar = new TopBar(host);
         bar.showSection(section);
+        // MainActivity.refresh() makes this call every second; a capture that skipped
+        // it drew a bridge the frame below it contradicted.
+        bar.showLink(link == null ? new DeckService.Snapshot() : link,
+                link != null && link.running);
         root.addView(bar.bar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
