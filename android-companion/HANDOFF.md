@@ -504,8 +504,9 @@ Identical to the sketch, checked against its `onWrite` handlers:
   sketches they name are inside the APK, `assets/widgets/phone_deck_cyd24R/` and
   `assets/widgets/spotify_deck_cyd24R/`, and `check_widget_assets.py` in the repo
   root compares those copies with `../<folder>/<sketch>.ino` byte for byte (phone
-  deck md5 `62c7e6c3…`, Spotify `00bb1560…` — `eca02e93…` before the callback
-  change and `49f29bcb…` before the one-line answer — both in sync on 2026-11-01).
+  deck md5 `62c7e6c3…`, Spotify `f234b68b…` — `00bb1560…` before the Bluetooth
+  link, `eca02e93…` before the callback change and `49f29bcb…` before the one-line
+  answer — both in sync on 2026-11-01).
 - **The Spotify deck's sign-in finishes here.** `SpotifyCallbackActivity` is
   exported for `phonedesk://spotify-callback`, and `aapt2 dump xmltree` on the
   shipped APK shows the VIEW/DEFAULT/BROWSABLE filter with scheme `phonedesk` and

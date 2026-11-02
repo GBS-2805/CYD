@@ -22,7 +22,7 @@ here.
 | Project | Folder | What it is | Read |
 | --- | --- | --- | --- |
 | **Phone Deck** | [`phone_deck_cyd24R/`](phone_deck_cyd24R) | ESP32-2432S024R (2.4" CYD) phone dashboard: clock, battery and notifications | [README](phone_deck_cyd24R/README.md) |
-| **Spotify Deck** | [`spotify_deck_cyd24R/`](spotify_deck_cyd24R) | The same board on the network: what you are playing on Spotify, with previous / play / next on the screen | [README](spotify_deck_cyd24R/README.md) |
+| **Spotify Deck** | [`spotify_deck_cyd24R/`](spotify_deck_cyd24R) | The same board on the network **or** on the phone's Bluetooth link: what you are playing, with previous / play / next on the screen | [README](spotify_deck_cyd24R/README.md) |
 | **ESP32_Widgets app** | [`android-companion/`](android-companion) | **Off-site**, the Android app: CYD monitor, BLE bridge, USB flasher and sketch shelf | [README](android-companion/README.md) · [HOWTO](android-companion/HOWTO.md) · [handoff](android-companion/HANDOFF.md) |
 
 **Phone Deck** is a BLE peripheral exposing a small **Phone Link** GATT
