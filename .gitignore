@@ -19,6 +19,9 @@ artifacts/launcher-preview-squircle.png
 # the seven screens and a strip of them, rebuilt on demand rather than tracked.
 artifacts/renders/scroll.png
 artifacts/renders/seven-screens.png
+# One strip of the seven, sized for a chat window: same rule, rebuilt on demand.
+artifacts/renders/chat-sheet.png
+artifacts/renders/chat-sheet.jpg
 
 # check_docs.py's last measurement of each deck: local, machine-specific,
 # and discarded the moment a sketch or the compiler changes.

@@ -30,7 +30,7 @@ sys.path.insert(0, HERE)
 import logo_icon  # noqa: E402  (the path above has to exist first)
 
 UI = os.path.join(ROOT, "android-companion", "app", "src", "main", "java",
-                  "dev", "phonedesk", "companion", "Ui.java")
+                  "dev", "phonedesk", "companion", "Palette.java")
 OUT = os.path.join(HERE, "renders", "scroll.png")
 
 ORDER = ["home", "home-open", "projects", "projects-open", "paired", "serial", "settings"]
@@ -51,13 +51,14 @@ NOTES = {
 
 
 def colours():
-    """The app's palette, read out of `Ui.java` so this file cannot disagree with it.
+    """The app's palette, read out of `Palette.java` so this file cannot disagree with it.
 
-    Constants are ARGB: `0xFFD9D9D9` is opaque, `0xA3D9D9D9` is the band grey at
-    64 %. A translucent ink is composited over the ground here, because a caption
-    strip is a painted rectangle and the app's own draw does the same blend.
+    Constants are ARGB: `0xFFD9D9D9` is opaque, `0xA3D9D9D9` is the band grey at an
+    alpha. A translucent ink is composited over the ground here, because a caption
+    strip is a painted rectangle and the app's own draw does the same blend. The keys
+    are this file's own names (BG is `Palette.FIELD`, the page ground).
     """
-    wanted = {"BG", "EDGE", "TEXT", "DIM"}
+    wanted = {"FIELD": "BG", "EDGE": "EDGE", "TEXT": "TEXT", "DIM": "DIM"}
     found = {}
     with open(UI, encoding="utf-8") as handle:
         for name, argb in re.findall(
@@ -65,10 +66,10 @@ def colours():
             if name in wanted:
                 alpha = int(argb[0:2], 16) / 255.0
                 rgb = tuple(int(argb[i:i + 2], 16) for i in (2, 4, 6))
-                found[name] = (alpha, rgb)
-    missing = set(wanted) - set(found)
+                found[wanted[name]] = (alpha, rgb)
+    missing = set(wanted.values()) - set(found)
     if missing:
-        raise SystemExit("Ui.java no longer defines %s" % ", ".join(sorted(missing)))
+        raise SystemExit("Palette.java no longer defines %s" % ", ".join(sorted(missing)))
     ground = found["BG"][1]
     return {name: tuple(round(alpha * channel + (1.0 - alpha) * base)
                         for channel, base in zip(rgb, ground))

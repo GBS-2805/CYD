@@ -18,7 +18,9 @@ import java.util.List;
  * the wrong opcode is skipped, a refused write is blamed on the bridge rather
  * than the board, a silent board fails, flash refuses a session that never synced,
  * a hand on BOOT and RESET is tried before any wiring is, and the wiring the serial
- * card's buttons name is the first one the fallback sweep tries.
+ * card's buttons name is the first one the fallback sweep tries. The palette is in
+ * there too: every ink the app draws is measured against the surface it sits on,
+ * because an alpha is the one design decision that can go wrong one step at a time.
  */
 public final class HostTests {
 
@@ -61,6 +63,7 @@ public final class HostTests {
         framingRoundTrip();
         bondAdvice();
         noticeText();
+        contrast();
         syncChecksum();
         handshakeIntoDownloadMode();
         quietSyncUsesNoControlLines();
@@ -844,6 +847,75 @@ public final class HostTests {
 
         check("nothing at all is still nothing, not an empty post",
                 NoticeText.from(null, null, null, null, null, null, null).empty());
+    }
+
+    /**
+     * The palette's floor, measured rather than asserted in prose.
+     *
+     * The inks are the band grey at an alpha, so a quieter hint is always one small
+     * edit away and never looks wrong in a diff. This walks what the app actually
+     * draws — words on the field, words on the band, text on a filled action, and the
+     * one hairline — and holds each to a ratio: 4.5:1 for body ink, 3:1 for a hint or
+     * a status word, 1.5:1 for a line, which only has to be visible. It also pins that
+     * a 48 % ink FAILS, so the check cannot quietly pass everything.
+     */
+    private static void contrast() {
+        // Whole numbers in the names: a reader should not have to run this to know
+        // how close a value sits to the floor.
+        for (int ink : Palette.ON_FIELD) {
+            check("contrast: " + percent(ink) + " ink on the field clears 3:1 ("
+                            + tenths(Contrast.ratio(ink, Palette.FIELD)) + ")",
+                    Contrast.ratio(ink, Palette.FIELD) >= Contrast.QUIET);
+        }
+        for (int ink : new int[] {Palette.TEXT, Palette.ACCENT, Palette.PINK}) {
+            check("contrast: " + percent(ink) + " ink on the field carries body text at 4.5:1 ("
+                            + tenths(Contrast.ratio(ink, Palette.FIELD)) + ")",
+                    Contrast.ratio(ink, Palette.FIELD) >= Contrast.BODY);
+        }
+        for (int ink : Palette.ON_BAND) {
+            check("contrast: " + percent(ink) + " on the band clears 3:1 ("
+                            + tenths(Contrast.ratio(ink, Palette.BAND)) + ")",
+                    Contrast.ratio(ink, Palette.BAND) >= Contrast.QUIET);
+        }
+        check("contrast: ink on the band carries body text at 4.5:1 ("
+                        + tenths(Contrast.ratio(Palette.INK, Palette.BAND)) + ")",
+                Contrast.ratio(Palette.INK, Palette.BAND) >= Contrast.BODY);
+        check("contrast: the black pill's band-grey text clears 4.5:1 ("
+                        + tenths(Contrast.ratio(Palette.BAND, Palette.INK)) + ")",
+                Contrast.ratio(Palette.BAND, Palette.INK) >= Contrast.BODY);
+        for (int fill : Palette.ON_ACCENT) {
+            check("contrast: ink on a filled action clears 4.5:1 ("
+                            + tenths(Contrast.ratio(fill, Palette.ACCENT)) + ")",
+                    Contrast.ratio(fill, Palette.ACCENT) >= Contrast.BODY);
+        }
+        for (int rule : Palette.RULES) {
+            check("contrast: the hairline is visible on the field at 1.5:1 ("
+                            + tenths(Contrast.ratio(rule, Palette.FIELD)) + ")",
+                    Contrast.ratio(rule, Palette.FIELD) >= Contrast.RULE);
+        }
+        // The order the docs promise: FLASHED, WORKING, PARKED, WANT TO TRY. A ramp
+        // that keeps every floor but collapses two steps into one is still a bug.
+        double flashed = Contrast.ratio(Palette.ACCENT, Palette.FIELD);
+        double working = Contrast.ratio(Palette.GOOD, Palette.FIELD);
+        double parked = Contrast.ratio(Palette.DIM, Palette.FIELD);
+        double want = Contrast.ratio(Palette.VIOLET, Palette.FIELD);
+        check("contrast: the four status inks stay in order (" + tenths(flashed) + " > "
+                        + tenths(working) + " > " + tenths(parked) + " > " + tenths(want) + ")",
+                flashed > working && working > parked && parked > want);
+        // And the refusal: this is the alpha the sheet shipped, and the reason the
+        // check exists. If it ever passes, the floor stopped meaning anything.
+        check("contrast: the sheet's own .48 ink is refused ("
+                        + tenths(Contrast.ratio(0x7AD9D9D9, Palette.FIELD)) + " < 3.0)",
+                Contrast.ratio(0x7AD9D9D9, Palette.FIELD) < Contrast.QUIET);
+    }
+
+    /** {@code 0xA8D9D9D9} reads as "66 %", which is how the palette is described. */
+    private static String percent(int argb) {
+        return Math.round(100.0 * ((argb >>> 24) & 0xFF) / 255.0) + " %";
+    }
+
+    private static String tenths(double ratio) {
+        return String.format(java.util.Locale.US, "%.2f:1", ratio);
     }
 
     private static void check(String name, boolean ok) {

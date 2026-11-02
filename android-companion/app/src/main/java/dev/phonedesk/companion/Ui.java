@@ -17,25 +17,24 @@ import android.widget.TextView;
  */
 final class Ui {
 
-    // The compress palette: a #3f4e96 field, a #d9d9d9 band and black ink on it,
-    // taken from the sheet the owner pasted. Hue is gone, so the band grey's own
-    // alpha steps do the work the INK theme's ramp did: .78 GOOD, .64 DIM, .48
-    // VIOLET, .26 EDGE, with PINK the single value brighter than the band. The
-    // names keep their jobs, so a screen does not care which theme is in force.
-    static final int BG = 0xFF3F4E96;          // the page field, and a card's fill
-    static final int CARD = 0xFF3F4E96;        // a cell: the field, hairline only
-    static final int CARD_HI = 0x29000000;     // rgba(0,0,0,.16) wash: chips, fields
-    static final int EDGE = 0x42D9D9D9;        // the band grey at 26 %
-    static final int TEXT = 0xFFD9D9D9;
-    static final int DIM = 0xA3D9D9D9;         // 64 %
-    static final int ACCENT = 0xFFD9D9D9;      // a fill, with INK on it
-    static final int VIOLET = 0x7AD9D9D9;      // 48 %
-    static final int PINK = 0xFFE8E8E8;        // the one ink above the band
-    static final int GOOD = 0xC7D9D9D9;        // 78 %
-    static final int BAND = 0xFFD9D9D9;        // the header bar, and a live pill's text
-    static final int INK = 0xFF000000;         // ink on the band
-    static final int BAND_DIM = 0x80000000;    // rgba(0,0,0,.5) hints on the band
-    static final int BAND_RULE = 0x24000000;   // rgba(0,0,0,.14) a rule on the band
+    // The values live in {@link Palette} so the host suite can measure them without
+    // Android; these names are what every screen still uses, and they keep their
+    // jobs — ACCENT is the fill a primary action carries, PINK the one error ink,
+    // GOOD success, VIOLET the quietest status.
+    static final int BG = Palette.FIELD;
+    static final int CARD = Palette.FIELD;
+    static final int CARD_HI = Palette.WASH;
+    static final int EDGE = Palette.EDGE;
+    static final int TEXT = Palette.TEXT;
+    static final int DIM = Palette.DIM;
+    static final int ACCENT = Palette.ACCENT;
+    static final int VIOLET = Palette.VIOLET;
+    static final int PINK = Palette.PINK;
+    static final int GOOD = Palette.GOOD;
+    static final int BAND = Palette.BAND;
+    static final int INK = Palette.INK;
+    static final int BAND_DIM = Palette.BAND_DIM;
+    static final int BAND_RULE = Palette.BAND_RULE;
 
     private Ui() {
     }

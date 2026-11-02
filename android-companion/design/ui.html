@@ -14,15 +14,18 @@
    =========================================================================== */
 :root {
   /* palette — Ui.BG … Ui.GOOD, the compress sheet: a field, a band, black ink,
-     and the band grey's own alpha steps where a ramp used to be */
+     and the band grey's own alpha steps where a ramp used to be. The alphas are
+     floors, not taste: HostTests.contrast() holds every ink it draws to 3:1 (or
+     4.5:1 for body), which is why DIM is .70 and VIOLET .66 rather than the .64
+     and .48 the sheet started with. */
   --bg:      #3f4e96;   /* Ui.BG       the page field             */
   --card:    #3f4e96;   /* Ui.CARD     a cell: field + hairline    */
   --card-hi: rgba(0, 0, 0, .16);   /* Ui.CARD_HI  a wash: chips, fields */
   --edge:    rgba(217, 217, 217, .26); /* Ui.EDGE  1dp hairline      */
   --text:    #d9d9d9;   /* Ui.TEXT     primary ink                */
-  --dim:     rgba(217, 217, 217, .64); /* Ui.DIM    secondary ink   */
+  --dim:     rgba(217, 217, 217, .70); /* Ui.DIM    secondary ink   */
   --accent:  #d9d9d9;   /* Ui.ACCENT   link state, primary action  */
-  --violet:  rgba(217, 217, 217, .48); /* Ui.VIOLET a section tag   */
+  --violet:  rgba(217, 217, 217, .66); /* Ui.VIOLET a section tag   */
   --pink:    #e8e8e8;   /* Ui.PINK     destructive, error          */
   --good:    rgba(217, 217, 217, .78); /* Ui.GOOD   success         */
   --band:      #d9d9d9;                 /* Ui.BAND      the header bar */
