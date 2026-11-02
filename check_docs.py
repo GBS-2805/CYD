@@ -296,6 +296,64 @@ def allowed_sizes(built):
     return ok
 
 
+# Names this repo does not hold but prose legitimately mentions, each with its
+# reason, like HISTORICAL: a tool the ROM protocol mirrors, a file a toolchain
+# root creates. Anything else named in backticks has to exist.
+ELSEWHERE = {
+    "esptool.py": "the uploader this app's protocol imitates, never vendored here",
+    "env.sh": "written into a toolchain root (~/.arduino-cyd, ~/.android-offsite)",
+    "my_deck_cyd24R.ino": "the name the Adding-a-widget recipe tells you to create",
+}
+
+# `Foo.java`, `bar.py`, `toolchain.sh`: prose names a file rather than a path.
+NAME_SHAPE = re.compile(r"`([\w-]+\.(?:java|ino|py|sh))`")
+# "The current 30 sources are ..." — a count that moves whenever a class arrives.
+SOURCE_CLAIM = re.compile(r"\b(\d+)\s+sources\b")
+# "The branch on it today is ..." — a reading of check_branches, true only once.
+UNDATED_READING = "branch on it today"
+
+_TREE_NAMES = None
+_SOURCE_COUNT = None
+
+
+def tree_facts():
+    """Basenames this tree holds, and how many app sources it has, read once."""
+    global _TREE_NAMES, _SOURCE_COUNT
+    if _TREE_NAMES is None:
+        _TREE_NAMES = {path.name for path in ROOT.rglob("*") if path.is_file()}
+        app = ROOT / "android-companion/app/src/main/java/dev/phonedesk/companion"
+        _SOURCE_COUNT = len(list(app.glob("*.java"))) if app.is_dir() else 0
+    return _TREE_NAMES, _SOURCE_COUNT
+
+
+def prose_problems(path, text):
+    """Claims a link and a figure cannot catch: a file that is gone, a count that
+    moved, a reading of another tool that ages the moment anything changes."""
+    out = []
+    names, sources = tree_facts()
+    for number, line in enumerate(text.splitlines(), start=1):
+        for match in NAME_SHAPE.finditer(line):
+            token = match.group(1)
+            if token in ELSEWHERE or token in names:
+                continue
+            out.append(
+                "%s:%d names %s, which this tree does not hold"
+                % (shown(path), number, token)
+            )
+        for match in SOURCE_CLAIM.finditer(line):
+            if int(match.group(1)) != sources:
+                out.append(
+                    "%s:%d says %s sources; there are %d"
+                    % (shown(path), number, match.group(1), sources)
+                )
+        if UNDATED_READING in line:
+            out.append(
+                "%s:%d says which branch is %r; a reading ages, so date it"
+                % (shown(path), number, UNDATED_READING)
+            )
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Check that docs quote the sizes and md5s of the current build."
@@ -373,6 +431,7 @@ def main():
     for path in read:
         text = path.read_text(encoding="utf-8", errors="replace")
         problems.extend(link_problems(path, text))
+        problems.extend(prose_problems(path, text))
         for number, line in enumerate(text.splitlines(), start=1):
             for match in SIZE.finditer(line):
                 value = int(match.group(1).replace(",", ""))

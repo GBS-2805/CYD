@@ -146,6 +146,13 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   (`--min-free-ram-kb`), because a full 320x240 RGB565 framebuffer is 153,600 of
   those bytes and a deck that cannot allocate one is stuck. Every run prints
   used, free and globals per deck, so erosion shows up even when nothing trips.
+* **The host tests run the probe on a clock they drive.** `EspRom` reads every
+  deadline and every pause through `EspRom.Clock`, real by default; `test.sh`
+  installs a virtual clock and the stub port advances it, so a check that runs the
+  real probe against a silent board still tries all five wirings and both windows
+  without waiting for them. Measured on 2026-11-02: 179 s before the seam, 1.45 s
+  after, the same 126 checks. The seam exists because the alternative — a shorter
+  window in the test — would test a different probe.
 * **That check runs on commit.** [`.githooks/pre-commit`](.githooks/pre-commit)
   compiles the decks whose `<folder>/<folder>.ino` is staged and refuses the
   commit if one fails, so a sketch cannot grow past its partition unnoticed.
@@ -402,6 +409,13 @@ other mention of it in this repo is a pointer back here.
 ## Working in this repo
 
 * One widget per change. A change touching two widget folders is two changes.
+* **Run the gates from one command.** [`check.sh`](check.sh) is the fast set a
+  commit must pass — docs (figures, links, prose), widget assets, the host tests,
+  and the branch list as a note rather than a failure — and `./check.sh --full`
+  adds deck headroom, the seven render captures and the APK build. The individual
+  checkers keep their names because the pre-commit hook calls two of them with
+  staged paths; nothing else needs six remembered invocations, and a round that
+  runs one command cannot skip a step by forgetting it.
 * **Two chats share this repo, and [`## The two chats`](#the-two-chats) is the
   whole agreement.** Nothing needs the other chat's permission: the table is the
   permission.

@@ -480,6 +480,12 @@ Identical to the sketch, checked against its `onWrite` handlers:
 
 ## Verified
 
+- **The host suite takes 1.45 s, not 179 s.** `EspRom.Clock` is the seam: every
+  deadline and every pause reads the clock, `test.sh` installs a virtual one and
+  the stub port advances it, so the two checks that ran the real probe against a
+  silent board — 57 s each — still try all five wirings and both windows. Measured
+  on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks green. `./check.sh`
+  runs the fast set, `./check.sh --full` the release set.
 - **A deck's tap now reaches the phone's player.** `DeckService` finds
   `6f2d0007-…` on the link, subscribes with `setCharacteristicNotification` and a
   CCCD write queued beside the other GATT operations, and both
@@ -488,7 +494,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   actions, a positive uint32 serial, and a repeated serial counting as one tap.
   `NowPlaying.run` then presses the key on the session it is already mirroring.
   `test.sh` reads **all 126 host checks passed**, nine of them new; the APK
-  rebuilt to **176,858 bytes**. **Nothing has run on a phone or a board**, so
+  rebuilt to **177,214 bytes**. **Nothing has run on a phone or a board**, so
   whether a chip's notify arrives and moves playback is unverified end to end.
 - The last `javac 17` type check against the Android 14 (API 34) framework
   classes (`android-all`) covered the pre-split sources: 9 files, 22 classes, only
@@ -503,7 +509,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the artifact in `dist/` now is the one rebuilt on 2026-11-02 after the drawer
   gained the owner's mark above its wordmark, which followed the sketch header
   change, the probe work, the drawer's rework and the deck's sign-in —
-  **176,858 bytes** on the file in
+  **177,214 bytes** on the file in
   `dist/`, against the 112,473 that the same work produced before the second
   widget joined it. The two
   halves were measured on their own branches the same day before they met —
@@ -565,7 +571,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **176,858 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
+  **177,214 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror, the three-step probe, the owner's logo as the icon, and the same
   ghost again above the drawer's wordmark. Quote the size to the nearest kB
@@ -663,10 +669,10 @@ printed in the status line and dropped.
 `./toolchain.sh` passed end to end on 2026-11-02 with the header mark in place, the
 buttons still feeding the sweep with the rate remembered, and the tap path wired:
 `all 126 host checks passed` (117 before those nine), `BUILD SUCCESSFUL`, v2
-signature, `zipalign -c 4`, both bundled sketches in sync, **176,858 bytes** in
-`dist/` — 2,028 bytes above the build before, which is the tap path: `LinkCommand`,
-the subscription and its descriptor write in the queue. The sketch did not move in
-this rebuild.
+signature, `zipalign -c 4`, both bundled sketches in sync, **177,214 bytes** in
+`dist/` — 356 bytes above the build before, which is the clock seam: `EspRom.Clock` and the
+pause it routes, with the probe's logic untouched. The sketch did not move in this
+rebuild.
 
 ## Not verified
 

@@ -33,7 +33,31 @@ public final class HostTests {
     private static int checks;
     private static final List<String> failures = new ArrayList<>();
 
+    /**
+     * Time the tests drive. EspRom's windows are real seconds wide, and every
+     * wiring is tried: on this clock a sleep advances the deadline instead of
+     * waiting for it, so "a silent board fails every wiring" still runs every
+     * wiring and every window, in milliseconds.
+     */
+    private static final class VirtualClock implements EspRom.Clock {
+        private long ms = 1_000_000L;
+
+        @Override
+        public long now() {
+            return ms;
+        }
+
+        @Override
+        public void sleep(long millis) {
+            ms += Math.max(1, millis);
+        }
+    }
+
+    private static final VirtualClock CLOCK = new VirtualClock();
+
     public static void main(String[] args) throws Exception {
+        EspRom.useClock(CLOCK);
+        UsbSerialCh340.clock = CLOCK;
         framingRoundTrip();
         syncChecksum();
         handshakeIntoDownloadMode();

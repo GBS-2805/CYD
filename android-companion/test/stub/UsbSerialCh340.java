@@ -16,6 +16,9 @@ import java.util.List;
  * {@link EspRom} on a JVM is to compile it against something with the same shape.
  */
 final class UsbSerialCh340 {
+    /** Set by the host tests to the clock they installed in EspRom. */
+    static EspRom.Clock clock;
+
 
     /** Called for every command frame that arrives, with the checksum it carried. */
     interface Responder {
@@ -122,7 +125,9 @@ final class UsbSerialCh340 {
                 try {
                     // A real port blocks; sleeping a little keeps the caller's
                     // deadline loop from spinning at full speed.
-                    Thread.sleep(Math.min(Math.max(timeoutMs, 1), 2));
+                    final long pauseMs = Math.min(Math.max(timeoutMs, 1), 2);
+                    if (clock != null) clock.sleep(pauseMs);
+                    else Thread.sleep(pauseMs);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
