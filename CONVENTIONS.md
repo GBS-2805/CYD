@@ -476,19 +476,27 @@ the front page needs no second navigation.
   `tokens.json`'s `screens` maps each frame to one — so a change that redraws a
   screen regenerates that render and commits it with the code and the page. A
   render is metric-accurate, not a device screenshot — say which.
-* **Metric-accurate means measured, not estimated.** Every line height comes from
-  the face the renderer loads — `line(sp)` is that TTF's own ascent plus descent —
-  and every wrap from the advance it measures for `M`, because Android lays a
-  `TextView` out on its font metrics too. No line-height multiplier and no em-width
-  is assumed anywhere in the renderer: the `1.45` and the `0.6 em` that used to be
-  there were guesses, and a guess inside a gate is a gate that lies. Geometry still
-  comes from the app's dp numbers, transcribed from the Java — this renderer does
-  not lay views out, so a screen whose flow moved has to be re-transcribed, and
-  [`check_renders.py`](check_renders.py) proves the PNG matches the renderer rather
-  than Android. What it can prove is that the picture is reviewable:
-  [`check_render_fit.py`](check_render_fit.py) audits every run the renderer paints
-  and fails when one crosses the canvas edge or lands on another run, so run it in
-  the same change that redraws them.
+* **A frame the app can build, the app builds.** Geometry is not transcribed any
+  more: [`render_host/`](android-companion/render_host/) compiles `Ui.java` and the
+  screen class against a small `android.*` stand-in, builds the frame, measures it
+  and writes the drawing operations to `build/render-host/dump.json`, and
+  `render_ui.py` only paints them. So a padding, a weight, a dp size or a row height
+  is the app's own arithmetic and a moved row cannot leave a stale picture behind.
+  What is reimplemented is the *platform*, not the layout — `LinearLayout`'s margins
+  and weights and a monospace word wrap live in
+  [`render_host/src/android/`](android-companion/render_host/src/android/), because
+  a JVM has no Android runtime — and that is the honest limit of the claim: a
+  render is metric-accurate, not a device screenshot. Type is measured from the same
+  TTF the painter draws with (`render/Face.java`, `line()`), never a `1.45`
+  multiplier or a `0.6 em` guess: those were in here once, and a guess inside a gate
+  is a gate that lies. Two things are still the renderer's: the top bar's height
+  (`MainActivity` needs a window and a service), and the frames whose classes need a
+  phone to answer — `projects`, `projects-open`, `paired`, `serial` and `settings`
+  are still transcribed, which is why `render_ui.HOSTED` names the converted ones
+  one by one instead of claiming the set. Text that does not fit is a review that
+  cannot happen, so [`check_render_fit.py`](check_render_fit.py) audits every run —
+  from the dump for a hosted frame, from the canvas for a transcribed one — and
+  fails a run that crosses an edge or lands on another run.
   [`check_renders.py`](check_renders.py) is what keeps the gate loud: it redraws
   every screen and fails when a committed PNG no longer matches the picture the
   app draws, comparing pixels rather than timestamps because git stores no mtime.

@@ -87,6 +87,39 @@ def audit(render_ui, name):
     return problems, clipped
 
 
+def audit_host(render_ui, name):
+    """Audit a frame the app measured, from the operations it produced.
+
+    These are the numbers the phone would use: the runs come out of `render_host`'s
+dump, where `DrawerHome` decided every position, so a run that crosses an edge is a
+    real fault in the app rather than a mistake in a transcription.
+    """
+    frame = render_ui.host_frames()[name]
+    offset = render_ui.BAR_DP
+    width = frame["width"]
+    height = frame["height"] + offset
+    runs = [(op["x"], op["y"] + offset, op["w"], op["h"], op["text"])
+            for op in frame["ops"] if op["op"] == "text"]
+    problems = []
+
+    for x, y, w, h, text in runs:
+        label = text if len(text) <= 46 else text[:43] + "..."
+        if x < -0.5 or x + w > width + 0.5:
+            problems.append("%s: %r runs %s..%s dp across a %d dp canvas"
+                            % (name, label, round(x, 1), round(x + w, 1), width))
+        if y < -0.5 or y + h > height + 0.5:
+            problems.append("%s: %r sits at %s..%s dp of a %d dp canvas"
+                            % (name, label, round(y, 1), round(y + h, 1), height))
+
+    for i in range(len(runs)):
+        for j in range(i + 1, len(runs)):
+            if overlap(runs[i], runs[j]):
+                problems.append("%s: %r lands on %r at y=%s"
+                                % (name, runs[i][4][:34], runs[j][4][:34],
+                                   round(runs[i][1], 1)))
+    return problems, 0
+
+
 def main(argv):
     render_ui = load_renderer()
     if render_ui is None:
@@ -102,7 +135,10 @@ def main(argv):
 
     rows, problems = [], []
     for name in wanted:
-        found, clipped = audit(render_ui, name)
+        if name in render_ui.HOSTED:
+            found, clipped = audit_host(render_ui, name)
+        else:
+            found, clipped = audit(render_ui, name)
         problems.extend(found)
         rows.append((name, len(found), clipped))
 

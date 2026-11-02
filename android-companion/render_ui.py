@@ -17,8 +17,10 @@ same size in sp, cards and gaps are the same dp, and the viewport is the 393 x
 852 dp of the reference phone.
 """
 
+import json
 import math
 import os
+import subprocess
 import sys
 
 from PIL import Image, ImageDraw, ImageFont
@@ -27,6 +29,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 W_DP, H_DP = 393, 852
 SCALE = 2
+
+# MainActivity's top bar, which the host does not build: it needs a window, a
+# permission request and a service. Everything under it is measured by the app.
+BAR_DP = 52
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
                    "artifacts", "renders")
@@ -252,54 +258,72 @@ def para_h(value, sp, max_w, leading=2):
 
 # --- screens ---------------------------------------------------------------
 
-def home(open_projects=False):
-    s = Screen()
-    s.top_bar("OFF-SITE")
-    # DrawerHome.build() opens with the owner's mark and puts the wordmark 8dp
-    # under it: the air the wordmark used to carry is what pays for the mark.
-    mark_h = s.logo(W_DP / 2.0, 52, 36)
-    wordmark_y = 52 + mark_h + 8
-    s.centered(wordmark_y, "[OFF-SITE]", 34, TEXT, bold=True, spacing=0.06)
-    s.centered(wordmark_y + line(34) + 10, "IDLE \u00b7 BRIDGE STOPPED", 10, DIM,
-               spacing=0.16)
+# --- the frames the app measures --------------------------------------------
 
-    # SETTINGS is not here: it hangs off the gear in the top bar.
-    s.card(18, 188, W_DP - 36, 56)
-    s.text(34, 188 + 18, "PAIRED", 17, TEXT, spacing=0.10)
-    s.right(W_DP - 34, 188 + 22, "live link", 10, DIM, spacing=0.10)
+_HOST = None
 
-    y = 188 + 56 + 10
-    s.card(18, y, W_DP - 36, 56)
-    s.text(34, y + 18, "BOARDS", 17, TEXT, spacing=0.10)
-    s.right(W_DP - 34, y + 22, "\u2212" if open_projects else "+", 16, DIM)
-    y += 56
-
-    if open_projects:
-        y = drawer_panel(s, y)
-
-    # SERIAL always lands here, whether the panel is open or not: the panel is
-    # added between the two rows and pushes it down rather than replacing it.
-    s.card(18, y + 10, W_DP - 36, 56)
-    s.text(34, y + 10 + 18, "SERIAL", 17, TEXT, spacing=0.10)
-    s.right(W_DP - 34, y + 10 + 22, "usb \u00b7 flash", 10, DIM, spacing=0.10)
-    return s.image
+#: the frames `render_host/` builds, in the order the scroll presents them
+HOSTED = ("home", "home-open")
 
 
-def drawer_panel(s, y):
-    """DrawerHome.projectsPanel(): one row per board, and the row opens the shelf.
+def _hex(value):
+    return tuple(int(value[i:i + 2], 16) for i in (1, 3, 5))
 
-    The projects stay on the shelf: listing them here as well made two indexes of
-    one list, and the drawer's copy carried no body or log to show.
+
+def host_frames():
+    """Compile and run the app's own builders, once per process.
+
+    The dump is the geometry: `render_host` measures the real `DrawerHome`, and every
+    position below it was decided by `Ui.dp`, a padding, a weight or a font metric in
+    the app — never by this file. A missing JDK is a hard stop, because a render that
+    fell back to a transcription would be a picture nobody can trust.
     """
-    x, w = 18 + 4, W_DP - 36 - 4
-    y += 6                              # Ui.space(row, 6): the row's top margin
-    h = 6 + line(13) + 6
-    # stroke 0 in the Java, so the fill is its own outline here.
-    s.card(x, y, w, h, 8, CARD, CARD)
-    s.text(x + 8, y + 6, "2.4\" CYD (RESISTIVE)", 13, TEXT)
-    s.right(x + w - 8, y + 8, "\u203a", 16, DIM)
-    y += h
-    return y                            # no trailing gap: SERIAL carries its own 10
+    global _HOST
+    if _HOST is not None:
+        return _HOST
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    host = os.path.join(here, "render_host")
+    done = subprocess.run(["bash", os.path.join(host, "run.sh")],
+                          capture_output=True, text=True)
+    if done.returncode != 0:
+        sys.stderr.write(done.stdout + done.stderr)
+        raise SystemExit("render_host/run.sh failed; the frames it builds cannot be drawn")
+
+    with open(os.path.join(here, "build", "render-host", "dump.json"), encoding="utf-8") as handle:
+        _HOST = {frame["name"]: frame for frame in json.load(handle)["frames"]}
+    return _HOST
+
+
+def hosted(name):
+    """Paint a frame the app measured. Nothing here computes a position.
+
+    `BAR_DP` is the one number this file still owns: `MainActivity` builds the top bar
+    and the host cannot run it, so the drawer's content is drawn under a bar of the
+    same height the older frames used.
+    """
+    frame = host_frames()[name]
+    s = Screen(int(round(frame["height"])) + BAR_DP)
+    s.top_bar("OFF-SITE")
+
+    for op in frame["ops"]:
+        y = op["y"] + BAR_DP
+        if op["op"] == "card":
+            s.card(op["x"], y, op["w"], op["h"], op["r"],
+                   _hex(op["fill"]), _hex(op["stroke"]))
+        elif op["op"] == "fill":
+            s.draw.rectangle([px(op["x"]), px(y), px(op["x"] + op["w"]),
+                              px(y + op["h"])], fill=_hex(op["fill"]))
+        elif op["op"] == "text":
+            s.text(op["x"], y, op["text"], op["sp"], _hex(op["color"]),
+                   op.get("bold", False), op.get("spacing", 0.0))
+        elif op["op"] == "image":
+            s.logo(op["x"] + op["w"] / 2.0, y, op["w"])
+
+    # The dump's numbers are the ones the fit audit reads, so the painter's own copy
+    # is dropped rather than given a second opinion.
+    s.runs.clear()
+    return s.image
 
 
 def projects(open_first=False):
@@ -636,8 +660,8 @@ def settings():
 
 
 SCREENS = {
-    "home": lambda: home(False),
-    "home-open": lambda: home(True),
+    "home": lambda: hosted("home"),
+    "home-open": lambda: hosted("home-open"),
     "projects": lambda: projects(False),
     "projects-open": lambda: projects(True),
     "paired": paired,
