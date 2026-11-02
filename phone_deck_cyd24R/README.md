@@ -235,6 +235,11 @@ board's MAC, so it differs per board.
 Service `6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10`: four write characteristics and one
 read.
 
+The Spotify deck speaks the same service with the same six UUIDs and adds a
+seventh for its transport chips, so a scan run from the app now sees **both**
+decks when both are powered on; the shelf tells them apart by name and tag, not
+by service.
+
 | Characteristic | UUID | Payload |
 | --- | --- | --- |
 | Time | `6f2d0002-9a3c-4b57-9d21-6a1e0c4f8b10` | 7 bytes: year−2000, month, day, hour, minute, second, weekday (ignored — see below) |
@@ -421,7 +426,7 @@ from the repo root, after sourcing a toolchain.
   so 3.x is path-sensitive too — 1,164–1,168 kB, not a fixed count.
 * The bundled copy matches byte for byte after `:app:syncWidgets`;
   `check_widget_assets.py` prints `2 widgets bundled, every copy matches`
-  (this sketch md5 `62c7e6c3…`, the Spotify one `00bb1560…`).
+  (this sketch md5 `62c7e6c3…`, the Spotify one `3b17f04a…`).
 * Core 3.x costs this sketch ~2.4 kB of flash and ~3.6 kB of RAM over 2.0.17 —
   nothing like the Spotify deck's 155 kB gap, which is that sketch's network
   stack rather than the core (see the build note in
