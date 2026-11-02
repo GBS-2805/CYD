@@ -552,12 +552,11 @@ Identical to the sketch, checked against its `onWrite` handlers:
 - `gradle assembleDebug` (Gradle 8.7, AGP 8.6.1, SDK 35, JDK 17) builds a debug
   APK at `dist/PhoneDeckBridge-debug.apk` — 102,590 bytes as measured on the file
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
-  the artifact in `dist/` now is the one rebuilt on 2026-11-02 after the drawer
-  gained the owner's mark above its wordmark, which followed the sketch header
-  change, the probe work, the drawer's rework and the deck's sign-in —
-  **180,126 bytes** on the file in
-  `dist/`, against the 112,473 that the same work produced before the second
-  widget joined it. The two
+  the artifact in `dist/` now is the one rebuilt on 2026-11-02 after the owner's
+  mark moved out of the drawer and onto the top bar's centre line at 26dp, which
+  followed the sketch header change, the probe work, the drawer's rework and the
+  deck's sign-in — its exact bytes are the line further down this section — against
+  the 112,473 that the same work produced before the second widget joined it. The two
   halves were measured on their own branches the same day before they met —
   146,290 bytes for the drawer alone, 149,494 for the sign-in alone — and this
   figure is the tree that has both.
@@ -617,11 +616,14 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **182,238 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
+  **192,970 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
-  app, the mirror, the three-step probe, the owner's logo as the icon, the same G
-  again above the drawer's wordmark, and the gear and chevrons drawn as shapes. Quote the size to the nearest kB
-  (~180 kB), never as a checksum.
+  app, the mirror, the three-step probe, the owner's logo as the icon, the mark
+  centred on the top bar at 26dp as one PNG per density rather than above the
+  drawer's wordmark, and the gear and chevrons drawn as shapes. That is 10,732
+  bytes above the previous 182,238, and the rebuild overwrote that file, so the
+  difference is not itemised here — the archive is not byte-reproducible either. Quote the size to the nearest kB
+  (~188 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set — now including
   `INTERNET`, the one outbound request to the deck —
@@ -734,6 +736,13 @@ signature, `zipalign -c 4`, both bundled sketches in sync, **180,126 bytes** in
 `dist/` — 356 bytes above the build before, which is the clock seam: `EspRom.Clock` and the
 pause it routes, with the probe's logic untouched. The sketch did not move in this
 rebuild.
+
+The same command ran again after the mark was centred at 26dp, from a `clean`:
+`all 152 host checks passed`, `BUILD SUCCESSFUL in 18s` with
+`compileDebugJavaWithJavac` actually running, v2 signature, `zipalign -c 4` clean,
+both bundled sketches byte-identical to the repo, and `dist/` rewritten to the size
+recorded above. Nothing was installed afterwards — no phone and no board has seen
+this build.
 
 ## Where the renders live
 

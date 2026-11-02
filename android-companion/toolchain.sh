@@ -267,6 +267,7 @@ printf '  %s bytes (%s kB)\n  sha256 %s\n' "$SIZE" "$((SIZE / 1024))" \
   "$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$DIST" | awk '{print $1}'; else shasum -a 256 "$DIST" | awk '{print $1}'; fi)"
 
 # The archive is not byte-reproducible: dex files carry build-time data, so the
-# hash moves even when the sources do not. `dist/README` in the app docs is where
-# the size is quoted; update it when this number changes.
+# hash moves even when the sources do not. `HANDOFF.md` holds these exact bytes,
+# and `README.md` beside it plus `dist/index.html` quote the size to the nearest
+# kB; update all three when this number changes.
 say "done — source $ROOT/env.sh to use the toolchain in this shell"
