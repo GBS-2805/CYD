@@ -11,6 +11,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
@@ -68,6 +69,14 @@ public class DeckService extends Service {
     static final UUID IDENTITY_UUID = UUID.fromString("6f2d0005-9a3c-4b57-9d21-6a1e0c4f8b10");
     /** What the phone is playing, mirrored. Also optional: an older flash has no such line. */
     static final UUID NOW_UUID = UUID.fromString("6f2d0006-9a3c-4b57-9d21-6a1e0c4f8b10");
+    /**
+     * Deck to phone: one notify per transport tap, {@code <serial>|<action>}.
+     * Optional like the mirror — a deck flashed before its chips asked the phone
+     * has no such characteristic, and such a deck still links.
+     */
+    static final UUID COMMAND_UUID = UUID.fromString("6f2d0007-9a3c-4b57-9d21-6a1e0c4f8b10");
+    /** The client-characteristic-configuration descriptor every notify carries. */
+    private static final UUID CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
 
     /**
      * The deck's identity document is ~150 bytes, so the default 23-byte ATT MTU
@@ -188,12 +197,20 @@ public class DeckService extends Service {
         context.stopService(new Intent(context, DeckService.class));
     }
 
+    /**
+     * One queued GATT operation: a characteristic value, or the descriptor write
+     * that subscribes to one. Both share the queue because Android allows one
+     * outstanding request at a time whichever kind it is.
+     */
     private static final class Write {
         final BluetoothGattCharacteristic characteristic;
+        final BluetoothGattDescriptor descriptor;
         final byte[] data;
 
-        Write(BluetoothGattCharacteristic characteristic, byte[] data) {
+        Write(BluetoothGattCharacteristic characteristic, BluetoothGattDescriptor descriptor,
+              byte[] data) {
             this.characteristic = characteristic;
+            this.descriptor = descriptor;
             this.data = data;
         }
     }
@@ -210,6 +227,7 @@ public class DeckService extends Service {
     private BluetoothGattCharacteristic noticeChar;
     private BluetoothGattCharacteristic identityChar;
     private BluetoothGattCharacteristic nowChar;
+    private BluetoothGattCharacteristic commandChar;
 
     private boolean scanning;
     private boolean connecting;
@@ -232,6 +250,8 @@ public class DeckService extends Service {
     /** The line last written to a deck, so an unchanged second is not re-sent. */
     private volatile String lastNow = "";
     private NowPlaying nowPlaying;
+    /** The last tap this link ran, so a repeated notify is not a second tap. */
+    private long lastCommandSerial;
 
     private final Runnable scanTimeout = () -> {
         stopScan();
@@ -333,6 +353,7 @@ public class DeckService extends Service {
             // and is remembered under its address instead.
             identityChar = service.getCharacteristic(IDENTITY_UUID);
             nowChar = service.getCharacteristic(NOW_UUID);
+            commandChar = service.getCharacteristic(COMMAND_UUID);
             if (timeChar == null || batteryChar == null || noticeChar == null) {
                 setStatus("Deck characteristics missing");
                 releaseGatt();
@@ -365,6 +386,9 @@ public class DeckService extends Service {
                 if (nowPlaying == null) nowPlaying = new NowPlaying(DeckService.this);
                 nowPlaying.start();
             }
+            // The other direction: a tap on the deck's chips. Subscribed here
+            // because a notify nothing listens for is dropped without a trace.
+            if (commandChar != null) subscribeCommands();
         }
 
         @Override
@@ -381,6 +405,34 @@ public class DeckService extends Service {
                 lastWriteMs = System.currentTimeMillis();
             }
             writing = false;
+            writeNext();
+        }
+
+        /** API 33 and later: the stack hands the value over instead of storing it. */
+        @Override
+        public void onCharacteristicChanged(BluetoothGatt g, BluetoothGattCharacteristic ch,
+                                            byte[] value) {
+            if (ch == null || !COMMAND_UUID.equals(ch.getUuid())) return;
+            handleCommand(value);
+        }
+
+        /** API 32 and earlier, where the value lives on the characteristic. */
+        @Override
+        public void onCharacteristicChanged(BluetoothGatt g, BluetoothGattCharacteristic ch) {
+            if (ch == null || !COMMAND_UUID.equals(ch.getUuid())) return;
+            handleCommand(ch.getValue());
+        }
+
+        @Override
+        public void onDescriptorWrite(BluetoothGatt g, BluetoothGattDescriptor descriptor,
+                                      int statusCode) {
+            // A descriptor write is a queued operation like any other, so the queue
+            // only learns it finished here.
+            handler.removeCallbacks(writeTimeout);
+            writing = false;
+            if (statusCode != BluetoothGatt.GATT_SUCCESS) {
+                Log.i(TAG, "commands: subscription refused (" + statusCode + ")");
+            }
             writeNext();
         }
 
@@ -721,6 +773,10 @@ public class DeckService extends Service {
         noticeChar = null;
         identityChar = null;
         nowChar = null;
+        commandChar = null;
+        // A rebooted deck starts its counter again at 1, so a new link forgets the
+        // last one it ran rather than judging the first tap a repeat.
+        lastCommandSerial = 0;
         lastNow = "";
         if (nowPlaying != null) nowPlaying.stop();
         linkedMac = "";
@@ -829,7 +885,15 @@ public class DeckService extends Service {
     private boolean enqueue(BluetoothGattCharacteristic characteristic, byte[] data) {
         if (characteristic == null || gatt == null) return false;
         if (writes.size() > 8) writes.clear();
-        writes.add(new Write(characteristic, data));
+        writes.add(new Write(characteristic, null, data));
+        writeNext();
+        return true;
+    }
+
+    private boolean enqueue(BluetoothGattDescriptor descriptor, byte[] data) {
+        if (descriptor == null || gatt == null) return false;
+        if (writes.size() > 8) writes.clear();
+        writes.add(new Write(null, descriptor, data));
         writeNext();
         return true;
     }
@@ -844,7 +908,18 @@ public class DeckService extends Service {
         handler.postDelayed(writeTimeout, 1500);
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (next.descriptor != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    gatt.writeDescriptor(next.descriptor, next.data);
+                } else {
+                    next.descriptor.setValue(next.data);
+                    if (!gatt.writeDescriptor(next.descriptor)) {
+                        handler.removeCallbacks(writeTimeout);
+                        writing = false;
+                        handler.postDelayed(this::writeNext, 60);
+                    }
+                }
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 gatt.writeCharacteristic(next.characteristic, next.data,
                         BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
             } else {
@@ -859,6 +934,53 @@ public class DeckService extends Service {
         } catch (SecurityException e) {
             handler.removeCallbacks(writeTimeout);
             writing = false;
+        }
+    }
+
+    // --------------------------------------------------------------- tapes ---
+
+    /**
+     * Turns the deck's chips into work. Two halves, and both are needed: the local
+     * subscription so the stack accepts the notify, then the CCCD write that tells
+     * the board to send one. The write goes through the shared queue, because a
+     * descriptor write is still a GATT request.
+     */
+    private void subscribeCommands() {
+        if (gatt == null || commandChar == null) return;
+        try {
+            if (!gatt.setCharacteristicNotification(commandChar, true)) {
+                setStatus("Linked, taps are silent");
+                return;
+            }
+        } catch (SecurityException e) {
+            setStatus("Bluetooth permission needed");
+            return;
+        }
+        final BluetoothGattDescriptor cccd = commandChar.getDescriptor(CCCD_UUID);
+        if (cccd == null) return;   // no descriptor, no way for the board to be told
+        enqueue(cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+    }
+
+    /** Parses one tap and hands it to the main thread, where the session is read. */
+    private void handleCommand(byte[] raw) {
+        final LinkCommand command = LinkCommand.parse(raw);
+        if (command == null) {
+            Log.i(TAG, "commands: ignored " + (raw == null ? 0 : raw.length) + " bytes");
+            return;
+        }
+        if (!LinkCommand.fresh(command, lastCommandSerial)) return;
+        lastCommandSerial = command.serial;
+        handler.post(() -> runCommand(command));
+    }
+
+    private void runCommand(LinkCommand command) {
+        if (nowPlaying == null) nowPlaying = new NowPlaying(this);
+        if (nowPlaying.run(command.action)) {
+            Log.i(TAG, "commands: " + command.action + " on the phone's player");
+        } else {
+            // The deck lit the chip when it asked; nothing here writes back, so the
+            // status line is the only way a person learns the tap landed nowhere.
+            setStatus("Tap arrived, nothing to play");
         }
     }
 

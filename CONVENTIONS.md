@@ -544,7 +544,12 @@ the front page needs no second navigation.
   playback itself. A deck with a transport row makes a chip a **request**: it
   raises a notify on `6f2d0007-…` and the phone runs the key against its own
   session, so the lit chip means the round trip, not the outcome, and the next
-  mirror line is what proves it. A deck with no phone linked keeps the Web API
+  mirror line is what proves it. The phone's half is `DeckService`: it calls
+  `setCharacteristicNotification` and writes the CCCD through the same one-op
+  queue as everything else, parses the line in `LinkCommand` (20 bytes, three
+  actions, a uint32 that restarts at 1 on reboot, so a repeated value is one tap),
+  and runs it on its own `MediaController` — `toggle` reading `PlaybackState`
+  rather than remembering what it last sent. A deck with no phone linked keeps the Web API
   path, where the chip really is a command. This is also why the
   two decks differ: the WiFi deck signs itself in and can play on its own, and a
   Bluetooth deck shows the phone's own player instead. Cost of the mirror: one

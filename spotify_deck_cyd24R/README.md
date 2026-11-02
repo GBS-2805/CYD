@@ -431,11 +431,13 @@ sourcing a toolchain.
 been flashed, so all of the following are still assumptions:
 
 * **The whole Bluetooth path is new and has never run.** No phone has connected to
-  this deck, no mirror line has been parsed on the board, and no notify has reached
-  a phone — the companion app has not been taught the command characteristic yet,
-  so a chip logs `[cmd] 3|toggle`, lights, and waits for an answer that does not
-  come. `PartitionScheme=huge_app` has also never been flashed to this board, and
-  the setup server has never run beside the Bluetooth stack.
+  this deck and no mirror line has been parsed on the board. The app side of a tap
+  now exists — it subscribes to the command characteristic and runs
+  `prev`/`toggle`/`next` against the phone's own media session — but no notify has
+  been seen arriving on a phone, so a chip logging `[cmd] 3|toggle` coming back as
+  playback is still untested. `PartitionScheme=huge_app` has also never been
+  flashed to this board, and the setup server has never run beside the Bluetooth
+  stack.
 * The access point, the setup page on a real phone, and whether that phone keeps
   mobile data for the Spotify tab while it is joined to the deck.
 * The S256 challenge as Spotify receives it, the code exchange, and the pinned

@@ -209,8 +209,11 @@ session — through the notification access the app already needs — and `NowPa
 writes one line a second, so nothing here talks to Spotify and no account is
 involved. The three text fields are clamped to 47, 31 and 31 bytes and any `|`
 becomes `/`, because the characteristic splits on it. The deck draws what it is
-told and cannot control playback, which is why its now-playing page has no
-transport buttons.
+told and cannot change playback on its own, so a tap on one of its transport
+chips is a **request** sent back up the link: `LinkCommand` parses
+`<serial>|<action>` out of the notify and `NowPlaying.run` presses the key on the
+same session the mirror reads, with `toggle` reading `PlaybackState` rather than
+a remembered state. The next mirror line is what shows it worked.
 
 **Which apps get through is the user's choice.** SETTINGS lists every launchable app
 with a checkbox, and the first **SAVE** turns filtering on: after that only the

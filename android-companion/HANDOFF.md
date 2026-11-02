@@ -480,6 +480,16 @@ Identical to the sketch, checked against its `onWrite` handlers:
 
 ## Verified
 
+- **A deck's tap now reaches the phone's player.** `DeckService` finds
+  `6f2d0007-…` on the link, subscribes with `setCharacteristicNotification` and a
+  CCCD write queued beside the other GATT operations, and both
+  `onCharacteristicChanged` overloads hand the bytes to `LinkCommand` — plain
+  Java, so `test.sh` covers the parser: the sketch's 20-byte buffer, the three
+  actions, a positive uint32 serial, and a repeated serial counting as one tap.
+  `NowPlaying.run` then presses the key on the session it is already mirroring.
+  `test.sh` reads **all 126 host checks passed**, nine of them new; the APK
+  rebuilt to **176,858 bytes**. **Nothing has run on a phone or a board**, so
+  whether a chip's notify arrives and moves playback is unverified end to end.
 - The last `javac 17` type check against the Android 14 (API 34) framework
   classes (`android-all`) covered the pre-split sources: 9 files, 22 classes, only
   deprecation notes from the pre-Android-13 `setValue`/`setWriteType` path.
@@ -493,7 +503,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the artifact in `dist/` now is the one rebuilt on 2026-11-02 after the drawer
   gained the owner's mark above its wordmark, which followed the sketch header
   change, the probe work, the drawer's rework and the deck's sign-in —
-  **174,830 bytes** on the file in
+  **176,858 bytes** on the file in
   `dist/`, against the 112,473 that the same work produced before the second
   widget joined it. The two
   halves were measured on their own branches the same day before they met —
@@ -555,7 +565,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **174,830 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
+  **176,858 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror, the three-step probe, the owner's logo as the icon, and the same
   ghost again above the drawer's wordmark. Quote the size to the nearest kB
@@ -653,12 +663,9 @@ printed in the status line and dropped.
 `./toolchain.sh` passed end to end on 2026-11-02 with the header mark in place and
 the buttons still feeding the sweep with the rate remembered: `all 117 host checks
 passed`, `BUILD SUCCESSFUL in 19s`, v2 signature, `zipalign -c 4`, both bundled
-sketches in sync, **174,830 bytes** in `dist/` — 324 bytes above the build before,
-because the bundled Spotify sketch's rewritten header is what changed: the app's
-own Java did not move in this rebuild
-it, which is the dex moving under an unchanged screen set: `DecksTab` now takes
-its state through a constructor argument and `DeckStore` grew a dated overload
-for the capture, and neither changes what the app does.
+sketches in sync, **176,858 bytes** in `dist/` — 2,028 bytes above the build before, which is the tap path: `LinkCommand`,
+the subscription and its descriptor write in the queue. The sketch did not
+move in this rebuild.
 
 ## Not verified
 

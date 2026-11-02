@@ -57,6 +57,7 @@ public final class HostTests {
         deckIdentity();
         deckAddresses();
         nowPacket();
+        linkCommand();
 
         System.out.println();
         if (failures.isEmpty()) {
@@ -685,6 +686,58 @@ public final class HostTests {
                         .getBytes(StandardCharsets.UTF_8).length <= NowPacket.ONE_WRITE_BYTES);
         check("a state that is neither play nor stop never claims to be playing",
                 !NowPacket.word("buffering").equals("play") && !NowPacket.word(null).equals("play"));
+    }
+
+    // ---------------------------------------------------------- link command ---
+
+    /**
+     * The deck's tap line, held to the sketch's own buffer: {@code <serial>|<action>}
+     * in at most 20 bytes, only three actions, serial from 1, and the same serial
+     * twice is one gesture. Nothing here needs a phone: the parser is plain Java.
+     */
+    private static void linkCommand() {
+        final LinkCommand toggle = LinkCommand.parse("3|toggle");
+        check("the deck's own tap line parses",
+                toggle != null && toggle.serial == 3
+                        && LinkCommand.TOGGLE.equals(toggle.action));
+
+        check("every action a chip can raise is understood",
+                LinkCommand.parse("1|prev") != null
+                        && LinkCommand.parse("2|toggle") != null
+                        && LinkCommand.parse("3|next") != null);
+
+        check("a key this app cannot run is dropped rather than guessed",
+                LinkCommand.parse("7|seek") == null
+                        && LinkCommand.parse("7|TOGGLE") == null
+                        && LinkCommand.parse("7|Toggle") == null);
+
+        check("a line with no serial or no action is dropped",
+                LinkCommand.parse("|toggle") == null
+                        && LinkCommand.parse("toggle") == null
+                        && LinkCommand.parse("9|") == null);
+
+        check("a serial that is not a positive number is dropped",
+                LinkCommand.parse("0|toggle") == null
+                        && LinkCommand.parse("x1|toggle") == null
+                        && LinkCommand.parse("-4|next") == null);
+
+        check("a line past the sketch's 20-byte buffer is dropped",
+                LinkCommand.parse("1|toggle" + "xxxxxxxxxxxx") == null
+                        && "1|toggle".getBytes(StandardCharsets.UTF_8).length
+                                <= LinkCommand.MAX_BYTES);
+
+        check("the value the stack hands over is the same line as the bytes",
+                LinkCommand.parse("12|next".getBytes(StandardCharsets.UTF_8)) != null
+                        && LinkCommand.parse("12|next".getBytes(StandardCharsets.UTF_8)).serial == 12);
+
+        check("a terminator the sketch never sends is padding, not a bad character",
+                LinkCommand.parse("4|next\0") != null
+                        && LinkCommand.parse(" 5|prev ") != null);
+
+        check("the same notify twice is one tap, and a rebooted counter is a new one",
+                !LinkCommand.fresh(LinkCommand.parse("8|toggle"), 8)
+                        && LinkCommand.fresh(LinkCommand.parse("1|toggle"), 8)
+                        && !LinkCommand.fresh(null, 0));
     }
 
     // ------------------------------------------------------------- helpers ---
