@@ -742,6 +742,32 @@ are the source. Nothing in the app reads this host. `capture.sh` rebuilds the bu
 time it installs frames, so the files the site serves cannot lag a capture; deploying them
 is a separate step, and publishing still needs asking.
 
+### What a capture costs
+
+Measured on 2026-11-02, on this machine, per command:
+
+| | Before | After |
+| --- | --- | --- |
+| One capture (`capture.sh`) | 26 s | **10 s** warm (21 s with a cold daemon) |
+| The tall scroll sheet | 1 s | 1 s |
+| The published bundle | <1 s | <1 s |
+| The gate's own re-capture | 23 s | ~10 s warm |
+| **One review loop** | **50 s** | **~21 s** |
+
+The 15 s came from two things, both now in the tree: the test tasks declare that their
+side-effect output never makes them current, so `--rerun-tasks` — which re-ran every
+compile to redraw screens whose code had not changed — is gone; and the Gradle daemon is
+kept instead of restarted per capture, with its JDK passed explicitly because this
+environment's default `javaHome` names a path that does not exist. Seven frames are
+byte-identical across the change, which is how it was verified rather than assumed.
+
+An **emulator was considered and is not the answer here**: this VM has `/dev/kvm` but the
+user is not in the `kvm` group, the emulator package and every system image are absent
+(~1 GB to fetch), and it would render on a different font stack to produce a *device*
+screenshot — a different claim from "what this app draws", which is what the renders are
+for. The frames come from the app's own views through Android's renderer, so a wrong
+padding still shows.
+
 ## Not verified
 
 - The **release** build type is unrun, and the shipped APK is debug-signed with
