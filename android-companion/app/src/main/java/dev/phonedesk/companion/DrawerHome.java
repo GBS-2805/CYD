@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -18,8 +19,9 @@ import java.util.Map;
  * The front page: a drawer that is already open.
  *
  * A slide-out panel behind a button would hide the only navigation this app has,
- * so the menu is the screen. The wordmark sits where a launcher's icon would, the
- * three sections hang under it, and BOARDS expands in place to name the boards
+ * so the menu is the screen. The owner's mark sits where a launcher's icon would,
+ * the wordmark under it, the three sections hang below, and BOARDS expands in
+ * place to name the boards
  * that hold projects, each row opening the shelf they live on.
  *
  * SETTINGS is deliberately not a row here: it is configuration rather than
@@ -85,11 +87,21 @@ final class DrawerHome extends ScrollView {
         int keepScroll = getScrollY();
         body.removeAllViews();
 
+        // The owner's mark, from the same artwork the launcher icon is cut from:
+        // one even-odd path, so the ghost is the hole its contour leaves. It stands
+        // where the wordmark's 60dp of air used to be, which is what pays for it.
+        ImageView logo = new ImageView(activity);
+        logo.setImageResource(R.drawable.logo_mark);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(
+                Ui.dp(activity, 36), Ui.dp(activity, 37));
+        logoParams.gravity = Gravity.CENTER_HORIZONTAL;
+        body.addView(logo, logoParams);
+
         TextView mark = Ui.text(activity, "[OFF-SITE]", 34, Ui.TEXT);
         mark.setGravity(Gravity.CENTER);
         mark.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         mark.setLetterSpacing(0.06f);
-        mark.setPadding(0, Ui.dp(activity, 60), 0, 0);
+        mark.setPadding(0, Ui.dp(activity, 8), 0, 0);
         body.addView(mark);
 
         TextView line = Ui.text(activity, statusLine(snapshot), 10, Ui.DIM);

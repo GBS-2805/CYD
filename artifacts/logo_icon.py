@@ -3,7 +3,7 @@
 
 The four `d` strings are copied out of `logo-source.svg` unchanged — Android's
 pathData is SVG's own grammar, so the artwork ships verbatim inside a <group>
-that only scales and centres it. This script writes the three resource files and
+that only scales and centres it. This script writes the four resource files and
 rasterises the result through the same transform for review.
 
     python3 artifacts/logo_icon.py            write the res files and previews
@@ -28,6 +28,7 @@ RES = os.path.join(ROOT, "android-companion", "app", "src", "main", "res")
 
 CANVAS = 108.0          # the adaptive-icon canvas, in dp
 SAFE = 72.0             # what every launcher mask is guaranteed to show
+MARK_DP = 36.0          # the drawer header draws the mark this wide
 INK = "#000000"         # the logo's own ink
 GROUND = "#FFFFFF"      # the logo draws the ghost as a hole: the ground is white
 
@@ -238,15 +239,100 @@ def write_res(box, paths, scale, dx, dy):
         ("drawable/ic_launcher_foreground.xml", foreground),
         ("drawable/ic_launcher_monochrome.xml", monochrome),
         ("values/ic_launcher_background.xml", background),
+        ("drawable/logo_mark.xml", mark(box, paths)),
     ):
         path = os.path.join(RES, name)
         open(path, "w").write(text)
         print("wrote", os.path.relpath(path, ROOT))
 
 
+def mark(box, paths):
+    """The drawer's header mark: the same four subpaths, in the artwork's own box.
+
+    The launcher icon needs a 108dp canvas and a 72dp safe zone; a header does not,
+    so this keeps the artwork's viewBox and is drawn at its own size. One even-odd
+    path, so the eyes and the mouth stay holes, in white because the drawer is
+    black — the same negative the themed icon uses.
+    """
+    height = MARK_DP * box[3] / box[2]
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<!-- The drawer\'s mark. Same four `d` strings as the icon, in the artwork\'s own\n'
+        '     viewBox rather than the launcher\'s 108dp canvas: the header wants the ghost\n'
+        '     at its own size, not a launcher glyph inside a safe zone. One even-odd path,\n'
+        '     so the eyes and the mouth stay holes; white, because the drawer is black. -->\n'
+        '<vector xmlns:android="http://schemas.android.com/apk/res/android"\n'
+        '    android:width="%sdp"\n'
+        '    android:height="%sdp"\n'
+        '    android:viewportWidth="%s"\n'
+        '    android:viewportHeight="%s">\n\n'
+        '    <path\n'
+        '        android:fillColor="#FFFFFFFF"\n'
+        '        android:fillType="evenOdd"\n'
+        '        android:pathData="%s" />\n'
+        '</vector>\n'
+    ) % (num(MARK_DP), num(height), num(box[2]), num(box[3]),
+         " ".join(d.strip() for d in paths))
+
+
 def num(value):
     text = ("%.4f" % value).rstrip("0").rstrip(".")
     return text or "0"
+
+
+# ------------------------------------------------------------------- mark ----
+
+def mark_mask(box, paths, width_px, supersample=4):
+    """The logo as an alpha mask, filled even-odd: the ghost is the hole.
+
+    A scanline fill rather than a polygon per shape, because the mark is one
+    contour with the ghost cut out of it: only the combined even-odd winding count
+    says which pixels are ink, and Pillow's `polygon` knows nothing about holes.
+    Drawn at 4x and scaled down once, which is the whole of its antialiasing.
+    """
+    scale = width_px * supersample / box[2]
+    subpaths = []
+    for d in paths:
+        subpaths.extend(flatten(d, scale, -box[0] * scale, -box[1] * scale))
+    width = max(1, int(round(box[2] * scale)))
+    height = max(1, int(round(box[3] * scale)))
+
+    mask = Image.new("L", (width, height), 0)
+    pen = ImageDraw.Draw(mask)
+    for row in range(height):
+        y = row + 0.5
+        crossings = []
+        for sub in subpaths:
+            for i, (x0, y0) in enumerate(sub):
+                x1, y1 = sub[(i + 1) % len(sub)]
+                if (y0 <= y < y1) or (y1 <= y < y0):
+                    crossings.append(x0 + (y - y0) * (x1 - x0) / (y1 - y0))
+        crossings.sort()
+        for i in range(0, len(crossings) - 1, 2):
+            pen.line([(crossings[i], row), (crossings[i + 1], row)], fill=255)
+
+    return mask.resize((max(1, int(round(width_px))),
+                        max(1, int(round(width_px * box[3] / box[2])))),
+                       Image.LANCZOS)
+
+
+_marks = {}
+
+
+def mark_image(width_px, ink=(255, 255, 255)):
+    """The mark alone, `width_px` wide, in one ink, transparent everywhere else.
+
+    The renderer and the scroll composer both call this, so the ghost is rasterised
+    from the artwork every time rather than pasted from a picture of itself.
+    """
+    key = (int(width_px), tuple(ink))
+    if key not in _marks:
+        box, paths = svg_paths()
+        mask = mark_mask(box, paths, key[0])
+        image = Image.new("RGBA", mask.size, key[1] + (0,))
+        image.putalpha(mask)
+        _marks[key] = image
+    return _marks[key]
 
 
 # --------------------------------------------------------------- preview ----

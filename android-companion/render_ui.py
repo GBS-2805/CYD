@@ -31,6 +31,13 @@ SCALE = 2
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
                    "artifacts", "renders")
 
+# The owner's mark is drawn from the artwork the launcher icon is cut from, so its
+# geometry keeps one home: the generator that sits beside the SVG.
+_ARTIFACTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "artifacts")
+if _ARTIFACTS not in sys.path:
+    sys.path.insert(0, _ARTIFACTS)
+import logo_icon  # noqa: E402  (the path above has to exist first)
+
 # The deck's INK palette, straight from Ui.java.
 BG = (0, 0, 0)
 CARD = (14, 14, 14)
@@ -112,6 +119,11 @@ class Screen:
         if spacing:
             width += spacing * sp * max(0, len(value) - 1)
         return width
+
+    def logo(self, cx, y, width_dp, color=TEXT):
+        """The owner's mark, centred on `cx`: the same ghost the launcher icon is cut around."""
+        image = logo_icon.mark_image(px(width_dp), color)
+        self.image.paste(image, (int(round(px(cx) - image.width / 2.0)), px(y)), image)
 
     def centered(self, y, value, sp, color, bold=False, spacing=0.0):
         self.text((W_DP - self.width(value, sp, bold, spacing)) / 2.0, y,
@@ -211,8 +223,13 @@ def para_h(value, sp, max_w, leading=2):
 def home(open_projects=False):
     s = Screen()
     s.top_bar("OFF-SITE")
-    s.centered(84, "[OFF-SITE]", 34, TEXT, bold=True, spacing=0.06)
-    s.centered(84 + 34 * 1.45 + 10, "IDLE \u00b7 BRIDGE STOPPED", 10, DIM, spacing=0.16)
+    # DrawerHome.build() opens with the owner's mark and puts the wordmark 8dp
+    # under it: the air the wordmark used to carry is what pays for the mark.
+    s.logo(W_DP / 2.0, 52, 36)
+    wordmark_y = 52 + 37 + 8
+    s.centered(wordmark_y, "[OFF-SITE]", 34, TEXT, bold=True, spacing=0.06)
+    s.centered(wordmark_y + 34 * 1.45 + 10, "IDLE \u00b7 BRIDGE STOPPED", 10, DIM,
+               spacing=0.16)
 
     # SETTINGS is not here: it hangs off the gear in the top bar.
     s.card(18, 188, W_DP - 36, 56)

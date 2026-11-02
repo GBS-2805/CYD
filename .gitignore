@@ -10,3 +10,12 @@ __pycache__/
 # these two belong to no build and no doc, so the tree stays clean without them.
 artifacts/*.diff
 artifacts/launcher-icon.png
+# Written by logo_icon.py on every run: the sheet below them is the one to keep.
+artifacts/launcher-preview.png
+artifacts/launcher-preview-masked.png
+artifacts/launcher-preview-squircle.png
+
+# Compositions of frames that are already committed beside them: a tall scroll of
+# the seven screens and a strip of them, rebuilt on demand rather than tracked.
+artifacts/renders/scroll.png
+artifacts/renders/seven-screens.png

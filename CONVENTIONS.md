@@ -417,6 +417,14 @@ than navigation, so it hangs off the gear at the outer end of the top bar, past
 the link pill. The bottom tab bar is gone on purpose, because a drawer that *is*
 the front page needs no second navigation.
 
+* **The front page opens with the owner's mark.** `DrawerHome` draws
+  `R.drawable.logo_mark` above the wordmark: the launcher icon's own four path
+  strings, in the artwork's viewBox rather than the launcher's 108dp canvas, as one
+  even-odd path so the eyes and the mouth are holes. Both the vector and the
+  renderer's copy come from [`artifacts/logo_icon.py`](artifacts/logo_icon.py) and
+  the SVG beside it — one geometry, not a redraw — and the 60dp of air the wordmark
+  used to carry is what pays for the mark.
+
 * **BOARDS expands to the board alone.** One row per distinct board, labelled
   exactly as the shelf's crumb labels it — `2.4" CYD (resistive)` — and tapping
   that row opens the shelf. The projects are not repeated underneath it: their
