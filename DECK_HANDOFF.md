@@ -56,8 +56,9 @@ they do, the sketches are the truth and the app copy is the stale one.
 `syncWidgets` copies every `*/widget.json` beside `android-companion/`, so both
 decks travel: `assets/widgets/phone_deck_cyd24R/` and
 `assets/widgets/spotify_deck_cyd24R/`. `check_widget_assets.py` prints
-`2 widgets bundled, every copy matches` (phone deck md5 `62c7e6c3…`, Spotify
-`f234b68b…`, both on 2026-11-01), and that is the check to run after either
+`2 widgets bundled, every copy matches` (phone deck md5 `62c7e6c3…` on
+2026-11-01, Spotify `3009ced7…` on 2026-11-02 after its header was rewritten;
+`f234b68b…` before that rewrite), and that is the check to run after either
 sketch changes — a passing `assembleDebug` says nothing about which copies went
 into the APK. The app's own docs described one bundled widget and a folder name
 from before the rename; that side is the app chat's to keep current, and what

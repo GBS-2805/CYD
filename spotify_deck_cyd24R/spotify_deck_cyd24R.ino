@@ -1,10 +1,23 @@
 /*
  * Spotify Deck - ESP32-2432S024R (2.4" resistive touch CYD)
  *
- * The second deck: instead of listening to a phone over Bluetooth, this one is
- * on the network. It signs in to Spotify with a refresh token, polls what is
- * playing, and draws it; the three chips under the track send previous, play or
- * pause, and next back to the account's active device.
+ * The second deck, and it has two sources rather than one.
+ *
+ * THE PHONE, OVER BLUETOOTH - no credentials, nothing to set up
+ *   The phone's companion app reads the media session it already has and writes
+ *   one line a second down a Phone Link service (state, position, duration,
+ *   title, artist, album), so the deck shows whatever the phone is playing with
+ *   no Spotify client id, no refresh token and no network. Tapping a chip raises
+ *   a notify back up the same link and the phone runs that key against its own
+ *   player, so the chips drive the phone's player, not the account. On a board
+ *   with no stored credentials this is the whole deck: it boots straight into
+ *   the player page, and nothing asks the user to make a developer app.
+ *
+ * SPOTIFY ITSELF, OVER WIFI - optional, needs a refresh token
+ *   With stored credentials the deck also signs in on its own: it polls the Web
+ *   API for what is playing, draws the same page, and the chips fall back to the
+ *   account's active device when no phone is linked. This is the original deck,
+ *   and it is the only half that needs a client id and a token.
  *
  * WIFI AND CREDENTIALS
  *   A sketch cannot invent a WiFi password, so nothing is baked in here. On a
@@ -28,11 +41,13 @@
  *   - Adafruit ILI9341
  *   - XPT2046_Touchscreen (Paul Stoffregen)
  *
- * Do not install ArduinoBLE - it is not used here, and on the other deck its
+ * Do not install ArduinoBLE - it is not used here, and on either deck its
  * BLEDevice.h shadows the core's BLE headers.
  *
  * Controls:
- *   - Tap |<< , PLAY/PAUSE or >>| to drive the account's active device.
+ *   - Tap |<< , PLAY/PAUSE or >>| . A linked phone runs that key against its own
+ *     player; with no phone linked and credentials stored, the account's active
+ *     device gets the Web API call instead.
  *   - Tap the wordmark to force a refresh.
  *   - Hold the wordmark for 1.5 s (or touch the screen at boot) to calibrate.
  *
