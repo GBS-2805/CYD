@@ -59,6 +59,7 @@ public final class HostTests {
         EspRom.useClock(CLOCK);
         UsbSerialCh340.clock = CLOCK;
         framingRoundTrip();
+        bondAdvice();
         syncChecksum();
         handshakeIntoDownloadMode();
         quietSyncUsesNoControlLines();
@@ -803,6 +804,23 @@ public final class HostTests {
 
     private static String joined(List<String> lines) {
         return String.join("\n", lines);
+    }
+
+    private static void bondAdvice() {
+        check("a failed connect while bonded asks for the stale bond to go",
+                BondAdvice.forFailure(BondAdvice.ERROR, BondAdvice.BOND_BONDED)
+                        .equals(BondAdvice.FORGET));
+        check("a refused write with no bond asks for one",
+                BondAdvice.forFailure(BondAdvice.INSUFFICIENT_AUTHENTICATION, BondAdvice.BOND_NONE)
+                        .equals(BondAdvice.PAIR));
+        check("a clean disconnect, and a refusal from an already-bonded phone, ask for nothing",
+                BondAdvice.forFailure(BondAdvice.SUCCESS, BondAdvice.BOND_BONDED)
+                        .equals(BondAdvice.NONE)
+                        && BondAdvice.forFailure(BondAdvice.INSUFFICIENT_AUTHENTICATION,
+                                BondAdvice.BOND_BONDED).equals(BondAdvice.NONE));
+        check("a bonding phone is still asked to pair rather than have its bond dropped",
+                BondAdvice.forFailure(BondAdvice.ERROR, BondAdvice.BOND_BONDING)
+                        .equals(BondAdvice.NONE));
     }
 
     private static void check(String name, boolean ok) {

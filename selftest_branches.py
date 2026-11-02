@@ -121,6 +121,14 @@ def behind(dest):
     commit(dest, "main moves on")
 
 
+def merged_with_lagging_remote(dest):
+    """Merged here, while origin/main still points at the old base."""
+    branch(dest, "feature", {"new.txt": "fresh work\n"})
+    base = git(dest, "rev-parse", "main").strip()
+    git(dest, "merge", "-q", "--no-ff", "-m", "merge feature", "feature", env=stamp())
+    git(dest, "update-ref", "refs/remotes/origin/main", base)
+
+
 def pushed(dest):
     git(dest, "init", "-q", "--bare", str(dest.parent / ("remote-%s.git" % dest.name)))
     git(dest, "remote", "add", "origin", str(dest.parent / ("remote-%s.git" % dest.name)))
@@ -134,6 +142,13 @@ CASES = [
         mutate=None,
         want_code=0,
         want=["nothing is pending against main"],
+    ),
+    dict(
+        name="a branch already merged here is not pending, even when origin/main lags",
+        mutate=merged_with_lagging_remote,
+        want_code=0,
+        want=["nothing is pending against main"],
+        forbids=["needs a merge"],
     ),
     dict(
         name="a branch with a path main has no bytes for is pending",

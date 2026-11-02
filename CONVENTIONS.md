@@ -151,7 +151,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   installs a virtual clock and the stub port advances it, so a check that runs the
   real probe against a silent board still tries all five wirings and both windows
   without waiting for them. Measured on 2026-11-02: 179 s before the seam, 1.45 s
-  after, the same 126 checks. The seam exists because the alternative — a shorter
+  after, the same 126 checks then, 130 now. The seam exists because the alternative — a shorter
   window in the test — would test a different probe.
 * **That check runs on commit.** [`.githooks/pre-commit`](.githooks/pre-commit)
   runs the whole fast gate — [`check.sh`](check.sh) — on every commit, so no
@@ -444,10 +444,13 @@ other mention of it in this repo is a pointer back here.
   commits: a branch whose changed files are the same bytes `main` already has — a
   folder renamed here, work rebased over — is reported as nothing to fold, and
   one whose patches are all upstream drops out the same way, so the list stays
-  what a merge would actually add. What it said on 2026-11-02: one branch,
-  `freebuff/60e73bbb…`, 10 commits past `origin/main` and 9 behind it, with 11
-  paths `origin/main` has no bytes for — and this chat merged it, which is where
-  the Spotify header rewrite arrived. `origin/main` still lags because nothing in
+  what a merge would actually add. What it says now (2026-11-02, after the base became the branch checked out
+  here): **nothing is pending**. The deck chat's tip `b3e8362` is an ancestor of
+  this branch — `git merge-base --is-ancestor b3e8362 HEAD` exits 0 — and neither
+  its short-named ref nor origin's copy holds anything this tree lacks. The same
+  branch read as "10 commits past `origin/main`, 11 paths it has no bytes for"
+  only because `origin/main` lags both trees while nothing is pushed, which is
+  why the base is the worktree now. `origin/main` still lags because nothing in
   either tree is pushed. Read the paths before merging anyway: an older branch can
   *look* like work and be a downgrade, which is what `app/phone-deck-build` was at
   87 commits back, 21 paths under `cyd_phone_deck/`, a folder this tree renamed

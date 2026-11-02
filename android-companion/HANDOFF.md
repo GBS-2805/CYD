@@ -484,7 +484,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   deadline and every pause reads the clock, `test.sh` installs a virtual one and
   the stub port advances it, so the two checks that ran the real probe against a
   silent board — 57 s each — still try all five wirings and both windows. Measured
-  on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks green. `./check.sh`
+  on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 130 now green then, 130 now. `./check.sh`
   runs the fast set, `./check.sh --full` the release set.
 - **The checkers' refusals are tested too, without a compiler.** Five
   `selftest_*.py` files build a throwaway repo — a stand-in `arduino-cli`, a
@@ -502,13 +502,22 @@ Identical to the sketch, checked against its `onWrite` handlers:
 - **The committed tree builds on its own.** Measured on 2026-11-02: `git archive
   HEAD` into an empty directory plus a fresh `git init` — no built assets, no
   `.build_figures.json`, nothing in `dist/` the commit does not hold — passed the
-  fast gate, compiled all 30 sources (**126 host checks**), and `toolchain.sh`
-  built the APK to **177,214 bytes**, sha256 beginning `dd5b475f`; the gate was green
+  fast gate, compiled all 31 sources (**130 host checks**), and `toolchain.sh`
+  built the APK to **178,630 bytes**, sha256 beginning `dd5b475f`; the gate was green
   afterwards, widget bundles and recorded bytes included. The docs step took
   **123 s** on that first run and ~1 s after, because `.build_figures.json` is a
   local cache: a fresh tree pays for both compiles once. A `git clone` of this
   worktree cannot be made on this host — git refuses a linked worktree as dubious
   ownership — so the export carries the same committed bytes by another route.
+- **The two chats are one tree again.** Measured on 2026-11-02:
+  `git merge-base --is-ancestor b3e8362 HEAD` exits 0, the deck branch holds no
+  commit this branch lacks, and neither the short-named ref nor origin's copy holds
+  anything either — the merge of `b3e8362` was already complete. What was wrong was
+  the reading: `check_branches.py` compared against `origin/main`, which lags both
+  chats because nothing is pushed, so merged work kept coming back as "10 commits on
+  top of origin/main, 11 paths it has no bytes for". It now compares against the
+  branch checked out here, and a self-test case pins that a merged branch stays
+  quiet even when `origin/main` is deliberately left behind.
 - **A deck's tap now reaches the phone's player.** `DeckService` finds
   `6f2d0007-…` on the link, subscribes with `setCharacteristicNotification` and a
   CCCD write queued beside the other GATT operations, and both
@@ -516,13 +525,13 @@ Identical to the sketch, checked against its `onWrite` handlers:
   Java, so `test.sh` covers the parser: the sketch's 20-byte buffer, the three
   actions, a positive uint32 serial, and a repeated serial counting as one tap.
   `NowPlaying.run` then presses the key on the session it is already mirroring.
-  `test.sh` reads **all 126 host checks passed**, nine of them new; the APK
-  rebuilt to **177,214 bytes**. **Nothing has run on a phone or a board**, so
+  `test.sh` reads **all 130 host checks passed**, nine of them new; the APK
+  rebuilt to **178,630 bytes**. **Nothing has run on a phone or a board**, so
   whether a chip's notify arrives and moves playback is unverified end to end.
 - The last `javac 17` type check against the Android 14 (API 34) framework
   classes (`android-all`) covered the pre-split sources: 9 files, 22 classes, only
   deprecation notes from the pre-Android-13 `setValue`/`setWriteType` path.
-  **That check predates the split into sections.** The current 30 sources are
+  **That check predates the split into sections.** The current 31 sources are
   covered by `gradle assembleDebug` instead, which is what produced the shipped
   APK.
 - Every relative Markdown link across the repo resolves.
@@ -532,7 +541,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the artifact in `dist/` now is the one rebuilt on 2026-11-02 after the drawer
   gained the owner's mark above its wordmark, which followed the sketch header
   change, the probe work, the drawer's rework and the deck's sign-in —
-  **177,214 bytes** on the file in
+  **178,630 bytes** on the file in
   `dist/`, against the 112,473 that the same work produced before the second
   widget joined it. The two
   halves were measured on their own branches the same day before they met —
@@ -594,7 +603,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **177,214 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
+  **178,630 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror, the three-step probe, the owner's logo as the icon, and the same
   ghost again above the drawer's wordmark. Quote the size to the nearest kB
@@ -691,8 +700,8 @@ printed in the status line and dropped.
 
 `./toolchain.sh` passed end to end on 2026-11-02 with the header mark in place, the
 buttons still feeding the sweep with the rate remembered, and the tap path wired:
-`all 126 host checks passed` (117 before those nine), `BUILD SUCCESSFUL`, v2
-signature, `zipalign -c 4`, both bundled sketches in sync, **177,214 bytes** in
+`all 130 host checks passed` (117 before those nine), `BUILD SUCCESSFUL`, v2
+signature, `zipalign -c 4`, both bundled sketches in sync, **178,630 bytes** in
 `dist/` — 356 bytes above the build before, which is the clock seam: `EspRom.Clock` and the
 pause it routes, with the probe's logic untouched. The sketch did not move in this
 rebuild.
@@ -711,14 +720,20 @@ rebuild.
 
 - **Missing bundled sketch**: a non-Gradle build has no asset, and the BOARDS
   deck card says so. That is expected, not a bug.
-- **Stale bond** from the old HID build can still block GATT connects; the app does
-  not call `removeBond()`. Forget the entry in Bluetooth settings.
+- **Stale bond**: a disconnect carrying a non-zero status while the phone holds a
+  bond now removes that bond (reflection over `removeBond`, at most once a minute)
+  and reconnects, instead of rescanning a link the stack will keep refusing.
+  **Unverified on a phone**: the decision is held by three host checks, the
+  reflection call itself has never run.
 - **Encryption**: the core defaults characteristics to
-  `ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE`, so writes need no bond. If a write
-  ever fails with insufficient authentication, add a `createBond()` before the
-  first write.
-- **Battery optimisation** can kill the foreground service; Setup links to the
-  exemption screen but does not request it programmatically.
+  `ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE`, so writes need no bond. A write
+  refused with insufficient authentication now calls `createBond()` once per
+  connection and lets the 1 Hz mirror re-send what it dropped. **Unverified on a
+  phone.**
+- **Battery optimisation** can kill the foreground service. SETTINGS now asks for
+  this app's own exemption (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, with the
+  permission in the manifest) and falls back to the list, then to system settings.
+  **Unverified on a phone.**
 - **Empty notification text**: apps with fully custom layouts may post no title
   or text extras, and are skipped.
 

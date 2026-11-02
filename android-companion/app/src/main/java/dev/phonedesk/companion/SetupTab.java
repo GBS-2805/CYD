@@ -2,8 +2,11 @@ package dev.phonedesk.companion;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -126,6 +129,28 @@ final class SetupTab extends ScrollView {
                 13, Ui.DIM));
         Button batteryButton = Ui.action(activity, "BATTERY SETTINGS", false);
         batteryButton.setOnClickListener(v -> {
+            Context context = activity.getApplicationContext();
+            PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            if (power != null && power.isIgnoringBatteryOptimizations(context.getPackageName())) {
+                // Already exempt: the settings list is where that can be undone.
+                try {
+                    activity.startActivity(new Intent(
+                            Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                } catch (Exception ignored) {
+                    // Nothing else to offer.
+                }
+                return;
+            }
+            // Ask for this app's exemption directly. The settings list works too,
+            // but leaves the user hunting for one name among every app installed.
+            try {
+                activity.startActivity(new Intent(
+                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        Uri.parse("package:" + context.getPackageName())));
+                return;
+            } catch (Exception e) {
+                // Some builds refuse the direct request; the list still works.
+            }
             try {
                 activity.startActivity(new Intent(
                         Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));

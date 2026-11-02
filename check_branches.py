@@ -17,7 +17,7 @@ actually add something.
 
   ./check_branches.py              exit 0 when nothing is pending, 1 otherwise
   ./check_branches.py --fetch      look at the remote first, in case a chat pushed
-  ./check_branches.py --base freebuff-base   compare against something other than main
+  ./check_branches.py --base freebuff-base   compare against something other than this branch
   ./check_branches.py --all        include the branch this worktree has checked out
   ./check_branches.py --commits-only   skip the content check: commits alone, no files read
 
@@ -43,14 +43,28 @@ def git(*args, check=True):
 
 
 def base_branch(named):
-    """The first base that exists, so a clone with no origin still works."""
-    for name in [named] if named else ["origin/main", "main", "freebuff-base"]:
+    """The branch this worktree has, so already-merged work is not called pending.
+
+    origin/main reads well only while everything is pushed, and nothing in this
+    repo is: the remote lags both chats, so work merged here days ago came back as
+    "10 commits on top of origin/main, 11 paths it has no bytes for" — twice, and
+    both times a person had to check by hand that the merge had happened. The
+    branch checked out here is the tree the answer is about; the old names stay as
+    fallbacks for a detached HEAD or a bare clone.
+    """
+    if named:
+        candidates = [named]
+    else:
+        here = git("rev-parse", "--abbrev-ref", "HEAD", check=False).stdout.strip()
+        candidates = [here if here and here != "HEAD" else "HEAD",
+                      "origin/main", "main", "freebuff-base"]
+    for name in candidates:
         found = git("rev-parse", "--verify", "--quiet", f"{name}^{{commit}}", check=False)
         if found.returncode == 0:
             return name, found.stdout.strip()
         if named:
             break
-    tried = named or "origin/main, main, freebuff-base"
+    tried = named or "this branch, origin/main, main, freebuff-base"
     print(f"error: no base to compare against (tried {tried})", file=sys.stderr)
     raise SystemExit(2)
 
@@ -159,7 +173,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="List branches holding work the base branch does not have."
     )
-    parser.add_argument("--base", default=None, help="branch to compare against (default: origin/main)")
+    parser.add_argument("--base", default=None, help="branch to compare against (default: the branch checked out here)")
     parser.add_argument("--fetch", action="store_true", help="fetch the remotes before comparing")
     parser.add_argument("--all", action="store_true", help="also report this worktree's own branch")
     parser.add_argument("--commits", type=int, default=5, metavar="N", help="commits to name per branch (default: 5)")

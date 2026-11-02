@@ -282,6 +282,10 @@ public class DeckService extends Service {
         }
     };
 
+    /** One bond attempt per link, and no bond removal more than once a minute. */
+    private long lastBondForgetMs;
+    private boolean bondAsked;
+
     private final Runnable writeTimeout = () -> {
         if (writing) {
             writing = false;
@@ -314,6 +318,7 @@ public class DeckService extends Service {
         public void onConnectionStateChange(BluetoothGatt g, int statusCode, int newState) {
             connecting = false;
             if (newState == BluetoothProfile.STATE_CONNECTED) {
+                bondAsked = false;
                 setStatus("Discovering services");
                 try {
                     // Ask for the larger MTU before the services are up: at the
@@ -326,7 +331,21 @@ public class DeckService extends Service {
                     releaseGatt();
                 }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                BluetoothDevice device = g.getDevice();
+                boolean staleBond = BondAdvice.FORGET.equals(bondAdvice(statusCode, bondState(device)))
+                        && System.currentTimeMillis() - lastBondForgetMs > 60000;
                 releaseGatt();
+                if (staleBond) {
+                    // A bond left by an older build makes the stack refuse the link
+                    // with 133, and rescanning never clears it. Android keeps
+                    // removeBond() out of the public API, so this asks for it by
+                    // reflection and reports whether it worked.
+                    lastBondForgetMs = System.currentTimeMillis();
+                    setStatus(forgetBond(device) ? "Stale pairing forgotten, retrying"
+                                                 : "Stale pairing could not be removed");
+                    scheduleScan(3000);
+                    return;
+                }
                 setStatus("Disconnected, scanning");
                 scheduleScan(2000);
             }
@@ -399,6 +418,12 @@ public class DeckService extends Service {
         @Override
         public void onCharacteristicWrite(BluetoothGatt g, BluetoothGattCharacteristic ch,
                                           int statusCode) {
+            // A write refused for authentication is the one failure another queue
+            // entry cannot fix: the link needs a bond first. Ask once, then let the
+            // 1 Hz mirror re-send what this one dropped.
+            if (BondAdvice.PAIR.equals(bondAdvice(statusCode, bondState(g.getDevice())))) {
+                askForBond(g.getDevice());
+            }
             handler.removeCallbacks(writeTimeout);
             if (statusCode == BluetoothGatt.GATT_SUCCESS) {
                 ++writesSent;
@@ -704,6 +729,45 @@ public class DeckService extends Service {
             connect(bluetooth.getRemoteDevice(mac));
         } catch (IllegalArgumentException e) {
             setStatus("Unknown deck address");
+        } catch (SecurityException e) {
+            setStatus("Bluetooth permission needed");
+        }
+    }
+
+    /** The platform's values, decided in {@link BondAdvice}, which the host suite can run. */
+    static String bondAdvice(int statusCode, int bondState) {
+        return BondAdvice.forFailure(statusCode, bondState);
+    }
+
+    /** The bond state, or BOND_NONE when the permission to read it is missing. */
+    private static int bondState(BluetoothDevice device) {
+        if (device == null) return BluetoothDevice.BOND_NONE;
+        try {
+            return device.getBondState();
+        } catch (SecurityException e) {
+            return BluetoothDevice.BOND_NONE;
+        }
+    }
+
+    /** Drops a bond this app did not make, so the deck can be reached again. */
+    private boolean forgetBond(BluetoothDevice device) {
+        if (device == null || !canConnect()) return false;
+        try {
+            Object done = device.getClass().getMethod("removeBond").invoke(device);
+            return !(done instanceof Boolean) || Boolean.TRUE.equals(done);
+        } catch (Exception e) {
+            Log.i(TAG, "bond: could not remove it: " + e);
+            return false;
+        }
+    }
+
+    /** A refused write needs a bond; ask once per connection, never in a loop. */
+    private void askForBond(BluetoothDevice device) {
+        if (bondAsked || device == null || !canConnect()) return;
+        bondAsked = true;
+        try {
+            if (bondState(device) == BluetoothDevice.BOND_BONDED) return;
+            if (device.createBond()) setStatus("Pairing to write");
         } catch (SecurityException e) {
             setStatus("Bluetooth permission needed");
         }
