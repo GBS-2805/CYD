@@ -114,6 +114,11 @@ final class EspRom {
     private boolean manualReset;
     /** DTR drives EN and RTS drives IO0 instead of the other way round. */
     private boolean swapControl;
+    /**
+     * The rate the last handshake answered at; tried first next time. The wiring is
+     * remembered the same way, so a board only has to teach the app its shape once.
+     */
+    private int preferredBaud = BAUDS[0];
     /** True once a plain reset produced readable boot text, not just noise. */
     private boolean bannerSeen;
     /**
@@ -174,6 +179,42 @@ final class EspRom {
     }
 
     /**
+     * Start at the rate that answered last time.
+     *
+     * A bridge whose crystal is far enough off only ever syncs at one rate, and the
+     * ROM keeps talking at whatever rate the sync packet taught it. Re-learning that
+     * costs a full wiring's worth of silent rounds, which is why the tab stores the
+     * answer next to the wiring.
+     */
+    void setPreferredBaud(int rate) {
+        preferredBaud = rate;
+    }
+
+    /**
+     * The rates to try, the remembered one first. Nothing is dropped: a board that
+     * answered at 460800 once may still be the board that answers at 115200, and a
+     * remembered rate that has stopped working must not cost the probe its fallback.
+     */
+    private int[] baudOrder() {
+        if (preferredBaud <= 0) return BAUDS;
+        int known = -1;
+        for (int i = 0; i < BAUDS.length; ++i) {
+            if (BAUDS[i] == preferredBaud) {
+                known = i;
+                break;
+            }
+        }
+        if (known == 0) return BAUDS;   // 115200 already leads
+        final int[] order = new int[BAUDS.length + (known < 0 ? 1 : 0)];
+        order[0] = preferredBaud;
+        int at = 1;
+        for (int i = 0; i < BAUDS.length; ++i) {
+            if (i != known) order[at++] = BAUDS[i];
+        }
+        return order;
+    }
+
+    /**
      * The whole probe in one press, in the order that asks the least of the reset
      * wiring first.
      *
@@ -213,7 +254,7 @@ final class EspRom {
             log("  the buttons select " + wiringName(preferSwap, preferManual)
                     + ", so step 3 tries that first");
         }
-        if (quietSync(QUIET_SYNC_ATTEMPTS)) {
+        if (quietSyncRemembered(QUIET_SYNC_ATTEMPTS)) {
             log("  step 1 answered: the chip was already sitting in its loader, so no"
                     + " reset and no wiring took part");
             return new Sweep(identify("none"), false, false, 0);
@@ -241,7 +282,7 @@ final class EspRom {
         final long deadline = System.currentTimeMillis() + handResetMs;
         while (System.currentTimeMillis() < deadline) {
             try {
-                if (quietSync(QUIET_SYNC_ATTEMPTS)) {
+                if (quietSyncRemembered(QUIET_SYNC_ATTEMPTS)) {
                     log("   step 2 answered: BOOT + RESET put the chip in its loader and"
                             + " the adapter's EN and IO0 legs were never used");
                     return true;
@@ -411,10 +452,15 @@ final class EspRom {
      */
     Detected connect() throws IOException {
         final StringBuilder silent = new StringBuilder();
+        final int[] order = baudOrder();
         boolean synced = false;
 
-        log("sync: " + BAUDS.length + " rates queued, " + CONNECT_ROUNDS
+        log("sync: " + order.length + " rates queued, " + CONNECT_ROUNDS
                 + " reset rounds x " + SYNC_ATTEMPTS + " sync packets at the first");
+        if (preferredBaud != BAUDS[0]) {
+            log("the last handshake answered at " + preferredBaud + " baud, so that rate"
+                    + " comes first and " + BAUDS[0] + " still gets its turn");
+        }
         if (swapControl) {
             log("control lines swapped: DTR drives EN, RTS drives IO0");
         }
@@ -428,7 +474,7 @@ final class EspRom {
         // pulse is the first thing that changes the chip's state.
         log("quiet sync: " + QUIET_SYNC_ATTEMPTS + " packets at " + baud
                 + " baud with the control lines untouched");
-        if (quietSync(QUIET_SYNC_ATTEMPTS)) {
+        if (quietSyncRemembered(QUIET_SYNC_ATTEMPTS)) {
             synced = true;
             log("synced at " + baud + " baud with no reset: the loader was already"
                     + " waiting for a packet, so EN and IO0 played no part");
@@ -441,8 +487,8 @@ final class EspRom {
         // rounds then alternate away from it and back.
         final boolean base = invertControl;
 
-        for (int index = 0; index < BAUDS.length && !synced; ++index) {
-            final int rate = BAUDS[index];
+        for (int index = 0; index < order.length && !synced; ++index) {
+            final int rate = order[index];
             final boolean first = index == 0;
             try {
                 changeBaud(rate);
@@ -573,7 +619,7 @@ final class EspRom {
                         + " question.";
             }
             final String message = "no answer from the bootloader at any of "
-                    + BAUDS.length + " baud rates (" + rates + ")" + tail;
+                    + order.length + " baud rates (" + rates + ")" + tail;
             throw new IOException(message);
         }
 
@@ -750,6 +796,23 @@ final class EspRom {
         } catch (IOException e) {
             return false;
         }
+    }
+
+    /**
+     * The quiet phase at the port's opening rate, then at the remembered one.
+     *
+     * A bridge whose crystal is off by enough only ever syncs at one rate, so the rate
+     * a previous handshake proved this board answers at is worth a second try before a
+     * reset of ours: steps 1 and 2 are the cheap entries, and leaving them on 115200
+     * alone would make step 2 wait out its whole window for a packet the bridge cannot
+     * hear. Steps 1 and 2 both use this, which is why it lives here and not in connect().
+     */
+    private boolean quietSyncRemembered(int attempts) throws IOException {
+        if (quietSync(attempts)) return true;
+        if (preferredBaud == baud) return false;
+        log("quiet sync again at the remembered " + preferredBaud + " baud");
+        changeBaudQuietly(preferredBaud);
+        return quietSync(attempts);
     }
 
     /**

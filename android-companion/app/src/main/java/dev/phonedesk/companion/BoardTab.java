@@ -61,6 +61,8 @@ final class BoardTab extends ScrollView {
     private boolean manualReset;
     /** DTR drives EN and RTS drives IO0; see EspRom.setSwappedLines(). */
     private boolean swappedLines;
+    /** The rate the last handshake answered at; PROBE and FLASH try it first. */
+    private int probeBaud = 115200;
 
     /**
      * The CH340 is one resource for the whole process, not one per Activity.
@@ -98,6 +100,7 @@ final class BoardTab extends ScrollView {
     private static final String KEY_MONITOR_EOL = "monitor_eol";
     private static final String KEY_MANUAL_RESET = "manual_reset";
     private static final String KEY_SWAPPED_LINES = "swapped_lines";
+    private static final String KEY_PROBE_BAUD = "probe_baud";
     private static final int PURPOSE_PROBE = 0;
     private static final int PURPOSE_MONITOR = 1;
     private static final int PURPOSE_PING = 2;
@@ -184,6 +187,7 @@ final class BoardTab extends ScrollView {
         monitorLineEnding = prefs().getString(KEY_MONITOR_EOL, "\r\n");
         manualReset = prefs().getBoolean(KEY_MANUAL_RESET, false);
         swappedLines = prefs().getBoolean(KEY_SWAPPED_LINES, false);
+        probeBaud = prefs().getInt(KEY_PROBE_BAUD, 115200);
 
         // Built once and re-added on each rebuild, so a half-typed line survives
         // the tab refreshing underneath it.
@@ -302,6 +306,17 @@ final class BoardTab extends ScrollView {
     private void setSwappedLines(boolean swapped) {
         swappedLines = swapped;
         prefs().edit().putBoolean(KEY_SWAPPED_LINES, swapped).apply();
+        signature = "";
+        refresh();
+    }
+
+    /**
+     * Remembers the rate that answered, so the next probe does not spend its first
+     * rounds proving 115200 is silent on this bridge.
+     */
+    private void setProbeBaud(int rate) {
+        probeBaud = rate;
+        prefs().edit().putInt(KEY_PROBE_BAUD, rate).apply();
         signature = "";
         refresh();
     }
@@ -1001,6 +1016,17 @@ final class BoardTab extends ScrollView {
             card.addView(manualNote);
         }
 
+        if (probeBaud != 115200) {
+            TextView baudNote = Ui.text(activity,
+                    "The last handshake answered at " + probeBaud + " baud, so PROBE and"
+                            + " FLASH try that rate first and 115200 after it. A rate that"
+                            + " stops answering falls through to the others on its own.",
+                    11, Ui.ACCENT);
+            baudNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
+            baudNote.setLineSpacing(Ui.dp(activity, 2), 1f);
+            card.addView(baudNote);
+        }
+
         card.addView(Ui.section(activity, "PROBE LOG"));
 
         final String log = logText();
@@ -1204,6 +1230,8 @@ final class BoardTab extends ScrollView {
             // a board that answered on swapped lines last time starts there again.
             rom.setSwappedLines(swappedLines);
             rom.setManualReset(manualReset);
+            // The rate that answered last time leads the sweep, for the same reason.
+            rom.setPreferredBaud(probeBaud);
             trace("== PROBE " + label + " · Android " + Build.VERSION.RELEASE
                     + " · " + device.getInterfaceCount() + " interface(s) ==");
             boolean opened = false;
@@ -1217,8 +1245,12 @@ final class BoardTab extends ScrollView {
                 final EspRom.Detected detected = sweep.detected;
                 message = detected.chip + " bootloader found · MAC " + detected.mac
                         + "\n" + label + "\n" + describeWiring(sweep);
-                if (detected.baud != 115200) {
-                    message += "\nHandshake needed " + detected.baud + " baud.";
+                if (detected.baud != probeBaud) {
+                    message += "\nHandshake answered at " + detected.baud + " baud; the"
+                            + " next probe starts there.";
+                } else if (detected.baud != 115200) {
+                    message += "\nHandshake answered at the remembered "
+                            + detected.baud + " baud.";
                 }
                 color = Ui.GOOD;
             } catch (Exception e) {
@@ -1251,10 +1283,14 @@ final class BoardTab extends ScrollView {
             final boolean found = sweep != null;
             final boolean foundSwapped = found && sweep.swapped;
             final boolean foundManual = found && sweep.manual;
+            final int foundBaud = found ? sweep.detected.baud : 0;
             activity.runOnUiThread(() -> {
                 if (activity.isDestroyed()) return;
                 usbProbing = false;
-                if (found) applyWiring(foundSwapped, foundManual);
+                if (found) {
+                    applyWiring(foundSwapped, foundManual);
+                    applyBaud(foundBaud);
+                }
                 setUsbStatus(result, resultColor);
             });
         }, "usb-probe").start();
@@ -1282,6 +1318,13 @@ final class BoardTab extends ScrollView {
         setSwappedLines(swapped);
         Actions.toast(activity, "Probe found " + (swapped ? "swapped lines" : "normal lines")
                 + ", " + (manual ? "BOOT held" : "app reset"));
+    }
+
+    /** Keeps the rate the handshake answered at, beside the wiring it answered on. */
+    private void applyBaud(int rate) {
+        if (rate <= 0 || rate == probeBaud) return;
+        setProbeBaud(rate);
+        Actions.toast(activity, "Probe found " + rate + " baud");
     }
 
     /** Boots what is in flash without entering the bootloader. */
@@ -1375,6 +1418,7 @@ final class BoardTab extends ScrollView {
             rom.setTrace(BoardTab.this::trace);
             rom.setSwappedLines(swappedLines);
             rom.setManualReset(manualReset);
+            rom.setPreferredBaud(probeBaud);
             trace("== FLASH " + name + " · " + Ui.size(image.length) + " ==");
             try {
                 port.open();

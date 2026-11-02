@@ -491,7 +491,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   in `dist/` after a `clean assembleDebug` on 2026-10-30, for the Off-site build;
   the artifact in `dist/` now is the one rebuilt on 2026-11-01 after the probe
   order changed, which followed the sketch header change, the probe work, the
-  drawer's rework and the deck's sign-in — **166,334 bytes** on the file in
+  drawer's rework and the deck's sign-in — **167,234 bytes** on the file in
   `dist/`, against the 112,473 that the same work produced before the second
   widget joined it. The two
   halves were measured on their own branches the same day before they met —
@@ -517,7 +517,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
   either instead of failing a build that has `INTERNET`, and its `aapt2 dump
   xmltree` check is what enforces the cleartext flag. `./toolchain.sh` passed end
   to end on 2026-11-01: `all 61 host checks passed`, as the suite stood then — it
-  is 107 now that the probe order and the buttons' wiring have their own checks (fifteen for the sign-in —
+  is 117 now that the probe order, the buttons' wiring and the remembered rate have
+  their own checks (fifteen for the sign-in —
   nine for `SpotifyLink`'s parser, six for the address it builds, including a `+`
   escaped as `%2B` rather than a space), `BUILD SUCCESSFUL`, v2 signature,
   `zipalign -c 4`, 165,242 bytes on the merged tree (149,494 for the sign-in
@@ -544,10 +545,10 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **166,334 bytes** on 2026-11-01, the rebuild carrying two bundled sketches, the
+  **167,234 bytes** on 2026-11-01, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror and the three-step probe. Quote the size to the nearest kB
-  (~162 kB), never as a checksum.
+  (~163 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set — now including
   `INTERNET`, the one outbound request to the deck —
@@ -623,10 +624,19 @@ wiring, and a silent board still reporting all four wirings at the end. **None o
 the three steps has run on a phone since the change**; the last hardware run is
 the one recorded above, before it.
 
+**The rate is remembered too.** A handshake that answered at anything other than
+115200 is kept in the tab's prefs (`probe_baud`) beside the wiring, because a
+bridge whose crystal is off by enough only ever syncs at one rate; PROBE and FLASH
+start there. Steps 1 and 2 ask at the remembered rate as well—otherwise a board
+that only speaks 460800 would sit out step 2's whole window for a packet the
+adapter cannot hear—and the other four rates still follow if it stops answering,
+so a stale value costs one attempt rather than the probe. Before this the rate was
+printed in the status line and dropped.
+
 `./toolchain.sh` passed end to end on 2026-11-01 with the buttons feeding the
-sweep too: `all 107 host checks passed` — four of them for the order — `BUILD
-SUCCESSFUL`, v2 signature, `zipalign -c 4`, both bundled sketches in sync,
-**166,334 bytes** in `dist/`.
+sweep and the rate remembered: `all 117 host checks passed` — four for the wiring
+order, four for the rate — `BUILD SUCCESSFUL`, v2 signature, `zipalign -c 4`,
+both bundled sketches in sync, **167,234 bytes** in `dist/`.
 
 ## Not verified
 

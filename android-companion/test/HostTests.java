@@ -48,6 +48,8 @@ public final class HostTests {
         handResetComesBeforeAnyWiring();
         sweepTriesEveryWiring();
         preferredWiringGoesFirst();
+        rememberedBaudAnswersStep1();
+        rememberedBaudLeadsTheSweep();
         flashBootNamesTheStrap();
         downloadBootAsksForASecondHost();
         spotifyCallbackLink();
@@ -302,6 +304,67 @@ public final class HostTests {
             check("the other three still run", log.contains("wiring 4/4"));
             check("every wiring is still counted", e.getMessage().contains("4 wirings"));
         }
+    }
+
+    /**
+     * A bridge whose crystal is off only answers at one rate, so the rate that worked
+     * last time is asked first — in step 1, before any reset. Here nothing but 460800
+     * reaches the chip, which is exactly the board this fixes.
+     */
+    private static void rememberedBaudAnswersStep1() throws Exception {
+        final UsbSerialCh340 port = new UsbSerialCh340();
+        final UsbSerialCh340.Responder answers = chip(false);
+        port.answer((p, op, checksum, payload) -> {
+            // Bytes at any other rate are noise to this bridge.
+            if (p.baud != 460800) return;
+            answers.onCommand(p, op, checksum, payload);
+        });
+        final EspRom rom = new EspRom(port);
+        rom.setPreferredBaud(460800);
+        rom.setHandResetWait(0);   // if step 1 misses, fail fast instead of waiting
+        final List<String> trace = new ArrayList<>();
+        rom.setTrace(trace::add);
+
+        final EspRom.Sweep sweep = rom.connectAll();
+
+        check("a remembered rate answers step 1", sweep.phases == 0);
+        check("the rate that answered is the remembered one", sweep.detected.baud == 460800);
+        check("step 1 asks again at the remembered rate",
+                joined(trace).contains("quiet sync again at the remembered 460800 baud"));
+        check("the remembered rate takes no reset", port.control.isEmpty());
+        check("the probe never reaches the wirings", !joined(trace).contains("wiring 1/4"));
+    }
+
+    /**
+     * When step 1 cannot answer, the remembered rate is the sweep's first rate, not its
+     * second: re-learning that the default is silent costs a wiring's silent rounds.
+     */
+    private static void rememberedBaudLeadsTheSweep() throws Exception {
+        final UsbSerialCh340 port = new UsbSerialCh340();
+        final UsbSerialCh340.Responder answers = chip(false);
+        port.answerOnlyAfterPulse = true;   // step 1 must fail, or no rate is tried
+        port.answer((p, op, checksum, payload) -> {
+            if (p.baud != 460800) return;
+            answers.onCommand(p, op, checksum, payload);
+        });
+        final EspRom rom = new EspRom(port);
+        rom.setPreferredBaud(460800);
+        rom.setHandResetWait(0);
+        rom.setBootHoldLeadIn(0);
+        final List<String> trace = new ArrayList<>();
+        rom.setTrace(trace::add);
+
+        final EspRom.Sweep sweep = rom.connectAll();
+
+        check("the remembered rate answers the first wiring", sweep.phases == 1);
+        check("the remembered rate leads the sweep",
+                joined(trace).contains("460800 baud: 3 rounds of 12 syncs"));
+        check("the sweep never asks for the default rate first",
+                !joined(trace).contains("115200 baud: 3 rounds"));
+        check("the log says the remembered rate comes first", joined(trace).contains(
+                "the last handshake answered at 460800 baud, so that rate comes first"));
+        check("the forgotten rates still follow", port.rates.contains(74880)
+                || joined(trace).contains("74880 baud"));
     }
 
     /** A board that never answers must say all four were tried, not one. */
