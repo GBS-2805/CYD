@@ -493,7 +493,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the artifact in `dist/` now is the one rebuilt on 2026-11-02 after the drawer
   gained the owner's mark above its wordmark, which followed the sketch header
   change, the probe work, the drawer's rework and the deck's sign-in —
-  **174,506 bytes** on the file in
+  **174,830 bytes** on the file in
   `dist/`, against the 112,473 that the same work produced before the second
   widget joined it. The two
   halves were measured on their own branches the same day before they met —
@@ -506,9 +506,16 @@ Identical to the sketch, checked against its `onWrite` handlers:
   sketches they name are inside the APK, `assets/widgets/phone_deck_cyd24R/` and
   `assets/widgets/spotify_deck_cyd24R/`, and `check_widget_assets.py` in the repo
   root compares those copies with `../<folder>/<sketch>.ino` byte for byte (phone
-  deck md5 `62c7e6c3…`, Spotify `f234b68b…` — `00bb1560…` before the Bluetooth
-  link, `eca02e93…` before the callback change and `49f29bcb…` before the one-line
-  answer — both in sync on 2026-11-01).
+  deck md5 `62c7e6c3…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
+  header rewrite, and `00bb1560…`, `eca02e93…`, `49f29bcb…` before the Bluetooth
+  link, the callback change and the one-line answer — both in sync on 2026-11-02).
+  The rewrite makes the phone-over-Bluetooth source the deck's first one and
+  Spotify's own Web API the optional half; it arrived by merging the deck chat's
+  branch, and the APK in `dist/` was rebuilt against it. That sketch also
+  **compiles here**, measured on 2026-11-02 once `~/.arduino-cyd/env.sh` was
+  sourced — `check_docs.py`'s gate built it on the `huge_app` partition and read
+  1,878,645 B with 69,092 B of globals, beside the phone deck's unchanged
+  1,168,314 B / 45,244 B. Neither board has run it.
 - **The Spotify deck's sign-in finishes here.** `SpotifyCallbackActivity` is
   exported for `phonedesk://spotify-callback`, and `aapt2 dump xmltree` on the
   shipped APK shows the VIEW/DEFAULT/BROWSABLE filter with scheme `phonedesk` and
@@ -548,7 +555,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **174,506 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
+  **174,830 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror, the three-step probe, the owner's logo as the icon, and the same
   ghost again above the drawer's wordmark. Quote the size to the nearest kB
@@ -646,7 +653,9 @@ printed in the status line and dropped.
 `./toolchain.sh` passed end to end on 2026-11-02 with the header mark in place and
 the buttons still feeding the sweep with the rate remembered: `all 117 host checks
 passed`, `BUILD SUCCESSFUL in 19s`, v2 signature, `zipalign -c 4`, both bundled
-sketches in sync, **174,506 bytes** in `dist/` — 220 bytes above the build before
+sketches in sync, **174,830 bytes** in `dist/` — 324 bytes above the build before,
+because the bundled Spotify sketch's rewritten header is what changed: the app's
+own Java did not move in this rebuild
 it, which is the dex moving under an unchanged screen set: `DecksTab` now takes
 its state through a constructor argument and `DeckStore` grew a dated overload
 for the capture, and neither changes what the app does.

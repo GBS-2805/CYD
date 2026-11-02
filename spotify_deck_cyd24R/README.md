@@ -11,7 +11,7 @@ active.
 
 This deck needs `PartitionScheme=huge_app`. Bluetooth does not fit beside WiFi,
 mbedTLS and the setup server in the default 1,310,720-byte app slot: the linked
-image is 1,878,581-1,878,629 bytes, 142 % of that slot and 59 % of this one. Flashing the
+image is 1,878,661 bytes, 142 % of that slot and 59 % of this one. Flashing the
 phone deck afterwards with the default scheme re-partitions the board back, so
 each upload has to carry the scheme its own sketch was built for.
 
@@ -25,7 +25,7 @@ this screen.
 The folder is `spotify_deck_cyd24R` and the sketch is `spotify_deck_cyd24R.ino`. Anything a
 person reads says **Spotify Deck**.
 
-## What it needs before it can do anything
+## What the WiFi path needs before it can do anything
 
 1. A **2.4 GHz WiFi network**. The ESP32 has no 5 GHz radio; a network that only
    offers 5 GHz is invisible to it no matter what is typed in.
@@ -118,11 +118,17 @@ setup **and** in the player, but `/auth`, `/code` and `/spotify` belong to setup
 deck that is already playing has no sign-in page, so hold the footer `SETUP` chip
 to get one back. The app says that rather than failing quietly.
 
-## First run: the setup page
+## First run, and the setup page when you want it
 
-With no stored credentials the deck draws a SETUP card, raises an **open** WiFi
-access point called `Spotify Deck`, and serves a page at `http://192.168.4.1`.
+A board with no stored credentials boots straight into the player page and links
+to the phone over Bluetooth: no access point, no wizard, nothing to type. The
+setup page is opt-in — hold the footer `SETUP` chip for 1.5 s, or type `setup` and
+Enter at 115200 — and *then* the deck draws the SETUP card, raises an **open**
+WiFi access point called `Spotify Deck`, and serves a page at `http://192.168.4.1`.
 There is nothing to install on the phone and nothing to type into a monitor.
+
+Ask for it when you want the deck to fetch music itself instead of asking the
+phone.
 
 1. Join `Spotify Deck` on the phone. Android warns that it has no internet —
    stay connected, the page is local.
@@ -276,7 +282,7 @@ scheme**; see the measurement below for why that is enough.
 
 Both decks are ordinary Arduino sketches and both travel on the phone: the app
 bundles this one too (`check_widget_assets.py` prints `2 widgets bundled, every
-copy matches`, with this sketch at md5 `f234b68b…`), so it can be pulled from the
+copy matches`, with this sketch at md5 `3b17f04a…`), so it can be pulled from the
 same shelf as its sibling.
 
 From a computer, `toolchain.sh` has already compiled it:
@@ -301,7 +307,9 @@ From the phone, with an OTG adapter and a USB **data** cable:
    companion app's own uploader, so it says nothing about this one. A computer
    over the same cable is the fallback when the phone's upload will not take.
 5. Nothing needs typing before a flash: no credentials live in the sketch, so the
-   first boot draws the SETUP card and raises the `Spotify Deck` access point.
+   first boot draws the player page and shows `NO LINK` until a phone pairs. Hold
+   the footer `SETUP` chip, or type `setup` at 115200, when you want the WiFi path;
+   that is what raises the `Spotify Deck` access point.
 
 There is no image to merge and no offset to set — this is a sketch upload, not a
 factory `.bin`. Uploading a different partition scheme later re-partitions the
@@ -364,7 +372,7 @@ compiler:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,878,581-1,878,629 | **1,267,099** | 3,145,728 (59 % used) |
+| flash | 1,878,645 | **1,267,083** | 3,145,728 (59 % used) |
 | DRAM | 69,092 globals | **258,588** | 327,680 |
 
 Without Bluetooth the same sketch was 1,125,781 bytes on the default scheme; the
@@ -405,8 +413,10 @@ sourcing a toolchain.
   A/B build rather than the shipping one.
 * **It needs `huge_app` now, and that is the scheme `toolchain.sh` pins.**
   Without Bluetooth the 3.3.12 build was 1,125,781 bytes (85 % of the
-  1,310,720-byte default slot); with the link it is 1,878,581-1,878,629 bytes, the same build
-  twice with 48 B between the runs, which is **142 %** of that slot and **59 %** of `huge_app`'s 3,145,728. `default.csv`
+  1,310,720-byte default slot); with the link it is 1,878,661 bytes, which is
+  **142 %** of that slot and **59 %** of `huge_app`'s 3,145,728. An earlier pair of
+  runs differed by 48 B; the pre-commit hook and a direct compile both print
+  1,878,661 now, so the single figure is the measured one. `default.csv`
   sizes `app0` and `app1` at 1,310,720 each, so on the default scheme this deck no
   longer links at all — not a tighter fit, a refusal. Uploading it re-partitions
   the board, and flashing the phone deck afterwards puts the default scheme back.

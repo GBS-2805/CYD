@@ -32,15 +32,12 @@ controller or bridge gets its own section here first.
   (`schema: 1`, with `id`, `name`, `sketch`, `board`, `tagline`, `body`, `notes`,
   `libraries`, `never`, and a `ble` block when it speaks BLE). The app copies the
   sketch at build time, so `android-companion/app/src/main/assets/widgets/<id>/`
-  must hold a byte-identical copy. Check it with
-  [`check_widget_assets.py`](check_widget_assets.py) before committing: it fails
-  when a descriptor names a missing sketch, when a bundled copy has drifted, or
-  when `assets/widgets/` holds a widget no descriptor claims.
-* **A deck's id is its own and no rule pools it.** Each folder keeps its name, its
-  `widget.json`, its `README.md` and the id its sketch prints: `<widget>-<tag>`,
-  the folder-named widget plus the low 24 bits of that board's efuse MAC. A
-  re-flash keeps the id, a second board of the same widget is a second id, and this
-  file records rules — it never assigns, renames or merges a deck's id.
+  must hold a byte-identical copy. That tree is **gitignored build output** —
+  Gradle rewrites it before every build and nothing under it belongs in a commit,
+  so a sketch edit wants a re-sync, not a staged file. Check the copy with
+  [`check_widget_assets.py`](check_widget_assets.py) after any sketch edit: it
+  fails when a descriptor names a missing sketch, when a bundled copy has drifted,
+  or when `assets/widgets/` holds a widget no descriptor claims.
 
 ### Naming: `<topic>_deck_<board>`
 
@@ -87,11 +84,17 @@ sketch and the descriptor `id`, which always move together:
   still proves nothing, because `esp32:esp32:esp32` defaults to `PSRAM=disabled`.
   Read the marking, never a product listing.
 * **Budget for 4 MB of flash and no PSRAM.** The default partition scheme gives
-  the app 1,310,720 bytes and the deck takes ~1,168,300 of them (89 % as reported
+  the app 1,310,720 bytes and the deck takes 1,168,314 of them (89 % as reported
   by the compiler, after the mirror). DRAM is 327,680 bytes with ~300 kB of heap
   free at boot once the display and touch drivers are up; a 320x240 RGB565
   framebuffer is 153,600, so there is room for one, not two. Treat "it fits" as a
   measurement from `Sketch uses ...`, never an assumption.
+* **A behaviour that becomes optional dates every doc that calls it required.**
+  When the Spotify deck stopped needing a token, its header and its "first run"
+  section still described a credential as the way in. A number check cannot see
+  that. When a default, a first boot or a required input changes, grep the folder
+  for the old requirement in the same change and rewrite it as the option it now
+  is.
 * **A control that ignores taps is usually a stale mapping, not a bad control.**
   The deck's `+` chip took no taps while `-` worked and a recalibration fixed it.
   Keep targets at least ~40 px on the short side, clear of the outer 8 px, with a
@@ -117,6 +120,23 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   phone deck to 1,168,314 B (89 %) / 45,244 B globals and the Spotify deck to
   1,125,781 B (85 %) / 53,636 B globals, as [`check_headroom.py`](check_headroom.py)
   read both of them on 2026-11-01.
+* **The numbers in these docs are checked too.** [`check_docs.py`](check_docs.py)
+  builds the decks and reads the markdown, and fails when a quoted flash size or
+  sketch md5 is not one of today's builds — the drift that twice left a README
+  describing last week's sketch — or when a relative link names a file that is
+  gone. It also requires each widget README to carry its
+  own deck's current size, globals and md5. It keeps its last measurement in a
+  gitignored `.build_figures.json` and reuses it only while that deck's sketch,
+  its FQBN and the compiler behind it are all unchanged, so a prose-only commit
+  costs a second instead of a minute; `--refresh` rebuilds anyway, and every run
+  names the decks that came from the file. A past build may stay in the prose,
+  but only by name in that file's `HISTORICAL` table, next to the reason.
+* **Quote the run, not a range.** A figure names the run it came from and is what
+  that run printed. When two builds of one sketch disagree — a pre-commit compile
+  and a direct one printed 1,878,581 and 1,878,629 for the same file — say which
+  one the doc quotes, or quote the one you can repeat. Never publish a span
+  measured at one end: `1,878,613-1,878,661` sat in five places with only the top
+  end ever observed, and the next build printed 1,878,661 twice.
 * **The margin is checked, not assumed.** [`check_headroom.py`](check_headroom.py)
   compiles each deck with the deck FQBN and reads the compiler's own `Maximum is
   …` figures, so both ceilings — 1,310,720 B of flash and 327,680 B of DRAM —
@@ -129,7 +149,13 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
 * **That check runs on commit.** [`.githooks/pre-commit`](.githooks/pre-commit)
   compiles the decks whose `<folder>/<folder>.ino` is staged and refuses the
   commit if one fails, so a sketch cannot grow past its partition unnoticed.
-  Docs-only commits return immediately, the app's synced asset copies are
+  A staged `.md` runs `check_docs.py` in the same pass, so a doc quoting a build
+  that no longer exists, or linking to a file that is gone, is refused before it
+  lands. That check reads its cache when neither a sketch nor the toolchain
+  moved, so a docs-only commit is quick and still refuses a figure from a build
+  that no longer exists. A commit with neither a sketch nor a doc returns
+  immediately; the
+  app's synced asset copies are
   ignored, and `git commit --no-verify` is the deliberate escape hatch. It needs
   `git config core.hooksPath .githooks` once per clone. A machine with no deck
   toolchain at all says the check did not run and lets the commit through, so a
@@ -399,6 +425,22 @@ other mention of it in this repo is a pointer back here.
   that measured the numbers.
 * Nothing is pushed or deployed without being asked. The repo stays private.
 * Numbers in docs are one board's measurements, not a contract. Say which.
+* **Every commit sweeps every file for what it just made untrue.** A sketch, a
+  doc, a README, a script comment and these rules are all descriptions of
+  something, and the description is the part that rots without anyone noticing.
+  Before committing, read the change for what it contradicts — a quoted number,
+  a "still carries", a "not yet", a step that has become optional, a rule whose
+  behaviour moved — and fix it in that commit, or write down why the old text
+  stays. The rules are included: a bullet that no longer describes the code is a
+  bug in the bullet, not a fact about the code. `check_docs.py` holds the quoted
+  sizes, md5s and links; everything else is a reader's job, so do it before the
+  reader does.
+* **Say it in words a person who was not there can use.** A commit subject names
+  what changed and why it matters, in the vocabulary the docs use — no ticket
+  shorthand, no "misc", no list of touched files standing in for a reason. The
+  hand-off note, the chat update and the commit body are one sentence seen from
+  three screens.
+
 * Never document a step as working because it should. The failed handshake is
   recorded with the baud rates and byte counts tried — including which handshake
   failed: the app's, not ArduinoDroid's — and that precision is what stops the

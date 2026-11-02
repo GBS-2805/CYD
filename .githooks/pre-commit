@@ -8,7 +8,8 @@
 #
 # Only a staged <folder>/<folder>.ino counts, so the copies the app syncs into
 # android-companion/app/src/main/assets/ never trigger a compile, and a docs-only
-# commit returns immediately. A machine that never had a deck toolchain says so
+# commit with neither a sketch nor a doc returns immediately; a staged .md runs
+# check_docs.py instead. A machine that never had a deck toolchain says so
 # and lets the commit through; one whose toolchain root exists without a runnable
 # arduino-cli is a half-finished install, and that is refused, because silence
 # there is a check that failed quietly. HEADROOM_ALLOW_MISSING_TOOLCHAIN=1
@@ -19,15 +20,19 @@ root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 cd "$root" || exit 0
 
 decks=()
+docs=()
 while IFS= read -r path; do
   [ -n "$path" ] || continue
+  case "$path" in
+    *.md) docs+=("$path") ;;
+  esac
   dir="${path%%/*}"
   [ "$path" = "$dir/$dir.ino" ] || continue   # nested paths are asset copies
   [ -f "$dir/$dir.ino" ] || continue          # a deleted sketch has nothing to build
   decks+=("$dir")
 done < <(git diff --cached --name-only --diff-filter=ACMR)
 
-if [ "${#decks[@]}" -eq 0 ]; then
+if [ "${#decks[@]}" -eq 0 ] && [ "${#docs[@]}" -eq 0 ]; then
   exit 0
 fi
 
@@ -86,8 +91,20 @@ args=(--arduino-cli "$cli")
 [ -n "${HEADROOM_MIN_FREE_KB:-}" ] && args+=(--min-free-kb "$HEADROOM_MIN_FREE_KB")
 [ -n "${HEADROOM_MIN_RAM_KB:-}" ] && args+=(--min-free-ram-kb "$HEADROOM_MIN_RAM_KB")
 
-if ! python3 "$root/check_headroom.py" "${args[@]}" "${decks[@]}"; then
-  echo "headroom: commit refused; see CONVENTIONS.md#build" >&2
-  exit 1
+status=0
+
+if [ "${#decks[@]}" -gt 0 ]; then
+  if ! python3 "$root/check_headroom.py" "${args[@]}" "${decks[@]}"; then
+    echo "headroom: commit refused; see CONVENTIONS.md#build" >&2
+    status=1
+  fi
 fi
-exit 0
+
+if [ "${#docs[@]}" -gt 0 ]; then
+  if ! python3 "$root/check_docs.py" --arduino-cli "$cli"; then
+    echo "docs: commit refused; a doc describes something this repo no longer has" >&2
+    status=1
+  fi
+fi
+
+exit "$status"
