@@ -32,10 +32,12 @@ controller or bridge gets its own section here first.
   (`schema: 1`, with `id`, `name`, `sketch`, `board`, `tagline`, `body`, `notes`,
   `libraries`, `never`, and a `ble` block when it speaks BLE). The app copies the
   sketch at build time, so `android-companion/app/src/main/assets/widgets/<id>/`
-  must hold a byte-identical copy. Check it with
-  [`check_widget_assets.py`](check_widget_assets.py) before committing: it fails
-  when a descriptor names a missing sketch, when a bundled copy has drifted, or
-  when `assets/widgets/` holds a widget no descriptor claims.
+  must hold a byte-identical copy. That tree is **gitignored build output** —
+  Gradle rewrites it before every build and nothing under it belongs in a commit,
+  so a sketch edit wants a re-sync, not a staged file. Check the copy with
+  [`check_widget_assets.py`](check_widget_assets.py) after any sketch edit: it
+  fails when a descriptor names a missing sketch, when a bundled copy has drifted,
+  or when `assets/widgets/` holds a widget no descriptor claims.
 
 ### Naming: `<topic>_deck_<board>`
 
@@ -87,6 +89,12 @@ sketch and the descriptor `id`, which always move together:
   free at boot once the display and touch drivers are up; a 320x240 RGB565
   framebuffer is 153,600, so there is room for one, not two. Treat "it fits" as a
   measurement from `Sketch uses ...`, never an assumption.
+* **A behaviour that becomes optional dates every doc that calls it required.**
+  When the Spotify deck stopped needing a token, its header and its "first run"
+  section still described a credential as the way in. A number check cannot see
+  that. When a default, a first boot or a required input changes, grep the folder
+  for the old requirement in the same change and rewrite it as the option it now
+  is.
 * **A control that ignores taps is usually a stale mapping, not a bad control.**
   The deck's `+` chip took no taps while `-` worked and a recalibration fixed it.
   Keep targets at least ~40 px on the short side, clear of the outer 8 px, with a
@@ -118,6 +126,12 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   describing last week's sketch. It also requires each widget README to carry its
   own deck's current size, globals and md5. A past build may stay in the prose,
   but only by name in that file's `HISTORICAL` table, next to the reason.
+* **Quote the run, not a range.** A figure names the run it came from and is what
+  that run printed. When two builds of one sketch disagree — a pre-commit compile
+  and a direct one printed 1,878,581 and 1,878,629 for the same file — say which
+  one the doc quotes, or quote the one you can repeat. Never publish a span
+  measured at one end: `1,878,613-1,878,661` sat in five places with only the top
+  end ever observed, and the next build printed 1,878,661 twice.
 * **The margin is checked, not assumed.** [`check_headroom.py`](check_headroom.py)
   compiles each deck with the deck FQBN and reads the compiler's own `Maximum is
   …` figures, so both ceilings — 1,310,720 B of flash and 327,680 B of DRAM —

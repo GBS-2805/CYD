@@ -25,11 +25,13 @@ Then build the APK as usual. `check_widget_assets.py` printing
 `N widgets bundled, every copy matches` is the check that the copies agree — a
 bare "BUILD SUCCESSFUL" only means Gradle ran.
 
-That asset tree is **generated output that is also committed**. Gradle derives
+That asset tree is **generated output and gitignored**: `android-companion/.gitignore`
+lists `app/src/main/assets/widgets/`, so nothing there is ever committed and a
+re-sync leaves `git status` clean. Gradle derives
 `app/src/main/assets/widgets/<id>/` from the `widget.json` and the sketch it
 names, and deletes anything under there no descriptor claims; `WidgetCatalog`
-reads the committed copy at runtime and the app's `toolchain.sh` reads the
-sketch back out of the built APK. So an edited sketch that never went through
+reads the built copy at runtime and the app's `toolchain.sh` reads the sketch
+back out of the built APK. So an edited sketch that never went through
 `:app:syncWidgets` ships the *old* file in the *new* APK: the change is in the
 repo, green in a build, and absent from the board. Nothing enforces the sync
 step — `check_widget_assets.py` is what makes the drift loud, naming both md5s

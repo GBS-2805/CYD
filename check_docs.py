@@ -65,6 +65,9 @@ HISTORICAL = {
     1165222: "the same phone sketch through toolchain.sh's root",
     1400000: "the const table quoted as the test that overflows the slot",
     1668748: "what that 1,400,000-byte table actually linked to",
+    1878581: "one run of the linked Spotify deck, 48 B under its sibling run",
+    1878629: "the other side of that 48 B disagreement, quoted as a rule's example",
+    1878613: "a lower bound nobody measured, quoted in CONVENTIONS as what not to publish",
 }
 
 # Old sketch hashes, likewise labelled in the prose as past values.

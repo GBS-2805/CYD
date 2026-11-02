@@ -5,10 +5,11 @@ android-companion/app/build.gradle copies each <widget>/widget.json and the
 sketch that descriptor names into
 android-companion/app/src/main/assets/widgets/<id>/ before every build, and
 deletes anything under there that no descriptor claims. So that asset tree is
-generated output - but it is also committed: WidgetCatalog reads it at runtime,
-and the app's toolchain.sh reads the sketch back out of the built APK and
-compares md5s. It goes stale the moment a sketch is edited without a rebuild,
-which is the gap CONVENTIONS.md names but nothing enforces.
+generated output and gitignored: no copy of it is ever committed, and a re-sync
+leaves `git status` clean. WidgetCatalog reads the built copy at runtime, and the
+app's toolchain.sh reads the sketch back out of the APK and compares md5s. It
+goes stale the moment a sketch is edited without a rebuild, which is the gap
+CONVENTIONS.md names and this file exists to close.
 
   ./check_widget_assets.py    exit 0 when every bundled copy matches, 1 otherwise
 """
