@@ -1,12 +1,14 @@
 package dev.phonedesk.companion;
 
 import android.content.Context;
+import android.graphics.PorterDuff;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -90,6 +92,29 @@ final class Ui {
         card.setBackground(rounded(context, CARD, EDGE, 14));
         card.setPadding(dp(context, 14), dp(context, 12), dp(context, 14), dp(context, 12));
         return card;
+    }
+
+    /**
+     * An icon from `res/drawable`, square and already tinted.
+     *
+     * Icons are shapes now, not characters: U+2699 and U+2039 were whatever the
+     * monospace face happened to carry, so their weight and optical size were the
+     * font's and a device without the glyph had no icon at all. A drawable is the
+     * same mark on every phone, and `SRC_IN` recolours it to the ink the row is
+     * drawn in instead of asking for a second asset per colour.
+     */
+    static ImageView icon(Context context, int drawable, int sizeDp, int color) {
+        ImageView view = new ImageView(context);
+        view.setImageResource(drawable);
+        view.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        tint(view, color);
+        view.setLayoutParams(new LinearLayout.LayoutParams(dp(context, sizeDp), dp(context, sizeDp)));
+        return view;
+    }
+
+    /** Recolour an icon in place, the way the bar lights the gear on its own screen. */
+    static void tint(ImageView view, int color) {
+        view.setColorFilter(color, PorterDuff.Mode.SRC_IN);
     }
 
     static Button action(Context context, String label, boolean primary) {

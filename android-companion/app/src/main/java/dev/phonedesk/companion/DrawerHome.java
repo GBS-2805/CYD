@@ -204,8 +204,11 @@ final class DrawerHome extends ScrollView {
         row.addView(name, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        TextView aside = Ui.text(activity, "\u203A", 16, Ui.DIM);
-        row.addView(aside);
+        // A chevron, not U+203A: the row says "this opens something" with a shape in
+        // the row's own ink rather than with whatever the monospace face calls an
+        // angle quote. The BOARDS row keeps its +/−, which are arithmetic signs on a
+        // line, not an icon standing in for one.
+        row.addView(Ui.icon(activity, R.drawable.ic_chevron_forward, 14, Ui.DIM));
 
         row.setOnClickListener(v -> nav.openSection(MainActivity.SECTION_PROJECTS));
         // Two boards need the gap the project rows had: the fill is only 6% above

@@ -576,9 +576,19 @@ the front page needs no second navigation.
   `R.drawable.logo_mark` above the wordmark: the launcher icon's own four path
   strings, in the artwork's viewBox rather than the launcher's 108dp canvas, as one
   even-odd path so the eyes and the mouth are holes. Both the vector and the
-  renderer's copy come from [`artifacts/logo_icon.py`](artifacts/logo_icon.py) and
-  the SVG beside it — one geometry, not a redraw — and the 60dp of air the wordmark
+  renderer's copy come from [`artifacts/logo_icon.py`](artifacts/logo_icon.py)  and the SVG beside it — one geometry, not a redraw — and the 60dp of air the wordmark
   used to carry is what pays for the mark.
+
+* **Iconography is drawables, not characters.** The gear and the two chevrons are
+  the places where a glyph was standing in for an icon, and both were a gamble on
+  the phone's monospace face: U+2699 could arrive as emoji colour or as nothing, and
+  U+2039 sat on the text baseline at the font's weight rather than the row's. A real
+  icon is `res/drawable/*.xml` — a 24dp grid, filled black — loaded through
+  `Ui.icon`, which sizes it square and tints it `SRC_IN`, so one asset serves every
+  ink and a lit state is a second `Ui.tint` rather than a second file. The drawer's
+  `+`/`−` stay characters on purpose: they are arithmetic signs on a line, not a
+  shape standing in for a thing.
+
 
 * **BOARDS expands to the board alone.** One row per distinct board, labelled
   exactly as the shelf's crumb labels it — `2.4" CYD (resistive)` — and tapping
@@ -644,8 +654,9 @@ the front page needs no second navigation.
   them with Android's own renderer on the JVM (Robolectric, native graphics). So the
   pixels carry the platform's fonts, the real vector drawables and the platform's
   text layout: a padding, a weight, a dp size or a row height is the app's own
-  arithmetic, a moved row cannot leave a stale picture behind, and the gear is the
-  `\u2699\uFE0E` the app sets rather than a shape drawn anywhere else. A state the app
+  arithmetic, a moved row cannot leave a stale picture behind, and the gear is
+  `R.drawable.ic_gear` — a drawable, because U+2699 and the two chevrons were
+  characters the monospace face might not carry at all. A state the app
   reaches by tapping is reached by tapping — `home-open` clicks BOARDS,
   `projects-open` clicks the first project's header — and a frame is the full height
   of what the screen builds, so a scrolled-away row is still in the picture. The
