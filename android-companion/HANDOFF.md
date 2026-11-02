@@ -486,6 +486,16 @@ Identical to the sketch, checked against its `onWrite` handlers:
   silent board — 57 s each — still try all five wirings and both windows. Measured
   on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks green. `./check.sh`
   runs the fast set, `./check.sh --full` the release set.
+- **The checkers' refusals are tested too, without a compiler.** Three
+  `selftest_*.py` files build a throwaway repo and a stand-in `arduino-cli`, then
+  make each gate refuse what it exists to refuse: 19 docs branches (a stale size,
+  a past build in `HISTORICAL`, a short and a full md5, a renamed link, an
+  ellipsis link, a gone file, an `ELSEWHERE` name, a moved source count, an
+  undated reading, each of a widget README's three figures, the APK's bytes, a
+  compiler that cannot run, a tree with no deck), 9 asset branches and 8 margin
+  branches. Measured on 2026-11-02: 1.3 s, 0.4 s and 0.5 s, all three in **2.3 s**
+  through `./check.sh --selftest`. That is the gap it closes: the three newest
+  docs refusals were found by a reader, because nothing had ever run them.
 - **A deck's tap now reaches the phone's player.** `DeckService` finds
   `6f2d0007-…` on the link, subscribes with `setCharacteristicNotification` and a
   CCCD write queued beside the other GATT operations, and both

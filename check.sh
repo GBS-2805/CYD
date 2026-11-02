@@ -6,6 +6,11 @@
 #   ./check.sh --full   what a release must pass           (~80 s, needs both
 #                       toolchains: source ~/.arduino-cyd/env.sh and
 #                       ~/.android-offsite/env.sh)
+#   ./check.sh --selftest  the checkers' own refusals        (~2 s, no toolchain)
+#
+# The gate passes on this tree every day, so its failure paths are the part
+# nobody exercises: --selftest runs the three selftest_*.py files, which hand
+# each checker a throwaway repo and a stand-in compiler and make it refuse.
 #
 # Fast:  docs (figures, links, prose, the recorded APK bytes), widget assets, the
 #        host tests, and the branch list as a note.
@@ -62,6 +67,19 @@ fi
 [ -n "$cli" ] || cli="$(command -v arduino-cli 2>/dev/null || true)"
 cli_args=()
 [ -n "$cli" ] && cli_args=(--arduino-cli "$cli")
+
+if [ "${1:-}" = "--selftest" ]; then
+  step "docs selftest"   'branches of check_docs'           python3 selftest_docs.py
+  step "assets selftest" 'branches of check_widget_assets'  python3 selftest_widgets.py
+  step "margin selftest" 'branches of check_headroom'       python3 selftest_headroom.py
+  echo
+  if [ "$failures" -gt 0 ]; then
+    echo "$failures step(s) failed"
+    exit 1
+  fi
+  echo "every check passed"
+  exit 0
+fi
 
 step "docs"       'docs, '              python3 check_docs.py "${cli_args[@]}"
 step "widgets"    'widgets bundled'     python3 check_widget_assets.py
