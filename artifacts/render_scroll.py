@@ -3,35 +3,38 @@
 
 Seven frames side by side shrink to a strip of thumbnails: the phone fits the
 *width*, so each screen ends up narrower than a line of this docstring. This lays
-them one under the other at their own 786 x 1704, each with its name and one line
-of what it shows, so opening the file is a scroll through the app — front page to
+them one under the other at twice their width, each with its name and one line of
+what it shows, so opening the file is a scroll through the app — front page to
 settings — at a size a phone can actually read.
 
     python3 artifacts/render_scroll.py
 
-The frames are the committed renders in `artifacts/renders/`, drawn by
-`android-companion/render_ui.py`; the order is that script's `SCREENS` and the
-mark is `artifacts/logo_icon.py`'s, so neither list nor logo is copied here. The
-output is a composition of files git already has, so it is rebuilt, not tracked
-(see `.gitignore`).
+The frames are the committed captures in `artifacts/renders/`, taken from the app
+itself by `android-companion/capture.sh`: `TopBar` and each tab drawn by Android's
+own renderer, so what is stacked here is what the phone draws. The mark is
+`artifacts/logo_icon.py`'s, so the geometry is not copied. The output is a
+composition of files git already has, so it is rebuilt, not tracked (see
+`.gitignore`).
 """
 
 import os
+import re
 import sys
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
-sys.path.insert(0, os.path.join(ROOT, "android-companion"))
 
 import logo_icon  # noqa: E402  (the path above has to exist first)
-import render_ui  # noqa: E402  the frames, their order, colours and fonts
 
+UI = os.path.join(ROOT, "android-companion", "app", "src", "main", "java",
+                  "dev", "phonedesk", "companion", "Ui.java")
 OUT = os.path.join(HERE, "renders", "scroll.png")
 
-WIDTH = 786                 # one screen's width at render_ui.SCALE
+ORDER = ["home", "home-open", "projects", "projects-open", "paired", "serial", "settings"]
+SCALE = 2                   # a capture is 393 px wide; the scroll reads at 786
 BAR = 78                    # the caption strip above each screen
 PAD = 28
 MARK_PX = 132               # the mark's width in the header, at twice its dp size
@@ -47,46 +50,70 @@ NOTES = {
 }
 
 
-def main():
-    frames = []
-    for name in render_ui.SCREENS:
-        path = os.path.join(render_ui.OUT, name + ".png")
-        frames.append((name, Image.open(path).convert("RGB")))
+def colours():
+    """The app's palette, read out of `Ui.java` so this file cannot disagree with it."""
+    wanted = {"BG": "BG", "EDGE": "EDGE", "TEXT": "TEXT", "DIM": "DIM"}
+    found = {}
+    with open(UI, encoding="utf-8") as handle:
+        for name, hexes in re.findall(
+                r"static final int (\w+) = 0xFF([0-9A-Fa-f]{6});", handle.read()):
+            if name in wanted:
+                found[name] = tuple(int(hexes[i:i + 2], 16) for i in (0, 2, 4))
+    missing = set(wanted) - set(found)
+    if missing:
+        raise SystemExit("Ui.java no longer defines %s" % ", ".join(sorted(missing)))
+    return found
 
-    # The header is measured, not guessed: the mark, the wordmark under it, then one
-    # line saying what these frames are, each placed from the one above.
-    title = render_ui.font(19, bold=True)
-    caption = render_ui.font(8)
+
+def font(px, bold=False, mono=False):
+    """DejaVu from matplotlib's bundle: the only TTFs this machine is guaranteed."""
+    import matplotlib
+    ttf = os.path.join(os.path.dirname(matplotlib.__file__), "mpl-data", "fonts", "ttf")
+    name = "DejaVuSansMono" if mono else "DejaVuSans"
+    return ImageFont.truetype(os.path.join(ttf, name + ("-Bold" if bold else "") + ".ttf"), px)
+
+
+def main():
+    ui = colours()
+    frames = []
+    for name in ORDER:
+        path = os.path.join(HERE, "renders", name + ".png")
+        frame = Image.open(path).convert("RGB")
+        frames.append((name, frame.resize((frame.width * SCALE, frame.height * SCALE),
+                                          Image.NEAREST)))
+
+    width = frames[0][1].width
+    title = font(19, bold=True)
+    caption = font(8)
     mark = logo_icon.mark_image(MARK_PX)
     title_y = 46 + mark.height + 26
     caption_y = title_y + 52
     head = caption_y + 34
 
     height = head + sum(BAR + frame.height for _, frame in frames)
-    canvas = Image.new("RGB", (WIDTH, height), render_ui.BG)
+    canvas = Image.new("RGB", (width, height), ui["BG"])
     draw = ImageDraw.Draw(canvas)
 
-    canvas.paste(mark, ((WIDTH - mark.width) // 2, 46), mark)
-    draw.text(((WIDTH - draw.textlength("[OFF-SITE]", font=title)) / 2, title_y),
-              "[OFF-SITE]", font=title, fill=render_ui.TEXT)
+    canvas.paste(mark, ((width - mark.width) // 2, 46), mark)
+    draw.text(((width - draw.textlength("[OFF-SITE]", font=title)) / 2, title_y),
+              "[OFF-SITE]", font=title, fill=ui["TEXT"])
 
-    line = "seven screens \u00b7 metric-accurate renders, not device screenshots"
-    draw.text(((WIDTH - draw.textlength(line, font=caption)) / 2, caption_y),
-              line, font=caption, fill=render_ui.DIM)
+    line = "seven screens \u00b7 captured from the app, not redrawn"
+    draw.text(((width - draw.textlength(line, font=caption)) / 2, caption_y),
+              line, font=caption, fill=ui["DIM"])
 
-    number = render_ui.font(9, bold=True)
-    name_face = render_ui.font(9.5, bold=True)
-    note_face = render_ui.font(8)
+    number = font(9, bold=True)
+    name_face = font(9, bold=True, mono=True)
+    note_face = font(8)
 
     y = head
     for index, (name, frame) in enumerate(frames, 1):
         # A hairline over each caption, so a screen does not run into the strip
         # that names it: both are on the same black ground.
-        draw.line([(0, y), (WIDTH, y)], fill=render_ui.EDGE, width=2)
-        draw.text((PAD, y + 22), "%02d" % index, font=number, fill=render_ui.DIM)
-        draw.text((PAD + 34, y + 17), name, font=name_face, fill=render_ui.TEXT)
-        draw.text((PAD + 34, y + 45), NOTES.get(name, ""), font=note_face,
-                  fill=render_ui.DIM)
+        draw.line([(0, y), (width, y)], fill=ui["EDGE"], width=2)
+        draw.text((PAD, y + 22), "%02d" % index, font=number, fill=ui["DIM"])
+        draw.text((PAD + 34, y + 17), name, font=name_face, fill=ui["TEXT"])
+        draw.text((PAD + 34, y + 45), NOTES.get(name, ""), font=note_face, fill=ui["DIM"])
         canvas.paste(frame, (0, y + BAR))
         y += BAR + frame.height
 

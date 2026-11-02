@@ -454,8 +454,8 @@ the front page needs no second navigation.
   opens it, so the custom scheme still returns into this app; a deck that is
   signed in and out of setup says so instead of asking a page it does not serve.
 * **Every UI change ships a render, and the render is linked before anything
-  ships.** Draw the screens it touches with `android-companion/render_ui.py`, which
-  reads its colours and metrics from `Ui.java`, and keep the PNGs in
+  ships.** Draw the screens it touches with `android-companion/capture.sh`, which runs the
+  app's own views through Android's renderer, and keep the PNGs in
   `artifacts/renders/`. Then *show* them: put each PNG somewhere that serves the
   bytes over public `https` and post it as a labelled link —
   `[Home, the drawer](https://host/abc.png)` — for every screen the change
@@ -475,35 +475,25 @@ the front page needs no second navigation.
   not "the renderer's seven frames". The PNGs are the page's own images —
   `tokens.json`'s `screens` maps each frame to one — so a change that redraws a
   screen regenerates that render and commits it with the code and the page. A
-  render is metric-accurate, not a device screenshot — say which.
-* **A frame the app can build, the app builds.** Geometry is not transcribed any
-  more: [`render_host/`](android-companion/render_host/) compiles `Ui.java` and the
-  screen class against a small `android.*` stand-in, builds the frame, measures it
-  and writes the drawing operations to `build/render-host/dump.json`, and
-  `render_ui.py` only paints them. So a padding, a weight, a dp size or a row height
-  is the app's own arithmetic and a moved row cannot leave a stale picture behind.
-  What is reimplemented is the *platform*, not the layout — `LinearLayout`'s margins
-  and weights and a monospace word wrap live in
-  [`render_host/src/android/`](android-companion/render_host/src/android/), because
-  a JVM has no Android runtime — and that is the honest limit of the claim: a
-  render is metric-accurate, not a device screenshot. Type is measured from the same
-  TTF the painter draws with (`render/Face.java`, `line()`), never a `1.45`
-  multiplier or a `0.6 em` guess: those were in here once, and a guess inside a gate
-  is a gate that lies. Two things are still the renderer's: the top bar's height
-  and the frames whose classes need a
-  phone to answer — `projects`, `projects-open`, `paired` and `serial` are still
-  transcribed, which is why `render_ui.HOSTED` names the converted ones one by one
-  instead of claiming the set. A frame whose copy is a live age cannot be a committed
-  render either: `check_renders.py` would fail it a minute later, so `paired` keeps a
-  fixed age until the host has a clock to freeze. The bar is not exempt: `TopBar` is a class the host builds,
-  so the crumb, the pill and the gear are measured, and the gear is the
-  `\u2699\uFE0E` the app sets rather than a shape drawn here. Text that does not fit is a review that
-  cannot happen, so [`check_render_fit.py`](check_render_fit.py) audits every run —
-  from the dump for a hosted frame, from the canvas for a transcribed one — and
-  fails a run that crosses an edge or lands on another run.
-  [`check_renders.py`](check_renders.py) is what keeps the gate loud: it redraws
-  every screen and fails when a committed PNG no longer matches the picture the
-  app draws, comparing pixels rather than timestamps because git stores no mtime.
+  render is a capture of the app, not a device screenshot — say which.
+* **A render is a capture from the app.** The frames in `artifacts/renders/` are
+  taken by [`android-companion/capture.sh`](android-companion/capture.sh), whose
+  `CaptureTest` instantiates `TopBar` and the screen class, lays them out and draws
+  them with Android's own renderer on the JVM (Robolectric, native graphics). So the
+  pixels carry the platform's fonts, the real vector drawables and the platform's
+  text layout: a padding, a weight, a dp size or a row height is the app's own
+  arithmetic, a moved row cannot leave a stale picture behind, and the gear is the
+  `\u2699\uFE0E` the app sets rather than a shape drawn anywhere else. A state the app
+  reaches by tapping is reached by tapping — `home-open` clicks BOARDS,
+  `projects-open` clicks the first project's header — and a frame is the full height
+  of what the screen builds, so a scrolled-away row is still in the picture. The
+  clock is frozen for the capture, because a shelf that says `3s ago` would otherwise
+  say a different number every run and the gate would flake on a non-change. It is
+  not a device screenshot: nothing here has a phone attached, so say "captured", not
+  "screenshotted", when the difference matters. [`check_renders.py`](check_renders.py)
+  keeps the gate loud: it captures again and fails when a committed PNG no longer
+  matches the pixels the app draws, comparing pixels rather than timestamps because
+  git stores no mtime.
 * **Music is mirrored, not fetched.** Nothing on this board holds a Spotify token
   and nothing asks the user to make a developer app: the companion app reads the
   phone's media session (already permitted by the notification access it needs for

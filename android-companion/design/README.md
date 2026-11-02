@@ -16,7 +16,7 @@ read at runtime. It is a drawing that is metric-accurate enough to argue with.
 
 Both files were written by reading the Java, not by memory: the colours came from
 `Ui.java`, the metrics from `MainActivity.buildTopBar()`, `DrawerHome`,
-`ProjectsTab`, `DecksTab`, `BoardTab` and `SetupTab`. The `render_ui.py` script in
+`ProjectsTab`, `DecksTab`, `BoardTab` and `SetupTab`. The `capture.sh` script in
 the parent folder draws the same seven screens to PNG from the same numbers, so
 there are three descriptions of one design and they have to agree.
 

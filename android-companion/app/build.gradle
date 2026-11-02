@@ -22,6 +22,14 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    testOptions {
+        // Robolectric draws the app's own views with Android's own renderer, so it
+        // needs the merged manifest and the real resources, not just the bytecode.
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
+
     buildTypes {
         debug {
             // Private builds only. A debuggable APK lets any machine with adb
@@ -85,4 +93,11 @@ tasks.register("syncWidgets") {
 
 afterEvaluate {
     tasks.named("preBuild").configure { dependsOn("syncWidgets") }
+}
+
+dependencies {
+    // The capture: the app's real screens, drawn by the platform's own graphics
+    // stack on the JVM, so a render is a picture of the app rather than a redraw.
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
 }

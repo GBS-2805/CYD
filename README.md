@@ -12,8 +12,8 @@ compiles the decks and fails one that no longer fits its partition;
 [`selftest_headroom.py`](selftest_headroom.py) proves the check's own refusals in
 about a second, with no toolchain installed.
 
-A screen change is verified by [`check_renders.py`](check_renders.py), which draws
-every screen again with [`android-companion/render_ui.py`](android-companion/render_ui.py)
+A screen change is verified by [`check_renders.py`](check_renders.py), which captures
+every screen again from the app with [`android-companion/capture.sh`](android-companion/capture.sh)
 and fails when a committed PNG in `artifacts/renders/` no longer matches, so a
 forgotten regeneration cannot pass as a reviewed change. It compares pixels, not
 timestamps: git stores no mtime, so a clone stamps every file with the same time.
