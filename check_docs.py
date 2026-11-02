@@ -20,6 +20,11 @@ What counts as a flash size here: a grouped number of 7 digits or more, like
 globals delta are all quoted in these docs as byte counts too, and flagging them
 would bury the one number this check exists for.
 
+A relative link is the same failure in another form: a doc pointing at a file
+somebody renamed describes a tree that no longer exists, and no number check can
+see it. So every `](path)` in a doc has to resolve from that doc's own folder;
+anchors and URLs are skipped.
+
 One rule more, the one that matters most: each widget's README has to carry its
 own deck's current size, globals and md5. That is the page a person reads before
 flashing, so a stale triple there is the bug this exists for.
@@ -86,6 +91,9 @@ MD5_LONG = re.compile(r"(?<![0-9a-f])([0-9a-f]{32})(?![0-9a-f])")
 # check's business.
 SIZE = re.compile(r"(?<![\d.,])(\d{1,3}(?:,\d{3})+)(?![\d,])")
 MIN_SIZE = 1000000
+# `[text](path)` and `![alt](path)`; the image form matters because the renders
+# live in artifacts/renders/ and a stale name there is just as invisible.
+LINK = re.compile(r"\]\(([^)\s]+)\)")
 
 
 def md5(path):
@@ -97,6 +105,23 @@ def shown(path):
         return path.relative_to(ROOT).as_posix()
     except ValueError:
         return str(path)
+
+
+def link_problems(path, text):
+    """Relative links that point at nothing, read from this doc's folder."""
+    out = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        for match in LINK.finditer(line):
+            href = match.group(1)
+            if href.startswith(("http://", "https://", "mailto:", "#")):
+                continue
+            local = href.split("#")[0]
+            if local and not (path.parent / local).exists():
+                out.append(
+                    "%s:%d links to %s, which is not there"
+                    % (shown(path), number, href)
+                )
+    return out
 
 
 def docs():
@@ -220,6 +245,7 @@ def main():
 
     for path in read:
         text = path.read_text(encoding="utf-8", errors="replace")
+        problems.extend(link_problems(path, text))
         for number, line in enumerate(text.splitlines(), start=1):
             for match in SIZE.finditer(line):
                 value = int(match.group(1).replace(",", ""))
@@ -281,7 +307,7 @@ def main():
         return 1
 
     print(
-        "\n%d doc%s, every quoted flash size and md5 is today's"
+        "\n%d doc%s, every quoted number is today's and every link resolves"
         % (len(read), "" if len(read) == 1 else "s")
     )
     return 0

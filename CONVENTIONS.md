@@ -123,7 +123,8 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
 * **The numbers in these docs are checked too.** [`check_docs.py`](check_docs.py)
   builds the decks and reads the markdown, and fails when a quoted flash size or
   sketch md5 is not one of today's builds — the drift that twice left a README
-  describing last week's sketch. It also requires each widget README to carry its
+  describing last week's sketch — or when a relative link names a file that is
+  gone. It also requires each widget README to carry its
   own deck's current size, globals and md5. A past build may stay in the prose,
   but only by name in that file's `HISTORICAL` table, next to the reason.
 * **Quote the run, not a range.** A figure names the run it came from and is what
@@ -144,7 +145,10 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
 * **That check runs on commit.** [`.githooks/pre-commit`](.githooks/pre-commit)
   compiles the decks whose `<folder>/<folder>.ino` is staged and refuses the
   commit if one fails, so a sketch cannot grow past its partition unnoticed.
-  Docs-only commits return immediately, the app's synced asset copies are
+  A staged `.md` runs `check_docs.py` in the same pass, so a doc quoting a build
+  that no longer exists, or linking to a file that is gone, is refused before it
+  lands. A commit with neither a sketch nor a doc returns immediately; the
+  app's synced asset copies are
   ignored, and `git commit --no-verify` is the deliberate escape hatch. It needs
   `git config core.hooksPath .githooks` once per clone. A machine with no deck
   toolchain at all says the check did not run and lets the commit through, so a
@@ -346,6 +350,22 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
   you see are yours.
 * Nothing is pushed or deployed without being asked. The repo stays private.
 * Numbers in docs are one board's measurements, not a contract. Say which.
+* **Every commit sweeps every file for what it just made untrue.** A sketch, a
+  doc, a README, a script comment and these rules are all descriptions of
+  something, and the description is the part that rots without anyone noticing.
+  Before committing, read the change for what it contradicts — a quoted number,
+  a "still carries", a "not yet", a step that has become optional, a rule whose
+  behaviour moved — and fix it in that commit, or write down why the old text
+  stays. The rules are included: a bullet that no longer describes the code is a
+  bug in the bullet, not a fact about the code. `check_docs.py` holds the quoted
+  sizes, md5s and links; everything else is a reader's job, so do it before the
+  reader does.
+* **Say it in words a person who was not there can use.** A commit subject names
+  what changed and why it matters, in the vocabulary the docs use — no ticket
+  shorthand, no "misc", no list of touched files standing in for a reason. The
+  hand-off note, the chat update and the commit body are one sentence seen from
+  three screens.
+
 * Never document a step as working because it should. The failed handshake is
   recorded with the baud rates and byte counts tried — including which handshake
   failed: the app's, not ArduinoDroid's — and that precision is what stops the
