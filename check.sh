@@ -49,6 +49,13 @@ step () {
   fi
 }
 
+# A step whose prerequisite is not on this machine says which one, the way the
+# old pre-commit hook did: a fresh clone has no built assets and a laptop may have
+# no deck toolchain, and neither is a broken tree.
+say () {
+  printf 'note  %-15s %s\n' "$1" "$2"
+}
+
 # Information, never a failure: an unmerged branch in another chat's worktree is
 # not a broken tree.
 report () {
@@ -100,10 +107,31 @@ tracked_step () {
   echo "every source file is in the index"
 }
 
-step "docs"       'docs, '              python3 check_docs.py "${cli_args[@]}"
-step "widgets"    'widgets bundled'     python3 check_widget_assets.py
+if [ -n "$cli" ]; then
+  step "docs"       'docs, '              python3 check_docs.py "${cli_args[@]}"
+else
+  say "docs" "no arduino-cli, so the figures and links were NOT checked"
+fi
+if [ -d android-companion/app/src/main/assets/widgets ]; then
+  step "widgets"    'widgets bundled'     python3 check_widget_assets.py
+else
+  say "widgets" "no built assets yet, so there is no bundled copy to compare"
+fi
 step "tracked"    'index'             tracked_step
-step "host tests" 'host checks'         bash android-companion/test.sh
+# test.sh finds its own JDK — $JAVA_HOME, then android-companion/jdk, then the
+# off-site root, then PATH — so the gate looks in the same four places before it
+# says the suite did not run. Asking only PATH skipped the suite on a machine that
+# has JDK 17 in its toolchain.
+have_javac=0
+[ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/javac" ] && have_javac=1
+[ -x android-companion/jdk/bin/javac ] && have_javac=1
+[ -x "$HOME/.android-offsite/jdk/bin/javac" ] && have_javac=1
+command -v javac >/dev/null 2>&1 && have_javac=1
+if [ "$have_javac" -eq 1 ]; then
+  step "host tests" 'host checks'         bash android-companion/test.sh
+else
+  say "host tests" "no javac, so the host suite did NOT run"
+fi
 report "branches" python3 check_branches.py
 
 if [ "$full" -eq 1 ]; then

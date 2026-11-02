@@ -1,31 +1,30 @@
 #!/usr/bin/env bash
 #
-# Compile the decks a commit touches and refuse the commit if one no longer fits.
+# Run the fast gate on every commit, compile the decks a commit touches, and
+# refuse the commit if any of it is red.
 #
 #   git config core.hooksPath .githooks     once per clone, from the repo root
 #   git commit --no-verify                  the deliberate escape hatch
 #   HEADROOM_MIN_FREE_KB=200 git commit …   tighten a floor for one commit
+#   HEADROOM_ALLOW_MISSING_TOOLCHAIN=1 git commit …   accept a half-finished deck install
 #
-# Only a staged <folder>/<folder>.ino counts, so the copies the app syncs into
-# android-companion/app/src/main/assets/ never trigger a compile, and a docs-only
-# commit with neither a sketch nor a doc returns immediately; a staged .md runs
-# check_docs.py instead. A machine that never had a deck toolchain says so
-# and lets the commit through; one whose toolchain root exists without a runnable
-# arduino-cli is a half-finished install, and that is refused, because silence
-# there is a check that failed quietly. HEADROOM_ALLOW_MISSING_TOOLCHAIN=1
-# overrides it for one commit.
+# The fast gate is ./check.sh — docs, widget assets, the index and the host tests,
+# about three seconds — and it runs whatever was staged, so a commit cannot land
+# with a fast step red. A step whose prerequisite is missing (no arduino-cli, no
+# built assets, no javac) says which one instead of passing quietly. Only a staged
+# <folder>/<folder>.ino adds a compile, so the copies the app syncs into
+# android-companion/app/src/main/assets/ never trigger one, and only a staged
+# check_*.py or selftest_*.py runs the gates' own refusals.
 set -uo pipefail
 
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 cd "$root" || exit 0
 
 decks=()
-docs=()
 checkers=0
 while IFS= read -r path; do
   [ -n "$path" ] || continue
   case "$path" in
-    *.md) docs+=("$path") ;;
     check_*.py|selftest_*.py) checkers=1 ;;
   esac
   dir="${path%%/*}"
@@ -34,88 +33,77 @@ while IFS= read -r path; do
   decks+=("$dir")
 done < <(git diff --cached --name-only --diff-filter=ACMR)
 
-if [ "${#decks[@]}" -eq 0 ] && [ "${#docs[@]}" -eq 0 ] && [ "$checkers" -eq 0 ]; then
-  exit 0
-fi
-
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "headroom: no python3, so the check did NOT run" >&2
+  echo "gate: no python3, so the fast gate did NOT run" >&2
   exit 0
 fi
-
-cli="${ARDUINO_CLI:-}"
-if [ -z "$cli" ]; then
-  for candidate in "${ARDUINO_HOME:+$ARDUINO_HOME/bin/arduino-cli}" \
-                   "$HOME/.arduino-cyd-3/bin/arduino-cli" \
-                   "$HOME/.arduino-cyd/bin/arduino-cli" \
-                   "$(command -v arduino-cli 2>/dev/null || true)"; do
-    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
-      cli="$candidate"
-      break
-    fi
-  done
-fi
-
-if [ -z "$cli" ]; then
-  # No compiler is one thing; a toolchain root with no compiler in it is another.
-  # The first is a machine that never installed one and should still be able to
-  # commit a sketch it cannot check. The second is a broken or half-finished
-  # install, and letting that pass would make the gate quietly decorative.
-  broken_root=""
-  for maybe_root in "${ARDUINO_HOME:-}" "${HOME:-}/.arduino-cyd-3" "${HOME:-}/.arduino-cyd"; do
-    if [ -n "$maybe_root" ] && [ -d "$maybe_root" ]; then
-      broken_root="$maybe_root"
-      break
-    fi
-  done
-
-  if [ -n "$broken_root" ] && [ "${HEADROOM_ALLOW_MISSING_TOOLCHAIN:-0}" = "1" ]; then
-    echo "headroom: $broken_root holds no runnable arduino-cli; continuing only because HEADROOM_ALLOW_MISSING_TOOLCHAIN=1" >&2
-    exit 0
-  fi
-
-  if [ -n "$broken_root" ]; then
-    {
-      echo "headroom: $broken_root exists but holds no runnable arduino-cli,"
-      echo "          so the check cannot run and the commit is refused."
-      echo "          finish the install:  ARDUINO_HOME=$broken_root ./toolchain.sh"
-      echo "          or name a compiler:  ARDUINO_CLI=/path/to/arduino-cli git commit ..."
-      echo "          or accept the gap:   HEADROOM_ALLOW_MISSING_TOOLCHAIN=1 git commit ..."
-    } >&2
-    exit 1
-  fi
-
-  echo "headroom: no arduino-cli and no deck toolchain root on this machine, so the check did NOT run" >&2
-  exit 0
-fi
-
-args=(--arduino-cli "$cli")
-[ -n "${HEADROOM_MIN_FREE_KB:-}" ] && args+=(--min-free-kb "$HEADROOM_MIN_FREE_KB")
-[ -n "${HEADROOM_MIN_RAM_KB:-}" ] && args+=(--min-free-ram-kb "$HEADROOM_MIN_RAM_KB")
 
 status=0
 
-if [ "${#decks[@]}" -gt 0 ]; then
-  if ! python3 "$root/check_headroom.py" "${args[@]}" "${decks[@]}"; then
-    echo "headroom: commit refused; see CONVENTIONS.md#build" >&2
-    status=1
-  fi
-fi
-
-if [ "${#docs[@]}" -gt 0 ]; then
-  if ! python3 "$root/check_docs.py" --arduino-cli "$cli"; then
-    echo "docs: commit refused; a doc describes something this repo no longer has" >&2
-    status=1
-  fi
-fi
-
-# A staged gate file is the one change nothing else here can test: the checkers
-# pass on this tree every day, so a refactor that quietly stopped one refusing
-# would look exactly like a green commit. The refusals take about four seconds.
+# A staged gate is the one change nothing else here tests: the checkers pass on
+# this tree every day, so a refactor that quietly stopped one refusing would look
+# exactly like a green commit. The refusals take about four seconds.
 if [ "$checkers" -eq 1 ]; then
   if ! bash "$root/check.sh" --selftest; then
     echo "checkers: commit refused; a gate no longer refuses what it exists for" >&2
     status=1
+  fi
+fi
+
+if ! bash "$root/check.sh"; then
+  echo "gate: commit refused; a fast step above is red" >&2
+  status=1
+fi
+
+if [ "${#decks[@]}" -gt 0 ]; then
+  cli="${ARDUINO_CLI:-}"
+  if [ -z "$cli" ]; then
+    for candidate in "${ARDUINO_HOME:+$ARDUINO_HOME/bin/arduino-cli}" \
+                     "$HOME/.arduino-cyd-3/bin/arduino-cli" \
+                     "$HOME/.arduino-cyd/bin/arduino-cli" \
+                     "$(command -v arduino-cli 2>/dev/null || true)"; do
+      if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+        cli="$candidate"
+        break
+      fi
+    done
+  fi
+
+  if [ -z "$cli" ]; then
+    # No compiler is one thing; a toolchain root with no compiler in it is another.
+    # The first is a machine that never installed one and should still be able to
+    # commit a sketch it cannot check. The second is a broken or half-finished
+    # install, and letting that pass would make the gate quietly decorative.
+    broken_root=""
+    for maybe_root in "${ARDUINO_HOME:-}" "$HOME/.arduino-cyd-3" "$HOME/.arduino-cyd"; do
+      if [ -n "$maybe_root" ] && [ -d "$maybe_root" ]; then
+        broken_root="$maybe_root"
+        break
+      fi
+    done
+
+    if [ -n "$broken_root" ] && [ "${HEADROOM_ALLOW_MISSING_TOOLCHAIN:-0}" = "1" ]; then
+      echo "headroom: $broken_root holds no runnable arduino-cli; continuing only because HEADROOM_ALLOW_MISSING_TOOLCHAIN=1" >&2
+    elif [ -n "$broken_root" ]; then
+      {
+        echo "headroom: $broken_root exists but holds no runnable arduino-cli,"
+        echo "          so the staged sketch was NOT compiled and the commit is refused."
+        echo "          finish the install:  ARDUINO_HOME=$broken_root ./toolchain.sh"
+        echo "          or name a compiler:  ARDUINO_CLI=/path/to/arduino-cli git commit ..."
+        echo "          or accept the gap:   HEADROOM_ALLOW_MISSING_TOOLCHAIN=1 git commit ..."
+      } >&2
+      status=1
+    else
+      echo "headroom: no arduino-cli on this machine, so the staged sketch was NOT compiled" >&2
+    fi
+  else
+    args=(--arduino-cli "$cli")
+    [ -n "${HEADROOM_MIN_FREE_KB:-}" ] && args+=(--min-free-kb "$HEADROOM_MIN_FREE_KB")
+    [ -n "${HEADROOM_MIN_RAM_KB:-}" ] && args+=(--min-free-ram-kb "$HEADROOM_MIN_RAM_KB")
+    if ! python3 "$root/check_headroom.py" "${args[@]}" "${decks[@]}"; then
+      echo "headroom: commit refused; see CONVENTIONS.md#build" >&2
+      status=1
+    fi
   fi
 fi
 

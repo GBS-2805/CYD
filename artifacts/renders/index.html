@@ -1,0 +1,77 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>ESP32_Widgets app — screen baseline</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 28px 24px 60px;
+    background: #0b0b0b; color: #f2f2f2;
+    font: 14px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  h1 { font-size: 18px; font-weight: 600; letter-spacing: .02em; margin: 0 0 6px; }
+  p.lede { margin: 0 0 26px; color: #9a9a9a; max-width: 80ch; }
+  code { color: #d8d8d8; }
+  .grid { display: grid; gap: 26px 22px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+  figure { margin: 0; }
+  img {
+    display: block; width: 100%; height: auto; border: 1px solid #262626;
+    border-radius: 12px; background: #000;
+  }
+  figcaption { margin-top: 8px; font-size: 12px; color: #8c8c8c; }
+  figcaption b { display: block; color: #f2f2f2; font-weight: 600; font-size: 13px; }
+  hr { border: 0; border-top: 1px solid #222; margin: 38px 0 26px; }
+</style>
+
+<h1>ESP32_Widgets app — the seven screens, and the icon</h1>
+<p class="lede">
+  Drawn by <code>android-companion/render_ui.py</code> from the numbers in
+  <code>Ui.java</code>: metric-accurate, not device screenshots. Every one of them
+  is what the tree draws —
+  <code>check_renders.py</code> compares the pixels and exits 1 when one is stale.
+</p>
+
+<div class="grid">
+  <figure>
+    <img src="home.png" alt="Home: the drawer">
+    <figcaption><b>home</b>the drawer: PAIRED, BOARDS, SERIAL</figcaption>
+  </figure>
+  <figure>
+    <img src="home-open.png" alt="Home with BOARDS expanded">
+    <figcaption><b>home-open</b>BOARDS expands to the board alone</figcaption>
+  </figure>
+  <figure>
+    <img src="projects.png" alt="The shelf: projects folded">
+    <figcaption><b>projects</b>the shelf, alphabetical and folded</figcaption>
+  </figure>
+  <figure>
+    <img src="projects-open.png" alt="One project unfolded">
+    <figcaption><b>projects-open</b>one project's body, log and actions</figcaption>
+  </figure>
+  <figure>
+    <img src="paired.png" alt="Paired decks and the live link">
+    <figcaption><b>paired</b>the link pill, the deck card, the LAN block</figcaption>
+  </figure>
+  <figure>
+    <img src="serial.png" alt="The USB flasher">
+    <figcaption><b>serial</b>the USB flasher and its sweep</figcaption>
+  </figure>
+  <figure>
+    <img src="settings.png" alt="Settings">
+    <figcaption><b>settings</b>off the gear, not a fourth row</figcaption>
+  </figure>
+</div>
+
+<hr>
+
+<h1 style="font-size:16px">The launcher icon</h1>
+<p class="lede" style="margin-bottom:18px">
+  The owner's own artwork: four <code>pathData</code> strings copied verbatim,
+  fitted to the 72dp safe zone, over the white the ghost is cut out of.
+</p>
+<div class="grid">
+  <figure>
+    <img src="../launcher-preview-sheet.png" alt="Launcher icon at four sizes, circle and squircle masks">
+    <figcaption><b>48 · 72 · 96 · 144 px</b>circle and squircle masks, beside the unmasked canvas</figcaption>
+  </figure>
+</div>

@@ -154,16 +154,16 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   after, the same 126 checks. The seam exists because the alternative — a shorter
   window in the test — would test a different probe.
 * **That check runs on commit.** [`.githooks/pre-commit`](.githooks/pre-commit)
-  compiles the decks whose `<folder>/<folder>.ino` is staged and refuses the
-  commit if one fails, so a sketch cannot grow past its partition unnoticed.
-  A staged `.md` runs `check_docs.py` in the same pass, so a doc quoting a build
-  that no longer exists, or linking to a file that is gone, is refused before it
-  lands. That check reads its cache when neither a sketch nor the toolchain
-  moved, so a docs-only commit is quick and still refuses a figure from a build
-  that no longer exists. A commit with neither a sketch nor a doc returns
-  immediately; the
-  app's synced asset copies are
-  ignored, and `git commit --no-verify` is the deliberate escape hatch. It needs
+  runs the whole fast gate — [`check.sh`](check.sh) — on every commit, so no
+  commit lands with a fast step red: docs, widget assets, the index, the host
+  tests. Compiling the decks whose `<folder>/<folder>.ino` is staged happens in
+  the same pass and refuses a commit whose sketch no longer fits its partition,
+  and a staged `check_*.py` or `selftest_*.py` runs `./check.sh --selftest` as
+  well. A step whose prerequisite is missing — no `arduino-cli`, no built assets,
+  no `javac` — says which one instead of passing quietly, and `check_docs.py`
+  reads its cache when neither a sketch nor the toolchain moved, so a docs-only
+  commit is quick and still refuses a figure from a build that no longer exists.
+  `git commit --no-verify` is the deliberate escape hatch. It needs
   `git config core.hooksPath .githooks` once per clone. A machine with no deck
   toolchain at all says the check did not run and lets the commit through, so a
   fresh clone is never blocked; but a root that exists with no runnable
