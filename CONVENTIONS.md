@@ -491,9 +491,11 @@ the front page needs no second navigation.
   multiplier or a `0.6 em` guess: those were in here once, and a guess inside a gate
   is a gate that lies. Two things are still the renderer's: the top bar's height
   (`MainActivity` needs a window and a service), and the frames whose classes need a
-  phone to answer — `projects`, `projects-open`, `paired`, `serial` and `settings`
-  are still transcribed, which is why `render_ui.HOSTED` names the converted ones
-  one by one instead of claiming the set. Text that does not fit is a review that
+  phone to answer — `projects`, `projects-open`, `paired` and `serial` are still
+  transcribed, which is why `render_ui.HOSTED` names the converted ones one by one
+  instead of claiming the set. A frame whose copy is a live age cannot be a committed
+  render either: `check_renders.py` would fail it a minute later, so `paired` keeps a
+  fixed age until the host has a clock to freeze. Text that does not fit is a review that
   cannot happen, so [`check_render_fit.py`](check_render_fit.py) audits every run —
   from the dump for a hosted frame, from the canvas for a transcribed one — and
   fails a run that crosses an edge or lands on another run.

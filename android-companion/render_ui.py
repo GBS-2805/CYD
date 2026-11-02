@@ -263,7 +263,7 @@ def para_h(value, sp, max_w, leading=2):
 _HOST = None
 
 #: the frames `render_host/` builds, in the order the scroll presents them
-HOSTED = ("home", "home-open")
+HOSTED = ("home", "home-open", "settings")
 
 
 def _hex(value):
@@ -304,7 +304,10 @@ def hosted(name):
     """
     frame = host_frames()[name]
     s = Screen(int(round(frame["height"])) + BAR_DP)
-    s.top_bar("OFF-SITE")
+    if name == "settings":
+        s.top_bar("\u2039  OFF-SITE", gear=True)
+    else:
+        s.top_bar("OFF-SITE")
 
     for op in frame["ops"]:
         y = op["y"] + BAR_DP
@@ -615,49 +618,6 @@ def serial():
     return s.image
 
 
-def settings():
-    s = Screen()
-    s.top_bar("\u2039  OFF-SITE", gear=True)
-    y = s.section_title("SETTINGS", "")
-
-    s.card(16, y, W_DP - 32, 46)
-    s.text(30, y + 14, "Bridge stopped — start it below", 14, ACCENT)
-    y += 46 + 4
-
-    y = s.section_label(y, "PERMISSIONS")
-    s.card(16, y, W_DP - 32, 84)
-    s.text(30, y + 12, "Notification access: not granted", 13, PINK)
-    s.button(30, y + 38, W_DP - 60, "NOTIFICATION ACCESS")
-    y += 84 + 10
-    s.card(16, y, W_DP - 32, 84)
-    s.text(30, y + 12, "Bluetooth: granted", 13, GOOD)
-    s.button(30, y + 38, W_DP - 60, "BLUETOOTH PERMISSIONS")
-    y += 84 + 4
-
-    y = s.section_label(y, "NOTIFICATIONS")
-    s.card(16, y, W_DP - 32, 118)
-    s.text(30, y + 12, "Apps allowed: all of them", 13, DIM)
-    s.paragraph(30, y + 34, "The deck sits where other people can read it. Pick the "
-                "apps it may show.", 11, DIM, W_DP - 60)
-    s.button(30, y + 74, (W_DP - 60 - 8) / 2.0, "CHOOSE APPS")
-    s.button(30 + (W_DP - 60 - 8) / 2.0 + 8, y + 74, (W_DP - 60 - 8) / 2.0,
-             "ALL APPS")
-    y += 118 + 4
-
-    y = s.section_label(y, "BACKGROUND")
-    background_text = ("Android may stop the bridge overnight. Exempting it from "
-                       "battery optimisation keeps the deck updating with the "
-                       "screen off.")
-    background_h = 12 + para_h(background_text, 13, W_DP - 60) + 12 + 35 + 12
-    s.card(16, y, W_DP - 32, background_h)
-    inner = s.paragraph(30, y + 12, background_text, 13, DIM, W_DP - 60)
-    s.button(30, inner + 12, W_DP - 60, "BATTERY SETTINGS")
-    y += background_h + 4
-
-    y = s.section_label(y, "BRIDGE")
-    s.button(16, y, W_DP - 32, "START BRIDGE", True, h=38)
-    return s.image
-
 
 SCREENS = {
     "home": lambda: hosted("home"),
@@ -666,7 +626,7 @@ SCREENS = {
     "projects-open": lambda: projects(True),
     "paired": paired,
     "serial": serial,
-    "settings": settings,
+    "settings": lambda: hosted("settings"),
 }
 
 

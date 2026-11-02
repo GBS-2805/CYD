@@ -39,6 +39,7 @@ public final class Dump {
         List<String> frames = new ArrayList<>();
         frames.add(home(false));
         frames.add(home(true));
+        frames.add(settings());
 
         StringBuilder document = new StringBuilder("{\"frames\":[\n");
         for (int i = 0; i < frames.size(); ++i) {
@@ -74,6 +75,19 @@ public final class Dump {
         drawer.emit(ops);
         return ops.document(open ? "home-open" : "home", WIDTH_DP,
                 Math.max(HEIGHT_DP, drawer.measuredHeight));
+    }
+
+    /** SETTINGS: permissions, the allowlist and the bridge switch, as the app builds them. */
+    private static String settings() {
+        Activity activity = new Activity();
+        SetupTab tab = new SetupTab(activity);
+        tab.refresh();
+        tab.measure(WIDTH_DP, true);
+        tab.layout(0, 0);
+
+        Ops ops = new Ops();
+        tab.emit(ops);
+        return ops.document("settings", WIDTH_DP, Math.max(HEIGHT_DP, tab.measuredHeight));
     }
 
     /** Press the row that carries `label`: the drawer's own listener flips the panel. */
