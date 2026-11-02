@@ -82,7 +82,7 @@ sketch and the descriptor `id`, which always move together:
   still proves nothing, because `esp32:esp32:esp32` defaults to `PSRAM=disabled`.
   Read the marking, never a product listing.
 * **Budget for 4 MB of flash and no PSRAM.** The default partition scheme gives
-  the app 1,310,720 bytes and the deck takes ~1,168,300 of them (89 % as reported
+  the app 1,310,720 bytes and the deck takes 1,168,314 of them (89 % as reported
   by the compiler, after the mirror). DRAM is 327,680 bytes with ~300 kB of heap
   free at boot once the display and touch drivers are up; a 320x240 RGB565
   framebuffer is 153,600, so there is room for one, not two. Treat "it fits" as a
@@ -112,6 +112,12 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   phone deck to 1,168,314 B (89 %) / 45,244 B globals and the Spotify deck to
   1,125,781 B (85 %) / 53,636 B globals, as [`check_headroom.py`](check_headroom.py)
   read both of them on 2026-11-01.
+* **The numbers in these docs are checked too.** [`check_docs.py`](check_docs.py)
+  builds the decks and reads the markdown, and fails when a quoted flash size or
+  sketch md5 is not one of today's builds — the drift that twice left a README
+  describing last week's sketch. It also requires each widget README to carry its
+  own deck's current size, globals and md5. A past build may stay in the prose,
+  but only by name in that file's `HISTORICAL` table, next to the reason.
 * **The margin is checked, not assumed.** [`check_headroom.py`](check_headroom.py)
   compiles each deck with the deck FQBN and reads the compiler's own `Maximum is
   …` figures, so both ceilings — 1,310,720 B of flash and 327,680 B of DRAM —
