@@ -180,21 +180,18 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
 * **The gate's refusals are tested without a compiler.** Every checker passes
   on this tree every day, so its failure paths are the part nobody exercises —
   and the last three docs refusals were found by a reader, not by the check. Each
-  `selftest_*.py` builds a throwaway repo in a temp directory, hands the checker a
-  stand-in compiler or a broken fixture, and asserts what it refuses:
-  [`selftest_docs.py`](selftest_docs.py) walks 19 branches (a stale size, a past
-  build in `HISTORICAL`, a short and a full md5, a renamed link, an ellipsis link,
-  a gone file, an `ELSEWHERE` name, a moved source count, an undated reading, each
-  of a widget README's three figures, the APK's bytes, a compiler that cannot run,
-  a tree with no deck), [`selftest_widgets.py`](selftest_widgets.py) 9 (drift, a
-  missing bundle, a descriptor naming a gone sketch, no id, unparseable JSON, no
-  built assets, an unclaimed folder, no widget), and
-  [`selftest_headroom.py`](selftest_headroom.py) 8 (an overflow the compiler still
-  exits 0 on, a failed link, both floors, a build that printed no size, no
-  compiler, no deck). Measured on 2026-11-02: 1.3 s, 0.4 s and 0.5 s, all three in
-  **2.3 s** through `./check.sh --selftest`, on a machine with no toolchain. The
-  decks themselves only ever walk the passing path; the overflow path was proved
-  once with a 1.4 MB throwaway sketch, and that is not a test anyone can rerun.
+  `selftest_*.py` builds a throwaway repo in a temp directory — a stand-in
+  `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
+  checker refuses: 19 docs branches, 9 asset branches, 8 margin branches, 9 branch
+  ones (a patch already upstream, the same bytes under a new name, a folder a
+  merge would resurrect, a pushed branch and its local alias) and 9 render ones (a
+  moved pixel, a wrong size, a corrupt PNG, a capture that failed). Measured on
+  2026-11-02: 1.3 s, 0.4 s, 0.5 s, 1.1 s and 0.9 s — all five in **4.2 s** through
+  `./check.sh --selftest`, on a machine with no toolchain. The pre-commit hook runs
+  that command whenever a `check_*.py` or `selftest_*.py` is staged, so a gate
+  refactor cannot land having quietly stopped refusing. The decks themselves only
+  ever walk the passing path; the overflow path was proved once with a 1.4 MB
+  throwaway sketch, and that is not a test anyone can rerun.
 * **Before you change a sketch, run both.** From the repo root:
 
   ```bash

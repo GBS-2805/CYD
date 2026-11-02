@@ -6,11 +6,12 @@
 #   ./check.sh --full   what a release must pass           (~80 s, needs both
 #                       toolchains: source ~/.arduino-cyd/env.sh and
 #                       ~/.android-offsite/env.sh)
-#   ./check.sh --selftest  the checkers' own refusals        (~2 s, no toolchain)
+#   ./check.sh --selftest  the checkers' own refusals        (~4 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
-# nobody exercises: --selftest runs the three selftest_*.py files, which hand
-# each checker a throwaway repo and a stand-in compiler and make it refuse.
+# nobody exercises: --selftest runs the five selftest_*.py files, which hand each
+# checker a throwaway repo and a stand-in (compiler, capture script, git repo) and
+# make it refuse.
 #
 # Fast:  docs (figures, links, prose, the recorded APK bytes), widget assets, the
 #        host tests, and the branch list as a note.
@@ -39,9 +40,9 @@ step () {
   last=$(grep -E "$filter" "$out" | tail -1)
   [ -n "$last" ] || last=$(tail -1 "$out")
   if [ "$rc" -eq 0 ]; then
-    printf 'ok    %-13s %6d ms  %s\n' "$name" "$ms" "$last"
+    printf 'ok    %-15s %6d ms  %s\n' "$name" "$ms" "$last"
   else
-    printf 'FAIL  %-13s %6d ms  %s\n' "$name" "$ms" "$last"
+    printf 'FAIL  %-15s %6d ms  %s\n' "$name" "$ms" "$last"
     failures=$((failures + 1))
     echo "----- $name"; sed -n '1,40p' "$out"; echo "-----"
   fi
@@ -51,7 +52,7 @@ step () {
 # not a broken tree.
 report () {
   local name="$1"; shift
-  printf 'note  %-13s %s\n' "$name" "$("$@" 2>&1 | grep -v '^$' | head -1)"
+  printf 'note  %-15s %s\n' "$name" "$("$@" 2>&1 | grep -v '^$' | head -1)"
 }
 
 # The gate finds the deck toolchain the way CONVENTIONS says to, so it does not
@@ -72,6 +73,8 @@ if [ "${1:-}" = "--selftest" ]; then
   step "docs selftest"   'branches of check_docs'           python3 selftest_docs.py
   step "assets selftest" 'branches of check_widget_assets'  python3 selftest_widgets.py
   step "margin selftest" 'branches of check_headroom'       python3 selftest_headroom.py
+  step "branch selftest" 'branches of check_branches'       python3 selftest_branches.py
+  step "render selftest" 'branches of check_renders'        python3 selftest_renders.py
   echo
   if [ "$failures" -gt 0 ]; then
     echo "$failures step(s) failed"

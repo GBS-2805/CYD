@@ -21,10 +21,12 @@ cd "$root" || exit 0
 
 decks=()
 docs=()
+checkers=0
 while IFS= read -r path; do
   [ -n "$path" ] || continue
   case "$path" in
     *.md) docs+=("$path") ;;
+    check_*.py|selftest_*.py) checkers=1 ;;
   esac
   dir="${path%%/*}"
   [ "$path" = "$dir/$dir.ino" ] || continue   # nested paths are asset copies
@@ -32,7 +34,7 @@ while IFS= read -r path; do
   decks+=("$dir")
 done < <(git diff --cached --name-only --diff-filter=ACMR)
 
-if [ "${#decks[@]}" -eq 0 ] && [ "${#docs[@]}" -eq 0 ]; then
+if [ "${#decks[@]}" -eq 0 ] && [ "${#docs[@]}" -eq 0 ] && [ "$checkers" -eq 0 ]; then
   exit 0
 fi
 
@@ -103,6 +105,16 @@ fi
 if [ "${#docs[@]}" -gt 0 ]; then
   if ! python3 "$root/check_docs.py" --arduino-cli "$cli"; then
     echo "docs: commit refused; a doc describes something this repo no longer has" >&2
+    status=1
+  fi
+fi
+
+# A staged gate file is the one change nothing else here can test: the checkers
+# pass on this tree every day, so a refactor that quietly stopped one refusing
+# would look exactly like a green commit. The refusals take about four seconds.
+if [ "$checkers" -eq 1 ]; then
+  if ! bash "$root/check.sh" --selftest; then
+    echo "checkers: commit refused; a gate no longer refuses what it exists for" >&2
     status=1
   fi
 fi
