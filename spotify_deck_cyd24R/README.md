@@ -11,7 +11,7 @@ active.
 
 This deck needs `PartitionScheme=huge_app`. Bluetooth does not fit beside WiFi,
 mbedTLS and the setup server in the default 1,310,720-byte app slot: the linked
-image is 1,878,613-1,878,661 bytes, 142 % of that slot and 59 % of this one. Flashing the
+image is 1,878,661 bytes, 142 % of that slot and 59 % of this one. Flashing the
 phone deck afterwards with the default scheme re-partitions the board back, so
 each upload has to carry the scheme its own sketch was built for.
 
@@ -372,7 +372,7 @@ compiler:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,878,613-1,878,661 | **1,267,099** | 3,145,728 (59 % used) |
+| flash | 1,878,661 | **1,267,067** | 3,145,728 (59 % used) |
 | DRAM | 69,092 globals | **258,588** | 327,680 |
 
 Without Bluetooth the same sketch was 1,125,781 bytes on the default scheme; the
@@ -413,8 +413,10 @@ sourcing a toolchain.
   A/B build rather than the shipping one.
 * **It needs `huge_app` now, and that is the scheme `toolchain.sh` pins.**
   Without Bluetooth the 3.3.12 build was 1,125,781 bytes (85 % of the
-  1,310,720-byte default slot); with the link it is 1,878,613-1,878,661 bytes, the same build
-  twice with 48 B between the runs, which is **142 %** of that slot and **59 %** of `huge_app`'s 3,145,728. `default.csv`
+  1,310,720-byte default slot); with the link it is 1,878,661 bytes, which is
+  **142 %** of that slot and **59 %** of `huge_app`'s 3,145,728. An earlier pair of
+  runs differed by 48 B; the pre-commit hook and a direct compile both print
+  1,878,661 now, so the single figure is the measured one. `default.csv`
   sizes `app0` and `app1` at 1,310,720 each, so on the default scheme this deck no
   longer links at all — not a tighter fit, a refusal. Uploading it re-partitions
   the board, and flashing the phone deck afterwards puts the default scheme back.

@@ -86,5 +86,5 @@ The deck `toolchain.sh` files pin `esp32:esp32@3.3.12`; 2.0.17 stays available a
 the A/B build in its own install root. No app file names a core, so there is
 nothing to change in the app — but any deck size quoted in app docs now means the
 3.3.12 build unless it says otherwise: 1,168,314 B for the phone deck on the
-default scheme (89 %) and 1,878,613-1,878,661 B for the Spotify deck on `huge_app` (59 %),
-as `check_headroom.py` read both of them on 2026-11-01 with the link in place.
+default scheme (89 %) and 1,878,661 B for the Spotify deck on `huge_app` (59 %),
+as `check_headroom.py` read both of them on 2026-11-02 with the link in place.
