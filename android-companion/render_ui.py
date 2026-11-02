@@ -30,8 +30,9 @@ from PIL import Image, ImageDraw, ImageFont
 W_DP, H_DP = 393, 852
 SCALE = 2
 
-# MainActivity's top bar, which the host does not build: it needs a window, a
-# permission request and a service. Everything under it is measured by the app.
+# The bar height the five transcriptions were drawn against. The bar itself is
+# measured now, so this is only the baseline their offsets ride on: each screen
+# shifts its content by however much the measured bar differs from it.
 BAR_DP = 52
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
@@ -122,6 +123,9 @@ class Screen:
         self.image = Image.new("RGB", (px(W_DP), px(height_dp)), BG)
         self.draw = ImageDraw.Draw(self.image)
         self.height_dp = height_dp
+        #: vertical shift for every primitive: a frame transcribed against a bar of
+        #: a different height moves with the bar instead of overlapping it
+        self.dy = 0
         #: (x, y, w, h, text) for every run painted, filled by text()
         self.runs = []
         Screen.instances.append(self)
@@ -131,7 +135,11 @@ class Screen:
     def text(self, x, y, value, sp, color, bold=False, spacing=0.0, clipped=False):
         """One run of text. `clipped` marks a run inside a scroller, where running
         off the edge is the app's own behaviour and not a layout fault."""
+        # U+FE0E asks for text presentation; it is a selector, not a glyph, and a face
+        # with no blank for it draws a tofu box.
+        value = value.replace("\ufe0e", "")
         face = font(sp, bold)
+        y += self.dy
         self.runs.append((x, y, self.width(value, sp, bold, spacing), line(sp, bold),
                           value, clipped))
         if not spacing:
@@ -168,6 +176,7 @@ class Screen:
                   color, bold, spacing)
 
     def card(self, x, y, w, h, radius=14, fill=CARD, stroke=EDGE):
+        y += self.dy
         self.draw.rounded_rectangle([px(x), px(y), px(x + w), px(y + h)],
                                     radius=px(radius), fill=fill,
                                     outline=stroke, width=max(1, px(0.5)))
@@ -188,36 +197,21 @@ class Screen:
 
     # -- chrome ------------------------------------------------------------
 
-    def gear(self, cx, cy, color=DIM, radius=4.2):
-        """A settings gear as a ring with eight teeth.
+    def drawable(self, x, y, w, h, art, color=TEXT):
+        """An image in the box its view measured, filled the way `ImageView` fills it.
 
-        Drawn rather than typed: U+2699 is an emoji on most phones and missing
-        from some monospace faces, and the render should show what the phone
-        shows, not a tofu box.
+        The default scaleType is FIT_CENTER: the artwork keeps its aspect, scales by
+        the smaller of the two ratios and is centred, so the mark is 36.75dp tall in
+        a 37dp box and sits an eighth of a dp low rather than at the top edge.
         """
-        ring = px(radius - 1.2)
-        self.draw.ellipse([px(cx) - ring, px(cy) - ring, px(cx) + ring, px(cy) + ring],
-                          outline=color, width=max(1, px(0.8)))
-        for tooth in range(8):
-            angle = math.pi * 2 * tooth / 8 + math.pi / 8
-            self.draw.line([
-                px(cx + math.cos(angle) * (radius - 0.6)),
-                px(cy + math.sin(angle) * (radius - 0.6)),
-                px(cx + math.cos(angle) * (radius + 1.2)),
-                px(cy + math.sin(angle) * (radius + 1.2)),
-            ], fill=color, width=max(1, px(1.0)))
-
-    def top_bar(self, crumb, gear=False, pill="IDLE"):
-        pill_w, pill_h = 62, 26
-        # The gear is the outermost thing in the bar: 2dp past the glyph, then the
-        # 10dp it is padded with, a 10dp gap, and the pill ends there.
-        pill_right = W_DP - 18 - 2 - 9 - 10 - 10
-        self.text(18, 20, crumb, 12, TEXT if crumb.startswith("\u2039") else DIM,
-                  spacing=0.12)
-        self.card(pill_right - pill_w, 14, pill_w, pill_h, 9)
-        self.text(pill_right - pill_w + 12, 20, pill, 11, DIM if pill == "IDLE" else GOOD,
-                  bold=True, spacing=0.14)
-        self.gear(W_DP - 20 - 5.4, 14 + pill_h / 2.0, TEXT if gear else DIM)
+        image = logo_icon.mark_image(px(w), color)
+        width = image.width / float(SCALE)
+        height = image.height / float(SCALE)
+        if height > h:
+            width, height = width * h / height, h
+            image = logo_icon.mark_image(px(width), color)
+        self.image.paste(image, (int(round(px(x + (w - width) / 2.0))),
+                                 int(round(px(y + (h - height) / 2.0)))), image)
 
     def section_title(self, title, subtitle):
         self.text(16, 56, title, 20, TEXT)
@@ -295,22 +289,10 @@ def host_frames():
     return _HOST
 
 
-def hosted(name):
-    """Paint a frame the app measured. Nothing here computes a position.
-
-    `BAR_DP` is the one number this file still owns: `MainActivity` builds the top bar
-    and the host cannot run it, so the drawer's content is drawn under a bar of the
-    same height the older frames used.
-    """
-    frame = host_frames()[name]
-    s = Screen(int(round(frame["height"])) + BAR_DP)
-    if name == "settings":
-        s.top_bar("\u2039  OFF-SITE", gear=True)
-    else:
-        s.top_bar("OFF-SITE")
-
-    for op in frame["ops"]:
-        y = op["y"] + BAR_DP
+def paint_ops(s, ops):
+    """Draw the operations the app measured. Nothing here computes a position."""
+    for op in ops:
+        y = op["y"]
         if op["op"] == "card":
             s.card(op["x"], y, op["w"], op["h"], op["r"],
                    _hex(op["fill"]), _hex(op["stroke"]))
@@ -321,8 +303,27 @@ def hosted(name):
             s.text(op["x"], y, op["text"], op["sp"], _hex(op["color"]),
                    op.get("bold", False), op.get("spacing", 0.0))
         elif op["op"] == "image":
-            s.logo(op["x"] + op["w"] / 2.0, y, op["w"])
+            s.drawable(op["x"], y, op["w"], op["h"], op["art"])
 
+
+def paint_bar(s, name):
+    """Draw the measured bar, and return its height in dp.
+
+    A frame the host cannot build still sits under the same bar, and the bar is the
+    app's own measurement: a moved crumb or a wider geometry moves here too.
+    """
+    frame = host_frames()[name]
+    keep, s.dy = s.dy, 0
+    paint_ops(s, frame["ops"])
+    s.dy = keep
+    return frame["height"]
+
+
+def hosted(name):
+    """Paint a frame the app measured, bar and all — no position is computed here."""
+    frame = host_frames()[name]
+    s = Screen(int(round(frame["height"])))
+    paint_ops(s, frame["ops"])
     # The dump's numbers are the ones the fit audit reads, so the painter's own copy
     # is dropped rather than given a second opinion.
     s.runs.clear()
@@ -335,7 +336,7 @@ def projects(open_first=False):
     # shelf does when a thumb scrolls to it, with the top bar staying put.
     s = Screen(1800 if open_first else H_DP)
     open_top = None
-    s.top_bar("\u2039  OFF-SITE")
+    s.dy = paint_bar(s, "bar-projects") - BAR_DP
     # Title, then which board this shelf belongs to, then the hint. The crumb no
     # longer leads with the section name: the title says it and the bar carries
     # the way back. Mirrors ProjectsTab.build().
@@ -483,7 +484,7 @@ def projects(open_first=False):
         scroll = max(0, open_top - 70)
         image = s.image.crop((0, px(scroll), px(W_DP), px(scroll + H_DP)))
         bar = Screen()
-        bar.top_bar("\u2039  OFF-SITE")
+        paint_bar(bar, "bar-projects")
         image.paste(bar.image.crop((0, 0, px(W_DP), px(70))), (0, 0))
         return image
     return s.image
@@ -521,7 +522,7 @@ def paired():
     seen. That is why two boards of one widget are two rows.
     """
     s = Screen()
-    s.top_bar("\u2039  OFF-SITE", pill="LINKED")
+    s.dy = paint_bar(s, "bar-decks") - BAR_DP
     x, w = 16, W_DP - 32
     inner = w - 28                      # Ui.card padding is 14 either side
     y = 56
@@ -577,7 +578,7 @@ def paired():
 
 def serial():
     s = Screen()
-    s.top_bar("\u2039  OFF-SITE")
+    s.dy = paint_bar(s, "bar-projects") - BAR_DP
     y = s.section_title("SERIAL", "Connect over OTG, then flash an image.")
 
     # Board picker.

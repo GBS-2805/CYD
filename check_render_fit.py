@@ -95,7 +95,7 @@ dump, where `DrawerHome` decided every position, so a run that crosses an edge i
     real fault in the app rather than a mistake in a transcription.
     """
     frame = render_ui.host_frames()[name]
-    offset = render_ui.BAR_DP
+    offset = 0.0          # the ops carry the bar themselves
     width = frame["width"]
     height = frame["height"] + offset
     runs = [(op["x"], op["y"] + offset, op["w"], op["h"], op["text"])

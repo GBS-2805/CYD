@@ -44,7 +44,7 @@ python3 "$HERE/stubs.py" "$OUT/src"
 # The app's own display code, verbatim.
 mkdir -p "$OUT/src/dev/phonedesk/companion"
 cp "$APP/Ui.java" "$APP/DrawerHome.java" "$APP/DecksTab.java" "$APP/SetupTab.java" \
-  "$OUT/src/dev/phonedesk/companion/"
+  "$APP/TopBar.java" "$OUT/src/dev/phonedesk/companion/"
 
 # The harness: the measured views and the dump.
 cp -r "$HERE/src/." "$OUT/src/"

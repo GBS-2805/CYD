@@ -15,6 +15,7 @@ The drawer (`DrawerHome`) is the front page and `MainActivity` hosts it:
 | --- | --- |
 | `MainActivity.java` | Header pill, drawer host, 1 s refresh loop, permissions, SAF result |
 | `DrawerHome.java` | The front page: `PAIRED`, `BOARDS`, `SERIAL`, and the gear that opens `SETUP` |
+| `TopBar.java` | The crumb, the link pill and the gear: one row, built by `TopBar` so the render host can measure it |
 | `DecksTab.java` | Live monitor: link telemetry, nearby scan results, saved decks |
 | `ProjectsTab.java` | Notebook: status chips, project cards, deck libraries, recipes |
 | `BoardTab.java` | Target picker, USB probe/restart, imported images, flashing, serial monitor |
@@ -492,7 +493,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the artifact in `dist/` now is the one rebuilt on 2026-11-02 after the drawer
   gained the owner's mark above its wordmark, which followed the sketch header
   change, the probe work, the drawer's rework and the deck's sign-in —
-  **174,206 bytes** on the file in
+  **174,286 bytes** on the file in
   `dist/`, against the 112,473 that the same work produced before the second
   widget joined it. The two
   halves were measured on their own branches the same day before they met —
@@ -547,7 +548,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **174,206 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
+  **174,286 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror, the three-step probe, the owner's logo as the icon, and the same
   ghost again above the drawer's wordmark. Quote the size to the nearest kB
@@ -645,7 +646,7 @@ printed in the status line and dropped.
 `./toolchain.sh` passed end to end on 2026-11-02 with the header mark in place and
 the buttons still feeding the sweep with the rate remembered: `all 117 host checks
 passed`, `BUILD SUCCESSFUL in 19s`, v2 signature, `zipalign -c 4`, both bundled
-sketches in sync, **174,206 bytes** in `dist/`.
+sketches in sync, **174,286 bytes** in `dist/`.
 
 ## Not verified
 

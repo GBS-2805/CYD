@@ -4,7 +4,6 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -15,7 +14,6 @@ import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 
 /**
  * Host for the drawer and the sections behind it — Decks (live link), Projects
@@ -46,28 +44,14 @@ public class MainActivity extends Activity {
     private BoardTab boardTab;
     private SetupTab setupTab;
     private FrameLayout content;
-    private LinearLayout topBar;
-    private TextView crumb;
-    private TextView gear;
-    private TextView pill;
+    private TopBar topBar;
     private int activeSection = HOME;
 
     private final Runnable refresh = new Runnable() {
         @Override
         public void run() {
             DeckService.Snapshot snapshot = DeckService.snapshot();
-            if (pill != null) {
-                if (snapshot.linked) {
-                    pill.setText("LINKED");
-                    pill.setTextColor(Ui.GOOD);
-                } else if (DeckService.isRunning()) {
-                    pill.setText("SCANNING");
-                    pill.setTextColor(Ui.ACCENT);
-                } else {
-                    pill.setText("IDLE");
-                    pill.setTextColor(Ui.DIM);
-                }
-            }
+            if (topBar != null) topBar.showLink(snapshot, DeckService.isRunning());
             switch (activeSection) {
                 case SECTION_DECKS:
                     decksTab.refresh();
@@ -147,8 +131,8 @@ public class MainActivity extends Activity {
         LinearLayout root = Ui.column(this);
         root.setBackgroundColor(Ui.BG);
 
-        topBar = buildTopBar();
-        root.addView(topBar, new LinearLayout.LayoutParams(
+        LinearLayout bar = buildTopBar();
+        root.addView(bar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         content = new FrameLayout(this);
@@ -172,43 +156,15 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * The crumb, the link pill and the settings gear. The crumb reads OFF-SITE on
-     * the drawer and carries a back chevron everywhere else, so the bar is the
-     * same height and the same place on every screen. SETTINGS is not a row in the
-     * drawer: it is configuration, not navigation, so it sits at the outer end of
-     * the bar, past the pill.
+     * The bar itself lives in {@link TopBar}, because the render host measures it
+     * and this class cannot be built off a device. Here it is only the views, the
+     * two taps they answer and the row they are added as.
      */
     private LinearLayout buildTopBar() {
-        LinearLayout bar = Ui.row(this);
-        bar.setPadding(Ui.dp(this, 18), Ui.dp(this, 14), Ui.dp(this, 18), Ui.dp(this, 8));
-
-        crumb = Ui.text(this, "OFF-SITE", 12, Ui.DIM);
-        crumb.setLetterSpacing(0.12f);
-        crumb.setPadding(0, Ui.dp(this, 6), Ui.dp(this, 12), Ui.dp(this, 6));
-        crumb.setOnClickListener(v -> showSection(HOME));
-        bar.addView(crumb, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        pill = Ui.text(this, "IDLE", 11, Ui.DIM);
-        pill.setLetterSpacing(0.14f);
-        pill.setTypeface(Typeface.DEFAULT_BOLD);
-        pill.setBackground(Ui.rounded(this, Ui.CARD, Ui.EDGE, 9));
-        pill.setPadding(Ui.dp(this, 12), Ui.dp(this, 6), Ui.dp(this, 12), Ui.dp(this, 6));
-        bar.addView(pill);
-
-        // \u2699 with the text-presentation selector: a glyph, not the emoji, which
-        // would arrive in colour on a monochrome screen. It sits outside the pill,
-        // hard against the screen edge, so it reads as chrome rather than as part
-        // of the link state the pill reports.
-        gear = Ui.text(this, "\u2699\uFE0E", 15, Ui.DIM);
-        gear.setGravity(android.view.Gravity.CENTER);
-        gear.setPadding(Ui.dp(this, 10), Ui.dp(this, 4), Ui.dp(this, 2), Ui.dp(this, 4));
-        gear.setOnClickListener(v -> showSection(SECTION_SETTINGS));
-        LinearLayout.LayoutParams gearParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        gearParams.leftMargin = Ui.dp(this, 10);
-        bar.addView(gear, gearParams);
-        return bar;
+        topBar = new TopBar(this);
+        topBar.crumb.setOnClickListener(v -> showSection(HOME));
+        topBar.gear.setOnClickListener(v -> showSection(SECTION_SETTINGS));
+        return topBar.bar;
     }
 
     /**
@@ -226,7 +182,7 @@ public class MainActivity extends Activity {
         root.setOnApplyWindowInsetsListener((view, insets) -> {
             android.graphics.Insets bars = insets.getInsets(
                     WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-            topBar.setPadding(side, top + bars.top, side, under);
+            topBar.bar.setPadding(side, top + bars.top, side, under);
             content.setPadding(0, 0, 0, bars.bottom);
             return insets;
         });
@@ -247,9 +203,7 @@ public class MainActivity extends Activity {
         boardTab.setVisibility(index == SECTION_SERIAL ? View.VISIBLE : View.GONE);
         setupTab.setVisibility(index == SECTION_SETTINGS ? View.VISIBLE : View.GONE);
 
-        crumb.setText(index == HOME ? "OFF-SITE" : "‹  OFF-SITE");
-        crumb.setTextColor(index == HOME ? Ui.DIM : Ui.TEXT);
-        if (gear != null) gear.setTextColor(index == SECTION_SETTINGS ? Ui.TEXT : Ui.DIM);
+        topBar.showSection(index);
 
         handler.removeCallbacks(refresh);
         handler.post(refresh);

@@ -490,12 +490,14 @@ the front page needs no second navigation.
   TTF the painter draws with (`render/Face.java`, `line()`), never a `1.45`
   multiplier or a `0.6 em` guess: those were in here once, and a guess inside a gate
   is a gate that lies. Two things are still the renderer's: the top bar's height
-  (`MainActivity` needs a window and a service), and the frames whose classes need a
+  and the frames whose classes need a
   phone to answer — `projects`, `projects-open`, `paired` and `serial` are still
   transcribed, which is why `render_ui.HOSTED` names the converted ones one by one
   instead of claiming the set. A frame whose copy is a live age cannot be a committed
   render either: `check_renders.py` would fail it a minute later, so `paired` keeps a
-  fixed age until the host has a clock to freeze. Text that does not fit is a review that
+  fixed age until the host has a clock to freeze. The bar is not exempt: `TopBar` is a class the host builds,
+  so the crumb, the pill and the gear are measured, and the gear is the
+  `\u2699\uFE0E` the app sets rather than a shape drawn here. Text that does not fit is a review that
   cannot happen, so [`check_render_fit.py`](check_render_fit.py) audits every run —
   from the dump for a hosted frame, from the canvas for a transcribed one — and
   fails a run that crosses an edge or lands on another run.

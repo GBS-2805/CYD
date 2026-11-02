@@ -96,7 +96,18 @@ public final class Face {
         return width;
     }
 
+    /**
+     * U+FE0E and its kin ask for a presentation, not a glyph: the bar's gear is
+     * "\u2699\uFE0E" and the selector must cost no advance, or the gear is measured
+     * a character too wide and the pill moves left to make room for nothing.
+     */
+    private static boolean isVariationSelector(int codePoint) {
+        return (codePoint >= 0xFE00 && codePoint <= 0xFE0F)
+                || (codePoint >= 0xE0100 && codePoint <= 0xE01EF);
+    }
+
     private float glyphAdvance(int codePoint) {
+        if (isVariationSelector(codePoint)) return 0f;
         int gid = glyph(codePoint);
         if (gid <= 0) gid = glyph('M');
         int index = Math.min(gid, numberOfHMetrics - 1);
