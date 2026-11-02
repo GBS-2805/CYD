@@ -3,9 +3,10 @@
 # One gate, two speeds. A rule has one home, and this is where to run them from.
 #
 #   ./check.sh          what a commit must pass            (~3 s)
-#   ./check.sh --full   what a release must pass           (~80 s, needs both
-#                       toolchains: source ~/.arduino-cyd/env.sh and
-#                       ~/.android-offsite/env.sh)
+#   ./check.sh --full   what a release must pass           (~4 min: the decks on
+#                       both cores, so it needs all three toolchains — source
+#                       ~/.arduino-cyd/env.sh, ~/.arduino15/env.sh for the old
+#                       core, and ~/.android-offsite/env.sh)
 #   ./check.sh --selftest  the checkers' own refusals        (~4 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
@@ -16,8 +17,8 @@
 # Fast:  docs (figures, links, prose, the recorded APK bytes), widget assets, the
 #        index (no source file left outside it), the host tests, and the branch list
 #        as a note.
-# Full:  the above, plus deck headroom, the seven render captures, and the APK
-#        build with its signature, alignment and bundled-sketch checks.
+# Full:  the above, plus deck headroom on both cores, the seven render captures,
+#        and the APK build with its signature, alignment and bundled-sketch checks.
 #
 # Each step takes the pattern of the line worth reading, so a passing step reports
 # its measurement rather than whatever the script said last.
@@ -136,6 +137,14 @@ report "branches" python3 check_branches.py
 
 if [ "$full" -eq 1 ]; then
   step "headroom" 'deck\(s\) fit'       python3 check_headroom.py "${cli_args[@]}"
+  # The old core is a separate question, not a second opinion: a deck that fits on
+  # 3.3.12 can still overflow on 2.0.17, and that root carries its own data dir and
+  # its own Python path, so it is built in a shell that sourced its env.sh.
+  if [ -f "$HOME/.arduino15/env.sh" ]; then
+    step "headroom 2.0.17" 'deck\(s\) fit' bash -c '. "$HOME/.arduino15/env.sh" && exec python3 check_headroom.py'
+  else
+    say "headroom 2.0.17" "no A/B root at ~/.arduino15/env.sh, so the old core was NOT built"
+  fi
   step "renders"  'renders current'     python3 check_renders.py
   step "apk"      '[0-9] bytes'         bash android-companion/toolchain.sh
 fi

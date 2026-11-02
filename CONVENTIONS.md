@@ -243,13 +243,21 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
 * **The 2.0.17 root takes the same cut, once its Python can see `serial`.** On
   2026-11-02 `~/.arduino15` went from 2.4 G to **1.2G** — `riscv32-esp-elf-gcc`
   (662 M), the ESP32-S2 and S3 compilers (413 M between them), the two `gdb`s and
-  `openocd` — and both decks still built on **2.0.17** from it, exit 0. One trap on
-  the way: that root's `esptool_py` is 4.5.1, which imports `serial`, and only the
-  3.3.12 root ships it, in `pylibs/`. Without
-  `PYTHONPATH=<3.3.12 root>/pylibs` every compile dies on
+  `openocd` — and both decks still built on **2.0.17** from it, exit 0. One trap on the way: that root's `esptool_py` is 4.5.1, which imports `serial`, and
+  only the 3.3.12 root ships it, in `pylibs/`; without it every compile dies on
   `ModuleNotFoundError: No module named 'serial'` before a sketch is touched, which
-  reads like a broken toolchain and is not — so an A/B measurement needs that path
-  set, or it is measuring the interpreter rather than the core.
+  reads like a broken toolchain and is not. So the A/B root carries its own
+  **`~/.arduino15/env.sh`** — data dirs pointed at itself, `PYTHONPATH` at the 3.3.12
+  root's `pylibs`, `arduino-cli` from `~/.arduino-cyd/bin` — and an old-core build is
+  one `source` away:
+
+  ```bash
+  source ~/.arduino15/env.sh && ./check_headroom.py     # both decks, on 2.0.17
+  ```
+
+  `./check.sh --full` runs that same build as its **`headroom 2.0.17`** step, and says
+  so when the root is missing, so the A/B measurement is a step that fails rather than
+  a paragraph nobody ran.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
@@ -456,7 +464,8 @@ other mention of it in this repo is a pointer back here.
 * **Run the gates from one command.** [`check.sh`](check.sh) is the fast set a
   commit must pass — docs (figures, links, prose), widget assets, the host tests,
   and the branch list as a note rather than a failure — and `./check.sh --full`
-  adds deck headroom, the seven render captures and the APK build, and
+  adds deck headroom on both cores, the seven render captures and the APK build,
+  and
   `./check.sh --selftest` runs the five change-the-checker gates in about four
   seconds. It also refuses a source file that is in the worktree but not in the
   index: every commit here stages tracked files, which cannot pick up a new one,
