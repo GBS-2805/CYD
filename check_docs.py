@@ -354,6 +354,22 @@ def prose_problems(path, text):
     return out
 
 
+def apk_problem():
+    """Exact bytes live in HANDOFF and nowhere else, so they have to be these."""
+    apk = ROOT / "android-companion/dist/PhoneDeckBridge-debug.apk"
+    handoff = ROOT / "android-companion/HANDOFF.md"
+    if not apk.is_file() or not handoff.is_file():
+        return []
+    size = "{:,} bytes".format(apk.stat().st_size)
+    text = handoff.read_text(encoding="utf-8", errors="replace")
+    if size in text:
+        return []
+    return [
+        "%s does not record %s, which is the APK in dist/; exact bytes live there "
+        "and nowhere else, so a rebuild is one edit" % (shown(handoff), size)
+    ]
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Check that docs quote the sizes and md5s of the current build."
@@ -480,6 +496,8 @@ def main():
                 "%s does not quote the current md5 %s\u2026"
                 % (shown(readme), deck["md5"][:8])
             )
+
+    problems.extend(apk_problem())
 
     for line in problems:
         print("  - " + line)

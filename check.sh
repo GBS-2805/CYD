@@ -26,7 +26,9 @@ step () {
   local name="$1"; shift
   local start end rc out last ms
   start=$(date +%s%N)
-  out=$(mktemp)
+  mkdir -p .scratch
+  out=".scratch/gate-$name.log"
+  : >"$out"
   "$@" >"$out" 2>&1; rc=$?
   end=$(date +%s%N); ms=$(( (end-start)/1000000 ))
   last=$(tail -1 "$out")
@@ -39,7 +41,6 @@ step () {
     sed -n '1,40p' "$out"
     echo "-----"
   fi
-  rm -f "$out"
 }
 
 # Information, never a failure: an unmerged branch in another chat's worktree is
@@ -73,7 +74,9 @@ report "branches" python3 check_branches.py
 if [ "$full" -eq 1 ]; then
   step "deck headroom" python3 check_headroom.py "${headroom_args[@]}"
   step "renders"       python3 check_renders.py
-  SUMMARY_GREP="[0-9] bytes" step "apk" bash android-companion/toolchain.sh
+  SUMMARY_GREP="[0-9] bytes"
+  step "apk" bash android-companion/toolchain.sh
+  SUMMARY_GREP=
 fi
 
 echo
