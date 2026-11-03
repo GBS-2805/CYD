@@ -12,6 +12,10 @@ width, separated by a hairline and one line of caption, so opening it and draggi
 walks the app from the front page to settings. A strip of nine thumbnails shows the
 shape of the app and nothing readable; this shows what the phone shows.
 
+The strip is the one exception, because a single chat message wants one picture. It is
+drawn here from the same nine frames the page uses, so it cannot be the seven-frame
+strip an earlier capture left in `renders/` while the app grew two screens.
+
     python3 artifacts/publish_renders.py          # rebuild the bundle
     # then deploy artifacts/site/manifest.json with the sites tooling
 
@@ -19,6 +23,8 @@ shape of the app and nothing readable; this shows what the phone shows.
 """
 import shutil
 from pathlib import Path
+
+from PIL import Image, ImageDraw
 
 HERE = Path(__file__).resolve().parent
 RENDERS = HERE / "renders"
@@ -97,6 +103,43 @@ PAGE = """<!doctype html>
 """
 
 
+# The strip one chat message shows. Drawn from the same nine frames the page uses, at
+# publish time: a strip copied out of `renders/` is how the published one came to show
+# the seven frames of an earlier capture a week after the app had grown two more.
+STRIP = "chat-sheet.jpg"
+THUMB = 196                          # a 393 px capture at half width
+GUTTER = 10
+PAD = 12
+FIELD = (0x3F, 0x4E, 0x96)           # Palette.FIELD, the page's own ground
+BAND = (0xD9, 0xD9, 0xD9)            # Palette.BAND, the hairline the app draws
+
+
+def strip():
+    """One row of the nine screens, drawn from the frames just copied into `public/`.
+
+    The page is a scroll because nine screens side by side are unreadable at phone
+    width; this is those same nine as one picture, so it is drawn rather than carried
+    in `renders/`, where a copy dates while the app moves. The frames keep their own
+    proportions and hang from the same top edge, so a short screen is a short card.
+    """
+    shots = []
+    for name, _, _ in SCREENS:
+        frame = Image.open(PUBLIC / (name + ".png")).convert("RGB")
+        shots.append(frame.resize((THUMB, round(frame.height * THUMB / frame.width)),
+                                  Image.LANCZOS))
+    cell = max(shot.height for shot in shots)
+    width = PAD * 2 + THUMB * len(shots) + GUTTER * (len(shots) - 1)
+    canvas = Image.new("RGB", (width, cell + PAD * 2), FIELD)
+    draw = ImageDraw.Draw(canvas)
+    x = PAD
+    for shot in shots:
+        canvas.paste(shot, (x, PAD))
+        draw.rectangle([x - 1, PAD - 1, x + THUMB, PAD + shot.height], outline=BAND)
+        x += THUMB + GUTTER
+    canvas.save(PUBLIC / STRIP, quality=88, optimize=True)
+    return canvas.size
+
+
 def main():
     PUBLIC.mkdir(parents=True, exist_ok=True)
     for stale in PUBLIC.glob("*.png"):
@@ -113,9 +156,7 @@ def main():
             '    <figcaption><b>%s</b><span>%s</span></figcaption>\n  </figure>'
             % (name, title, title, blurb))
 
-    sheet = RENDERS / "chat-sheet.jpg"
-    if sheet.is_file():
-        shutil.copyfile(sheet, PUBLIC / sheet.name)
+    size = strip()
 
     # The logo sheet is drawn by `logo_icon.py` beside the drawable it shows, so it
     # cannot describe a mark the app stopped drawing. Copied here, not remembered.
@@ -129,6 +170,8 @@ def main():
     print("bundle: %d files in %s" % (len(files), PUBLIC.relative_to(HERE.parent)))
     for name in files:
         print("  %-20s %6.0f kB" % (name, (PUBLIC / name).stat().st_size / 1024))
+    print("strip: %s %d x %d from the same %d frames" % (STRIP, size[0], size[1],
+                                                         len(SCREENS)))
 
 
 if __name__ == "__main__":

@@ -773,15 +773,16 @@ bytes) is not in the APK`; over the real archive it prints all five and exits 0.
 
 ## Where the renders live
 
-The seven frames and the chat strip are published as a static site, because a link a
+The nine frames and the chat strip are published as a static site, because a link a
 person can tap is what the render rule in `CONVENTIONS.md` asks for and a workspace path
-opens nothing:
+opens nothing. The strip is drawn by `publish_renders.py` from those same nine frames on
+every run, so it is never a picture of an earlier capture.
 
 | What | Where |
 | --- | --- |
 | Gallery (a scroll, one screen under the next) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/ |
 | One screen | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/home.png — likewise `home-open`, `projects`, `projects-open`, `projects-edit`, `projects-file`, `paired`, `serial`, `settings` |
-| The strip | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/chat-sheet.jpg |
+| The strip (one row of the nine, for a single message) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/chat-sheet.jpg |
 | Preview copy | https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/ — the same bundle, deployed first and kept for a second look |
 | Bundle source | [`artifacts/site/`](../artifacts/site/) (`worker.js`, `manifest.json`), built by [`artifacts/publish_renders.py`](../artifacts/publish_renders.py) into the gitignored `artifacts/site/public/` |
 | Site | Freebuff Sites `3f6c1a9e-8b47-4d2c-9f11-5a7e2c4d8b60` — **production published**, preview published beside it |

@@ -686,8 +686,10 @@ One command per stage, and each one is checked rather than assumed:
   `--rerun-tasks`. The daemon is kept and its JDK passed explicitly.
 * **The published page is a scroll, not a contact sheet.**  `publish_renders.py` stacks
   the nine at phone width with a hairline and one caption between them, so dragging
-  down walks the app; the strip (`chat-sheet.jpg`) exists for a single message, not for
-  reading. The addresses are recorded in
+  down walks the app; the strip it serves beside them exists for a single message, not
+  for reading, and the same script draws it from those same nine frames on every run —
+  a strip kept in `renders/` is how the published one came to show seven frames a week
+  after the app had nine. The addresses are recorded in
   [`android-companion/HANDOFF.md`](android-companion/HANDOFF.md#where-the-renders-live).
 * **An emulator is not the upgrade it sounds like.** It would answer a different
   question — a device screenshot with the phone's fonts and status bar — while the
