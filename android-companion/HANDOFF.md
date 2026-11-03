@@ -662,7 +662,10 @@ Identical to the sketch, checked against its `onWrite` handlers:
   would ship an identity whose password is in the tree, which is what
   `OFFSITE_KEYSTORE` exists to replace. The archive is 191,798 bytes (187 kB),
   about 10 kB under the debug APK because `debug` writes the larger signing block;
-  both carry the same bundled sketches.
+  both carry the same bundled sketches. That archive is build output rather than a
+  kept file: the next `toolchain.sh` run starts with `clean` and takes it with it,
+  and it is not committed anywhere, so it is rebuilt with `gradle assembleRelease`
+  when it is wanted and checked again then.
 - **The signing key ships with the tree.** `android-companion/keystore/debug.jks`
   is the project's own debug key — alias `androiddebugkey`, password `android`,
   RSA 2048, `CN=Android Debug` — committed so that two machines and two runs sign
