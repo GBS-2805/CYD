@@ -79,6 +79,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import check_headroom as headroom  # noqa: E402  (same folder, same build rules)
+import check_old_core  # noqa: E402  (the one reader for old_core.json)
 
 ROOT = Path(__file__).resolve().parent
 SKIP_DIRS = {".git", ".gradle", "build", "node_modules"}
@@ -381,19 +382,28 @@ def old_core_figures():
     while that sketch is still this tree's and stops being quotable the moment it
     moves - which is exactly when it wants re-measuring.
 
+    The file itself is read by check_old_core.read_record() and each row is judged
+    by check_old_core.row_shape(), so this gate and the 2.0.17 one cannot disagree
+    about what a valid record is; only what a figure is worth to the prose is
+    decided here.
+
     Returns (sizes a doc may quote, problems with the file itself).
     """
-    if not OLD_CORE.is_file():
-        return {}, [
-            "%s is missing, so the 2.0.17 figures in the prose have nothing behind "
-            "them" % shown(OLD_CORE)
-        ]
-    try:
-        data = json.loads(OLD_CORE.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        return {}, ["%s does not parse: %s" % (shown(OLD_CORE), exc)]
-    if not isinstance(data, dict):
-        return {}, ["%s does not hold an object" % shown(OLD_CORE)]
+    data, duplicates, error = check_old_core.read_record(OLD_CORE)
+    if error:
+        kind, detail = error
+        if kind == "missing":
+            return {}, [
+                "%s is missing, so the 2.0.17 figures in the prose have nothing "
+                "behind them" % shown(OLD_CORE)
+            ]
+        if kind == "not-object":
+            return {}, ["%s does not hold an object" % shown(OLD_CORE)]
+        if kind == "no-decks":
+            return {}, ["%s records no deck" % shown(OLD_CORE)]
+        if kind == "unreadable":
+            return {}, ["%s cannot be read: %s" % (shown(OLD_CORE), detail)]
+        return {}, ["%s does not parse: %s" % (shown(OLD_CORE), detail)]
 
     problems = []
     core = data.get("core")
@@ -401,49 +411,33 @@ def old_core_figures():
         problems.append("%s names no core, so no figure in it names a build"
                         % shown(OLD_CORE))
         core = "an unnamed core"
-    decks = data.get("decks")
-    if not isinstance(decks, dict) or not decks:
-        return {}, problems + ["%s records no deck" % shown(OLD_CORE)]
 
     allowed = {}
-    for name, entry in sorted(decks.items()):
+    for name, entry in sorted(data["decks"].items()):
         where = "%s: %s" % (shown(OLD_CORE), name)
-        sketch = ROOT / name / (name + ".ino")
-        if not sketch.is_file():
-            problems.append("%s names a deck this tree does not hold" % where)
+        found, figures = check_old_core.row_shape(name, entry)
+        problems.extend("%s %s" % (where, reason) for reason in found)
+        if figures is None:
             continue
-        if not isinstance(entry, dict):
-            problems.append("%s is not an object" % where)
-            continue
-        figures = {}
-        for key in ("used", "globals", "slot"):
-            value = entry.get(key)
-            if not isinstance(value, int) or value <= 0:
-                problems.append("%s records no %s" % (where, key))
-                break
-            figures[key] = value
-        else:
-            if figures["used"] > figures["slot"]:
-                problems.append(
-                    "%s puts %s B in a %s B slot, which no build does"
-                    % (where, "{:,}".format(figures["used"]),
-                       "{:,}".format(figures["slot"]))
-                )
-            recorded, now = entry.get("md5"), md5(sketch)
-            if recorded != now:
-                problems.append(
-                    "%s records md5 %s but the sketch is %s now; rebuild it on "
-                    "core %s and update the file"
-                    % (where, recorded, now[:8] + "\u2026", core)
-                )
-                continue
-            allowed[figures["used"]] = "the %s build on core %s" % (name, core)
-            allowed.setdefault(
-                figures["slot"],
-                "the app slot %s builds for on core %s" % (name, core),
+        recorded, now = entry.get("md5"), md5(ROOT / name / (name + ".ino"))
+        if recorded != now:
+            problems.append(
+                "%s records md5 %s but the sketch is %s now; rebuild it on "
+                "core %s and update the file"
+                % (where, recorded, now[:8] + "\u2026", core)
             )
+            continue
+        allowed[figures["used"]] = "the %s build on core %s" % (name, core)
+        allowed.setdefault(
+            figures["slot"],
+            "the app slot %s builds for on core %s" % (name, core),
+        )
+    for key in dict.fromkeys(duplicates):
+        problems.append(
+            "%s names %s twice, so a read keeps only one of the rows"
+            % (shown(OLD_CORE), key)
+        )
     return allowed, problems
-
 
 # Names this repo does not hold but prose legitimately mentions, each with its
 # reason, like HISTORICAL: a tool the ROM protocol mirrors, a file a toolchain

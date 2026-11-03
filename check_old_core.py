@@ -52,12 +52,22 @@ def shown(path):
         return str(path)
 
 
-def load():
-    """The record with any key it repeats, or None after saying why it will not read.
+def read_record(path=RECORD):
+    """(data, duplicates, error) for old_core.json, read one way for every checker.
 
     json keeps the last of two equal keys without a word, so a deck named twice
-    reads as one deck and the other row is invisible. The hook below remembers it.
+    reads as one deck and the other row is invisible; the hook below remembers it.
+    `error` is a kind and a detail rather than a sentence, because the docs gate
+    says a figure has nothing behind it while this one says the file will not
+    read: the rules are shared, the wording belongs to whoever is speaking.
     """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None, [], ("missing", str(path))
+    except OSError as exc:
+        return None, [], ("unreadable", str(exc))
+
     duplicates = []
 
     def hook(pairs):
@@ -69,14 +79,58 @@ def load():
         return seen
 
     try:
-        data = json.loads(RECORD.read_text(encoding="utf-8"), object_pairs_hook=hook)
-    except (OSError, ValueError) as exc:
-        print("error: %s does not read as JSON: %s" % (shown(RECORD), exc),
-              file=sys.stderr)
-        return None
-    if not isinstance(data, dict) or not isinstance(data.get("decks"), dict) \
-            or not data["decks"]:
-        print("error: %s records no deck" % shown(RECORD), file=sys.stderr)
+        data = json.loads(text, object_pairs_hook=hook)
+    except ValueError as exc:
+        return None, [], ("unparseable", str(exc))
+    if not isinstance(data, dict):
+        return None, [], ("not-object", None)
+    if not isinstance(data.get("decks"), dict) or not data["decks"]:
+        return None, [], ("no-decks", None)
+    return data, duplicates, None
+
+
+def row_shape(name, entry):
+    """(reasons, figures) for one row, before its figures are compared with a build.
+
+    One home for the two questions both readers ask - does this tree hold the deck,
+    and does its row carry three positive numbers - so a rule cannot hold in the
+    docs gate and not in this one.
+    """
+    sketch = ROOT / name / (name + ".ino")
+    if not sketch.is_file():
+        return ["names a deck this tree does not hold"], None
+    if not isinstance(entry, dict):
+        return ["is not an object"], None
+    figures = {}
+    for key in ("used", "globals", "slot"):
+        value = entry.get(key)
+        if not isinstance(value, int) or value <= 0:
+            return ["records no %s" % key], None
+        figures[key] = value
+    found = []
+    if figures["used"] > figures["slot"]:
+        found.append(
+            "puts %s B in a %s B slot, which no build does"
+            % ("{:,}".format(figures["used"]), "{:,}".format(figures["slot"]))
+        )
+    return found, figures
+
+
+def load():
+    """The record and the keys it repeats, or None after saying why it will not read."""
+    data, duplicates, error = read_record()
+    if error:
+        kind, detail = error
+        if kind == "missing":
+            print("error: %s is missing" % shown(RECORD), file=sys.stderr)
+        elif kind in ("unparseable", "unreadable"):
+            print("error: %s does not read as JSON: %s" % (shown(RECORD), detail),
+                  file=sys.stderr)
+        elif kind == "not-object":
+            print("error: %s does not hold an object" % shown(RECORD),
+                  file=sys.stderr)
+        else:
+            print("error: %s records no deck" % shown(RECORD), file=sys.stderr)
         return None
     return data, duplicates
 
@@ -106,12 +160,11 @@ def index_problem(sketch):
 
 
 def row_problems(name, entry, want_index):
-    """What is wrong with one deck's row, before any number in it is compared."""
+    """What is wrong with one deck's row, before any build is compared with it."""
+    found, _ = row_shape(name, entry)
+    if found:
+        return found
     sketch = ROOT / name / (name + ".ino")
-    if not sketch.is_file():
-        return ["names a deck this tree does not hold"]
-    if not isinstance(entry, dict):
-        return ["is not an object"]
     out = []
     digest = entry.get("md5")
     if not isinstance(digest, str) or not MD5_RE.match(digest):

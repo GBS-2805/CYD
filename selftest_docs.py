@@ -35,6 +35,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 CHECK = ROOT / "check_docs.py"
 HEADROOM = ROOT / "check_headroom.py"
+CORE = ROOT / "check_old_core.py"
 DECK = "phone_deck_cyd24R"
 SKETCH = "/* stand-in sketch: the build is canned, so this is never compiled */\n"
 USED, SLOT, GLOBALS = 1168314, 1310720, 45244
@@ -77,6 +78,7 @@ def tree(dest, used=USED):
     dest.mkdir(parents=True, exist_ok=True)
     shutil.copy2(CHECK, dest / "check_docs.py")
     shutil.copy2(HEADROOM, dest / "check_headroom.py")
+    shutil.copy2(CORE, dest / "check_old_core.py")
     deck = dest / DECK
     deck.mkdir()
     (deck / (DECK + ".ino")).write_text(SKETCH)

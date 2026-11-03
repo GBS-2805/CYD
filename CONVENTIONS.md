@@ -296,7 +296,9 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   compiler at all: `./check_old_core.py --record`, the fast gate's `old record`
   step, requires every deck it names to be here with one row and an md5 for a
   sketch that is in the index, because an md5 of a file a clone would not have
-  describes bytes nobody can check out.
+  describes bytes nobody can check out. Both gates read the file through
+  `check_old_core.read_record()` and judge its rows with `row_shape()`, so a
+  rule about the record cannot hold in one gate and not the other.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
