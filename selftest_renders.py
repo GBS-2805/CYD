@@ -107,7 +107,8 @@ CASES = [
         name="a frame at the wrong size is refused with both sizes",
         mutate=resize,
         want_code=1,
-        want=["artifacts/renders/paired.png is 6x4 but the app draws 7x4"],
+        want=["artifacts/renders/paired.png is 6x4 but the app draws 7x4; run "
+              "capture.sh"],
     ),
     dict(
         name="a committed render that is gone is refused by name",

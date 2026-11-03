@@ -179,6 +179,25 @@ def stale_record_only(dest):
                     encoding="utf-8")
 
 
+def no_core(dest):
+    """A record that names no core, so no figure in it names a build."""
+    path = dest / "old_core.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data.pop("core", None)
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8")
+
+
+def no_readme(dest):
+    """A deck whose README is gone, so the page a person reads is not there."""
+    (dest / DECK / "README.md").unlink()
+
+
+def no_record(dest):
+    """No old_core.json at all, while the prose still quotes 2.0.17 figures."""
+    (dest / "old_core.json").unlink()
+
+
 def no_sketch(dest):
     shutil.rmtree(dest / DECK)
 
@@ -410,6 +429,25 @@ CASES = [
         mutate=twice,
         want_code=1,
         want=["names phone_deck_cyd24R twice, so a read keeps only one of the rows"],
+    ),
+    dict(
+        name="a record that names no core is refused",
+        mutate=no_core,
+        want_code=1,
+        want=["names no core, so no figure in it names a build"],
+    ),
+    dict(
+        name="a widget README that is gone is refused by name",
+        mutate=no_readme,
+        want_code=1,
+        want=["phone_deck_cyd24R/README.md is missing"],
+    ),
+    dict(
+        name="a missing record is refused, not treated as no figures",
+        mutate=no_record,
+        want_code=1,
+        want=["is missing, so the 2.0.17 figures in the prose have nothing behind "
+              "them"],
     ),
     dict(
         name="a widget README without the current size is refused",

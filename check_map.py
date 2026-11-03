@@ -106,7 +106,8 @@ def squash(text):
     """
     text = text.replace("%%", "%")
     text = PLACEHOLDER.sub("\u2026", text)
-    text = re.sub(r"\b\d[\d,.]*\b", "\u2026", text)
+    text = re.sub(r"\b\d+\s*x\s*\d+\b", "\u2026x\u2026", text)
+    text = re.sub(r"(?<!\w)\d[\d,.]*", "\u2026", text)
     return re.sub(r"\s+", " ", text).strip()
 
 

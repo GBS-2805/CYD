@@ -19,12 +19,28 @@ CHECK = ROOT / "check_map.py"
 GATE = "check_map.py"
 
 
-def selftest(checker):
+CHECKER = (
+    "def check(problems, digest):\n"
+    '    problems.append("%s is %dx%d but the app draws %dx%d; run capture.sh"\n'
+    '                    % ("a.png", 6, 4, 7, 4))\n'
+    '    problems.append("quotes %d %% of the slot" % 74)\n'
+    '    problems.append("%s quotes md5 %s\\u2026, which is not a sketch here now"\n'
+    '                    % ("README.md", digest))\n'
+)
+
+WANTS = [
+    "a.png is 6x4 but the app draws 7x4; run capture.sh",
+    "quotes 74 % of the slot",
+    "quotes md5 deadbeef\u2026, which is not a sketch here now",
+]
+
+
+def selftest(checker, wants=WANTS):
     """A stand-in fixture: one branch, naming the checker it exercises."""
     return (
         "from pathlib import Path\n\n"
         'CHECK = Path(__file__).resolve().parent / "%s"\n'
-        'CASES = [{"name": "a branch", "want": ["x"]}]\n' % checker
+        "CASES = [dict(name=\"a branch\", want=%r)]\n" % (checker, wants)
     )
 
 
@@ -32,12 +48,19 @@ def tree(dest):
     dest.mkdir(parents=True, exist_ok=True)
     shutil.copy2(CHECK, dest / "check_map.py")
     (dest / "selftest_map.py").write_text(selftest("check_map.py"))
-    (dest / "check_a.py").write_text("# a checker\n")
+    (dest / "check_a.py").write_text(CHECKER)
     (dest / "selftest_a.py").write_text(selftest("check_a.py"))
 
 
 def orphan_checker(dest):
     (dest / "check_b.py").write_text("# a gate nobody tests\n")
+
+
+def unasserted(dest):
+    """A message the checker can print that no branch repeats."""
+    path = dest / "check_a.py"
+    path.write_text(path.read_text() +
+                    '    problems.append("a sentence nothing repeats")\n')
 
 
 def ghost_checker(dest):
@@ -52,7 +75,14 @@ def nameless(dest):
 
 CASES = [
     dict(name="a tree where every checker has a selftest passes", mutate=None,
-         want_code=0, want=["every checker has a selftest (2 checked)"],
+         want_code=0,
+         want=["every checker has a selftest (2 checked)",
+               "check_a.py: every appended message is repeated by a branch"],
+         forbids=["pairing problem"]),
+    dict(name="a message no branch asserts is reported, not refused",
+         mutate=unasserted, want_code=0,
+         want=["check_a.py: 1 message(s) no branch repeats",
+               "a sentence nothing repeats"],
          forbids=["pairing problem"]),
     dict(name="a checker with no selftest is refused", mutate=orphan_checker,
          want_code=1,

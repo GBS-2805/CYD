@@ -215,16 +215,17 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   and the last three docs refusals were found by a reader, not by the check. Each
   `selftest_*.py` builds a throwaway repo in a temp directory — a stand-in
   `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
-  checker refuses: 35 docs branches, 9 asset branches, 8 margin branches, 14 old-core
+  checker refuses: 38 docs branches, 9 asset branches, 8 margin branches, 15 old-core
   ones, 9 branch ones (a patch already upstream, the same bytes under a new name, a folder a
   merge would resurrect, a pushed branch and its local alias), 9 render ones (a
-  moved pixel, a wrong size, a corrupt PNG, a capture that failed) , 4 on the map itself
+  moved pixel, a wrong size, a corrupt PNG, a capture that failed) , 5 on the map itself
   (a checker with no selftest, a selftest naming a checker that is gone, a
-  selftest with no checker, and a tree where every pair is present) and 4 on
+  selftest with no checker, a tree where every pair is present, and a message
+  no branch asserts) and 4 on
   the gate itself (a root that pins its directories, a root whose `env.sh` sets only
   `PATH`, the default root order, and a stale default root). Measured on
-  2026-11-03: 2.4 s, 0.5 s, 0.5 s, 1.0 s, 1.3 s, 0.8 s, 0.3 s and 0.2 s — all eight in
-  **7.0 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
+  2026-11-03: 2.9 s, 0.6 s, 0.5 s, 1.1 s, 1.2 s, 0.9 s, 0.4 s and 0.3 s — all eight in
+  **7.9 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
   VM the same command has also taken 4.4 s and 106.5 s an hour apart, which is
   the machine's load rather than the checkers', so read a slow run as load
   before assuming a checker got slower. The pre-commit hook runs
