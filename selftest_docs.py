@@ -41,15 +41,20 @@ APK = "android-companion/dist/PhoneDeckBridge-debug.apk"
 HANDOFF = "android-companion/HANDOFF.md"
 
 
-def stub():
-    """A stand-in compiler: the two lines check_docs reads, and nothing else."""
+def stub(used=USED):
+    """A stand-in compiler: the two lines check_docs reads, and nothing else.
+
+    `used` exists so a case can be a deck whose build *is* one of the figures the
+    checker has been told no sketch makes; everything else about the stand-in
+    stays fixed, because nothing else is what such a case is about.
+    """
     return (
         "#!/bin/sh\n"
         'case "$1" in\n'
         "  version) echo 'arduino-cli  Version: 1.1.1 Commit: stand-in'; exit 0;;\n"
         "  core) echo '[{\"id\":\"esp32:esp32\",\"installed\":\"3.3.12\"}]'; exit 0;;\n"
         "esac\n"
-        f"echo 'Sketch uses {USED} bytes (89%) of program storage space. "
+        f"echo 'Sketch uses {used} bytes (89%) of program storage space. "
         f"Maximum is {SLOT} bytes.'\n"
         f"echo 'Global variables use {GLOBALS} bytes (13%) of dynamic memory, "
         "leaving 282436 bytes for local variables. Maximum is 327680 bytes.'\n"
@@ -61,7 +66,7 @@ def digest():
     return hashlib.md5(SKETCH.encode()).hexdigest()[:8]
 
 
-def tree(dest):
+def tree(dest, used=USED):
     """The smallest repo that passes: two checkers, one deck, its two docs."""
     dest.mkdir(parents=True, exist_ok=True)
     shutil.copy2(CHECK, dest / "check_docs.py")
@@ -71,13 +76,13 @@ def tree(dest):
     (deck / (DECK + ".ino")).write_text(SKETCH)
     (dest / "README.md").write_text(
         "# Fixture\n\n"
-        f"The deck builds to {USED:,} B with {GLOBALS:,} B of globals, "
+        f"The deck builds to {used:,} B with {GLOBALS:,} B of globals, "
         f"md5 {digest()}\u2026.\n\n"
         f"See [the deck]({DECK}/README.md).\n"
     )
     (deck / "README.md").write_text(
         f"# {DECK}\n\n"
-        f"Last build: {USED:,} B, {GLOBALS:,} B of globals, md5 {digest()}\u2026.\n"
+        f"Last build: {used:,} B, {GLOBALS:,} B of globals, md5 {digest()}\u2026.\n"
     )
 
 
@@ -251,6 +256,16 @@ CASES = [
         forbids=["  - "],
     ),
     dict(
+        name="a NO_SKETCH figure a deck builds to is refused",
+        mutate=None,
+        used=1162877,
+        want_code=1,
+        want=[
+            "NO_SKETCH lists 1,162,877, but a deck builds to it today, so it is "
+            "rebuildable and the entry is wrong"
+        ],
+    ),
+    dict(
         name="a widget README without the current size is refused",
         mutate=deck_readme("{globals} B of globals, md5 {digest}\u2026.\n"),
         want_code=1,
@@ -305,7 +320,8 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         for index, case in enumerate(CASES, 1):
             dest = Path(tmp) / f"case{index}"
-            tree(dest)
+            used = case.get("used", USED)
+            tree(dest, used)
             if case["mutate"]:
                 case["mutate"](dest)
 
@@ -313,7 +329,7 @@ def main():
             if case.get("missing_cli"):
                 cli = dest / "no_such_arduino_cli"   # never created on purpose
             else:
-                cli.write_text(stub())
+                cli.write_text(stub(used))
                 cli.chmod(cli.stat().st_mode | stat.S_IXUSR)
 
             done = subprocess.run(
