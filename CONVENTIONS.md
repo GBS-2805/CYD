@@ -242,67 +242,52 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   furniture, not state — a session that finds no `arduino-cli` re-provisions it with
   [`phone_deck_cyd24R/toolchain.sh`](phone_deck_cyd24R/toolchain.sh) instead of
   concluding the decks cannot be checked.
-* **What the root has to hold, and what it does not.** Measured on 2026-11-02:
-  **7.8 G** installed, **3.3 G** after dropping the toolchains for chips this board
-  is not — `esp-rv32` (2.1 G, RISC-V: C3/C5/C6/H2/P4), the eight other
-  `esp32*-libs` (2.3 G), both `gdb`s (247 M) and `openocd-esp32` (11 M), 4.6 G of
-  silicon that is not on the desk — and **1.6 G** once the 1.7 G `staging/` of
-  downloaded archives goes with it, because `packages/` already holds what was
-  unpacked out of them. What stays: `esp-x32` (1.1 G, the Xtensa compiler),
-  `esp32-libs` (184 M), `esptool_py`, `mkspiffs`, `mklittlefs`. Both decks then
-  built **cold**, exit 0, printing the same figures the run before the trim
-  printed, and again on a second run, so the trim is a measurement rather than an
-  assumption. A re-provision downloads those 3.3 G into whatever room the VM has;
-  this disk was at 94 % used before the cleanups on that date and 58 % after.
-* **A second root is only worth a second core.** `~/.arduino-cyd` held **3.3.12**
-  too, so it was a copy rather than an A/B root: 6.1 G of it, and 4.6 G of that the
-  same chip toolchains the trim above removes. Cut the same way it is **1.6 G**, and
-  it still compiles both decks — proved by running `check_headroom.py` from that
-  root's own `env.sh`, exit 0.
-* **The 2.0.17 root takes the same cut, once its Python can see `serial`.** On
-  2026-11-02 `~/.arduino15` went from 2.4 G to **1.2G** — `riscv32-esp-elf-gcc`
-  (662 M), the ESP32-S2 and S3 compilers (413 M between them), the two `gdb`s and
-  `openocd` — and both decks still built on **2.0.17** from it, exit 0. One trap on the way: that root's `esptool_py` is 4.5.1, which imports `serial`, and
-  only the 3.3.12 root ships it, in `pylibs/`; without it every compile dies on
+* **What the root has to hold.** One core, that chip's compiler, the libraries and
+  `esptool_py`. Measured on 2026-11-02: **7.8 G** installed; **3.3 G** without the
+  toolchains for chips this board is not — `esp-rv32` 2.1 G, the eight other
+  `esp32*-libs` 2.3 G, both `gdb`s 247 M, `openocd-esp32` 11 M, 4.6 G of silicon
+  that is not on the desk; **1.6 G** once the 1.7 G `staging/` of archives goes,
+  since `packages/` already holds what was unpacked. What stays: `esp-x32` 1.1 G,
+  `esp32-libs` 184 M, `esptool_py`, `mkspiffs`, `mklittlefs`. Both decks then built
+  cold, exit 0, twice, on the same figures, so the trim is measured: 94 % → 58 %
+  disk. A second 3.3.12 root is a copy, not an A/B — `~/.arduino-cyd` held 3.3.12
+  at 6.1 G (4.6 G of it those chip toolchains), 1.6 G cut the same way, and still
+  compiled both decks from its own `env.sh`.
+* **The A/B root is the 2.0.17 one, and its Python has to see `serial`.** Cut the
+  same way, `~/.arduino15` went 2.4 G → **1.2G** on 2026-11-02 (662 M
+  `riscv32-esp-elf-gcc`, 413 M of S2/S3 compilers, the `gdb`s, `openocd`) and still
+  built both decks on 2.0.17. Its `esptool_py` 4.5.1 imports `serial`, which only
+  the 3.3.12 root ships, in `pylibs/`; without it every compile dies on
   `ModuleNotFoundError: No module named 'serial'` before a sketch is touched, which
   reads like a broken toolchain and is not. So the A/B root carries its own
-  **`~/.arduino15/env.sh`** — data dirs pointed at itself, `PYTHONPATH` at the 3.3.12
-  root's `pylibs`, `arduino-cli` from `~/.arduino-cyd/bin` — and an old-core build is
-  one `source` away:
+  `env.sh`: data dirs pointed at itself, `PYTHONPATH` at the 3.3.12 root's
+  `pylibs/`, `arduino-cli` in its `bin/`, core 2.0.17. On 2026-11-03 this VM had no
+  2.0.17 at all — `~/.arduino15` here is the fallback data dir, holds 3.3.12 and has
+  no `env.sh` — so it was re-provisioned as **`~/.arduino-cyd-2`** (own `data`,
+  `downloads` and `user`, the 3.3.12 libraries copied in). Source the one that
+  exists:
 
   ```bash
-  source ~/.arduino15/env.sh && ./check_headroom.py     # both decks, on 2.0.17
+  source ~/.arduino-cyd-2/env.sh && ./check_headroom.py   # both decks, on 2.0.17
   ```
 
-  `./check.sh --full` runs that same build as its **`headroom 2.0.17`** step, and says
-  so when the root is missing, so the A/B measurement is a step that fails rather than
-  a paragraph nobody ran.
-* **On 2026-11-03 this VM had no 2.0.17 at all, so the A/B root was rebuilt.** The
-  `~/.arduino15/env.sh` above belongs to the machine that trimmed it; here
-  `~/.arduino15` is the fallback data dir, holds 3.3.12 and has no `env.sh`, so
-  that `source` line fails before a sketch is touched — a missing root, not a
-  smaller build. The A/B root is now **`~/.arduino-cyd-2`**: its own `data`,
-  `downloads` and `user` (the 3.3.12 root's libraries copied in), `PYTHONPATH` at
-  that root's `pylibs/`, `arduino-cli` in its `bin/`, core **2.0.17** installed
-  from scratch. `source ~/.arduino-cyd-2/env.sh` is what every 2.0.17 figure here
-  was rebuilt with.
+  `./check.sh --full` runs the same build as its **`headroom 2.0.17`** step, and says
+  so when no A/B root is found.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
   1,162,8xx → 1,165,174 B (about **2.3 kB**), while the WiFi/TLS Spotify deck
   grows 967,493 → 1,122,249 B (**+154,756 B**), 73 % → **85 %** of 1,310,720 —
-  the default app partition. The 967,413 the Spotify README quotes is the same
-  file on a path ten characters shorter: rebuilt on 2026-11-03, it prints 967,493
-  at this repo's path. It is not mbedTLS getting
-  fatter: named `mbedtls_*` symbols
-  only go 83,854 → 91,309 B and `wifi`/`lwip` symbols 83,470 → 87,007 B. It is
-  how IDF 5 assembles the network stack — the 3.3.12 image links
+  the default app partition. Not mbedTLS getting fatter: named `mbedtls_*` symbols
+  only go 83,854 → 91,309 B and `wifi`/`lwip` 83,470 → 87,007 B. It is how IDF 5
+  assembles the network stack — the 3.3.12 image links
   `network_provisioning`, `esp_driver_uart`/`gpio`/`i2c`, `esp_mm` and `espnow`
   that the 2.0.17 image never referenced, its `libnet80211`, `liblwip` and
   `libwpa_supplicant` are each larger, and more of the core's WiFi code is inline
   in headers, so the sketch's own object grows with it. So never scale one
   deck's core delta onto another: recompile and quote `Sketch uses …`, and check
-  the partition before assuming a sketch still fits.
+  the partition before assuming a sketch still fits. The Spotify README's 967,413
+  is this file on a path ten characters shorter; here it prints 967,493.
 * **Why 3.x is the default, and what would reverse it.** Core 2.0.17 ships
   mbedTLS 2.28.7, a branch that reached end of life at the end of 2024, and the
   Spotify deck's whole job is TLS to a third party — an unpatched TLS stack

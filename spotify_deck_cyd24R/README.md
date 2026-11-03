@@ -335,17 +335,15 @@ scheme free, so dropping Bluedroid still pays for mbedTLS and a certificate chai
 per host. Under `PartitionScheme=huge_app` it is 967,413 bytes, **30 %** of
 3,145,728: a bigger room, not smaller code.
 
-The 192 kB gap this paragraph used to draw against a phone build "without
-Bluetooth" rested on 1,164,489 bytes, which no committed file produces: the
-phone deck carries its BLE link from `d53664ec` on. The pair that rebuilds is
-967,493 B above against 1,162,877 B on 2.0.17 — 195,384 B, 191 kB.
+History, kept because other docs quote it: 1,164,489 B was a phone build "without
+Bluetooth", which no committed file produces — the phone deck carries its BLE link
+from `d53664ec` on. The pair that rebuilds is 967,493 B against 1,162,877 B on
+2.0.17, 195,384 B (191 kB) apart.
 
-An earlier version of this note recorded 1,114,485 bytes (85 % of 1,310,720), 192 kB free and
-a 49 kB gap to the phone deck for the same sketch. That figure does not
-reproduce: the committed file links at 967,413 bytes with the same core, the same
-`arduino-cli` and `--warnings all`, on a clean build path, twice over, so the
-smaller number is the one that belongs here. The seven warnings below still
-match, warning for warning.
+An earlier note's 1,114,485 B (85 % of 1,310,720, 192 kB free, a 49 kB gap to the
+phone deck) never reproduced: the committed file links at 967,413 with the same
+core, `arduino-cli` and `--warnings all`, twice over. The seven warnings below
+still match, warning for warning.
 
 Seven warnings under `--warnings all`, all accounted for: five are palette slots
 (`C_ACCENT`, `C_ACCENT_DIM`, `C_PURPLE`, `C_YELLOW`, `C_GREEN`) that this widget
