@@ -386,12 +386,15 @@ list of distinct devices rather than a row of identical entries.
 A compile in this repo, on 2026-10-30 and before the mirror, with `arduino-cli`
 1.5.2-rc.1:
 **core 2.0.17** 1,162,797–1,162,813 B, **88 %** of 1,310,720, and
-41,436 B, **12 %** of 327,680: the file then in the tree (`d53664ec`), which reads
-1,162,877 B at this repo's path today, against 1,167,409 B / 41,660 B of globals
-for today's sketch, rebuilt 2026-11-03. **core 3.3.12** 1,163,930 B, 88 % of 1,310,720,
-and 45,004 B, 13 % of 327,680. The 2.x figure moves by ~16 bytes with the build
-root: read it as 1,135.6 kB, not a fixed count. 3.x costs 1–2.3 kB of flash and
-3.7 kB of RAM more, depending on the path.
+41,436 B, **12 %** of 327,680: the file then in the tree (`d53664ec`),
+which the docs used to rebuild at 1,162,877 B here. That file is in no
+commit this repository holds, so the figure is a record rather than a
+measurement anyone can repeat; today's sketch reads 1,167,409 B /
+41,660 B of globals, rebuilt 2026-11-03 through `~/.arduino-cyd-2`.
+**core 3.3.12** 1,163,930 B, **88 %** of 1,310,720, and
+45,004 B, **13 %** of 327,680. The 2.x figure moves by ~16 bytes with the
+build root: read it as 1,135.6 kB, not a fixed count. 3.x costs 1–2.3 kB of
+flash and 3.7 kB of RAM more, depending on the path.
 
 ### Headroom
 
@@ -426,9 +429,10 @@ from the repo root, after sourcing a toolchain.
 **Verified here** — none of this needs hardware:
 
 * Core **2.0.17** is the A/B build, not the default — `toolchain.sh` pins 3.3.12.
-  The 1,162,797–1,162,813 B / 41,436 B above is the 2026-10-30 file (`d53664ec`):
-  at this repo's path it reads 1,162,877 B, and today's sketch reads 1,167,409 B
-  with 41,660 B of globals, rebuilt 2026-11-03 through `~/.arduino-cyd-2`.
+  The 1,162,797–1,162,813 B / 41,436 B above is the 2026-10-30 file (`d53664ec`),
+    which no commit here holds: its 1,162,877 B at this repo's path cannot be
+    rebuilt, so it is quoted as history. Today's sketch reads 1,167,409 B with
+    41,660 B of globals on that core, rebuilt 2026-11-03 through `~/.arduino-cyd-2`.
 * Core **3.3.12** links it at 1,168,314 bytes (89 % of 1,310,720) with 45,244 bytes of RAM
   (13 %), `EXIT=0` under `--warnings all`, re-measured on 2026-11-01 after the
   mirror. An earlier 3.3.12 build on a shorter path reported 1,163,930 / 45,004,

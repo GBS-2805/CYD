@@ -84,7 +84,8 @@ HISTORICAL = {
     1162797: "the phone sketch on core 2.0.17; the size follows the build root",
     1162813: "the phone sketch on core 2.0.17, the other end of that spread",
     1162877: "the 2026-10-30 phone sketch on 2.0.17 at this repo's path, 64 B "
-             "over the shorter one that first printed it",
+             "over the shorter one that first printed it; no commit here holds that "
+             "file, so the docs quote it as a record",
     1167409: "today's phone sketch on 2.0.17; the prose's 2.0.17 figures are "
              "the 2026-10-30 file",
     1748037: "today's Spotify sketch on 2.0.17 through ~/.arduino-cyd-2, "

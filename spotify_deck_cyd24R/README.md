@@ -341,9 +341,10 @@ per host. Under `PartitionScheme=huge_app` it is 967,413 bytes, **30 %** of
 
 History, kept because other docs quote it: 1,164,489 B was a phone build "without
 Bluetooth", which no committed file produces — the phone deck carries its BLE link
-from `d53664ec` on. The pair that rebuilds is `ef0681b`'s Spotify file at
-967,493 B against 1,162,877 B for the 2026-10-30 phone file, both on 2.0.17
-through `~/.arduino-cyd-2`, 195,384 B (191 kB) apart.
+from `d53664ec` on, and no commit here holds that sketch either, so the
+1,162,877 B these docs used to pair with `ef0681b`'s 967,493 B is a record, not a
+rebuild: only the Spotify half of that pair can be rebuilt. Both stay because
+other docs quote them.
 
 An earlier note's 1,114,485 B (85 % of 1,310,720, 192 kB free, a 49 kB gap to the
 phone deck) never reproduced: the committed file links at 967,413 with the same
