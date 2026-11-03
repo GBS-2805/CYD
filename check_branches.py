@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Say when another chat's branch holds work `main` does not have yet.
+"""Say when another branch holds work this one does not have yet.
 
-Every chat builds in its own worktree on its own `freebuff/<id>` branch, so a
-commit made over there is invisible here: `main` stays green, the numbers in
-these docs stay true for the tree that printed them, and two copies of the repo
-quietly disagree about what the deck does. Nothing catches that, because a branch
+Every branch is its own line of work, so a commit made on one is invisible from
+another: `main` stays green, the numbers in these docs stay true for the tree that
+printed them, and two copies of the repo quietly disagree about what the deck
+does. Nothing catches that, because a branch
 is not a file and no compile reads it.
 
 Counting commits is not enough to answer it. A branch can sit ahead and carry
@@ -22,8 +22,8 @@ actually add something.
   ./check_branches.py --commits-only   skip the content check: commits alone, no files read
 
 It reads refs and objects only: no compile, no checkout, nothing written, and no
-file under a worktree is opened — another chat's branch can be unreadable on disk
-and still answer here.
+file under a worktree is opened — a branch can be unreadable on disk and still
+answer here.
 """
 import argparse
 import subprocess
@@ -47,8 +47,8 @@ def base_branch(named):
     """The branch this worktree has, so already-merged work is not called pending.
 
     origin/main reads well only while everything is pushed, and this history is
-    not pushed as it lands: the two chats commit on their own branches, so work
-    merged here days ago came back as
+    not pushed as it lands: work lands on its own branch, so work merged here days
+    ago came back as
     "10 commits on top of origin/main, 11 paths it has no bytes for" — twice, and
     both times a person had to check by hand that the merge had happened. The
     branch checked out here is the tree the answer is about; the old names stay as

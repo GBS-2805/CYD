@@ -4,9 +4,9 @@
 This is the checker with no trustworthy passing path to lean on. On the real repo
 it has printed "one branch, 10 commits past, 9 behind, 11 paths main has no bytes
 for" — a paragraph a human then had to interpret, and twice the interpretation was
-"that is a downgrade" or "that work is already here". Its quiet branches decide
-whether another chat's work gets merged at all, so they are the ones worth
-pinning: a branch whose changed file is the same bytes under a new name, a branch
+"that is a downgrade" or "that work is already here". Its quiet branches decide whether
+work on another branch gets merged at all, so they are the ones worth pinning: a
+branch whose changed file is the same bytes under a new name, a branch
 whose patches are already upstream, a branch that would resurrect a folder this
 tree renamed away.
 

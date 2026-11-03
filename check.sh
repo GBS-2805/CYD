@@ -63,7 +63,7 @@ say () {
   printf 'note  %-15s %s\n' "$1" "$2"
 }
 
-# Information, never a failure: an unmerged branch in another chat's worktree is
+# Information, never a failure: a branch here holding work this tree does not is
 # not a broken tree.
 report () {
   local name="$1"; shift

@@ -1,10 +1,9 @@
 # Handing a deck change to the app
 
 One chat edits the sketches and `android-companion/`'s Java, so a deck change that
-needs a line of Java is one commit instead of a hand-off between branches. Who owns
-what, and how another chat's work reaches this tree, is
-[`## The two chats`](CONVENTIONS.md#the-two-chats) in `CONVENTIONS.md` — this page
-is only the build step.
+needs a line of Java is one commit in one tree. How work moves between branches is
+[`## One chat, one tree`](CONVENTIONS.md#one-chat-one-tree) in `CONVENTIONS.md` —
+this page is only the build step.
 
 What still matters is that the APK carries a *copy* of each sketch.
 `:app:syncWidgets` is what moves a sketch into `app/src/main/assets/widgets/`,
@@ -13,10 +12,9 @@ new name. The rest of this page is that step.
 
 ## Preferred: cherry-pick the commit
 
-Both chats are worktrees of one repository: `git worktree list` names this tree
-and the app's side by side under one bare repo, so a commit made here is already
-in the object store the app tree reads and `git cherry-pick <sha>` in that tree
-works with nothing pushed. A push is a publish, not a hand-off — `CONVENTIONS.md`
+Every worktree of this repository shares one object store, so `git worktree list`
+says what is checked out where, and a commit made on one branch is already readable
+from the others: `git cherry-pick <sha>` needs nothing pushed. A push is a publish, not a hand-off — `CONVENTIONS.md`
 says nothing goes out unless it is asked for — so the hand-off is a SHA, and it
 has to be the right one:
 

@@ -16,4 +16,4 @@ Non-negotiables if you read nothing else:
 * Build with the widget's `toolchain.sh`, and report only what actually ran. Never
   claim a compile, a flash or a measurement that did not happen.
 * Do not commit, push or deploy unless asked, and do not touch another widget's
-  folder or another chat's worktree.
+  folder or another branch's worktree.

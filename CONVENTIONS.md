@@ -551,52 +551,45 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
   services and asks again after `onMtuChanged`; a truncated read names no widget
   and falls back to the address rather than inventing a half id.
 
-## The two chats
+## One chat, one tree
 
-Two chats work this repository, each in its own worktree on its own
-`freebuff/<id>` branch. This section is the whole agreement between them; every
-other mention of it in this repo is a pointer back here.
+One chat works this repository, on one `freebuff/<id>` branch. Until 2026-11-03 it
+was two — a deck chat beside this one, each in its own worktree — which is why
+older notes and commit bodies here still say "the deck chat". That split is over
+and its work is folded in, so there is nobody to ask permission of and no
+hand-off to arrange: the rules below are about branches of one tree now.
 
-| Chat | Owns | May do without asking |
-| --- | --- | --- |
-| **this chat**, `freebuff/e9252a57…` | both decks, this file, the root checkers and all of `android-companion/` | build, measure and edit any of it; merge the deck chat's branch |
-| **the deck chat**, `freebuff/60e73bbb…` | its own worktree and branch | edit anything in its own tree; merge this branch; read this tree |
-
-* **The app's Java is this chat's.** It was written in the deck chat while the
-  split lasted, which made a deck change that needed one line of Java a two-branch
-  dance and left the two worktrees quoting different numbers. `android-companion/`
-  is edited here now, by the chat that edits the sketches.
-* **A change crosses as a commit and an SHA, never as a file copy.** The chat with
-  work to give commits on its own branch, pushes, and names the SHA; the receiving
-  chat merges it. A merge shows both sides of a disagreement, where a copy
-  silently drops whichever version was written second. Nothing is copied into
-  another chat's worktree — not `android-companion/`, not a sketch, not a doc —
-  and nothing is checked out over files the owner has changed since.
-* **Neither chat writes into the other's worktree**, and no branch checked out
-  somewhere else is force-pushed. A file that appears in a tree without a commit
-  is drift, not a handoff: `git status` there is that tree's owner to explain
-  before anything is merged over it.
-* **A rule has one home.** Anything true of the whole board or of both chats lives
-  in this file; anything true of one widget lives in that widget's `README.md`;
+* **A change crosses a branch as a commit and an SHA, never as a file copy.** Every
+  worktree of this repository shares one object store, so a commit on one branch is
+  already readable from another and `git cherry-pick <sha>` needs nothing pushed —
+  a push is a publish, not a hand-off. A copy silently drops whichever version was
+  written second; a merge shows both sides of the disagreement.
+* **Nothing is checked out over a branch another worktree holds**, and no branch
+  checked out somewhere else is force-pushed. `git worktree list` says what is
+  where; a file that appears without a commit is drift to explain before anything
+  is merged over it.
+* **A merge is re-measured, not trusted.** The figures in a branch belong to the
+  root that printed them, so a merged size is rebuilt here before it is quoted: the
+  1,880,101 B above is the deck chat's 1,879,489 B read again through this root, not
+  a number copied across.
+* **A rule has one home.** Anything true of the whole board or of the app lives in
+  this file; anything true of one widget lives in that widget's `README.md`;
   everywhere else a rule is a link, never a restatement. Two copies disagree
   eventually, and then neither is trusted.
 * **A checker beats a paragraph.** If a rule can be tested, it becomes an assertion
   in a root checker and the prose shrinks to a pointer at it — a rule that cannot
   drift does not need repeating.
-* **The owner edits; the other reports.** A failure in another chat's area is
-  reported with the command that printed it and the SHA it printed on, never
-  quietly fixed in that tree.
-* **A measurement is true of the tree that printed it.** Merge this branch before
+* **A measurement is true of the tree that printed it.** Merge the branch before
   quoting a number, and run [`check_branches.py`](check_branches.py) when a doc and
   a tree seem to disagree.
 * **Exact bytes live in one file.**
   [`android-companion/HANDOFF.md`](android-companion/HANDOFF.md) keeps the exact APK
   size with the date it was measured; every other file rounds it to the nearest kB,
-  so a rebuild is one edit. A number a chat did not print is quoted with its date
-  or not at all.
+  so a rebuild is one edit. A number nobody printed is quoted with its date or not
+  at all.
 * **Commit before going quiet.** Uncommitted work is what makes an edit look
-  ownerless a session later, so anything left uncommitted gets a line in that
-  tree's `HANDOFF.md` saying what and why.
+  ownerless a session later, so anything left uncommitted gets a line in
+  `HANDOFF.md` saying what and why.
 
 ## Working in this repo
 
@@ -616,36 +609,25 @@ other mention of it in this repo is a pointer back here.
   checkers keep their names because the pre-commit hook calls two of them with
   staged paths; nothing else needs six remembered invocations, and a round that
   runs one command cannot skip a step by forgetting it.
-* **Two chats share this repo, and [`## The two chats`](#the-two-chats) is the
-  whole agreement.** Nothing needs the other chat's permission: the table is the
-  permission.
-* **Another chat's work reaches this tree by merge, never by copy.** Each chat is
-  a worktree on its own `freebuff/<id>` branch, so a commit made over there
-  leaves `main` green and these numbers true for the tree that printed them, and
-  nothing else notices the two disagree. [`check_branches.py`](check_branches.py)
-  names the branches carrying commits `main` does not have yet, with the worktree
-  that has one checked out; it reads refs and blobs and never a worktree, so it
-  answers even for a tree this chat cannot open. Look at it before believing a doc
-  that seems stale, and merge rather than hand-editing the numbers, because the
-  other branch has usually already re-measured them. It judges content, not just
-  commits: a branch whose changed files are the same bytes `main` already has — a
-  folder renamed here, work rebased over — is reported as nothing to fold, and
-  one whose patches are all upstream drops out the same way, so the list stays
-  what a merge would actually add. What it says now (2026-11-02, after the base became the branch checked out
-  here): **nothing is pending**. The deck chat's tip `b3e8362` is an ancestor of
-  this branch — `git merge-base --is-ancestor b3e8362 HEAD` exits 0 — and neither
-  its short-named ref nor origin's copy holds anything this tree lacks. The same
-  branch read as "10 commits past `origin/main`, 11 paths it has no bytes for"
-  only because `origin/main` lags both trees while nothing is pushed, which is
-  why the base is the worktree now. That reading is dated 2026-11-02; on
-  2026-11-03 this chat pushed, so `origin/freebuff/e9252a57…` and this worktree
-  agree and `origin/main` is the base both trees grew from rather than a copy of
-  either. Read the paths before merging anyway: an older branch can
-  *look* like work and be a downgrade, which is what `app/phone-deck-build` was at
-  87 commits back, 21 paths under `cyd_phone_deck/`, a folder this tree renamed
-  away. The check names that folder instead of guessing, because merging it would
-  bring the folder back — read the paths before merging one, and prefer the branch
-  that measured the numbers.
+* **One chat works this repo, and [`## One chat, one tree`](#one-chat-one-tree) is
+  how work moves between branches.** Nothing here needs anyone's permission; a
+  branch is mergeable on its own terms.
+* **Work reaches a branch by merge, never by copy.** Every branch here is a line of
+  work in this same tree, so a commit on one leaves these numbers true for the
+  branch that printed them. [`check_branches.py`](check_branches.py) names the
+  branches carrying commits this one does not have, with the worktree that has one
+  checked out; it reads refs and blobs and never a worktree, so it answers for a
+  tree this chat cannot open. Look at it before believing a doc that seems stale,
+  and merge rather than hand-editing the numbers, because the other branch has
+  usually already re-measured them. It judges content, not just commits: a branch
+  whose changed files are the same bytes this tree already has — a folder renamed,
+  work rebased over — is reported as nothing to fold, and one whose patches are all
+  upstream drops out the same way, so the list is what a merge would actually add.
+  The merge of 2026-11-03 is the worked example: two commits from the deck chat,
+  five conflicted files, and every figure rebuilt here before it was quoted. Read
+  the paths before merging anyway: an older branch can *look* like work and be a
+  downgrade, which is what `app/phone-deck-build` was at 87 commits back, 21 paths
+  under `cyd_phone_deck/`, a folder this tree renamed away.
 * Nothing is pushed or deployed without being asked. The repo stays private.
 * **One kB is 1,024 bytes, and it is written down once, here.** Every size in
   these docs is binary: 202,353 B is "198 kB", 343,307 B is "335 kB", rounded to

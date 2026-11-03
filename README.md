@@ -18,12 +18,12 @@ and fails when a committed PNG in `artifacts/renders/` no longer matches, so a
 forgotten regeneration cannot pass as a reviewed change. It compares pixels, not
 timestamps: git stores no mtime, so a clone stamps every file with the same time.
 
-Each chat works on its own branch in its own worktree — who owns what is
-[`## The two chats`](CONVENTIONS.md#the-two-chats) — so
-[`check_branches.py`](check_branches.py) names the branches holding work `main`
-does not have — commits and bytes, no compile — and drops the ones whose content
-it already has, which makes it the list to merge from before trusting a number
-here.
+One chat works the repo on its own `freebuff/<id>` branch, so a change arrives as
+another branch and [`check_branches.py`](check_branches.py) names the ones holding
+work this tree does not have — commits and bytes, no compile — dropping the ones
+whose content it already has. That makes it the list to merge from before trusting
+a number here; [`## One chat, one tree`](CONVENTIONS.md#one-chat-one-tree) is how
+that move is made.
 
 | Project | Folder | What it is | Read |
 | --- | --- | --- | --- |
