@@ -20,6 +20,7 @@ same core puts the sketch at a different build path, and that moves the count by
 tens of bytes (1,165,174 here against 1,165,222 through toolchain.sh).
 """
 import argparse
+import hashlib
 import os
 import re
 import shutil
@@ -57,6 +58,21 @@ RAM_RE = re.compile(
 )
 
 
+def sketch_of(folder):
+    """The one file a deck folder's sketch can be, per CONVENTIONS.
+
+    One home for that rule: the docs gate, the 2.0.17 gate and this one all ask
+    here, so no two of them can decide a deck is a different file.
+    """
+    folder = Path(folder)
+    return folder / f"{folder.name}.ino"
+
+
+def md5(path):
+    """A file's md5, the digest every checker quotes and compares."""
+    return hashlib.md5(Path(path).read_bytes()).hexdigest()
+
+
 def find_sketches(wanted):
     """Every top-level folder whose name matches its single .ino, per CONVENTIONS."""
     if wanted:
@@ -64,7 +80,7 @@ def find_sketches(wanted):
     else:
         folders = sorted(ROOT.iterdir())
     for folder in folders:
-        if folder.is_dir() and (folder / f"{folder.name}.ino").is_file():
+        if folder.is_dir() and sketch_of(folder).is_file():
             yield folder
 
 

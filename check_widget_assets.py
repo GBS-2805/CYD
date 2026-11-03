@@ -13,18 +13,20 @@ CONVENTIONS.md names and this file exists to close.
 
   ./check_widget_assets.py    exit 0 when every bundled copy matches, 1 otherwise
 """
-import hashlib
 import json
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import check_headroom as headroom  # noqa: E402  (one hash for every checker)
 
 ROOT = Path(__file__).resolve().parent
 ASSETS = ROOT / "android-companion/app/src/main/assets/widgets"
 NOT_A_WIDGET = {"android-companion"}
 
 
-def md5(path):
-    return hashlib.md5(path.read_bytes()).hexdigest()
+# One hash for every checker; see check_headroom.md5.
+md5 = headroom.md5
 
 
 def shown(path):

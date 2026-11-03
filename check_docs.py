@@ -68,7 +68,6 @@ Pair it with check_headroom.py: that one refuses a build that is too big, this
 one refuses a doc that describes last week's build.
 """
 import argparse
-import hashlib
 import json
 import re
 import shutil
@@ -249,8 +248,9 @@ def save_cache(cache):
         )
 
 
-def md5(path):
-    return hashlib.md5(path.read_bytes()).hexdigest()
+# One hash for every checker, so a quoted md5 and a compared copy are the same
+# digest of the same bytes; see check_headroom.md5.
+md5 = headroom.md5
 
 
 def shown(path):
@@ -292,7 +292,7 @@ def docs():
 
 def measure(cli, folder, timeout, cache=None, fingerprint=None):
     """Compile one deck, or take its last measurement, and return the figures."""
-    sketch = folder / (folder.name + ".ino")
+    sketch = headroom.sketch_of(folder)
     digest = md5(sketch)
     if cache is not None and fingerprint:
         entry = cache.get(folder.name)
@@ -419,7 +419,7 @@ def old_core_figures():
         problems.extend("%s %s" % (where, reason) for reason in found)
         if figures is None:
             continue
-        recorded, now = entry.get("md5"), md5(ROOT / name / (name + ".ino"))
+        recorded, now = entry.get("md5"), md5(headroom.sketch_of(ROOT / name))
         if recorded != now:
             problems.append(
                 "%s records md5 %s but the sketch is %s now; rebuild it on "

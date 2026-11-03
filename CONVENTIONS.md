@@ -298,7 +298,10 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   sketch that is in the index, because an md5 of a file a clone would not have
   describes bytes nobody can check out. Both gates read the file through
   `check_old_core.read_record()` and judge its rows with `row_shape()`, so a
-  rule about the record cannot hold in one gate and not the other.
+  rule about the record cannot hold in one gate and not the other. The same
+  holds for which file a deck is: every checker asks `check_headroom.sketch_of()`
+  and hashes through `check_headroom.md5()`, so a quoted figure, a bundled copy
+  and a recorded md5 are always the same bytes.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows

@@ -25,6 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 CHECK = ROOT / "check_widget_assets.py"
+HEADROOM = ROOT / "check_headroom.py"
 WIDGET = "demo_deck_cyd24R"
 SKETCH = "/* stand-in widget */\nvoid setup() {}\nvoid loop() {}\n"
 ASSETS = "android-companion/app/src/main/assets/widgets"
@@ -33,6 +34,7 @@ ASSETS = "android-companion/app/src/main/assets/widgets"
 def tree(dest):
     dest.mkdir(parents=True, exist_ok=True)
     shutil.copy2(CHECK, dest / "check_widget_assets.py")
+    shutil.copy2(HEADROOM, dest / "check_headroom.py")
     folder = dest / WIDGET
     folder.mkdir()
     descriptor = folder / "widget.json"

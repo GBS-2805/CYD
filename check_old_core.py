@@ -28,7 +28,6 @@ is either the sketch or the record. The row says which figures moved and by how
 much, so re-measuring is one edit.
 """
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -96,7 +95,7 @@ def row_shape(name, entry):
     and does its row carry three positive numbers - so a rule cannot hold in the
     docs gate and not in this one.
     """
-    sketch = ROOT / name / (name + ".ino")
+    sketch = headroom.sketch_of(ROOT / name)
     if not sketch.is_file():
         return ["names a deck this tree does not hold"], None
     if not isinstance(entry, dict):
@@ -164,7 +163,7 @@ def row_problems(name, entry, want_index):
     found, _ = row_shape(name, entry)
     if found:
         return found
-    sketch = ROOT / name / (name + ".ino")
+    sketch = headroom.sketch_of(ROOT / name)
     out = []
     digest = entry.get("md5")
     if not isinstance(digest, str) or not MD5_RE.match(digest):
@@ -278,7 +277,7 @@ def main():
     for name in names:
         entry = data["decks"][name]
         folder = ROOT / name
-        sketch = folder / (name + ".ino")
+        sketch = headroom.sketch_of(folder)
         loose = row_problems(name, entry, want_index=False)
         if loose:
             print(f"{name:24s}  {'; '.join(loose)}")
@@ -308,7 +307,7 @@ def main():
         used, slot = int(flash.group(1)), int(flash.group(3))
         globals_used = int(ram.group(1))
         ram_free = int(ram.group(2))
-        digest = hashlib.md5(sketch.read_bytes()).hexdigest()
+        digest = headroom.md5(sketch)
         found = headroom.verdict(used, slot, ram_free, min_flash, min_ram)
         found += moves(entry, used, globals_used, slot, digest)
         status = "; ".join(found) or "agrees with the record"
