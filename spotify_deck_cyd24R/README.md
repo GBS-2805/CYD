@@ -325,19 +325,25 @@ Sketch uses 967413 bytes (73%) of program storage space. Maximum is 1310720 byte
 Global variables use 50324 bytes (15%) of dynamic memory, leaving 277356 bytes for local variables. Maximum is 327680 bytes.
 ```
 
+That block is the path it ran on: the same file rebuilt on 2026-11-03 through a
+fresh 2.0.17 root prints 967,493 bytes at this repo's path, 80 B higher for ten
+characters of path — which is the 967,493 `CONVENTIONS.md` uses as its baseline.
+
 That includes the setup web server, the PKCE exchange, the redrawn setup card and
 both pinned roots (about 2.7 kB of PEM), and leaves **335 kB** of the default
-scheme free — 192 kB under the phone deck's Bluetooth build, 1,164,489 bytes
-measured the same way on the same machine, so dropping Bluedroid still pays for
-mbedTLS and a certificate chain per host. Under `PartitionScheme=huge_app` it is
-967,413 bytes, **30 %** of 3,145,728: a bigger room, not smaller code.
+scheme free, so dropping Bluedroid still pays for mbedTLS and a certificate chain
+per host. Under `PartitionScheme=huge_app` it is 967,413 bytes, **30 %** of
+3,145,728: a bigger room, not smaller code.
 
-An earlier version of this note recorded 1,114,485 bytes (85 % of 1,310,720), 192 kB free and
-a 49 kB gap to the phone deck for the same sketch. That figure does not
-reproduce: the committed file links at 967,413 bytes with the same core, the same
-`arduino-cli` and `--warnings all`, on a clean build path, twice over, so the
-smaller number is the one that belongs here. The seven warnings below still
-match, warning for warning.
+History, kept because other docs quote it: 1,164,489 B was a phone build "without
+Bluetooth", which no committed file produces — the phone deck carries its BLE link
+from `d53664ec` on. The pair that rebuilds is 967,493 B against 1,162,877 B on
+2.0.17, 195,384 B (191 kB) apart.
+
+An earlier note's 1,114,485 B (85 % of 1,310,720, 192 kB free, a 49 kB gap to the
+phone deck) never reproduced: the committed file links at 967,413 with the same
+core, `arduino-cli` and `--warnings all`, twice over. The seven warnings below
+still match, warning for warning.
 
 Seven warnings under `--warnings all`, all accounted for: five are palette slots
 (`C_ACCENT`, `C_ACCENT_DIM`, `C_PURPLE`, `C_YELLOW`, `C_GREEN`) that this widget
@@ -384,7 +390,10 @@ under with the globals identical, and the deck chat's root reads **1,878,661 B**
 both read md5 `3b17f04a…`. Quote the root you measured on rather than reconciling the
 last two digits.
 
-Without Bluetooth the same sketch was 1,125,781 bytes on the default scheme; the
+Without Bluetooth the sketch was 1,125,781 bytes on the default scheme — the
+pre-link file, md5 `00bb1560`, since today's has the link compiled in and there
+is no flag to switch it off; rebuilt from that file on 2026-11-03 and it still
+prints 1,125,781 B with 53,636 B of globals. The
 link costs **about 735 kB** of flash and 15,456 B of globals, which is Bluedroid, not
 this sketch's own code. On the default scheme the linked build reads 143 % and
 will not link at all — that is the measurement that forced `huge_app`, and
@@ -405,8 +414,9 @@ sourcing a toolchain.
 
 * The committed sketch links under the documented core **2.0.17** at 967,413
   bytes (73 %), the measurement above, taken before the deck grew its
-  `/deck.json` identity. 2.0.17 has not been re-measured since, so quote that as
-  the pre-identity figure and not as the current size.
+  `/deck.json` identity, on a path ten characters shorter. Rebuilt through
+  `~/.arduino-cyd-2` on 2026-11-03 the same file prints 967,493 bytes here, so
+  the 967,413 is history and 967,493 is what the repo path reads today.
 * Re-measured on 2026-11-01 with `arduino-cli` 1.5.2-rc.1, core **3.3.12** links
   the committed file at 1,125,781 bytes, 85 % of 1,310,720, with
   53,636 bytes of globals, 16 % of 327,680, `EXIT=0` under `--warnings all`. That
@@ -422,7 +432,8 @@ sourcing a toolchain.
   now, so that is where the release numbers come from, and 2.0.17 is kept as the
   A/B build rather than the shipping one.
 * **It needs `huge_app` now, and that is the scheme `toolchain.sh` pins.**
-  Without Bluetooth the 3.3.12 build was 1,125,781 bytes, 85 % of 1,310,720.
+  Without Bluetooth the 3.3.12 build was 1,125,781 bytes, 85 % of 1,310,720:
+  measured from the pre-link sketch (`00bb1560`), not a flag on today's file.
   With the link it is 1,878,645 bytes: **143 %** of 1,310,720, **59 %** of 3,145,728.
   An earlier pair of runs differed by 48 B; the pre-commit hook and a direct
   compile both print 1,878,645 now, so the single figure is the measured one.

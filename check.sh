@@ -5,7 +5,7 @@
 #   ./check.sh          what a commit must pass            (~3 s)
 #   ./check.sh --full   what a release must pass           (~4 min: the decks on
 #                       both cores, so it needs all three toolchains — source
-#                       ~/.arduino-cyd/env.sh, ~/.arduino15/env.sh for the old
+#                       ~/.arduino-cyd/env.sh, ~/.arduino-cyd-2/env.sh or ~/.arduino15/env.sh for the old
 #                       core, and ~/.android-offsite/env.sh)
 #   ./check.sh --selftest  the checkers' own refusals        (~4 s, no toolchain)
 #
@@ -174,10 +174,14 @@ if [ "$full" -eq 1 ]; then
   # The old core is a separate question, not a second opinion: a deck that fits on
   # 3.3.12 can still overflow on 2.0.17, and that root carries its own data dir and
   # its own Python path, so it is built in a shell that sourced its env.sh.
-  if [ -f "$HOME/.arduino15/env.sh" ]; then
-    step "headroom 2.0.17" 'deck\(s\) fit' bash -c '. "$HOME/.arduino15/env.sh" && exec python3 check_headroom.py'
+  abroot=""
+  for candidate in "$HOME/.arduino-cyd-2/env.sh" "$HOME/.arduino15/env.sh"; do
+    if [ -f "$candidate" ]; then abroot="$candidate"; break; fi
+  done
+  if [ -n "$abroot" ]; then
+    step "headroom 2.0.17" 'deck\(s\) fit' bash -c '. "$0" && exec python3 check_headroom.py' "$abroot"
   else
-    say "headroom 2.0.17" "no A/B root at ~/.arduino15/env.sh, so the old core was NOT built"
+    say "headroom 2.0.17" "no A/B root in ~/.arduino-cyd-2 or ~/.arduino15, so the old core was NOT built"
   fi
   step "renders"  'renders current'     python3 check_renders.py
   step "apk"      '[0-9] bytes'         bash android-companion/toolchain.sh

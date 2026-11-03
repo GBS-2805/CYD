@@ -79,9 +79,14 @@ HISTORICAL = {
     1114485: "an earlier note's Spotify figure, which did not reproduce",
     1123241: "the Spotify sketch on 3.3.12 from an earlier root",
     1125781: "the Spotify sketch without Bluetooth, on the default scheme",
-    1164489: "the phone sketch without Bluetooth, measured the same day",
+    1164489: "a phone build with no link, quoted once; no committed phone "
+             "sketch lacks BLE, so it cannot be rebuilt",
     1162797: "the phone sketch on core 2.0.17; the size follows the build root",
     1162813: "the phone sketch on core 2.0.17, the other end of that spread",
+    1162877: "the 2026-10-30 phone sketch on 2.0.17 at this repo's path, 64 B "
+             "over the shorter one that first printed it",
+    1167409: "today's phone sketch on 2.0.17; the prose's 2.0.17 figures are "
+             "the 2026-10-30 file",
     1168282: "~/.arduino-cyd/env.sh's phone build while that script set only "
              "PATH, so ~/.arduino15's dirs",
     1163930: "an earlier 3.3.12 phone build on a shorter path",
@@ -97,8 +102,9 @@ HISTORICAL = {
              "~/.arduino-cyd-3/env.sh, 16 B over this root; first seen as the top "
              "of a 2026-11-02 range",
     1168170: "the phone sketch through a second install root, 144 B under this one",
-    1878469: "the linked Spotify sketch through that same second root, 176 B under "
-             "this one",
+    1878469: "the linked Spotify sketch through /tmp/arduino-cyd-3: 176 B under "
+             "the 1,878,645 these docs quote, and 192 B under the deck chat's "
+             "1,878,661",
     1125669: "the Spotify sketch through that same second root, 112 B under it",
     1267083: "not a build at all: the flash left beside the 1,878,645 B Spotify "
              "build, its huge_app slot minus what the sketch used",
