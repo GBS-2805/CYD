@@ -116,6 +116,28 @@ def no_sketch(dest):
     shutil.rmtree(dest / DECK)
 
 
+def invented_no_sketch(dest):
+    """A NO_SKETCH entry that HISTORICAL does not keep: the two tables must agree.
+
+    HISTORICAL is what lets a past figure stay in the prose; NO_SKETCH says no
+    committed sketch makes it. They only work as a pair - so an entry added to one
+    and not the other has to be refused where it is written, rather than found
+    later by the doc that quotes it.
+    """
+    path = dest / "check_docs.py"
+    text = path.read_text(encoding="utf-8")
+    anchor = "NO_SKETCH = {\n"
+    if text.count(anchor) != 1:
+        raise SystemExit("the fixture could not find %r exactly once" % anchor)
+    path.write_text(
+        text.replace(
+            anchor,
+            anchor + '    1234567: "a figure this case invents, which no table keeps",\n',
+        ),
+        encoding="utf-8",
+    )
+
+
 CASES = [
     dict(
         name="a tree whose docs match the build passes",
@@ -263,6 +285,15 @@ CASES = [
         want=[
             "NO_SKETCH lists 1,162,877, but a deck builds to it today, so it is "
             "rebuildable and the entry is wrong"
+        ],
+    ),
+    dict(
+        name="a NO_SKETCH entry HISTORICAL does not keep is refused",
+        mutate=invented_no_sketch,
+        want_code=1,
+        want=[
+            "NO_SKETCH lists 1,234,567, which is not in HISTORICAL, so the size "
+            "check refuses it before this rule can"
         ],
     ),
     dict(
