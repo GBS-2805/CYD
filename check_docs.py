@@ -112,17 +112,17 @@ HISTORICAL = {
     1878629: "the other side of that 48 B disagreement, quoted as a rule's example",
     1878613: "what ~/.arduino-cyd/env.sh printed while it set only PATH, so the "
              "build went through ~/.arduino15",
-    1878661: "the linked Spotify sketch through the deck chat's "
+    1878661: "the linked Spotify sketch through another worktree's "
              "~/.arduino-cyd-3/env.sh, 16 B over this root; first seen as the top "
              "of a 2026-11-02 range",
-    1878645: "the linked Spotify sketch through ~/.arduino-cyd under this chat's "
+    1878645: "the linked Spotify sketch through ~/.arduino-cyd under this worktree's "
              "26-character home id: 32 B over the same root under a 24-character "
              "one and 16 B under that tree's ~/.arduino-cyd-3. The figure the "
              "docs quote, and a probe on 2026-11-03 showed it does not move with "
              "the sketch's own path - only with where the root is installed",
     1168170: "the phone sketch through a second install root, 144 B under this one",
     1878469: "the linked Spotify sketch through /tmp/arduino-cyd-3: 176 B under "
-             "the 1,880,101 these docs quote, and 192 B under the deck chat's "
+             "the 1,880,101 these docs quote, and 192 B under the other root's "
              "1,878,661",
     1125669: "the Spotify sketch through that same second root, 112 B under it",
     1267083: "not a build at all: the flash left beside an earlier 1,880,101 B "
@@ -466,7 +466,7 @@ ELSEWHERE = {
 NAME_SHAPE = re.compile(r"`([\w-]+\.(?:java|ino|py|sh))`")
 # "The current 30 sources are ..." — a count that moves whenever a class arrives.
 SOURCE_CLAIM = re.compile(r"\b(\d+)\s+sources\b")
-# "The branch on it today is ..." — a reading of check_branches, true only once.
+# "The branch on it today is ..." — a reading of the tree, true only once.
 UNDATED_READING = "branch on it today"
 
 _TREE_NAMES = None

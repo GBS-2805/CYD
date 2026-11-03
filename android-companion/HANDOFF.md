@@ -519,19 +519,17 @@ Identical to the sketch, checked against its `onWrite` handlers:
   silent board — 57 s each — still try all five wirings and both windows. Measured
   on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 152 now green then, 135 now. `./check.sh`
   runs the fast set, `./check.sh --full` the release set.
-- **The checkers' refusals are tested too, without a compiler.** Eleven
+- **The checkers' refusals are tested too, without a compiler.** Ten
   `selftest_*.py` files build a throwaway repo — a stand-in `arduino-cli`, a
   stand-in `capture.sh`, a real `git init` — and make each gate refuse what it
-  exists for: 137 branches over the eleven, from a stale flash size, a
+  exists for: 125 branches over the ten, from a stale flash size, a
   `HISTORICAL` size that must still pass, short and full md5s, a renamed link, an
   `ELSEWHERE` name, a moved source count and an undated reading, through asset
-  drift and a descriptor naming a gone sketch, the branch verdicts (a patch
-  already upstream, the same bytes renamed, a folder a merge would resurrect, a
-  pushed alias), to a render whose pixels moved, a capture that wrote nothing, a stale screen
+  drift and a descriptor naming a gone sketch, to a render whose pixels moved, a capture that wrote nothing, a stale screen
   count, an archive that rebuilds differently, two sketch images that disagree and a
-  root whose `env.sh` sets only `PATH`. Measured on 2026-11-03: 3.0 s, 0.5 s, 0.5 s,
-  1.6 s, 1.4 s, 0.9 s, 0.7 s, 0.3 s, 1.4 s, 0.3 s and 0.4 s — all eleven in
-  **11.2 s** through
+  root whose `env.sh` sets only `PATH`. Measured on 2026-11-03: 3.3 s, 0.6 s, 0.6 s,
+  1.7 s, 0.9 s, 0.7 s, 0.3 s, 1.4 s, 0.4 s and 0.4 s — all ten in
+  **10.2 s** through
   `./check.sh --selftest`, and the pre-commit hook runs it when a
   `check_*.py` or `selftest_*.py` is staged. That is the gap it closes: the three
   newest docs refusals were found by a reader, because nothing had ever run them.
@@ -545,15 +543,17 @@ Identical to the sketch, checked against its `onWrite` handlers:
   local cache: a fresh tree pays for both compiles once. A `git clone` of this
   worktree cannot be made on this host — git refuses a linked worktree as dubious
   ownership — so the export carries the same committed bytes by another route.
-- **The two chats are one tree again.** Measured on 2026-11-02:
-  `git merge-base --is-ancestor b3e8362 HEAD` exits 0, the deck branch holds no
-  commit this branch lacks, and neither the short-named ref nor origin's copy holds
-  anything either — the merge of `b3e8362` was already complete. What was wrong was
-  the reading: `check_branches.py` compared against `origin/main`, which lagged both
-  chats because nothing was pushed, so merged work kept coming back as "10 commits on
-  top of origin/main, 11 paths it has no bytes for". It now compares against the
-  branch checked out here, and a self-test case pins that a merged branch stays
-  quiet even when `origin/main` is deliberately left behind.
+- **The two-chat machinery is deleted, and the one reading it fixed stays here.**
+  Measured on 2026-11-02: `git merge-base --is-ancestor b3e8362 HEAD` exits 0 and the
+  deck branch held no commit this branch lacked — the merge of `b3e8362` was already
+  complete. What was wrong was the comparison: the branch census measured against
+  `origin/main`, which lagged because nothing was pushed, so merged work kept coming
+  back as "10 commits on top of origin/main, 11 paths it has no bytes for". On
+  2026-11-03 the census and its selftest are deleted, and so is the root
+  `DECK_HANDOFF.md`: one chat in one tree has no second tree to compare and no
+  hand-off to make, so both described parties that no longer exist. The lesson they
+  carried is the half worth keeping — compare against the branch the work is on, not
+  a remote that lags.
 - **A deck's tap now reaches the phone's player.** `DeckService` finds
   `6f2d0007-…` on the link, subscribes with `setCharacteristicNotification` and a
   CCCD write queued beside the other GATT operations, and both
@@ -593,15 +593,15 @@ Identical to the sketch, checked against its `onWrite` handlers:
   header rewrite, and `00bb1560…`, `eca02e93…`, `49f29bcb…` before the Bluetooth
   link, the callback change and the one-line answer — both in sync on 2026-11-02).
   The rewrite makes the phone-over-Bluetooth source the deck's first one and
-  Spotify's own Web API the optional half; it arrived by merging the deck chat's
-  branch, and the APK in `dist/` was rebuilt against it. That sketch also
+  Spotify's own Web API the optional half; it arrived by merging a branch that was
+  folded in on 2026-11-03, and the APK in `dist/` was rebuilt against it. That sketch also
   **compiles here**, measured on 2026-11-03 once `~/.arduino-cyd/env.sh` was
   sourced — `check_docs.py`'s gate built it on the `huge_app` partition and read
   1,880,101 B with 69,100 B of globals, beside the phone deck's unchanged
   1,168,314 B / 45,244 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
   `PATH`, so that build goes through `~/.arduino15` and reads 1,880,053 B — 48 B
   under with the globals identical, the build-root sensitivity the docs record.
-  The deck chat's root reads 1,878,661 B, 16 B over. Neither board has run it.
+  The root that first printed that figure reads 1,878,661 B, 16 B over. Neither board has run it.
 - **The Spotify deck's sign-in finishes here.** `SpotifyCallbackActivity` is
   exported for `phonedesk://spotify-callback`, and `aapt2 dump xmltree` on the
   shipped APK shows the VIEW/DEFAULT/BROWSABLE filter with scheme `phonedesk` and
@@ -657,7 +657,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   AOSP issue 268071369). `toolchain.sh` now rewrites the archive with `zipalign`,
   which drops the signing block, and signs it again from the pinned debug key,
   whose RSA signatures are deterministic. Two full runs then shipped the same
-  file, byte for byte: **202,353 bytes** in the run before the deck chat's chips,
+  file, byte for byte: **202,353 bytes** in the run before the exact-rect chips,
   4,367 of them the bigger signing
   block that re-signing writes. A different keystore signs different bytes, so
   reproducible means this toolchain and this key; `OFFSITE_KEYSTORE` overrides

@@ -1,7 +1,7 @@
 # Conventions — ESP32-2432S024R widgets
 
-House rules for every project in this repo. They exist so a new widget — or a new
-chat — does not have to rediscover them. If a rule stops being true, change it
+House rules for every project in this repo. They exist so a new widget does not have
+to rediscover them. If a rule stops being true, change it
 here in the same change as the code that broke it.
 
 **Scope: the ESP32-2432S024R only** — the 2.4" CYD with a resistive panel, an
@@ -17,16 +17,17 @@ controller or bridge gets its own section here first.
 * One sketch, one tab, **no extra headers**. A pasted `.ino` cannot see a header
   beside it.
 * Each **widget** folder has one `README.md`: what it is, how to flash it, the
-  traps, and what is verified. No `HOWTO.md`, no `HANDOFF.md`, no `DECK_HANDOFF.md`
-  inside one — a task that needs steps gets them in that README. The app folder is
-  the one exception, because it carries three documents with three audiences and
-  one `README.md` holding all of them was unreadable:
+  traps, and what is verified. No `HOWTO.md`, no `HANDOFF.md` beside it — a task
+  that needs steps gets them in that README. The app folder is the one exception,
+  because it carries three documents with three audiences and one `README.md`
+  holding all of them was unreadable:
   [`android-companion/README.md`](android-companion/README.md) is the product and
   its build, [`HOWTO.md`](android-companion/HOWTO.md) is the step-by-step a person
   follows on the phone, and [`HANDOFF.md`](android-companion/HANDOFF.md) is the
   state behind the code — what exists, what is verified, what is not. The root
-  keeps [`DECK_HANDOFF.md`](DECK_HANDOFF.md) for the same reason: the deck-to-app
-  hand-off crosses both trees, so it belongs to neither folder.
+  keeps no page of its own: a step that crosses a folder lives in the folder it
+  acts on, which is why syncing a sketch into the APK is written down in
+  [`android-companion/README.md`](android-companion/README.md#build).
 * Add the row to the [root README](README.md) table in the same change.
 * Widgets bundled into the APK also carry [`widget.json`](phone_deck_cyd24R/widget.json)
   (`schema: 1`, with `id`, `name`, `sketch`, `board`, `tagline`, `body`, `notes`,
@@ -275,10 +276,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   and the last three docs refusals were found by a reader, not by the check. Each
   `selftest_*.py` builds a throwaway repo in a temp directory — a stand-in
   `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
-  checker refuses: 43 docs branches, 9 asset branches, 10 margin branches, 23 old-core
-  ones, 12 branch ones (a patch already upstream, the same bytes under a new name, a folder a
-  merge would resurrect, a pushed branch and its local alias), 9 render ones (a
-  moved pixel, a wrong size, a corrupt PNG, a capture that failed), 11 screen ones
+  checker refuses: 43 docs branches, 9 asset branches, 10 margin branches, 23 old-core  ones, 9 render ones (a moved pixel, a wrong size, a corrupt PNG, a capture that failed), 11 screen ones
   (a stale count written in words, in digits and with a hyphen, a right count in
   the wrong paragraph, and frames that do not match the prose), 4 repro ones (two
   archives of different bytes, of different sizes, a build that fails and a build
@@ -290,7 +288,8 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   no branch asserts) and 4 on
   the gate itself (a root that pins its directories, a root whose `env.sh` sets only
   `PATH`, the default root order, and a stale default root). Measured on
-  2026-11-03: 3.0 s, 0.5 s, 0.5 s, 1.6 s, 1.4 s, 0.9 s, 0.7 s, 0.3 s,  1.4 s, 0.3 s and 0.4 s — all eleven in **11.2 s** through
+  2026-11-03, with the branch census gone: 3.3 s, 0.6 s, 0.6 s, 1.7 s, 0.9 s,
+  0.7 s, 0.3 s, 1.4 s, 0.4 s and 0.4 s — all ten in **10.2 s** through
   `./check.sh --selftest`, on a machine with no
   toolchain. On this shared
   VM the same command has also taken 4.4 s and 106.5 s an hour apart, which is
@@ -429,7 +428,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   the build dies in a wall of errors. BLE comes from the core (Bluedroid) —
   `BLEDevice`, `BLEServer`, `BLEClient`.
 * Use the widget's [`toolchain.sh`](phone_deck_cyd24R/toolchain.sh) rather than
-  assembling a toolchain per chat; it is idempotent and keeps everything under one
+  assembling a toolchain per session; it is idempotent and keeps everything under one
   `ARDUINO_HOME`.
 * Report what actually ran. "Compiles" means a compile exited 0 in this repo.
 * **Flashing from the phone is ArduinoDroid's job, not the app's.** On
@@ -553,25 +552,19 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
 
 ## One chat, one tree
 
-One chat works this repository, on one `freebuff/<id>` branch. Until 2026-11-03 it
-was two — a deck chat beside this one, each in its own worktree — which is why
-older notes and commit bodies here still say "the deck chat". That split is over
-and its work is folded in, so there is nobody to ask permission of and no
-hand-off to arrange: the rules below are about branches of one tree now.
+One chat works this repository, in one worktree, on one branch. Until 2026-11-03 it
+was two — a deck chat beside this one, each in its own worktree — and what let them
+meet went with the split: a branch census compared the two trees and a root hand-off
+page carried a deck commit into the app tree, and one chat needs neither, so both are
+deleted. What is left is the part that was never about the count.
 
-* **A change crosses a branch as a commit and an SHA, never as a file copy.** Every
-  worktree of this repository shares one object store, so a commit on one branch is
-  already readable from another and `git cherry-pick <sha>` needs nothing pushed —
-  a push is a publish, not a hand-off. A copy silently drops whichever version was
-  written second; a merge shows both sides of the disagreement.
-* **Nothing is checked out over a branch another worktree holds**, and no branch
-  checked out somewhere else is force-pushed. `git worktree list` says what is
-  where; a file that appears without a commit is drift to explain before anything
-  is merged over it.
-* **A merge is re-measured, not trusted.** The figures in a branch belong to the
-  root that printed them, so a merged size is rebuilt here before it is quoted: the
-  1,880,101 B above is the deck chat's 1,879,489 B read again through this root, not
-  a number copied across.
+* **A commit is how work moves, never a file copy.** Every branch here is a line of
+  work in one object store, so a commit on one is already readable from another and
+  `git cherry-pick <sha>` needs nothing pushed — a push is a publish, not a hand-off.
+  A copy silently drops whichever version was written second; a merge shows both
+  sides of the disagreement. Re-measure what a merge brings, because a figure
+  belongs to the root that printed it: the 1,880,101 B above is a branch's
+  1,879,489 B read again through this root, not a number copied across.
 * **A rule has one home.** Anything true of the whole board or of the app lives in
   this file; anything true of one widget lives in that widget's `README.md`;
   everywhere else a rule is a link, never a restatement. Two copies disagree
@@ -579,9 +572,6 @@ hand-off to arrange: the rules below are about branches of one tree now.
 * **A checker beats a paragraph.** If a rule can be tested, it becomes an assertion
   in a root checker and the prose shrinks to a pointer at it — a rule that cannot
   drift does not need repeating.
-* **A measurement is true of the tree that printed it.** Merge the branch before
-  quoting a number, and run [`check_branches.py`](check_branches.py) when a doc and
-  a tree seem to disagree.
 * **Exact bytes live in one file.**
   [`android-companion/HANDOFF.md`](android-companion/HANDOFF.md) keeps the exact APK
   size with the date it was measured; every other file rounds it to the nearest kB,
@@ -596,38 +586,24 @@ hand-off to arrange: the rules below are about branches of one tree now.
 * One widget per change. A change touching two widget folders is two changes.
 * **Run the gates from one command.** [`check.sh`](check.sh) is the fast set a
   commit must pass — docs (figures, links, prose), widget assets, the 2.0.17
-  record's shape (no compiler needed), the host tests, and the branch list as a
-  note rather than a failure — and `./check.sh --full`
+  record's shape (no compiler needed), the host tests — and `./check.sh --full`
   adds deck headroom on 3.3.12, the 2.0.17 decks compared with `old_core.json`,
   the nine render captures, the APK build, two more builds of that APK that must
   match it byte for byte, and every deck compiled twice with its clock pinned,
-  whose images must match too — and `./check.sh --selftest` runs the eleven
-  `selftest_*.py` files in about eleven seconds. It also refuses a source file that is in the worktree but not in the
+  whose images must match too — and `./check.sh --selftest` runs the ten
+  `selftest_*.py` files in about ten seconds. It also refuses a source file that is in the worktree but not in the
   index: every commit here stages tracked files, which cannot pick up a new one,
   and `LinkCommand.java` was referenced by two tracked classes for a day while a
   clone of the branch would not have compiled. The individual
   checkers keep their names because the pre-commit hook calls two of them with
   staged paths; nothing else needs six remembered invocations, and a round that
   runs one command cannot skip a step by forgetting it.
-* **One chat works this repo, and [`## One chat, one tree`](#one-chat-one-tree) is
-  how work moves between branches.** Nothing here needs anyone's permission; a
-  branch is mergeable on its own terms.
-* **Work reaches a branch by merge, never by copy.** Every branch here is a line of
-  work in this same tree, so a commit on one leaves these numbers true for the
-  branch that printed them. [`check_branches.py`](check_branches.py) names the
-  branches carrying commits this one does not have, with the worktree that has one
-  checked out; it reads refs and blobs and never a worktree, so it answers for a
-  tree this chat cannot open. Look at it before believing a doc that seems stale,
-  and merge rather than hand-editing the numbers, because the other branch has
-  usually already re-measured them. It judges content, not just commits: a branch
-  whose changed files are the same bytes this tree already has — a folder renamed,
-  work rebased over — is reported as nothing to fold, and one whose patches are all
-  upstream drops out the same way, so the list is what a merge would actually add.
-  The merge of 2026-11-03 is the worked example: two commits from the deck chat,
-  five conflicted files, and every figure rebuilt here before it was quoted. Read
-  the paths before merging anyway: an older branch can *look* like work and be a
-  downgrade, which is what `app/phone-deck-build` was at 87 commits back, 21 paths
-  under `cyd_phone_deck/`, a folder this tree renamed away.
+* **Work reaches a branch by merge, never by copy**, so
+  [the section above](#one-chat-one-tree) is the whole of it: a branch is mergeable
+  on its own terms, nothing here needs anyone's permission, and a number a merge
+  brings is re-measured here. Read a branch's paths before merging: an older one can
+  *look* like work and be a downgrade, which is what `app/phone-deck-build` was at 87
+  commits back, 21 paths under `cyd_phone_deck/`, a folder this tree renamed away.
 * Nothing is pushed or deployed without being asked. The repo stays private.
 * **One kB is 1,024 bytes, and it is written down once, here.** Every size in
   these docs is binary: 202,353 B is "198 kB", 343,307 B is "335 kB", rounded to

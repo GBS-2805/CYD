@@ -251,6 +251,18 @@ icon, requires `INTERNET` and cleartext (the sign-in hand-off is one request to
 the deck), refuses an APK that is `debuggable`, targets anything but 35 or ships
 without an icon, and prints the size and SHA-256 of what it copied to `dist/`.
 
+**The APK carries a copy of each sketch, not the sketch itself.**
+`syncWidgets` copies every `*/widget.json` beside this folder, and the sketch each
+descriptor names, into `app/src/main/assets/widgets/<id>/`, wiping the destination
+first so a removed widget does not live on in the APK. It is wired before
+`preBuild`, so any Gradle build runs it; that tree is gitignored build output and
+never belongs in a commit. `check_widget_assets.py` in the root compares the
+copies with `../<folder>/<sketch>.ino` and prints `2 widgets bundled, every copy
+matches` in a second without Gradle — the cheaper alarm to run after a sketch
+edit — and `toolchain.sh` reads the sketch back out of the finished APK and
+refuses a mismatched md5, which is the one that catches a build that skipped the
+sync.
+
 Android Studio still works: open the `android-companion` folder (Ladybug or
 newer), let it sync, and run the `app` configuration.
 

@@ -8,18 +8,17 @@
 #                       each deck built twice, so it needs all three toolchains — source
 #                       ~/.arduino-cyd/env.sh, ~/.arduino-cyd-2/env.sh or ~/.arduino15/env.sh for the old
 #                       core, and ~/.android-offsite/env.sh)
-#   ./check.sh --selftest  the checkers' own refusals       (~11 s, no toolchain)
+#   ./check.sh --selftest  the checkers' own refusals       (~10 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
-# nobody exercises: --selftest runs the eleven selftest_*.py files, which hand each
+# nobody exercises: --selftest runs the ten selftest_*.py files, which hand each
 # checker a throwaway repo and a stand-in (compiler, capture script, git repo) and
 # make it refuse.
 #
 # Fast:  docs (figures, links, prose, the recorded APK bytes), widget assets, the
 #        index (no source file left outside it), the 2.0.17 record's shape (no
-#        compiler needed), the screen counts, the host tests, the branch list as a
-#        note, and the nine render captures whenever a staged file could move a
-#        pixel.
+#        compiler needed), the screen counts, the host tests, and the nine render
+#        captures whenever a staged file could move a pixel.
 # Full:  the above, plus deck headroom on 3.3.12, the 2.0.17 decks compared with
 #        old_core.json, the nine render captures, the APK build with its signature,
 #        alignment and bundled-sketch checks, two more builds of that APK that must
@@ -63,13 +62,6 @@ say () {
   printf 'note  %-15s %s\n' "$1" "$2"
 }
 
-# Information, never a failure: a branch here holding work this tree does not is
-# not a broken tree.
-report () {
-  local name="$1"; shift
-  printf 'note  %-15s %s\n' "$name" "$("$@" 2>&1 | grep -v '^$' | head -1)"
-}
-
 # The gate finds the deck toolchain the way CONVENTIONS says to, so it does not
 # depend on which shell launched it.
 cli="${ARDUINO_CLI:-}"
@@ -99,7 +91,6 @@ if [ "${1:-}" = "--selftest" ]; then
   step "assets selftest" 'branches of check_widget_assets'  python3 selftest_widgets.py
   step "margin selftest" 'branches of check_headroom'       python3 selftest_headroom.py
   step "core selftest"   'branches of check_old_core'       python3 selftest_old_core.py
-  step "branch selftest" 'branches of check_branches'       python3 selftest_branches.py
   step "render selftest" 'branches of check_renders'        python3 selftest_renders.py
   step "screens selftest" 'branches of check_screens'       python3 selftest_screens.py
   step "repro selftest" 'branches of check_repro'          python3 selftest_repro.py
@@ -163,7 +154,6 @@ if [ "$have_javac" -eq 1 ]; then
 else
   say "host tests" "no javac, so the host suite did NOT run"
 fi
-report "branches" python3 check_branches.py
 # Not a failure: the branches are the check. This is the index from a failing
 # case back to the refusal it pins, so a red --selftest names a rule.
 step   "map"      'has a selftest'     python3 check_map.py

@@ -18,12 +18,10 @@ and fails when a committed PNG in `artifacts/renders/` no longer matches, so a
 forgotten regeneration cannot pass as a reviewed change. It compares pixels, not
 timestamps: git stores no mtime, so a clone stamps every file with the same time.
 
-One chat works the repo on its own `freebuff/<id>` branch, so a change arrives as
-another branch and [`check_branches.py`](check_branches.py) names the ones holding
-work this tree does not have — commits and bytes, no compile — dropping the ones
-whose content it already has. That makes it the list to merge from before trusting
-a number here; [`## One chat, one tree`](CONVENTIONS.md#one-chat-one-tree) is how
-that move is made.
+One chat works the repo, in this worktree, on one branch. Every figure here was
+printed by this tree, and a number that arrives with a merge is rebuilt here before
+it is quoted — [`## One chat, one tree`](CONVENTIONS.md#one-chat-one-tree) is the
+rule and the reason.
 
 | Project | Folder | What it is | Read |
 | --- | --- | --- | --- |
@@ -46,7 +44,8 @@ cable. It files its projects under **ESP32_Widgets**, with this one as
 **Phone Deck**.
 
 A built debug APK is at [`android-companion/dist/PhoneDeckBridge-debug.apk`](android-companion/dist/PhoneDeckBridge-debug.apk).
-A deck change reaches that APK by commit; the exact commands are in [DECK_HANDOFF.md](DECK_HANDOFF.md).
+A sketch reaches that APK through `:app:syncWidgets`, the step written down in
+[android-companion/README.md](android-companion/README.md#build).
 
 Nothing here needs Bluetooth pairing. The deck is a GATT peripheral, not a
 keyboard, so it does not appear in the phone's Bluetooth settings list.

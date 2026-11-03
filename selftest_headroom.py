@@ -3,7 +3,7 @@
 
 Neither deck has ever tripped this check - both fit - so the refusals only ever
 ran when someone went looking: a 1.4 MB throwaway sketch proved the overflow path
-once, in one chat, and the scratch files went away with it. This writes a shell
+once, by hand, and the scratch files went away with it. This writes a shell
 script that prints the compiler's two lines and nothing else, which makes each
 branch reachable in about a second, on a machine with no toolchain installed.
 

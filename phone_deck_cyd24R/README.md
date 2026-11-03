@@ -410,7 +410,7 @@ The root behind those figures is `~/.arduino-cyd/env.sh`, the one whose `env.sh`
 pins its own data and library dirs: `check_docs.py --refresh` re-read 1,168,314 B
 and 45,244 B from it on 2026-11-03. While that script set only `PATH` the same
 build went through `~/.arduino15` and printed 1,168,282 B — 32 B under with the
-globals identical — the deck chat's root prints the same 1,168,314 B, and
+globals identical — another worktree's root prints the same 1,168,314 B, and
 `/tmp/arduino-cyd-3` was read at 1,168,170 B, 144 B under. Quote the root with the
 number (see
 [the build note](../CONVENTIONS.md#build)).
