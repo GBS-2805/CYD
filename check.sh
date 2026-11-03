@@ -7,7 +7,7 @@
 #                       both cores, so it needs all three toolchains — source
 #                       ~/.arduino-cyd/env.sh, ~/.arduino-cyd-2/env.sh or ~/.arduino15/env.sh for the old
 #                       core, and ~/.android-offsite/env.sh)
-#   ./check.sh --selftest  the checkers' own refusals        (~4 s, no toolchain)
+#   ./check.sh --selftest  the checkers' own refusals        (~9 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
 # nobody exercises: --selftest runs the six selftest_*.py files, which hand each

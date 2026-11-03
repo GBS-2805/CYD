@@ -14,7 +14,7 @@ one deck, the docs that quote it, and a stand-in `arduino-cli` that prints a fix
 `Sketch uses` line and a fake core list. The case then changes one fact — a size,
 an md5, a link, a name, a count — and asks what check_docs.py says about it.
 Nothing compiles, nothing outside the temp directory is read or written, and the
-whole list finishes in about two seconds on a machine with no toolchain.
+whole list finishes in about three seconds on a machine with no toolchain.
 
   python3 selftest_docs.py        exit 0 when every branch still behaves
 
@@ -213,6 +213,42 @@ CASES = [
         mutate=append_readme("\nFull hash 0123456789abcdef0123456789abcdef.\n"),
         want_code=1,
         want=["quotes md5 0123456789abcdef0123456789abcdef"],
+    ),
+    dict(
+        name="a sentence calling a figure with no sketch rebuildable is refused",
+        mutate=append_readme(
+            "\nThe pair that rebuilds is 967,493 B against 1,162,877 B for the "
+            "2026-10-30 phone file.\n"
+        ),
+        want_code=1,
+        want=[
+            "calls 1,162,877 B rebuildable, but no committed sketch makes it",
+            "the 2026-10-30 phone sketch, which no commit here holds",
+        ],
+    ),
+    dict(
+        name="that claim wrapped across two lines is still refused whole",
+        mutate=append_readme(
+            "\nBoth halves rebuild: 967,493 B on this path and\n"
+            "1,162,877 B for the 2026-10-30 phone file, 195,384 B apart.\n"
+        ),
+        want_code=1,
+        want=["calls 1,162,877 B rebuildable"],
+    ),
+    dict(
+        name="a sentence that says such a figure cannot be rebuilt passes",
+        mutate=append_readme(
+            "\n1,162,877 B is the 2026-10-30 phone file, which no commit here "
+            "holds, so it cannot be rebuilt.\n"
+        ),
+        want_code=0,
+        forbids=["  - "],
+    ),
+    dict(
+        name="a rebuild word beside a figure this tree makes is left alone",
+        mutate=append_readme("\nA clean rebuild of the deck prints 1,168,314 B again.\n"),
+        want_code=0,
+        forbids=["  - "],
     ),
     dict(
         name="a widget README without the current size is refused",

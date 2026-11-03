@@ -132,7 +132,11 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   its FQBN and the compiler behind it are all unchanged, so a prose-only commit
   costs a second instead of a minute; `--refresh` rebuilds anyway, and every run
   names the decks that came from the file. A past build may stay in the prose,
-  but only by name in that file's `HISTORICAL` table, next to the reason.
+  but only by name in that file's `HISTORICAL` table, next to the reason, and
+  a sentence that calls one rebuildable has to say in that same sentence that
+  it cannot be: the builds in `NO_SKETCH` have no committed sketch behind
+  them, and "the pair that rebuilds" credited a phone file this repository
+  has never held until a reader went looking for it.
 * **Quote the run, not a range.** A figure names the run it came from and is what
   that run printed. When two builds of one sketch disagree — a pre-commit compile
   and a direct one printed 1,878,581 and 1,878,629 for the same file — say which
@@ -206,14 +210,17 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   and the last three docs refusals were found by a reader, not by the check. Each
   `selftest_*.py` builds a throwaway repo in a temp directory — a stand-in
   `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
-  checker refuses: 23 docs branches, 9 asset branches, 8 margin branches, 9 branch
+  checker refuses: 27 docs branches, 9 asset branches, 8 margin branches, 9 branch
   ones (a patch already upstream, the same bytes under a new name, a folder a
   merge would resurrect, a pushed branch and its local alias), 9 render ones (a
   moved pixel, a wrong size, a corrupt PNG, a capture that failed) and 4 on the
   gate itself (a root that pins its directories, a root whose `env.sh` sets only
   `PATH`, the default root order, and a stale default root). Measured on
-  2026-11-03: 1.5 s, 0.4 s, 0.4 s, 1.2 s, 0.8 s and 0.2 s — all six in **4.4 s**
-  through `./check.sh --selftest`, on a machine with no toolchain. The pre-commit hook runs
+  2026-11-03: 3.0 s, 0.7 s, 0.8 s, 2.4 s, 1.4 s and 0.2 s — all six in **8.6 s**
+  through `./check.sh --selftest`, on a machine with no toolchain. On this shared
+  VM the same command has also taken 4.4 s and 106.5 s an hour apart, which is
+  the machine's load rather than the checkers', so read a slow run as load
+  before assuming a checker got slower. The pre-commit hook runs
   that command whenever a `check_*.py` or `selftest_*.py` is staged, so a gate
   refactor cannot land having quietly stopped refusing. The decks themselves only
   ever walk the passing path; the overflow path was proved once with a 1.3 MB
@@ -490,7 +497,7 @@ other mention of it in this repo is a pointer back here.
   and the branch list as a note rather than a failure — and `./check.sh --full`
   adds deck headroom on both cores, the seven render captures and the APK build,
   and
-  `./check.sh --selftest` runs the six `selftest_*.py` files in about four
+  `./check.sh --selftest` runs the six `selftest_*.py` files in about nine
   seconds. It also refuses a source file that is in the worktree but not in the
   index: every commit here stages tracked files, which cannot pick up a new one,
   and `LinkCommand.java` was referenced by two tracked classes for a day while a

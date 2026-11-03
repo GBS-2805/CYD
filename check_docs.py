@@ -26,6 +26,13 @@ names one ceiling and carries one percentage. Anything looser ("143 % of that
 slot") would need the checker to decide which slot the sentence meant, and a
 checker that guesses is one people learn to skip.
 
+One claim needs the whole sentence rather than one line: a figure the prose says
+can be rebuilt. "The pair that rebuilds" once named 967,493 B against 1,162,877 B
+for a phone sketch no commit holds, and a reader who went looking for the file
+found nothing to compile. So a sentence that pairs a rebuild word with a figure
+in NO_SKETCH, and denies it nowhere in that sentence, is refused: the prose may
+keep such a number as history, but never as something to build again.
+
 A relative link is the same failure in another form: a doc pointing at a file
 somebody renamed describes a tree that no longer exists, and no number check can
 see it. So every `](path)` in a doc has to resolve from that doc's own folder;
@@ -121,6 +128,32 @@ HISTORICAL_MD5 = {
     "eca02e93": "the Spotify sketch before the callback change",
     "49f29bcb": "the Spotify sketch before the one-line answer",
 }
+
+# Figures no committed sketch produces: a build taken from a working tree nobody
+# committed, so no checkout can rebuild it. The prose may keep one as history, but
+# a sentence that pairs it with a rebuild word claims a reader can compile it
+# again, and there is no file to compile. 1,162,877 B is the 2026-10-30 phone
+# deck, overwritten the next day by `ef0681b`; 1,164,489 B is a Bluetooth-less
+# phone build no committed sketch has ever made. Each names why here, so the
+# table cannot grow into a place for stale numbers to hide.
+NO_SKETCH = {
+    1162877: "the 2026-10-30 phone sketch, which no commit here holds",
+    1164489: "the phone build without a Bluetooth link, which no committed "
+             "sketch makes",
+}
+
+# A claim that a figure can be had again by compiling something, and the words
+# that take it back. Judged per sentence, because markdown wraps a size and the
+# verb that calls it repeatable onto different lines.
+REBUILD_WORD = re.compile(r"\b(rebuild\w*|rebuilt|reproduc\w*|re-creat\w*)\b", re.I)
+REBUILD_DENIED = re.compile(
+    r"\b(cannot|can not|can't|never|nobody|no|not|without|used to|gone|record)\b",
+    re.I,
+)
+# A sentence ends at `.`, `?` or `!` followed by space and something that starts
+# one — a capital, a backtick, a bold mark, an opening bracket. That leaves
+# 1,135.6 and `.build_figures.json` alone.
+SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9`*(\[\"])")
 
 # `62c7e6c3…` in prose, and the full 32-hex form a build log prints.
 # A path segment is a branch id — `freebuff/e9252a57…` — not a sketch.
@@ -452,6 +485,78 @@ def percentage_problems(path, text, ceilings):
     return problems
 
 
+def sentences(text):
+    """Every sentence, with the line its first word sits on.
+
+    A flash size and the verb calling it repeatable can land on different lines
+    of one paragraph, which is what wrapping does to a README. Judging a line at
+    a time would either miss that claim or refuse the half that carries only the
+    number, so the paragraph is flattened and split into sentences, and each one
+    reports the line a reader would scroll to.
+    """
+    lines = text.splitlines()
+    starts = []
+    offset = 0
+    for number, line in enumerate(lines, start=1):
+        starts.append((offset, number))
+        offset += len(line) + 1
+    flat = " ".join(lines)
+
+    def line_of(index):
+        found = 1
+        for start, number in starts:
+            if start > index:
+                break
+            found = number
+        return found
+
+    begin = 0
+    stops = [match.start() for match in SENTENCE_END.finditer(flat)]
+    stops.append(len(flat))
+    for stop in stops:
+        piece = flat[begin:stop]
+        body = piece.strip()
+        if body:
+            lead = len(piece) - len(piece.lstrip())
+            yield line_of(begin + lead), body
+        begin = stop
+        while begin < len(flat) and flat[begin].isspace():
+            begin += 1
+
+
+def rebuild_problems(path, text):
+    """Refuse a sentence that calls a figure rebuildable when no sketch makes it.
+
+    `ef0681b`'s Spotify file at 967,493 B against 1,162,877 B for the 2026-10-30
+    phone file was written as a pair both halves of which rebuild, and one half
+    never could: that phone sketch is in no commit, so a reader who believed the
+    sentence found nothing to check out. A rebuild word beside a NO_SKETCH figure
+    is therefore only allowed in a sentence that says it cannot be rebuilt — where
+    the claim and its correction are read together, not a paragraph apart.
+    """
+    problems = []
+    for number, sentence in sentences(text):
+        if not REBUILD_WORD.search(sentence):
+            continue
+        figures = [
+            int(match.group(1).replace(",", "")) for match in SIZE.finditer(sentence)
+        ]
+        missing = [value for value in figures if value in NO_SKETCH]
+        if not missing or REBUILD_DENIED.search(sentence):
+            continue
+        problems.append(
+            "%s:%d calls %s rebuildable, but no committed sketch makes it (%s); "
+            "say in that sentence that it cannot be rebuilt"
+            % (
+                shown(path),
+                number,
+                " and ".join("{:,} B".format(value) for value in missing),
+                "; ".join(NO_SKETCH[value] for value in missing),
+            )
+        )
+    return problems
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Check that docs quote the sizes and md5s of the current build."
@@ -532,6 +637,7 @@ def main():
         problems.extend(link_problems(path, text))
         problems.extend(prose_problems(path, text))
         problems.extend(percentage_problems(path, text, ceilings))
+        problems.extend(rebuild_problems(path, text))
         for number, line in enumerate(text.splitlines(), start=1):
             for match in SIZE.finditer(line):
                 value = int(match.group(1).replace(",", ""))
@@ -579,6 +685,23 @@ def main():
             problems.append(
                 "%s does not quote the current md5 %s\u2026"
                 % (shown(readme), deck["md5"][:8])
+            )
+
+    # The table is only honest while it names figures no build makes. One that a
+    # deck prints today would label a rebuildable number unbuildable, and one
+    # missing from HISTORICAL would be refused as stale before this rule ran.
+    built_sizes = {deck["used"] for deck in built}
+    for value in sorted(NO_SKETCH):
+        if value not in HISTORICAL:
+            problems.append(
+                "NO_SKETCH lists %s, which is not in HISTORICAL, so the size check "
+                "refuses it before this rule can: add it there with its reason"
+                % "{:,}".format(value)
+            )
+        if value in built_sizes:
+            problems.append(
+                "NO_SKETCH lists %s, but a deck builds to it today, so it is "
+                "rebuildable and the entry is wrong" % "{:,}".format(value)
             )
 
     problems.extend(apk_problem())
