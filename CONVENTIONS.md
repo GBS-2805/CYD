@@ -150,7 +150,10 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   1,878,469 B, 144 B and 176 B under. None of that is sketch drift, because the
   md5s match: it is the build path, so source the `env.sh` whose figures you are
   quoting, say which root when two disagree, and re-measure a merged number here
-  instead of accepting another tree's last two digits.
+  instead of accepting another tree's last two digits. Both deck toolchains write
+  that file byte for byte identically, and the gate refuses a root whose `env.sh`
+  does not pin the directories — the copy this VM already held was written before
+  they did, which is how one root name came to mean two builds.
 * **The margin is checked, not assumed.** [`check_headroom.py`](check_headroom.py)
   compiles each deck with the deck FQBN and reads the compiler's own `Maximum is
   …` figures, so both ceilings — 1,310,720 B of flash and 327,680 B of DRAM —

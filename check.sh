@@ -71,7 +71,17 @@ cli="${ARDUINO_CLI:-}"
 if [ -z "$cli" ]; then
   for root in "${ARDUINO_HOME:-}" "$HOME/.arduino-cyd-3" "$HOME/.arduino-cyd"; do
     [ -n "$root" ] || continue
-    if [ -f "$root/env.sh" ]; then . "$root/env.sh"; fi
+    if [ -f "$root/env.sh" ]; then
+      . "$root/env.sh"
+      # A root name must mean one build. An env.sh written before the toolchains
+      # pinned their directories sets only PATH, so sourcing it quietly builds
+      # against ~/.arduino15 and reports a size that belongs to no named root —
+      # the confusion that put a 16-byte "spread" in five documents. Refuse it.
+      if [ -z "${ARDUINO_DIRECTORIES_DATA:-}" ]; then
+        printf 'error: %s does not pin the arduino-cli directories, so a build here\n       would use ~/.arduino15 instead of that root. Re-run the toolchain.sh in\n       that root, or source the env.sh of the root you mean.\n' "$root/env.sh" >&2
+        exit 2
+      fi
+    fi
     if [ -z "$cli" ] && [ -x "$root/bin/arduino-cli" ]; then cli="$root/bin/arduino-cli"; break; fi
   done
 fi
