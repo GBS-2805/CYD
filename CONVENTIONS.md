@@ -215,17 +215,18 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   and the last three docs refusals were found by a reader, not by the check. Each
   `selftest_*.py` builds a throwaway repo in a temp directory — a stand-in
   `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
-  checker refuses: 43 docs branches, 9 asset branches, 10 margin branches, 20 old-core
+  checker refuses: 43 docs branches, 9 asset branches, 10 margin branches, 23 old-core
   ones, 12 branch ones (a patch already upstream, the same bytes under a new name, a folder a
   merge would resurrect, a pushed branch and its local alias), 9 render ones (a
-  moved pixel, a wrong size, a corrupt PNG, a capture that failed) , 6 on the map itself
+  moved pixel, a wrong size, a corrupt PNG, a capture that failed), 9 on the map itself
   (a checker with no selftest, a selftest naming a checker that is gone, a
-  selftest with no checker, a tree where every pair is present, and a message
-  no branch asserts) and 4 on
+  selftest with no checker, a tree where every pair is present, a message
+  no branch asserts, one a shared helper returns from a list, and one built
+  with `str.format`) and 4 on
   the gate itself (a root that pins its directories, a root whose `env.sh` sets only
   `PATH`, the default root order, and a stale default root). Measured on
-  2026-11-03: 2.9 s, 0.5 s, 0.5 s, 1.4 s, 1.3 s, 0.7 s, 0.4 s and 0.4 s — all eight in
-  **8.4 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
+  2026-11-03: 3.0 s, 0.6 s, 0.6 s, 1.9 s, 1.7 s, 1.0 s, 0.5 s and 0.6 s — all eight in
+  **8.6 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
   VM the same command has also taken 4.4 s and 106.5 s an hour apart, which is
   the machine's load rather than the checkers', so read a slow run as load
   before assuming a checker got slower. The pre-commit hook runs
@@ -241,9 +242,12 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   message appended to a problem list and one written with
   `print(..., file=sys.stderr)`, so a refusal cannot slip past by choosing the
   other way to say it. The match is word
-  for word, with placeholders, sizes and md5s standing in for any one word,
-  because a `want` string is a substring of a formatted message; a message a
-  helper builds is invisible to it.
+  for word, with placeholders, sizes and md5s standing in for the value filled
+  in at run time — a run of words, because a printed size can be "123 bytes" —
+  because a `want` string is a substring of a formatted message. A message is
+  read where it is written, the sentence a shared helper returns included, so
+  `row_shape`, `verdict` and `index_problem` cannot hide one; a message
+  assembled at run time from variables is still invisible.
 * **Before you change a sketch, run both.** From the repo root:
 
   ```bash

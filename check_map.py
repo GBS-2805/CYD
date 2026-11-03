@@ -12,21 +12,24 @@ It refuses a message no branch asserts, which is why that list is empty: the
 match is word for word, with placeholders standing in for any one word, because
 a `want` string is a substring of a formatted message. A branch that asserts a
 message in other words can therefore look uncovered - write its `want` from the
-checker's own line - and a message a helper builds is invisible to the scan.
+checker's own line. A message is read where it is written, the sentence a shared
+helper returns (`row_shape`, `verdict`, `index_problem`) included, so a refusal
+cannot hide in a helper; one assembled at run time from variables is still
+invisible.
 
   python3 check_map.py       exit 0 when every checker has a selftest
 
-It also lists, per checker, the messages no branch repeats: every string the
-checker appends to a problem list or prints as an error, and whether a branch
-asserts it, matching word for word with placeholders and numbers standing in
-for any one word. That list is a report, not a refusal - a phrase can match by
-coincidence, and a message built by a helper is invisible to it - but it is
-where an untested refusal shows up first.
+It refuses, per checker, every message it can print that no branch repeats:
+every string the checker appends to a problem list, returns from a helper or
+prints as an error, matched word for word with placeholders, sizes and md5s
+standing in for the values filled in at run time. A refusal with no branch
+behind it fails this gate rather than sitting in a report.
 """
 import ast
 import importlib.util
 import re
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -56,9 +59,17 @@ MIN_PHRASE = 8
 
 
 def _message(node):
-    """The literal text of one append/print argument, or None when it is built."""
+    """The literal text of one string expression, or None when it is built.
+
+    A refusal is spelled several ways and only the values differ: `%s` formatting,
+    `str.format`, an f-string, or two literals added together. Each keeps the words
+    it was written with, so each is the message a branch has to assert.
+    """
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod):
-        node = node.left
+        return _message(node.left)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left, right = _message(node.left), _message(node.right)
+        return None if left is None or right is None else left + right
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return node.value
     if isinstance(node, ast.JoinedStr):
@@ -66,7 +77,28 @@ def _message(node):
             part.value for part in node.values
             if isinstance(part, ast.Constant) and isinstance(part.value, str)
         )
+    if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "format"):
+        # "the {:,} B floor".format(ram_free): the template is the message.
+        return _message(node.func.value)
     return None
+
+
+def _returned(value):
+    """Every literal a helper hands back, at any depth of list or tuple.
+
+    `row_shape` answers `["names a deck this tree does not hold"], None`: that
+    sentence is the message, and the caller adds the deck's name in front of it,
+    so the literal belongs to the map where it is written rather than where the
+    line ends up printed.
+    """
+    if isinstance(value, (ast.List, ast.Tuple)):
+        out = []
+        for item in value.elts:
+            out.extend(_returned(item))
+        return out
+    text = _message(value)
+    return [text] if text else []
 
 
 def _sink(node):
@@ -77,27 +109,40 @@ def _sink(node):
 
 
 def messages(path):
-    """Every message a Python checker appends to a problem list or prints as an error."""
+    """Every message a Python checker can print, however it is spelled.
+
+    A refusal reaches the reader three ways, and all three are read: appended to a
+    problem list the checker collects itself, returned by a shared helper that
+    builds it (`row_shape`, `verdict`, `index_problem`) so the caller can add the
+    name in front, or printed to stderr with no list at all. A helper's `return`
+    is the one that used to hide: the sentence is a literal there and nowhere else.
+    """
     try:
         tree = ast.parse(Path(path).read_text(encoding="utf-8"))
     except (OSError, SyntaxError, ValueError):
         return []
     found = []
+
+    def note(text):
+        if text and text not in found:
+            found.append(text)
+
     for node in ast.walk(tree):
+        if isinstance(node, ast.Return) and node.value is not None:
+            for text in _returned(node.value):
+                note(text)
+            continue
         if not isinstance(node, ast.Call):
             continue
         attr = getattr(node.func, "attr", "")
         name = getattr(node.func, "id", "")
-        text = None
         if attr == "append" and _sink(node.func.value):
-            text = _message(node.args[0]) if node.args else None
+            note(_message(node.args[0]) if node.args else None)
         elif (attr == "print" or name == "print") and any(
                 kw.arg == "file" for kw in node.keywords):
             # `print(..., file=sys.stderr)` is how a checker says a refusal without
             # a problem list; the builtin has no `.attr`, so it is matched by name.
-            text = next((t for t in (_message(arg) for arg in node.args) if t), None)
-        if text and text not in found:
-            found.append(text)
+            note(next((t for t in (_message(arg) for arg in node.args) if t), None))
     return found
 
 
@@ -133,15 +178,34 @@ def tokens(text):
 
 
 def _contains(needle, haystack):
-    """A wildcard on either side matches any one word."""
-    for start in range(len(haystack) - len(needle) + 1):
-        for offset, token in enumerate(needle):
-            other = haystack[start + offset]
-            if token != "*" and other != "*" and token != other:
-                break
-        else:
+    """A placeholder matches the value printed there, which can hold spaces.
+
+    So `*` stands for a run of words on either side, not exactly one: a branch
+    that spells out "123 bytes" covers a message whose `%s` printed that size,
+    and a message whose `%s` printed it is covered by a branch that wrote only
+    the placeholder. Every word outside a placeholder still has to appear, and a
+    placeholder in the asserted phrase may only swallow words that the phrase
+    then goes on to anchor: one that ends inside its own placeholder would
+    match any message at all, which is how the first version matched everything.
+    """
+
+    @lru_cache(maxsize=None)
+    def go(i, j):
+        if i == len(needle):
             return True
-    return False
+        if j == len(haystack):
+            return False
+        if needle[i] == haystack[j] and needle[i] != "*":
+            return go(i + 1, j + 1)
+        if needle[i] == "*" and any(
+                go(i + 1, j + take) for take in range(1, len(haystack) - j + 1)):
+            return True
+        if haystack[j] == "*" and len(needle) - i >= 2 and any(
+                go(i + take, j + 1) for take in range(1, len(needle) - i)):
+            return True
+        return False
+
+    return bool(needle) and any(go(0, start) for start in range(len(haystack)))
 
 
 def repeated(text, phrases):

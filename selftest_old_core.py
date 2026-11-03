@@ -66,7 +66,7 @@ def twice():
     )
 
 
-def tree(dest, decks=None, text=None, staged=True):
+def tree(dest, decks=None, text=None, staged=True, repo=True):
     dest.mkdir(parents=True, exist_ok=True)
     for name in ("check_old_core.py", "check_headroom.py"):
         (dest / name).write_text((ROOT / name).read_text(encoding="utf-8"),
@@ -83,6 +83,8 @@ def tree(dest, decks=None, text=None, staged=True):
     # index - and once wrote a stand-in sketch into it - so git here is handed a
     # clean environment.
     genv = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    if not repo:
+        return              # a tree git cannot read: no .git anywhere above it
     subprocess.run(["git", "init", "-q"], cwd=str(dest), capture_output=True,
                    env=genv)
     if staged:
@@ -130,6 +132,9 @@ CASES = [
     dict(name="a record naming a deck this tree lost is refused without a compiler",
          record=True, want_code=1, decks={"gone_deck_cyd24R": row()},
          want=["names a deck this tree does not hold", "problem(s) in old_core.json"]),
+    dict(name="a row that is not an object is refused", record=True, want_code=1,
+         text='{"core": "2.0.17", "decks": {"%s": "a string"}}\n' % DECK,
+         want=["is not an object"]),
     dict(name="a deck named twice is refused, because a read keeps one row",
          record=True, want_code=1, text=twice(),
          want=["is named twice"]),
@@ -149,6 +154,12 @@ CASES = [
     dict(name="an inherited GIT_INDEX_FILE does not decide the answer", record=True,
          env={"GIT_INDEX_FILE": "/nonexistent/index"}, want_code=0,
          want=["recorded consistently"]),
+    dict(name="a machine with no git cannot read the index, and says so",
+         record=True, env={"PATH": ""}, want_code=1,
+         want=["git could not be run here, so the index cannot be read"]),
+    dict(name="a tree with no git repository says the index cannot be read",
+         record=True, repo=False, want_code=1,
+         want=["there is no git repository here, so the index cannot be read"]),
 ]
 
 
@@ -161,7 +172,7 @@ def main():
         for index, case in enumerate(CASES, 1):
             dest = Path(tmp) / f"case{index}"
             tree(dest, case.get("decks"), case.get("text"),
-                 case.get("staged", True))
+                 case.get("staged", True), case.get("repo", True))
 
             if case.get("record"):
                 argv = ["--record"]
