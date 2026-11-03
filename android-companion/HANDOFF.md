@@ -573,12 +573,13 @@ Identical to the sketch, checked against its `onWrite` handlers:
   The rewrite makes the phone-over-Bluetooth source the deck's first one and
   Spotify's own Web API the optional half; it arrived by merging the deck chat's
   branch, and the APK in `dist/` was rebuilt against it. That sketch also
-  **compiles here**, measured on 2026-11-02 once `~/.arduino-cyd/env.sh` was
-  sourced — `check_docs.py`'s gate built it on the `huge_app` partition and read    1,878,645 B with 69,092 B of globals, beside the phone deck's unchanged
-    1,168,314 B / 45,244 B. The deck chat's tree printed 1,878,661 B for the same
-    sketch — 16 B apart with the globals identical, the build-root sensitivity the
-    docs record — so the number above is this root's, quoted with its root. Neither
-    board has run it.
+  **compiles here**, measured on 2026-11-02 once `~/.arduino-cyd-3/env.sh` was
+  sourced — `check_docs.py`'s gate built it on the `huge_app` partition and read
+  1,878,661 B with 69,092 B of globals, beside the phone deck's unchanged
+  1,168,314 B / 45,244 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
+  `PATH`, so that build goes through `~/.arduino15` and reads 1,878,613 B — 48 B
+  under with the globals identical, the build-root sensitivity the docs record.
+  Neither board has run it.
 - **The Spotify deck's sign-in finishes here.** `SpotifyCallbackActivity` is
   exported for `phonedesk://spotify-callback`, and `aapt2 dump xmltree` on the
   shipped APK shows the VIEW/DEFAULT/BROWSABLE filter with scheme `phonedesk` and
