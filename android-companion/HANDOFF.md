@@ -625,21 +625,31 @@ Identical to the sketch, checked against its `onWrite` handlers:
   experiment is historical. What is general is the mechanism: a folder with a
   descriptor and a sketch, nothing to edit in Java or Gradle.
 - A fresh-toolchain run of unchanged sources produced **97,769 bytes** against
-  the then-committed 97,757, so the APK is *not* byte-reproducible: dex files embed
-  build-time data. The probe changes shipped **99,533 bytes**, the flash-shelf
+  the then-committed 97,757, which is what dex build-time data looked like until the
+  cause turned out to be AGP's Dependency Info Block; the fix is below. The probe changes shipped **99,533 bytes**, the flash-shelf
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **197,986 bytes** on 2026-11-03, the rebuild carrying two bundled sketches, the
+  **202,353 bytes** on 2026-11-03, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror, the three-step probe, the owner's logo as the icon, the mark
   centred on the top bar at 26dp as one PNG per density rather than above the
   drawer's wordmark, the gear and chevrons drawn as shapes, and the shelf that
   adds, edits, deletes and attaches a project and imports a file from its own
-  picker. That is 15,748 bytes above the previous 182,238, and the rebuild
-  overwrote that file, so the
-  difference is not itemised here — the archive is not byte-reproducible either. Quote the size to the nearest kB
-  (~193 kB), never as a checksum.
+  picker. That is 20,115 bytes above the previous 182,238, and the rebuild overwrote
+  that file, so the difference is not itemised here.
+- **The archive is byte-reproducible now, on one machine.** AGP stamps a
+  *Dependency Info Block* into the APK Signing Block and fills it differently on
+  every build — same sources, different bytes. On 2026-11-03 two builds of this
+  tree differed in 179 bytes of that block and nowhere else: the same 21 entries
+  in the same order, the same bytes, the same v2 and v3 signatures (`0x504b4453`,
+  AOSP issue 268071369). `toolchain.sh` now rewrites the archive with `zipalign`,
+  which drops the signing block, and signs it again from the pinned debug key,
+  whose RSA signatures are deterministic. Two full runs then shipped the same
+  file, byte for byte: **202,353 bytes**, 4,367 of them the bigger signing
+  block that re-signing writes. A different keystore signs different bytes, so
+  reproducible means this toolchain and this key; `OFFSITE_KEYSTORE` overrides
+  both halves. Quote the size to the nearest kB (198 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set — now including
   `INTERNET`, the one outbound request to the deck —

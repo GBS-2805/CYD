@@ -31,6 +31,13 @@ CMDLINE_TOOLS="${OFFSITE_CMDLINE_TOOLS:-11076708}"   # cmdline-tools 12.0
 COMPILE_SDK=35
 BUILD_TOOLS=35.0.0
 
+# Signing. AGP signs with the machine's debug key and the archive is signed again
+# below, from the same key, to drop the build-time block AGP stamps into it; both
+# halves have to name the same key or the rebuild below changes the signature.
+KEYSTORE="${OFFSITE_KEYSTORE:-$HOME/.android/debug.keystore}"
+KEYSTORE_PASS="${OFFSITE_KEYSTORE_PASS:-android}"
+KEYSTORE_ALIAS="${OFFSITE_KEYSTORE_ALIAS:-androiddebugkey}"
+
 SETUP_ONLY=0
 CLEAN=1
 for arg in "$@"; do
@@ -196,6 +203,23 @@ APK="$APP_DIR/$APK_REL"
 [ -f "$APK" ] || fail "no APK at $APK"
 BT="$ANDROID_SDK_ROOT/build-tools/$BUILD_TOOLS"
 
+# ------------------------------------------------------- reproducible bytes ---
+# AGP writes a "Dependency Info Block" into the APK Signing Block and fills it
+# differently on every build, unchanged sources included: it describes the
+# dependency set, and it was the one part of the archive that moved (AOSP issue
+# 268071369). Everything else held byte for byte across two builds here — the same
+# 21 entries in the same order, the same bytes, the same v2 and v3 signatures — so
+# the fix is to rewrite the archive and sign it again. zipalign drops the signing
+# block on its way through, and apksigner adds back only signatures, which are
+# deterministic for an RSA key.
+say "strip the build-time signing block and sign again"
+[ -f "$KEYSTORE" ] || fail "no keystore at $KEYSTORE; AGP should have created the debug one"
+"$BT/zipalign" -f 4 "$APK" "$APK.rebuilt" || fail "zipalign could not rewrite the archive"
+"$BT/apksigner" sign --ks "$KEYSTORE" --ks-pass "pass:$KEYSTORE_PASS" \
+  --key-pass "pass:$KEYSTORE_PASS" --ks-key-alias "$KEYSTORE_ALIAS" \
+  "$APK.rebuilt" || fail "apksigner could not sign the rebuilt archive"
+mv -f "$APK.rebuilt" "$APK"
+
 say "verify signature"
 "$BT/apksigner" verify "$APK" || fail "apksigner rejected the APK"
 "$BT/apksigner" verify -v "$APK" | grep -i 'scheme' || true
@@ -287,11 +311,14 @@ mkdir -p "$(dirname "$DIST")"
 cp "$APK" "$DIST"
 SIZE="$(wc -c < "$DIST" | tr -d ' ')"
 say "ship $DIST"
-printf '  %s bytes (%s kB)\n  sha256 %s\n' "$SIZE" "$((SIZE / 1024))" \
+printf '  %s bytes (%s kB)\n  sha256 %s\n' "$SIZE" "$(( (SIZE + 512) / 1024 ))" \
   "$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$DIST" | awk '{print $1}'; else shasum -a 256 "$DIST" | awk '{print $1}'; fi)"
 
-# The archive is not byte-reproducible: dex files carry build-time data, so the
-# hash moves even when the sources do not. `HANDOFF.md` holds these exact bytes,
-# and `README.md` beside it plus `dist/index.html` quote the size to the nearest
-# kB; update all three when this number changes.
+# The bytes are reproducible on one machine: the same sources, the pinned
+# toolchain and the same debug keystore give the same hash, which is what
+# stripping the dependency block above buys. A different keystore signs different
+# bytes, which is what a signature is; OFFSITE_KEYSTORE overrides both halves.
+# `HANDOFF.md` holds these exact bytes, and `README.md` beside it plus
+# `dist/index.html` quote the size to the nearest kB, so update them when this
+# number changes.
 say "done — source $ROOT/env.sh to use the toolchain in this shell"
