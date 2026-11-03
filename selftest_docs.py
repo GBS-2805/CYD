@@ -22,6 +22,7 @@ The numbers here are pinned rather than recomputed, so a change that moves a
 message or a floor fails loudly instead of quietly agreeing with itself.
 """
 import hashlib
+import json
 import os
 import shutil
 import stat
@@ -37,6 +38,7 @@ HEADROOM = ROOT / "check_headroom.py"
 DECK = "phone_deck_cyd24R"
 SKETCH = "/* stand-in sketch: the build is canned, so this is never compiled */\n"
 USED, SLOT, GLOBALS = 1168314, 1310720, 45244
+OLD_USED = 1200000
 APK = "android-companion/dist/PhoneDeckBridge-debug.apk"
 HANDOFF = "android-companion/HANDOFF.md"
 
@@ -62,8 +64,12 @@ def stub(used=USED):
     )
 
 
+def full_digest():
+    return hashlib.md5(SKETCH.encode()).hexdigest()
+
+
 def digest():
-    return hashlib.md5(SKETCH.encode()).hexdigest()[:8]
+    return full_digest()[:8]
 
 
 def tree(dest, used=USED):
@@ -74,6 +80,27 @@ def tree(dest, used=USED):
     deck = dest / DECK
     deck.mkdir()
     (deck / (DECK + ".ino")).write_text(SKETCH)
+    (dest / "old_core.json").write_text(
+        json.dumps(
+            {
+                "core": "2.0.17",
+                "root": "~/.arduino-cyd-2",
+                "measured": "2026-11-03",
+                "decks": {
+                    DECK: {
+                        "md5": full_digest(),
+                        "used": OLD_USED,
+                        "globals": GLOBALS,
+                        "slot": SLOT,
+                    }
+                },
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     (dest / "README.md").write_text(
         "# Fixture\n\n"
         f"The deck builds to {used:,} B with {GLOBALS:,} B of globals, "
@@ -110,6 +137,19 @@ def apk_case(size, claim, extra=None):
         if extra:
             extra(dest)
     return mutate
+
+
+def stale_old_core(dest):
+    """A file that records a sketch which has since changed, and a doc quoting it."""
+    path = dest / "old_core.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["decks"][DECK]["md5"] = "0" * 32
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    readme = dest / "README.md"
+    readme.write_text(
+        readme.read_text(encoding="utf-8")
+        + "\nAn older 2.0.17 build printed 1,200,000 B for it.\n"
+    )
 
 
 def no_sketch(dest):
@@ -314,6 +354,21 @@ CASES = [
         want=[
             "NO_SKETCH lists 1,234,567, which is not in HISTORICAL, so the size "
             "check refuses it before this rule can"
+        ],
+    ),
+    dict(
+        name="a 2.0.17 figure old_core.json records is quotable",
+        mutate=append_readme("\nAn older 2.0.17 build printed 1,200,000 B.\n"),
+        want_code=0,
+        forbids=["  - "],
+    ),
+    dict(
+        name="a 2.0.17 figure whose sketch has moved is refused",
+        mutate=stale_old_core,
+        want_code=1,
+        want=[
+            "records md5 00000000",
+            "quotes 1,200,000, which is not a size any deck builds to now",
         ],
     ),
     dict(

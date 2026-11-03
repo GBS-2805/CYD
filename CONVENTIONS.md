@@ -137,7 +137,10 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   the number and of the verb — punctuation between them is not a word, and a
   path counts once: the builds in `NO_SKETCH` have no committed sketch behind
   them, and "the pair that rebuilds" credited a phone file this repository
-  has never held until a reader went looking for it.
+  has never held until a reader went looking for it. A 2.0.17 figure is not
+  one of those rows: it lives in `old_core.json` beside the md5 of the sketch
+  that printed it, and the checker stops vouching for it the moment that
+  sketch moves, so an old core's number cannot outlive its file.
 * **Quote the run, not a range.** A figure names the run it came from and is what
   that run printed. When two builds of one sketch disagree — a pre-commit compile
   and a direct one printed 1,878,581 and 1,878,629 for the same file — say which
@@ -211,13 +214,13 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   and the last three docs refusals were found by a reader, not by the check. Each
   `selftest_*.py` builds a throwaway repo in a temp directory — a stand-in
   `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
-  checker refuses: 31 docs branches, 9 asset branches, 8 margin branches, 9 branch
+  checker refuses: 33 docs branches, 9 asset branches, 8 margin branches, 9 branch
   ones (a patch already upstream, the same bytes under a new name, a folder a
   merge would resurrect, a pushed branch and its local alias), 9 render ones (a
   moved pixel, a wrong size, a corrupt PNG, a capture that failed) and 4 on the
   gate itself (a root that pins its directories, a root whose `env.sh` sets only
   `PATH`, the default root order, and a stale default root). Measured on
-  2026-11-03: 2.1 s, 0.4 s, 0.5 s, 1.6 s, 0.9 s and 0.3 s — all six in **5.7 s**
+  2026-11-03: 2.1 s, 0.4 s, 0.5 s, 1.5 s, 0.8 s and 0.3 s — all six in **5.6 s**
   through `./check.sh --selftest`, on a machine with no toolchain. On this shared
   VM the same command has also taken 4.4 s and 106.5 s an hour apart, which is
   the machine's load rather than the checkers', so read a slow run as load

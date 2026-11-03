@@ -15,6 +15,11 @@ with the reason it is legitimately still in the prose ("1,125,781, the build
 before the Bluetooth link"). An md5 that is not one of today's sketches fails
 the same way.
 
+An old core's figure cannot be rebuilt by a 3.3.12 gate at all, so it is not
+a HISTORICAL row either: `old_core.json` carries it beside the md5 of the
+sketch that printed it, and stops vouching for it the moment that sketch
+moves - which is when the figure would have wanted re-measuring anyway.
+
 What counts as a flash size here: a grouped number of 7 digits or more, like
 1,878,645. That is deliberately narrow. The APK, an mbedTLS margin and a
 globals delta are all quoted in these docs as byte counts too, and flagging them
@@ -94,11 +99,6 @@ HISTORICAL = {
     1162877: "the 2026-10-30 phone sketch on 2.0.17 at this repo's path, 64 B "
              "over the shorter one that first printed it; no commit here holds that "
              "file, so the docs quote it as a record",
-    1167409: "today's phone sketch on 2.0.17; the prose's 2.0.17 figures are "
-             "the 2026-10-30 file",
-    1748037: "today's Spotify sketch on 2.0.17 through ~/.arduino-cyd-2, "
-             "measured 2026-11-03; the gate builds 3.3.12 only, so nothing it "
-             "builds produces this one",
     1168282: "~/.arduino-cyd/env.sh's phone build while that script set only "
              "PATH, so ~/.arduino15's dirs",
     1163930: "an earlier 3.3.12 phone build on a shorter path",
@@ -365,6 +365,84 @@ def allowed_sizes(built):
         ok[deck["slot"] - deck["used"]] = "free flash in %s" % deck["folder"].name
     ok.update(HISTORICAL)
     return ok
+
+
+OLD_CORE = ROOT / "old_core.json"
+
+
+def old_core_figures():
+    """The old core's figures, tied to the sketch that printed them.
+
+    The gate builds 3.3.12 only, so a 2.0.17 size can never be rebuilt here. It
+    used to sit in HISTORICAL with a sentence and nothing behind it, which is the
+    shape that let a figure outlive the sketch it described: a rewrite changed the
+    build and the prose went on quoting the old number as history. old_core.json
+    names each deck's md5 with its size, globals and slot, so a figure is quotable
+    while that sketch is still this tree's and stops being quotable the moment it
+    moves - which is exactly when it wants re-measuring.
+
+    Returns (sizes a doc may quote, problems with the file itself).
+    """
+    if not OLD_CORE.is_file():
+        return {}, [
+            "%s is missing, so the 2.0.17 figures in the prose have nothing behind "
+            "them" % shown(OLD_CORE)
+        ]
+    try:
+        data = json.loads(OLD_CORE.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return {}, ["%s does not parse: %s" % (shown(OLD_CORE), exc)]
+    if not isinstance(data, dict):
+        return {}, ["%s does not hold an object" % shown(OLD_CORE)]
+
+    problems = []
+    core = data.get("core")
+    if not isinstance(core, str) or not core.strip():
+        problems.append("%s names no core, so no figure in it names a build"
+                        % shown(OLD_CORE))
+        core = "an unnamed core"
+    decks = data.get("decks")
+    if not isinstance(decks, dict) or not decks:
+        return {}, problems + ["%s records no deck" % shown(OLD_CORE)]
+
+    allowed = {}
+    for name, entry in sorted(decks.items()):
+        where = "%s: %s" % (shown(OLD_CORE), name)
+        sketch = ROOT / name / (name + ".ino")
+        if not sketch.is_file():
+            problems.append("%s names a deck this tree does not hold" % where)
+            continue
+        if not isinstance(entry, dict):
+            problems.append("%s is not an object" % where)
+            continue
+        figures = {}
+        for key in ("used", "globals", "slot"):
+            value = entry.get(key)
+            if not isinstance(value, int) or value <= 0:
+                problems.append("%s records no %s" % (where, key))
+                break
+            figures[key] = value
+        else:
+            if figures["used"] > figures["slot"]:
+                problems.append(
+                    "%s puts %s B in a %s B slot, which no build does"
+                    % (where, "{:,}".format(figures["used"]),
+                       "{:,}".format(figures["slot"]))
+                )
+            recorded, now = entry.get("md5"), md5(sketch)
+            if recorded != now:
+                problems.append(
+                    "%s records md5 %s but the sketch is %s now; rebuild it on "
+                    "core %s and update the file"
+                    % (where, recorded, now[:8] + "\u2026", core)
+                )
+                continue
+            allowed[figures["used"]] = "the %s build on core %s" % (name, core)
+            allowed.setdefault(
+                figures["slot"],
+                "the app slot %s builds for on core %s" % (name, core),
+            )
+    return allowed, problems
 
 
 # Names this repo does not hold but prose legitimately mentions, each with its
@@ -664,6 +742,10 @@ def main():
     hashes = {deck["md5"][:8] for deck in built}
     full_hashes = {deck["md5"] for deck in built}
     problems = []
+    # A 2.0.17 figure is the file's to vouch for, not HISTORICAL's.
+    old_sizes, old_problems = old_core_figures()
+    sizes.update(old_sizes)
+    problems.extend(old_problems)
     read = list(docs())
 
     for path in read:
