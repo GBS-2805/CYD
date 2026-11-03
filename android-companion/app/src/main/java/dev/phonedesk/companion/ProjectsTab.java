@@ -51,6 +51,10 @@ final class ProjectsTab extends ScrollView {
     /** The project whose card is the edit form, and whether that form adds a new one. */
     private String editing;
     private boolean creating;
+    /** The project whose file picker is showing, or null for none. */
+    private String picking;
+    /** Where a card sends a file it cannot flash itself; null in a JVM capture. */
+    private Handoff handoff;
 
     ProjectsTab(Activity activity) {
         super(activity);
@@ -103,6 +107,7 @@ final class ProjectsTab extends ScrollView {
                 .append('b').append(BoardCatalog.selectedIndex(activity))
                 .append('f').append(activeFilter)
                 .append('q').append(query)
+                .append('k').append(picking)
                 .append('e').append(expanded.size());
         for (String id : expanded) sig.append('x').append(id);
         if (!sig.toString().equals(signature)) {
@@ -206,6 +211,8 @@ final class ProjectsTab extends ScrollView {
             if (!matches(project)) continue;
             if (!creating && project.id.equals(editing)) {
                 body.addView(editorCard(project));
+            } else if (project.id.equals(picking)) {
+                body.addView(pickerCard(project));
             } else {
                 body.addView(projectCard(project));
             }
@@ -434,6 +441,10 @@ final class ProjectsTab extends ScrollView {
 
         card.addView(logView(project));
 
+        // Only a card the app may change can be given a file: a widget's card is
+        // the descriptor's, and it already knows which sketch it ships with.
+        if (!project.inside()) card.addView(fileBlock(project));
+
         LinearLayout primary = Ui.row(activity);
         primary.setPadding(0, Ui.dp(activity, 10), 0, 0);
 
@@ -631,6 +642,165 @@ final class ProjectsTab extends ScrollView {
         ProjectStore.write(activity, record);
         closeEditor();
         Actions.toast(activity, project == null ? "Added " + title : "Saved " + title);
+    }
+
+    /**
+     * The file a card names, and the two things a file is good for here.
+     *
+     * A sketch copies its source into ArduinoDroid, which is the app that can
+     * compile and upload it; an image is handed to the USB flasher on SERIAL,
+     * which is the only path in this app that writes bytes to a board. A card with
+     * no file offers one button rather than two controls that would do nothing.
+     */
+    private LinearLayout fileBlock(ProjectStore.Project project) {
+        LinearLayout block = Ui.column(activity);
+        block.setPadding(0, Ui.dp(activity, 10), 0, 0);
+
+        if (project.fileName.isEmpty()) {
+            Button attach = Ui.action(activity, "ATTACH A FILE", false);
+            attach.setOnClickListener(v -> startPicking(project));
+            Ui.fullWidth(activity, attach);
+            block.addView(attach);
+            return block;
+        }
+
+        FlashLibrary.Entry entry = entryNamed(project.fileName);
+
+        TextView line = Ui.text(activity, "FILE  " + project.fileName, 11, Ui.ACCENT);
+        line.setTypeface(Typeface.MONOSPACE);
+        block.addView(line);
+
+        // The record keeps the name, not the bytes: a file deleted from FILES is a
+        // card naming something gone, and saying so beats a FLASH that fails on tap.
+        TextView detail = Ui.text(activity, entry == null
+                ? "Not in FILES any more. Attach it again."
+                : Ui.size(entry.size) + "  \u00B7  "
+                        + (entry.textual() ? "sketch source" : "image"), 11, Ui.DIM);
+        detail.setPadding(0, Ui.dp(activity, 2), 0, 0);
+        block.addView(detail);
+
+        LinearLayout actions = Ui.row(activity);
+        actions.setPadding(0, Ui.dp(activity, 8), 0, 0);
+        if (entry != null && entry.textual()) {
+            Button copy = Ui.action(activity, "COPY SOURCE", true);
+            copy.setOnClickListener(v -> Actions.copyOrSay(activity, entry.name,
+                    FlashLibrary.read(activity, entry)));
+            actions.addView(copy);
+        } else if (entry != null) {
+            Button flash = Ui.action(activity, "FLASH", true);
+            flash.setOnClickListener(v -> flashFile(entry));
+            actions.addView(flash);
+        }
+        Button change = Ui.action(activity, entry == null ? "ATTACH" : "CHANGE", false);
+        change.setOnClickListener(v -> startPicking(project));
+        if (actions.getChildCount() == 0) actions.addView(change);
+        else actions.addView(change, spaced(8));
+        block.addView(actions);
+        return block;
+    }
+
+    /** Hands an image to the flasher on SERIAL. A capture has no screen to send it to. */
+    private void flashFile(FlashLibrary.Entry entry) {
+        if (handoff == null) {
+            Actions.toast(activity, "Open SERIAL to flash " + entry.name);
+            return;
+        }
+        handoff.flash(entry.name);
+    }
+
+    /**
+     * The picker, as a card where the project's own was: the same reason as the
+     * editor. It lists what FILES holds, because that is the one place a file can
+     * come from without a second window the capture could not draw.
+     */
+    private LinearLayout pickerCard(ProjectStore.Project project) {
+        LinearLayout card = Ui.card(activity);
+
+        TextView title = Ui.text(activity, "ATTACH TO " + project.name.toUpperCase(Locale.US),
+                10, Ui.ACCENT);
+        title.setLetterSpacing(0.12f);
+        card.addView(title);
+
+        TextView hint = Ui.text(activity,
+                "A sketch copies into ArduinoDroid; a .bin image flashes from SERIAL. "
+                        + "Import one on SERIAL first.", 11, Ui.DIM);
+        hint.setPadding(0, Ui.dp(activity, 6), 0, 0);
+        hint.setLineSpacing(Ui.dp(activity, 2), 1f);
+        card.addView(hint);
+
+        int listed = 0;
+        for (FlashLibrary.Entry entry : currentEntries) {
+            ++listed;
+            Button pick = Ui.action(activity,
+                    entry.name + "  \u00B7  " + Ui.size(entry.size), false);
+            pick.setTextSize(12);
+            pick.setOnClickListener(v -> saveFile(project, entry));
+            Ui.space(activity, pick, 8);
+            card.addView(pick);
+        }
+        if (listed == 0) {
+            TextView empty = Ui.text(activity,
+                    "FILES is empty. Import a .ino or a .bin on SERIAL.", 11, Ui.DIM);
+            empty.setPadding(0, Ui.dp(activity, 8), 0, 0);
+            card.addView(empty);
+        }
+
+        Button cancel = Ui.action(activity, "CANCEL", false);
+        cancel.setOnClickListener(v -> closePicker());
+        Ui.space(activity, cancel, 10);
+        card.addView(cancel);
+
+        Ui.space(activity, card, 8);
+        return card;
+    }
+
+    private void startPicking(ProjectStore.Project project) {
+        creating = false;
+        editing = null;
+        picking = project.id;
+        signature = "";
+        refresh();
+    }
+
+    private void closePicker() {
+        picking = null;
+        signature = "";
+        refresh();
+    }
+
+    /**
+     * Attaching is the record's own change, so it goes through the store like any
+     * other edit. The kind follows the file, because the kind is what the card says
+     * it is built from: a .bin makes RECIPE honest, a sketch makes it a lie.
+     */
+    private void saveFile(ProjectStore.Project project, FlashLibrary.Entry entry) {
+        ProjectStore.Project record = new ProjectStore.Project(project);
+        record.fileName = entry.name;
+        record.kind = entry.textual() ? ProjectStore.KIND_SKETCH : ProjectStore.KIND_IMAGE;
+        record.updatedMs = System.currentTimeMillis();
+        ProjectStore.write(activity, record);
+        picking = null;
+        signature = "";
+        refresh();
+        Actions.toast(activity, "Attached " + entry.name);
+    }
+
+    /** The library entry a record names, or null once the file is gone from FILES. */
+    private FlashLibrary.Entry entryNamed(String name) {
+        if (name == null || name.isEmpty()) return null;
+        for (FlashLibrary.Entry entry : currentEntries) {
+            if (entry.name.equals(name)) return entry;
+        }
+        return null;
+    }
+
+    /** The serial tab, reached through the activity that owns both screens. */
+    interface Handoff {
+        void flash(String entryName);
+    }
+
+    void handoff(Handoff where) {
+        handoff = where;
     }
 
     private void confirmDelete(ProjectStore.Project project) {

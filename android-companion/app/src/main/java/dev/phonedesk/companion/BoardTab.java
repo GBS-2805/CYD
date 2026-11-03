@@ -63,6 +63,8 @@ final class BoardTab extends ScrollView {
     private boolean swappedLines;
     /** The rate the last handshake answered at; PROBE and FLASH try it first. */
     private int probeBaud = 115200;
+    /** A file the shelf handed over, drawn as chosen so the two screens agree. */
+    private String pickedFromShelf;
 
     /**
      * The CH340 is one resource for the whole process, not one per Activity.
@@ -217,7 +219,8 @@ final class BoardTab extends ScrollView {
                 .append(usbProbing).append(usbFlashing)
                 .append('l').append(logVersion)
                 .append('m').append(monitorMode).append(monitorOpen).append(monitorBaud)
-                .append('p').append(portOwner);
+                .append('p').append(portOwner)
+                .append('k').append(pickedFromShelf);
         if (!sig.toString().equals(signature)) {
             signature = sig.toString();
             int keepScroll = getScrollY();
@@ -243,6 +246,18 @@ final class BoardTab extends ScrollView {
             signature = "";
             refresh();
         }
+    }
+
+    /**
+     * A card on the shelf asked for its image to be flashed. It is picked here, not
+     * started: the cable, the board and the confirm are this screen's business, and
+     * a flash is not something a tap on another screen should begin.
+     */
+    void pick(String name) {
+        pickedFromShelf = name;
+        if (monitorMode) setMode(false);
+        signature = "";
+        refresh();
     }
 
     private void build(List<FlashLibrary.Entry> entries) {
@@ -1499,6 +1514,13 @@ final class BoardTab extends ScrollView {
         size.setPadding(0, Ui.dp(activity, 2), 0, 0);
         card.addView(size);
 
+        if (entry.name.equals(pickedFromShelf)) {
+            TextView picked = Ui.text(activity, "PICKED FROM THE SHELF", 10, Ui.ACCENT);
+            picked.setLetterSpacing(0.12f);
+            picked.setPadding(0, Ui.dp(activity, 4), 0, 0);
+            card.addView(picked);
+        }
+
         LinearLayout actions = Ui.row(activity);
         actions.setPadding(0, Ui.dp(activity, 10), 0, 0);
 
@@ -1514,7 +1536,7 @@ final class BoardTab extends ScrollView {
         actions.addView(save);
 
         if (!entry.textual()) {
-            Button flash = Ui.action(activity, "FLASH", false);
+            Button flash = Ui.action(activity, "FLASH", entry.name.equals(pickedFromShelf));
             flash.setTextColor(Ui.ACCENT);
             flash.setOnClickListener(v -> flashBinary(entry));
             actions.addView(flash);

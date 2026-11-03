@@ -140,6 +140,12 @@ public class MainActivity extends Activity {
         decksTab = new DecksTab(this);
         projectsTab = new ProjectsTab(this);
         boardTab = new BoardTab(this);
+        // A card's FLASH is a request to the one screen that writes bytes: hand it
+        // the image and open SERIAL rather than growing a second flasher here.
+        projectsTab.handoff(name -> {
+            boardTab.pick(name);
+            showSection(SECTION_SERIAL);
+        });
         setupTab = new SetupTab(this);
         content.addView(home, frameParams());
         content.addView(decksTab, frameParams());

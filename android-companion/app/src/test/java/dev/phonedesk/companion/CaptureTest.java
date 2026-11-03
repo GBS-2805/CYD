@@ -19,6 +19,7 @@ import org.robolectric.annotation.GraphicsMode;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -81,6 +82,8 @@ public final class CaptureTest {
                 firstName());
         capture("projects-edit", MainActivity.SECTION_PROJECTS, new ProjectsTab(host),
                 "ADD A PROJECT");
+        captureTaps("projects-file", MainActivity.SECTION_PROJECTS, new ProjectsTab(host),
+                firstAttachable(), "ATTACH A FILE");
         capture("serial", MainActivity.SECTION_SERIAL, new BoardTab(host), null);
         capture("settings", MainActivity.SECTION_SETTINGS, new SetupTab(host), null);
     }
@@ -146,16 +149,44 @@ public final class CaptureTest {
     }
 
     /**
+     * The first card that can take a file, in the order the shelf draws them. A
+     * widget's card cannot: its sketch ships inside the app, so the shelf has no
+     * ATTACH to tap on it.
+     */
+    private String firstAttachable() {
+        List<ProjectStore.Project> projects = new ArrayList<>(ProjectStore.all(host));
+        projects.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
+        for (ProjectStore.Project project : projects) {
+            if (project.kind != ProjectStore.KIND_INSIDE) return project.name;
+        }
+        throw new IllegalStateException("no card can take a file");
+    }
+
+    /**
      * The bar and one screen in a column, exactly as {@code MainActivity.buildUi}
      * stacks them, optionally tapped, then drawn and written out.
      */
     private void capture(String name, int section, View screen, String tap) throws Exception {
-        capture(name, section, screen, tap, null);
+        draw(name, section, screen, tap == null ? new String[0] : new String[] { tap }, null);
+    }
+
+    /**
+     * A state two taps away: {@code ATTACH A FILE} lives on an opened card, so the
+     * frame opens the project first and then taps the button inside it.
+     */
+    private void captureTaps(String name, int section, View screen, String... taps)
+            throws Exception {
+        draw(name, section, screen, taps, null);
     }
 
     /** As above, with the link state the bar is drawn against; null is a stopped bridge. */
     private void capture(String name, int section, View screen, String tap,
                          DeckService.Snapshot link) throws Exception {
+        draw(name, section, screen, tap == null ? new String[0] : new String[] { tap }, link);
+    }
+
+    private void draw(String name, int section, View screen, String[] taps,
+                      DeckService.Snapshot link) throws Exception {
         LinearLayout root = Ui.column(host);
         root.setBackgroundColor(Ui.BG);
 
@@ -172,7 +203,7 @@ public final class CaptureTest {
             refresh(screen);
             root.addView(screen, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            if (tap != null) {
+            for (String tap : taps) {
                 tapText(screen, tap);
                 refresh(screen);
             }

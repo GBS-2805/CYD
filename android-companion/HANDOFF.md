@@ -125,14 +125,17 @@ reason to add a resource pipeline.
   than resetting them.
 - The bundled deck is a project of kind INSIDE: its card carries COPY DROID and
   SAVE, and the LIBRARIES card hangs off it.
-- **Add, edit and delete are built; attaching a file to a card is not.** `ADD A
-  PROJECT` and the `EDIT` chip open the same form card — name, tagline, status,
-  notes — and `DELETE` is offered only for records this app made (`user:` ids),
-  because a widget's card belongs to its descriptor and would be seeded back on
-  the next read. A project added here has no file yet, so its card carries no
-  COPY, FLASH or RECIPE; wiring an imported sketch to a card is the next gap.
-  The catalogue is the seeded cards, plus whatever this app added, plus whatever
-  is imported into FILES.
+- **Add, edit, delete and attach are built.** `ADD A PROJECT` and the `EDIT` chip
+  open the same form card — name, tagline, status, notes — and `DELETE` is offered
+  only for records this app made (`user:` ids), because a widget's card belongs to
+  its descriptor and would be seeded back on the next read. `ATTACH A FILE` opens
+  the picker as a card in its place, listing what FILES holds: a `.ino` becomes
+  `COPY SOURCE` (the text ArduinoDroid compiles) and a `.bin` becomes `FLASH`,
+  which opens SERIAL with that image marked `PICKED FROM THE SHELF`. The writing
+  is still the app's own uploader, which has never synced, so a card can reach the
+  flasher but cannot make it work — that gap is unchanged. The catalogue is the
+  seeded cards, plus whatever this app added, plus whatever is imported into
+  FILES.
 
 ## Third-party firmware: catalogue, do not bundle
 
@@ -773,7 +776,7 @@ opens nothing:
 | What | Where |
 | --- | --- |
 | Gallery (a scroll, one screen under the next) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/ |
-| One screen | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/home.png — likewise `home-open`, `projects`, `projects-open`, `projects-edit`, `paired`, `serial`, `settings` |
+| One screen | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/home.png — likewise `home-open`, `projects`, `projects-open`, `projects-edit`, `projects-file`, `paired`, `serial`, `settings` |
 | The strip | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/chat-sheet.jpg |
 | Preview copy | https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/ — the same bundle, deployed first and kept for a second look |
 | Bundle source | [`artifacts/site/`](../artifacts/site/) (`worker.js`, `manifest.json`), built by [`artifacts/publish_renders.py`](../artifacts/publish_renders.py) into the gitignored `artifacts/site/public/` |

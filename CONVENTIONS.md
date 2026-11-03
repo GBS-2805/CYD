@@ -534,7 +534,7 @@ other mention of it in this repo is a pointer back here.
   record's shape (no compiler needed), the host tests, and the branch list as a
   note rather than a failure — and `./check.sh --full`
   adds deck headroom on 3.3.12, the 2.0.17 decks compared with `old_core.json`,
-  the eight render captures and the APK build, and `./check.sh --selftest` runs
+  the nine render captures and the APK build, and `./check.sh --selftest` runs
   the eight `selftest_*.py` files in about eight seconds. It also refuses a source file that is in the worktree but not in the
   index: every commit here stages tracked files, which cannot pick up a new one,
   and `LinkCommand.java` was referenced by two tracked classes for a day while a
@@ -615,7 +615,7 @@ One command per stage, and each one is checked rather than assumed:
 * **The capture runs the app, not a drawing.** `CaptureTest` builds `TopBar` and each
   screen, measures at 393 dp, lays them out and draws with Android's renderer; a state
   reached by tapping is reached by tapping, and the clock and the link snapshot are
-  frozen so a frame reads the same on every run. Eight frames, `artifacts/renders/`.
+  frozen so a frame reads the same on every run. Nine frames, `artifacts/renders/`.
 * **The gate captures again on purpose.** `check_renders.py` does not trust the PNGs a
   previous command installed; it draws them again and compares pixels, which is why
   "current" means something. That is the one duplicate in the loop and it stays.
@@ -624,7 +624,7 @@ One command per stage, and each one is checked rather than assumed:
   up to date (`app/build.gradle`) instead of every compile being re-run by
   `--rerun-tasks`. The daemon is kept and its JDK passed explicitly.
 * **The published page is a scroll, not a contact sheet.**  `publish_renders.py` stacks
-  the eight at phone width with a hairline and one caption between them, so dragging
+  the nine at phone width with a hairline and one caption between them, so dragging
   down walks the app; the strip (`chat-sheet.jpg`) exists for a single message, not for
   reading. The addresses are recorded in
   [`android-companion/HANDOFF.md`](android-companion/HANDOFF.md#where-the-renders-live).
@@ -712,6 +712,15 @@ the front page needs no second navigation.
   exists only for records this app made (`user:` ids) for the same reason, and
   a record added here is `SKETCH` kind, which is why `INSTALLER` and `SOURCE`
   appear only when a link is set and `RECIPE` only on an `IMAGE`.
+* **A card can name a file, and the kind follows the file.** `ATTACH A FILE` opens
+  the picker as a card in place of the project's own — the same reason the editor
+  is a card — listing what FILES already holds, because a second picker window is
+  a second thing the capture cannot draw. A `.ino` becomes `COPY SOURCE`, the text
+  ArduinoDroid compiles; a `.bin` becomes `FLASH`, which opens SERIAL with that
+  image marked `PICKED FROM THE SHELF` and leaves the confirm to the flasher, the
+  only screen that writes bytes to a board. The store keeps the file's *name*, not
+  its bytes: a file deleted from FILES draws `Not in FILES any more` instead of a
+  button that fails on tap.
 * **Libraries are one disclaimer at the top of the shelf**, read from the widget
   descriptors and never retyped in Java. Each library is a button that copies the
   exact name ArduinoDroid's library list searches for, and the ArduinoBLE warning
@@ -748,15 +757,15 @@ the front page needs no second navigation.
   `python3 artifacts/publish_renders.py`, then the deploy, then one *labelled* link
   per touched screen — `[Home, the drawer](https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/home.png)`. Publishing the renders
   is part of shipping them; publishing the code still needs asking. The fast gate
-  itself draws the eight frames whenever a staged file could move a pixel — the
+  itself draws the nine frames whenever a staged file could move a pixel — the
   app's Java, its resources or the capture — so a commit cannot leave them behind;
   posting the link is the one step no checker can do for you. "It compiles"
   says nothing about what a page looks like, and a change nobody looked at is a
   change to be undone later. A change that alters something which is not one of
-  those eight screens — the launcher icon, a design page, `dist/index.html`, the
+  those nine screens — the launcher icon, a design page, `dist/index.html`, the
   app's own copy in `artifacts/` — gets a sheet of its own under `artifacts/` and
   the same link, because the rule is "what a user sees ships with its picture",
-  not "the renderer's eight frames". The PNGs are the page's own images —
+  not "the renderer's nine frames". The PNGs are the page's own images —
   `tokens.json`'s `screens` maps each frame to one — so a change that redraws a
   screen regenerates that render and commits it with the code and the page. A
   render is a capture of the app, not a device screenshot — say which.

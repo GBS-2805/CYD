@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent
 APP = ROOT / "android-companion"
 FRESH = APP / "app" / "build" / "capture"
 SCREENS = ["home", "home-open", "paired", "projects", "projects-open", "projects-edit",
-           "serial", "settings"]
+           "projects-file", "serial", "settings"]
 
 
 def shown(path):
