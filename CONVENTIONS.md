@@ -144,7 +144,11 @@ it is the drift this file exists to stop.
    the phone per round at 115200, 57600, 230400, 460800 and 74880 in both DTR/RTS
    polarities, with no sync — so run it as an experiment with the log kept, and never
    let its result stand in for the sketch's. ArduinoDroid proved that the phone, the
-   adapter and the board can flash; it did not prove that either deck runs.
+   adapter and the board can flash; it did not prove that either deck runs. The
+   2026-11-03 log narrows the failure further — the chip reaches `DOWNLOAD_BOOT`
+   with a readable banner at four wirings and five rates while 552 B per round
+   leave the phone unanswered — and since a successful flash already rules the
+   hardware out, the block is this app's send path, not the board.
 
 A board that answers every step is a deck that can be called working. One that fails
 at 3 or 4 is a board or a panel problem, and steps 5 to 8 would have blamed the
@@ -476,12 +480,17 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   57600, 230400, 460800 or 74880 baud in either DTR/RTS polarity while 552 B left
   the phone per round. Keep the two apart: a deck flashes from the phone today,
   and the app's USB flasher is the thing that cannot write a board until its
-  packets arrive. A computer over the same cable is the fallback, and it is also
-  the test that separates the app's transmit path from the bridge. That record
+  packets arrive. A computer over the same cable is the fallback for a machine
+  without ArduinoDroid, and it separates the app's transmit path from the bridge
+  the same way the phone's own successful flash already does. That record
   does not name the image that flashed — no log of the session survives in either
   tree — so it proves the phone, the adapter and the board are up to a flash;
-  it does not prove that either deck has run. Do not re-litigate either without a
-  new measurement.
+  it does not prove that either deck has run. A successful flash also rules the
+  hardware out — cable, adapter, board, bridge and ROM all work — so a probe that
+  writes bytes and hears nothing blames this app's send path and nothing else, and
+  a diagnosis that sends the owner back to test the cable is re-testing what a
+  flash has already proven. The flasher stays in the app for a future fix rather
+  than being deleted: ArduinoDroid carries flashing in the meantime.
 
 ## Palette
 

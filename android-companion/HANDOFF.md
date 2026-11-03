@@ -780,6 +780,24 @@ wiring, and a silent board still reporting all four wirings at the end. **None o
 the three steps has run on a phone since the change**; the last hardware run is
 the one recorded above, before it.
 
+**The 2026-11-03 log put the fault in the app's own send path, and that is why the
+flasher stays.** The probe found the chip in its ROM loader after every pulse, at
+four wirings and five rates in both control polarities: `rst:0x1
+(POWERON_RESET)` and a banner ending `boot:0x3 (DOWNLOAD_BOOT…) waiting for
+download`. Each round handed 552 bytes to the bridge at 115200 — twelve 46-byte
+frames — and 276 at the slower rates, and no rate, wiring or polarity drew a
+reply. A readable banner proves the chip's transmit side, the framing and the
+rate; ArduinoDroid flashing this board from this same phone, cable, adapter and
+CH340 proves the rest of the path, down to the ROM. So the one link left
+unproven is this app's send code: `UsbSerialCh340.write()` hands slices to
+`bulkTransfer`, throws only when the transfer reports nothing sent, and `bytesOut`
+counts what the port accepted, not what left the phone. The open question is not
+how another program does it — the protocol is esptool's and this driver follows
+`usb-serial-for-android`'s register sequence with flow control already off — but
+where a write the phone accepts stops travelling. The flasher is kept rather than
+deleted, at the owner's request, because a fix would belong in the app.
+
+
 **The rate is remembered too.** A handshake that answered at anything other than
 115200 is kept in the tab's prefs (`probe_baud`) beside the wiring, because a
 bridge whose crystal is off by enough only ever syncs at one rate; PROBE and FLASH
