@@ -723,7 +723,9 @@ the front page needs no second navigation.
   button that fails on tap. `IMPORT A FILE` sits in the picker, so the shelf can add
   to FILES rather than only read it: the platform's document picker opens, its
   result goes through `MainActivity` on a second request code, and the list is
-  rebuilt in place so the next tap is the new file rather than ATTACH again.
+  rebuilt in place so the next tap is the new file rather than ATTACH again. A
+  folded card carries a `FILE` badge when it names one, so the shelf answers
+  "which of these can run something" before anything is opened.
 * **Libraries are one disclaimer at the top of the shelf**, read from the widget
   descriptors and never retyped in Java. Each library is a button that copies the
   exact name ArduinoDroid's library list searches for, and the ArduinoBLE warning

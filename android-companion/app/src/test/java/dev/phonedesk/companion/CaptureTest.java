@@ -72,6 +72,7 @@ public final class CaptureTest {
         now = System.currentTimeMillis();
         pinAges();
         pinDeck();
+        pinFile();
 
         capture("home", MainActivity.HOME, drawer(), null);
         capture("home-open", MainActivity.HOME, drawer(), "BOARDS");
@@ -83,7 +84,7 @@ public final class CaptureTest {
         capture("projects-edit", MainActivity.SECTION_PROJECTS, new ProjectsTab(host),
                 "ADD A PROJECT");
         captureTaps("projects-file", MainActivity.SECTION_PROJECTS, new ProjectsTab(host),
-                firstAttachable(), "ATTACH A FILE");
+                firstUnfiled(), "ATTACH A FILE");
         capture("serial", MainActivity.SECTION_SERIAL, new BoardTab(host), null);
         capture("settings", MainActivity.SECTION_SETTINGS, new SetupTab(host), null);
     }
@@ -149,17 +150,40 @@ public final class CaptureTest {
     }
 
     /**
-     * The first card that can take a file, in the order the shelf draws them. A
-     * widget's card cannot: its sketch ships inside the app, so the shelf has no
-     * ATTACH to tap on it.
+     * One card with a file, stored the way the shelf would store one. No seed has a
+     * file, so without this the FILE badge and the FILE block would be in no frame
+     * at all: a render cannot show what the app never held.
      */
-    private String firstAttachable() {
+    private void pinFile() {
+        List<FlashLibrary.Entry> entries = FlashLibrary.list(host);
+        if (entries.isEmpty()) return;
+        FlashLibrary.Entry entry = entries.get(0);
         List<ProjectStore.Project> projects = new ArrayList<>(ProjectStore.all(host));
         projects.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
         for (ProjectStore.Project project : projects) {
-            if (project.kind != ProjectStore.KIND_INSIDE) return project.name;
+            if (project.kind == ProjectStore.KIND_INSIDE) continue;
+            project.fileName = entry.name;
+            project.kind = entry.textual()
+                    ? ProjectStore.KIND_SKETCH : ProjectStore.KIND_IMAGE;
+            ProjectStore.save(host, projects);
+            return;
         }
-        throw new IllegalStateException("no card can take a file");
+    }
+
+    /**
+     * The first card the shelf would draw with an ATTACH on it, in the order it
+     * draws them. A widget's card has none because its sketch ships inside the app,
+     * and the card {@link #pinFile} already filed has `CHANGE` instead.
+     */
+    private String firstUnfiled() {
+        List<ProjectStore.Project> projects = new ArrayList<>(ProjectStore.all(host));
+        projects.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
+        for (ProjectStore.Project project : projects) {
+            if (project.kind != ProjectStore.KIND_INSIDE && project.fileName.isEmpty()) {
+                return project.name;
+            }
+        }
+        throw new IllegalStateException("no unfiled card to attach to");
     }
 
     /**

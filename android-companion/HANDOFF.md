@@ -132,7 +132,8 @@ reason to add a resource pipeline.
   the picker as a card in its place, listing what FILES holds and offering
   `IMPORT A FILE` for what it does not: a `.ino` becomes
   `COPY SOURCE` (the text ArduinoDroid compiles) and a `.bin` becomes `FLASH`,
-  which opens SERIAL with that image marked `PICKED FROM THE SHELF`. The writing
+  which opens SERIAL with that image marked `PICKED FROM THE SHELF`, and a folded
+  card carries a `FILE` badge when it names one. The writing
   is still the app's own uploader, which has never synced, so a card can reach the
   flasher but cannot make it work — that gap is unchanged. The catalogue is the
   seeded cards, plus whatever this app added, plus whatever is imported into

@@ -401,6 +401,22 @@ final class ProjectsTab extends ScrollView {
         status.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         status.setPadding(Ui.dp(activity, 8), 0, 0, 0);
         meta.addView(status);
+
+        // A filed card says so while folded: whether it can run a file is the
+        // difference between a note and something to copy or flash.
+        if (!project.fileName.isEmpty()) {
+            TextView file = Ui.text(activity, "FILE", 10, Ui.ACCENT);
+            file.setLetterSpacing(0.12f);
+            file.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+            file.setBackground(Ui.rounded(activity, Ui.CARD_HI, Ui.ACCENT, 6));
+            file.setPadding(Ui.dp(activity, 6), Ui.dp(activity, 2),
+                    Ui.dp(activity, 6), Ui.dp(activity, 2));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            params.leftMargin = Ui.dp(activity, 8);
+            meta.addView(file, params);
+        }
         header.addView(meta, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
