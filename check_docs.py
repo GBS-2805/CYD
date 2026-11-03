@@ -530,6 +530,21 @@ def sentences(text):
             begin += 1
 
 
+def word_tokens(sentence):
+    r"""The words a person counts, which `\S+` is not.
+
+    A dash between two clauses is a token and not a word, so counting it would
+    spend the window on typography; and a path or a URL counts once however long
+    it is, because reading `~/.arduino-cyd-2` is reading one name, not the dozen
+    words its separators would make.
+    """
+    return [
+        match.group(0)
+        for match in re.finditer(r"\S+", sentence)
+        if re.search(r"\w", match.group(0))
+    ]
+
+
 def rebuild_problems(path, text):
     """Refuse a sentence that calls a figure rebuildable when no sketch makes it.
 
@@ -538,23 +553,23 @@ def rebuild_problems(path, text):
     never could: that phone sketch is in no commit, so a reader who believed the
     sentence found nothing to check out. A rebuild word beside a NO_SKETCH figure
     is therefore only allowed where a denial reaches the number itself and a
-    rebuild verb, both within DENIAL_WORDS: a correction parked a clause away is
-    one a reader skimming the figure never sees, which is how the sentence read
-    as true for as long as it did.
+    rebuild verb, both within DENIAL_WORDS words: a correction parked a clause
+    away is one a reader skimming the figure never sees, which is how the
+    sentence read as true for as long as it did.
     """
     def window(index):
         low = max(0, index - DENIAL_WORDS)
-        return " ".join(m.group(0) for m in words[low:index + DENIAL_WORDS + 1])
+        return " ".join(words[low:index + DENIAL_WORDS + 1])
 
     problems = []
     for number, sentence in sentences(text):
         if not REBUILD_WORD.search(sentence):
             continue
-        words = list(re.finditer(r"\S+", sentence))
-        verbs = [i for i, m in enumerate(words) if REBUILD_WORD.search(m.group(0))]
+        words = word_tokens(sentence)
+        verbs = [i for i, word in enumerate(words) if REBUILD_WORD.search(word)]
         verb_denied = any(REBUILD_DENIED.search(window(i)) for i in verbs)
-        for index, match in enumerate(words):
-            digits = re.sub(r"[^\d,]", "", match.group(0))
+        for index, token in enumerate(words):
+            digits = re.sub(r"[^\d,]", "", token)
             if not re.fullmatch(r"\d{1,3}(?:,\d{3})+", digits):
                 continue
             value = int(digits.replace(",", ""))

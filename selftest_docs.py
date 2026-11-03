@@ -264,6 +264,16 @@ CASES = [
         want=["calls 1,162,877 B rebuildable with no denial within 12 words of it"],
     ),
     dict(
+        name="punctuation between a figure and its denial is not words",
+        mutate=append_readme(
+            "\n1,162,877 B is the 2026-10-30 phone file — · — · — "
+            "· — · — and no commit here holds it, so it cannot be "
+            "rebuilt.\n"
+        ),
+        want_code=0,
+        forbids=["  - "],
+    ),
+    dict(
         name="that claim wrapped across two lines is still refused whole",
         mutate=append_readme(
             "\nBoth halves rebuild: 967,493 B on this path and\n"
