@@ -277,14 +277,23 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   `./check.sh --full` runs that same build as its **`headroom 2.0.17`** step, and says
   so when the root is missing, so the A/B measurement is a step that fails rather than
   a paragraph nobody ran.
+* **On 2026-11-03 this VM had no 2.0.17 at all, so the A/B root was rebuilt.** The
+  `~/.arduino15/env.sh` above belongs to the machine that trimmed it; here
+  `~/.arduino15` is the fallback data dir, holds 3.3.12 and has no `env.sh`, so
+  that `source` line fails before a sketch is touched — a missing root, not a
+  smaller build. The A/B root is now **`~/.arduino-cyd-2`**: its own `data`,
+  `downloads` and `user` (the 3.3.12 root's libraries copied in), `PYTHONPATH` at
+  that root's `pylibs/`, `arduino-cli` in its `bin/`, core **2.0.17** installed
+  from scratch. `source ~/.arduino-cyd-2/env.sh` is what every 2.0.17 figure here
+  was rebuilt with.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
   1,162,8xx → 1,165,174 B (about **2.3 kB**), while the WiFi/TLS Spotify deck
   grows 967,493 → 1,122,249 B (**+154,756 B**), 73 % → **85 %** of 1,310,720 —
-  the default app partition; the documented 2.0.17 build reads 967,413 on its
-  own path,
-  because the build root moves the last digits). It is not mbedTLS getting
+  the default app partition. The 967,413 the Spotify README quotes is the same
+  file on a path ten characters shorter: rebuilt on 2026-11-03, it prints 967,493
+  at this repo's path. It is not mbedTLS getting
   fatter: named `mbedtls_*` symbols
   only go 83,854 → 91,309 B and `wifi`/`lwip` symbols 83,470 → 87,007 B. It is
   how IDF 5 assembles the network stack — the 3.3.12 image links

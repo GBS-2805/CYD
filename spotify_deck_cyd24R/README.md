@@ -325,6 +325,10 @@ Sketch uses 967413 bytes (73%) of program storage space. Maximum is 1310720 byte
 Global variables use 50324 bytes (15%) of dynamic memory, leaving 277356 bytes for local variables. Maximum is 327680 bytes.
 ```
 
+That block is the path it ran on: the same file rebuilt on 2026-11-03 through a
+fresh 2.0.17 root prints 967,493 bytes at this repo's path, 80 B higher for ten
+characters of path — which is the 967,493 `CONVENTIONS.md` uses as its baseline.
+
 That includes the setup web server, the PKCE exchange, the redrawn setup card and
 both pinned roots (about 2.7 kB of PEM), and leaves **335 kB** of the default
 scheme free — 192 kB under the phone deck's Bluetooth build, 1,164,489 bytes

@@ -82,6 +82,10 @@ HISTORICAL = {
     1164489: "the phone sketch without Bluetooth, measured the same day",
     1162797: "the phone sketch on core 2.0.17; the size follows the build root",
     1162813: "the phone sketch on core 2.0.17, the other end of that spread",
+    1162877: "the 2026-10-30 phone sketch on 2.0.17, rebuilt at this repo's "
+             "path: 64 B over the shorter path that first printed it",
+    1167409: "today's phone sketch on 2.0.17 through ~/.arduino-cyd-2; the "
+             "2.0.17 figures in the prose are the 2026-10-30 file",
     1168282: "~/.arduino-cyd/env.sh's phone build, PATH only, so ~/.arduino15's "
              "dirs",
     1163930: "an earlier 3.3.12 phone build on a shorter path",
