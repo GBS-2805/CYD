@@ -218,11 +218,13 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   checker refuses: 35 docs branches, 9 asset branches, 8 margin branches, 14 old-core
   ones, 9 branch ones (a patch already upstream, the same bytes under a new name, a folder a
   merge would resurrect, a pushed branch and its local alias), 9 render ones (a
-  moved pixel, a wrong size, a corrupt PNG, a capture that failed) and 4 on the
-  gate itself (a root that pins its directories, a root whose `env.sh` sets only
+  moved pixel, a wrong size, a corrupt PNG, a capture that failed) , 4 on the map itself
+  (a checker with no selftest, a selftest naming a checker that is gone, a
+  selftest with no checker, and a tree where every pair is present) and 4 on
+  the gate itself (a root that pins its directories, a root whose `env.sh` sets only
   `PATH`, the default root order, and a stale default root). Measured on
-  2026-11-03: 2.6 s, 0.5 s, 0.5 s, 1.1 s, 1.2 s, 0.9 s and 0.4 s — all seven in
-  **7.2 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
+  2026-11-03: 2.4 s, 0.5 s, 0.5 s, 1.0 s, 1.3 s, 0.8 s, 0.3 s and 0.2 s — all eight in
+  **7.0 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
   VM the same command has also taken 4.4 s and 106.5 s an hour apart, which is
   the machine's load rather than the checkers', so read a slow run as load
   before assuming a checker got slower. The pre-commit hook runs
@@ -230,9 +232,11 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   refactor cannot land having quietly stopped refusing. The decks themselves only
   ever walk the passing path; the overflow path was proved once with a 1.3 MB
   throwaway sketch, and that is not a test anyone can rerun. `check_map.py`
-  prints which branch pins which refusal, as the fast gate's `map` step: it
-  reports rather than refuses, because a `want` string is a substring of a
-  formatted message and coverage cannot honestly be decided from text.
+  prints which branch pins which refusal, as the fast gate's `map` step. It
+  refuses only the pairing - a checker with no selftest, a selftest naming a
+  checker that is gone, a selftest with no checker - and reports the rest,
+  because a `want` string is a substring of a formatted message and coverage
+  cannot honestly be decided from text.
 * **Before you change a sketch, run both.** From the repo root:
 
   ```bash
@@ -518,7 +522,7 @@ other mention of it in this repo is a pointer back here.
   note rather than a failure — and `./check.sh --full`
   adds deck headroom on 3.3.12, the 2.0.17 decks compared with `old_core.json`,
   the seven render captures and the APK build, and `./check.sh --selftest` runs
-  the seven `selftest_*.py` files in about seven seconds. It also refuses a source file that is in the worktree but not in the
+  the eight `selftest_*.py` files in about eight seconds. It also refuses a source file that is in the worktree but not in the
   index: every commit here stages tracked files, which cannot pick up a new one,
   and `LinkCommand.java` was referenced by two tracked classes for a day while a
   clone of the branch would not have compiled. The individual

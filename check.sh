@@ -8,10 +8,10 @@
 #                       it needs all three toolchains — source
 #                       ~/.arduino-cyd/env.sh, ~/.arduino-cyd-2/env.sh or ~/.arduino15/env.sh for the old
 #                       core, and ~/.android-offsite/env.sh)
-#   ./check.sh --selftest  the checkers' own refusals        (~7 s, no toolchain)
+#   ./check.sh --selftest  the checkers' own refusals        (~8 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
-# nobody exercises: --selftest runs the seven selftest_*.py files, which hand each
+# nobody exercises: --selftest runs the eight selftest_*.py files, which hand each
 # checker a throwaway repo and a stand-in (compiler, capture script, git repo) and
 # make it refuse.
 #
@@ -99,6 +99,7 @@ if [ "${1:-}" = "--selftest" ]; then
   step "branch selftest" 'branches of check_branches'       python3 selftest_branches.py
   step "render selftest" 'branches of check_renders'        python3 selftest_renders.py
   step "gate selftest"   'branches of check.sh'            python3 selftest_gate.py
+  step "map selftest"    'branches of check_map'           python3 selftest_map.py
   echo
   if [ "$failures" -gt 0 ]; then
     echo "$failures step(s) failed"
@@ -155,7 +156,7 @@ fi
 report "branches" python3 check_branches.py
 # Not a failure: the branches are the check. This is the index from a failing
 # case back to the refusal it pins, so a red --selftest names a rule.
-step   "map"      'assert a message'   python3 check_map.py
+step   "map"      'has a selftest'     python3 check_map.py
 
 # A commit that can change a pixel has to leave a picture of it behind, and a rule
 # nobody runs is a paragraph. The fast gate draws the frames whenever the staged

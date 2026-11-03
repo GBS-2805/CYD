@@ -21,6 +21,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+CHECK = ROOT / "check_old_core.py"
 DECK = "phone_deck_cyd24R"
 SKETCH = "/* stand-in sketch: nothing compiles, the build is canned */\n"
 USED, SLOT, GLOBALS, RAM_FREE = 1200000, 1310720, 40000, 280000
