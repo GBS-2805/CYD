@@ -277,14 +277,16 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   checker refuses: 43 docs branches, 9 asset branches, 10 margin branches, 23 old-core
   ones, 12 branch ones (a patch already upstream, the same bytes under a new name, a folder a
   merge would resurrect, a pushed branch and its local alias), 9 render ones (a
-  moved pixel, a wrong size, a corrupt PNG, a capture that failed), 6 on the map itself
+  moved pixel, a wrong size, a corrupt PNG, a capture that failed), 11 screen ones
+  (a stale count written in words, in digits and with a hyphen, a right count in
+  the wrong paragraph, and frames that do not match the prose), 6 on the map itself
   (a checker with no selftest, a selftest naming a checker that is gone, a
   selftest with no checker, a tree where every pair is present, and a message
   no branch asserts) and 4 on
   the gate itself (a root that pins its directories, a root whose `env.sh` sets only
   `PATH`, the default root order, and a stale default root). Measured on
-  2026-11-03: 3.0 s, 0.5 s, 0.5 s, 1.5 s, 1.4 s, 0.8 s, 0.3 s and 0.3 s — all eight in
-  **8.4 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
+  2026-11-03: 3.1 s, 0.5 s, 0.5 s, 1.7 s, 1.4 s, 1.0 s, 0.7 s, 0.4 s and 0.3 s — all
+  nine in **9.8 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
   VM the same command has also taken 4.4 s and 106.5 s an hour apart, which is
   the machine's load rather than the checkers', so read a slow run as load
   before assuming a checker got slower. The pre-commit hook runs
@@ -594,7 +596,7 @@ other mention of it in this repo is a pointer back here.
   note rather than a failure — and `./check.sh --full`
   adds deck headroom on 3.3.12, the 2.0.17 decks compared with `old_core.json`,
   the nine render captures and the APK build, and `./check.sh --selftest` runs
-  the eight `selftest_*.py` files in about eight seconds. It also refuses a source file that is in the worktree but not in the
+  the nine `selftest_*.py` files in about ten seconds. It also refuses a source file that is in the worktree but not in the
   index: every commit here stages tracked files, which cannot pick up a new one,
   and `LinkCommand.java` was referenced by two tracked classes for a day while a
   clone of the branch would not have compiled. The individual
@@ -691,6 +693,15 @@ One command per stage, and each one is checked rather than assumed:
   a strip kept in `renders/` is how the published one came to show seven frames a week
   after the app had nine. The addresses are recorded in
   [`android-companion/HANDOFF.md`](android-companion/HANDOFF.md#where-the-renders-live).
+* **A count of the screens is checked, not remembered.** [`check_screens.py`](check_screens.py)
+  reads every tracked file for a number before *screens*, *frames* or *captures* and
+  compares it with the frames git holds in `artifacts/renders/`, so "the seven screens"
+  fails the day there are nine. A paragraph that also spells today's count is a
+  history rather than a claim — that is what keeps the strip's "seven frames a week
+  after the app had nine" readable — and the selftests are skipped, because a
+  fixture's job is to say the wrong number. Seven files had drifted from seven to
+  nine before it existed: the design page, its README, this gate's own header, the
+  capture script, a Gradle comment, a cost table and the screen baseline page.
 * **An emulator is not the upgrade it sounds like.** It would answer a different
   question — a device screenshot with the phone's fonts and status bar — while the
   layout arithmetic is already the app's own; and on this machine it is not even

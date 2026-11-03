@@ -8,17 +8,18 @@
 #                       it needs all three toolchains — source
 #                       ~/.arduino-cyd/env.sh, ~/.arduino-cyd-2/env.sh or ~/.arduino15/env.sh for the old
 #                       core, and ~/.android-offsite/env.sh)
-#   ./check.sh --selftest  the checkers' own refusals        (~8 s, no toolchain)
+#   ./check.sh --selftest  the checkers' own refusals       (~10 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
-# nobody exercises: --selftest runs the eight selftest_*.py files, which hand each
+# nobody exercises: --selftest runs the nine selftest_*.py files, which hand each
 # checker a throwaway repo and a stand-in (compiler, capture script, git repo) and
 # make it refuse.
 #
 # Fast:  docs (figures, links, prose, the recorded APK bytes), widget assets, the
 #        index (no source file left outside it), the 2.0.17 record's shape (no
-#        compiler needed), the host tests, the branch list as a note, and the nine
-#        render captures whenever a staged file could move a pixel.
+#        compiler needed), the screen counts, the host tests, the branch list as a
+#        note, and the nine render captures whenever a staged file could move a
+#        pixel.
 # Full:  the above, plus deck headroom on 3.3.12, the 2.0.17 decks compared with
 #        old_core.json, the nine render captures, and the APK build with its
 #        signature, alignment and bundled-sketch checks.
@@ -98,6 +99,7 @@ if [ "${1:-}" = "--selftest" ]; then
   step "core selftest"   'branches of check_old_core'       python3 selftest_old_core.py
   step "branch selftest" 'branches of check_branches'       python3 selftest_branches.py
   step "render selftest" 'branches of check_renders'        python3 selftest_renders.py
+  step "screens selftest" 'branches of check_screens'       python3 selftest_screens.py
   step "gate selftest"   'branches of check.sh'            python3 selftest_gate.py
   step "map selftest"    'branches of check_map'           python3 selftest_map.py
   echo
@@ -139,6 +141,10 @@ step "tracked"    'index'             tracked_step
 # it needs no compiler: a deck it names, one row per deck, an md5 for a sketch a
 # clone would have. A build on that core is the slower question, in --full.
 step "old record" 'consistently'      python3 check_old_core.py --record
+# A number of screens is a claim like a size, and the one that drifted: seven files
+# said seven for a week after the app drew nine. This reads the tracked prose against
+# the frames git holds, so the count has one home instead of eight.
+step "screens"    'screen count'      python3 check_screens.py
 # test.sh finds its own JDK — $JAVA_HOME, then android-companion/jdk, then the
 # off-site root, then PATH — so the gate looks in the same four places before it
 # says the suite did not run. Asking only PATH skipped the suite on a machine that
