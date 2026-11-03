@@ -354,6 +354,31 @@ at 115200 or 74880 points at the cable, the adapter, or the sketch's baud rather
 than at the app. The USB probe has run on a phone; this monitor has not, so treat
 the counters as unmeasured rather than as expected values.
 
+## Test the phone's send path with a loopback
+
+This asks one question and needs no board: do the app's bytes leave the phone at
+all? A jumper answers it.
+
+1. Take a spare **CH340** module — the same chip as the CYD's own bridge — and
+   jumper its TX pin to its RX pin. Nothing else is connected to it.
+2. Plug it into the phone through the OTG adapter and data cable the deck uses,
+   and accept Android's permission prompt.
+3. Open **BOARD**, leave **MONITOR** off, and tap **PROBE**. The reset steps have
+   nothing to drive on a bare module, so expect them to report no boot text.
+4. Read the round line: `N B in / M B out`.
+
+- **`in` close to `out`** — the frames left the phone and came back through the
+  jumper, so the app's write path works and the fault sits on the deck's side of
+  the cable. That contradicts the 2026-11-03 log, so check the jumper is TX to RX
+  and not TX to GND before believing it.
+- **`in` at zero while `out` climbs** — the writes never left the phone, or the
+  adapter dropped them, which puts the fault in the driver's bulk transfer.
+- **Text instead of a count** — the jumper is echoing a boot banner, so something
+  other than a bare module is plugged in.
+
+Write the first round line down verbatim with its rate: the two byte counts are the
+whole claim, and `HANDOFF.md` is where the result belongs.
+
 ## Troubleshooting
 
 **Deck never appears under NEARBY**

@@ -795,7 +795,12 @@ counts what the port accepted, not what left the phone. The open question is not
 how another program does it — the protocol is esptool's and this driver follows
 `usb-serial-for-android`'s register sequence with flow control already off — but
 where a write the phone accepts stops travelling. The flasher is kept rather than
-deleted, at the owner's request, because a fix would belong in the app.
+deleted, at the owner's request, because a fix would belong in the app. **The
+loopback that would say whether those writes leave the phone has not been run:** it
+needs a spare CH340 module with TX jumpered to RX, and no USB host exists on this
+machine to try one. The steps and what each result would mean are in
+[`HOWTO.md`](HOWTO.md), so the first person with a module and a phone produces a
+measurement rather than a session note.
 
 
 **The rate is remembered too.** A handshake that answered at anything other than
