@@ -11,7 +11,7 @@ active.
 
 This deck needs `PartitionScheme=huge_app`. Bluetooth does not fit beside WiFi,
 mbedTLS and the setup server in the default 1,310,720-byte app slot: the linked
-image is 1,878,661 bytes, 142 % of that slot and 59 % of this one. Flashing the
+image is 1,878,645 bytes, 142 % of that slot and 59 % of this one. Flashing the
 phone deck afterwards with the default scheme re-partitions the board back, so
 each upload has to carry the scheme its own sketch was built for.
 
@@ -372,8 +372,15 @@ compiler:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,878,661 | **1,267,067** | 3,145,728 (59 % used) |
+| flash | 1,878,645 | **1,267,083** | 3,145,728 (59 % used) |
 | DRAM | 69,092 globals | **258,588** | 327,680 |
+
+The two figures are this tree's own build, `~/.arduino-cyd/env.sh` on 2026-11-02.
+The deck chat's tree prints **1,878,661 B** for the same sketch, 16 B above with the
+globals identical — the build-root sensitivity
+[`../CONVENTIONS.md`](../CONVENTIONS.md#build) records, not a different sketch, since
+both read md5 `3b17f04a…`. Quote the root you measured on rather than reconciling the
+last two digits.
 
 Without Bluetooth the same sketch was 1,125,781 bytes on the default scheme; the
 link costs **about 753 kB** of flash and 15,456 B of globals, which is Bluedroid, not
@@ -413,10 +420,10 @@ sourcing a toolchain.
   A/B build rather than the shipping one.
 * **It needs `huge_app` now, and that is the scheme `toolchain.sh` pins.**
   Without Bluetooth the 3.3.12 build was 1,125,781 bytes (85 % of the
-  1,310,720-byte default slot); with the link it is 1,878,661 bytes, which is
+  1,310,720-byte default slot); with the link it is 1,878,645 bytes, which is
   **142 %** of that slot and **59 %** of `huge_app`'s 3,145,728. An earlier pair of
   runs differed by 48 B; the pre-commit hook and a direct compile both print
-  1,878,661 now, so the single figure is the measured one. `default.csv`
+  1,878,645 now, so the single figure is the measured one. `default.csv`
   sizes `app0` and `app1` at 1,310,720 each, so on the default scheme this deck no
   longer links at all — not a tighter fit, a refusal. Uploading it re-partitions
   the board, and flashing the phone deck afterwards puts the default scheme back.
