@@ -810,8 +810,9 @@ The 15 s came from two things, both now in the tree: the test tasks declare that
 side-effect output never makes them current, so `--rerun-tasks` — which re-ran every
 compile to redraw screens whose code had not changed — is gone; and the Gradle daemon is
 kept instead of restarted per capture, with its JDK passed explicitly because this
-environment's default `javaHome` names a path that does not exist. Seven frames are
-byte-identical across the change, which is how it was verified rather than assumed.
+environment's default `javaHome` names a path that does not exist. Seven frames came back byte-identical across the change, which is how it
+was verified rather than assumed — the app drew seven screens then and has drawn nine
+since.
 
 An **emulator was considered and is not the answer here**: this VM has `/dev/kvm` but the
 user is not in the `kvm` group, the emulator package and every system image are absent

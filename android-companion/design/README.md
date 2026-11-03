@@ -10,15 +10,18 @@ read at runtime. It is a drawing that is metric-accurate enough to argue with.
 
 | File | What it is |
 | --- | --- |
-| `ui.html` | The app's seven screens at 393 × 852 dp, one static page. Open it in any browser. No build, no server, no dependencies. |
+| `ui.html` | Seven of the app's nine screens — all but the editor card and the file picker — at 393 × 852 dp, one static page. Open it in any browser. No build, no server, no dependencies. |
 | `tokens.json` | The same numbers as data — palette, radii, type sizes, letter-spacing, padding — each tied to the `Ui.java` constant or the method that uses it. This is what a handoff gets diffed against. |
 | `README.md` | This file. |
 
 Both files were written by reading the Java, not by memory: the colours came from
 `Ui.java`, the metrics from `MainActivity.buildTopBar()`, `DrawerHome`,
 `ProjectsTab`, `DecksTab`, `BoardTab` and `SetupTab`. The `capture.sh` script in
-the parent folder draws the same seven screens to PNG from the same numbers, so
-there are three descriptions of one design and they have to agree.
+the parent folder draws all nine screens to PNG from the same numbers, seven of
+which are drawn here, so there are three descriptions of one design and they have
+to agree. The two missing from `ui.html` are the editor card and the file picker:
+both came after this page was drawn, and its frames are numbered 1 to 7.
+
 
 ## Opening and editing it
 

@@ -42,7 +42,8 @@ rm -rf app/build/capture
 # app/build.gradle (`outputs.upToDateWhen { false }` on the test tasks), instead of with
 # --rerun-tasks, which also re-ran every compile. The daemon is kept, and its JDK named
 # explicitly because this environment's default javaHome is a path that does not exist.
-# Measured on 2026-11-02: 21 s per capture before, 10 s warm after, same seven frames.
+# Measured on 2026-11-02: 21 s per capture before, 10 s warm after, the same frames
+# byte for byte.
 JVM=()
 [ -n "${JAVA_HOME:-}" ] && JVM=("-Dorg.gradle.java.home=$JAVA_HOME")
 gradle :app:testDebugUnitTest --tests '*CaptureTest*' --console=plain "${JVM[@]}"

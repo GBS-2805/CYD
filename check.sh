@@ -17,10 +17,10 @@
 #
 # Fast:  docs (figures, links, prose, the recorded APK bytes), widget assets, the
 #        index (no source file left outside it), the 2.0.17 record's shape (no
-#        compiler needed), the host tests, the branch list as a note, and the seven
+#        compiler needed), the host tests, the branch list as a note, and the nine
 #        render captures whenever a staged file could move a pixel.
 # Full:  the above, plus deck headroom on 3.3.12, the 2.0.17 decks compared with
-#        old_core.json, the seven render captures, and the APK build with its
+#        old_core.json, the nine render captures, and the APK build with its
 #        signature, alignment and bundled-sketch checks.
 #
 # Each step takes the pattern of the line worth reading, so a passing step reports
