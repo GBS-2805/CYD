@@ -238,6 +238,22 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   is what makes the bytes reproducible against the tree's own key,
   `android-companion/keystore/debug.jks`: a different keystore signs different
   bytes, which is what a signature is, and `OFFSITE_KEYSTORE` overrides it.
+* **The sketches reproduce too, once the clock is out of the way.** A sketch's
+  image carries its own build time, so [`check_sketch_repro.py`](check_sketch_repro.py)
+  compiles each deck twice and refuses two images that differ — the full gate's
+  `sketch repro` step, four compiles in all, which is most of the gate's rise
+  from four minutes to seven. On 2026-11-03 the phone deck's two builds differed
+  in **69 bytes**: the image's 32-byte copy of the ELF's SHA-256, four digits of
+  `19:42` against `20:29` in `.rodata`, and the image's trailing 33-byte hash and
+  checksum — and the ELF differed in exactly those four digits, so nothing else
+  had moved. One compile cannot say whether a build reproduces, and the same build
+  path twice cannot either: the second run is answered from the first one's cache
+  and matches by construction. The core honours `SOURCE_DATE_EPOCH`, so the
+  checker pins the clock and clears one build path between its two runs, because
+  the path is written into the ELF's debug info and a different path changes the
+  digest the image carries. Both decks then build byte for byte identically, and
+  the image keeps its exact size either way, so a pinned build is still the build
+  the figures come from.
 * **The margin is checked, not assumed.** [`check_headroom.py`](check_headroom.py)
   compiles each deck with the deck FQBN and reads the compiler's own `Maximum is
   …` figures, so both ceilings — 1,310,720 B of flash and 327,680 B of DRAM —
@@ -290,14 +306,16 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   (a stale count written in words, in digits and with a hyphen, a right count in
   the wrong paragraph, and frames that do not match the prose), 4 repro ones (two
   archives of different bytes, of different sizes, a build that fails and a build
-  that ships nothing), 6 on the map itself
+  that ships nothing), 6 sketch ones (two builds that agree, an image that moved,
+  one the second build never wrote, a compile that fails, one that hangs, and a
+  machine with no compiler), 6 on the map itself
   (a checker with no selftest, a selftest naming a checker that is gone, a
   selftest with no checker, a tree where every pair is present, and a message
   no branch asserts) and 4 on
   the gate itself (a root that pins its directories, a root whose `env.sh` sets only
   `PATH`, the default root order, and a stale default root). Measured on
-  2026-11-03: 3.0 s, 0.5 s, 0.5 s, 1.6 s, 1.4 s, 0.9 s, 0.7 s, 0.3 s, 0.4 s and
-  0.4 s — all ten in **10.0 s** through `./check.sh --selftest`, on a machine with no
+  2026-11-03: 3.0 s, 0.5 s, 0.5 s, 1.6 s, 1.4 s, 0.9 s, 0.7 s, 0.3 s,  1.4 s, 0.3 s and 0.4 s — all eleven in **11.2 s** through
+  `./check.sh --selftest`, on a machine with no
   toolchain. On this shared
   VM the same command has also taken 4.4 s and 106.5 s an hour apart, which is
   the machine's load rather than the checkers', so read a slow run as load
@@ -607,9 +625,10 @@ other mention of it in this repo is a pointer back here.
   record's shape (no compiler needed), the host tests, and the branch list as a
   note rather than a failure — and `./check.sh --full`
   adds deck headroom on 3.3.12, the 2.0.17 decks compared with `old_core.json`,
-  the nine render captures, the APK build, and two more builds of that APK that
-  must match it byte for byte, and `./check.sh --selftest` runs the ten
-  `selftest_*.py` files in about ten seconds. It also refuses a source file that is in the worktree but not in the
+  the nine render captures, the APK build, two more builds of that APK that must
+  match it byte for byte, and every deck compiled twice with its clock pinned,
+  whose images must match too — and `./check.sh --selftest` runs the eleven
+  `selftest_*.py` files in about eleven seconds. It also refuses a source file that is in the worktree but not in the
   index: every commit here stages tracked files, which cannot pick up a new one,
   and `LinkCommand.java` was referenced by two tracked classes for a day while a
   clone of the branch would not have compiled. The individual

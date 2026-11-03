@@ -3,15 +3,15 @@
 # One gate, two speeds. A rule has one home, and this is where to run them from.
 #
 #   ./check.sh          what a commit must pass            (~3 s)
-#   ./check.sh --full   what a release must pass           (~4 min: the decks on
-#                       both cores, the old ones compared with old_core.json, so
-#                       it needs all three toolchains — source
+#   ./check.sh --full   what a release must pass           (~7 min: the decks on
+#                       both cores, the old ones compared with old_core.json, and
+#                       each deck built twice, so it needs all three toolchains — source
 #                       ~/.arduino-cyd/env.sh, ~/.arduino-cyd-2/env.sh or ~/.arduino15/env.sh for the old
 #                       core, and ~/.android-offsite/env.sh)
-#   ./check.sh --selftest  the checkers' own refusals       (~10 s, no toolchain)
+#   ./check.sh --selftest  the checkers' own refusals       (~11 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
-# nobody exercises: --selftest runs the nine selftest_*.py files, which hand each
+# nobody exercises: --selftest runs the eleven selftest_*.py files, which hand each
 # checker a throwaway repo and a stand-in (compiler, capture script, git repo) and
 # make it refuse.
 #
@@ -22,8 +22,9 @@
 #        pixel.
 # Full:  the above, plus deck headroom on 3.3.12, the 2.0.17 decks compared with
 #        old_core.json, the nine render captures, the APK build with its signature,
-#        alignment and bundled-sketch checks, and two more builds of that APK that
-#        must match it byte for byte.
+#        alignment and bundled-sketch checks, two more builds of that APK that must
+#        match it byte for byte, and every deck built twice with its clock pinned,
+#        whose images must match too.
 #
 # Each step takes the pattern of the line worth reading, so a passing step reports
 # its measurement rather than whatever the script said last.
@@ -102,6 +103,7 @@ if [ "${1:-}" = "--selftest" ]; then
   step "render selftest" 'branches of check_renders'        python3 selftest_renders.py
   step "screens selftest" 'branches of check_screens'       python3 selftest_screens.py
   step "repro selftest" 'branches of check_repro'          python3 selftest_repro.py
+  step "sketch selftest" 'branches of check_sketch_repro'   python3 selftest_sketch_repro.py
   step "gate selftest"   'branches of check.sh'            python3 selftest_gate.py
   step "map selftest"    'branches of check_map'           python3 selftest_map.py
   echo
@@ -210,6 +212,9 @@ if [ "$full" -eq 1 ]; then
   # on every run until 2026-11-03 and nothing noticed for weeks. Two builds, twice
   # the cost, and the only question is whether the bytes match.
   step "repro"    'same bytes'          python3 check_repro.py
+  # The sketches are flashed, so their bytes matter the same way the APK's do:
+  # each deck is compiled twice and the images must match.
+  step "sketch repro" 'same bytes'      python3 check_sketch_repro.py "${cli_args[@]}"
 fi
 
 echo

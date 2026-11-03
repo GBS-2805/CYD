@@ -510,18 +510,19 @@ Identical to the sketch, checked against its `onWrite` handlers:
   silent board — 57 s each — still try all five wirings and both windows. Measured
   on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 152 now green then, 135 now. `./check.sh`
   runs the fast set, `./check.sh --full` the release set.
-- **The checkers' refusals are tested too, without a compiler.** Eight
+- **The checkers' refusals are tested too, without a compiler.** Eleven
   `selftest_*.py` files build a throwaway repo — a stand-in `arduino-cli`, a
   stand-in `capture.sh`, a real `git init` — and make each gate refuse what it
-  exists for: 131 branches over the ten, from a stale flash size, a
+  exists for: 137 branches over the eleven, from a stale flash size, a
   `HISTORICAL` size that must still pass, short and full md5s, a renamed link, an
   `ELSEWHERE` name, a moved source count and an undated reading, through asset
   drift and a descriptor naming a gone sketch, the branch verdicts (a patch
   already upstream, the same bytes renamed, a folder a merge would resurrect, a
   pushed alias), to a render whose pixels moved, a capture that wrote nothing, a stale screen
-  count, an archive that rebuilds differently and a root whose `env.sh` sets
-  only `PATH`. Measured on 2026-11-03: 3.0 s, 0.5 s, 0.5 s, 1.6 s, 1.4 s, 0.9 s, 0.7 s, 0.3 s, 0.4 s and
-0.4 s — all ten in **10.0 s** through
+  count, an archive that rebuilds differently, two sketch images that disagree and a
+  root whose `env.sh` sets only `PATH`. Measured on 2026-11-03: 3.0 s, 0.5 s, 0.5 s,
+  1.6 s, 1.4 s, 0.9 s, 0.7 s, 0.3 s, 1.4 s, 0.3 s and 0.4 s — all eleven in
+  **11.2 s** through
   `./check.sh --selftest`, and the pre-commit hook runs it when a
   `check_*.py` or `selftest_*.py` is staged. That is the gap it closes: the three
   newest docs refusals were found by a reader, because nothing had ever run them.
@@ -651,6 +652,17 @@ Identical to the sketch, checked against its `onWrite` handlers:
   block that re-signing writes. A different keystore signs different bytes, so
   reproducible means this toolchain and this key; `OFFSITE_KEYSTORE` overrides
   both halves. Quote the size to the nearest kB (198 kB), never as a checksum.
+- **The release build type runs, and produces an unsigned archive.** Measured on
+  2026-11-03: `gradle assembleRelease` exited 0 in 17 s, ran 43 tasks including
+  `lintVitalRelease`, and wrote
+  `app/build/outputs/apk/release/app-release-unsigned.apk` — versionCode 1,
+  minSdk 26, targetSdk 35, and `apksigner verify` refusing it because `release`
+  has no `signingConfig`. So a release is one signing step away rather than
+  untested, and it needs a key of its own: signing it with the committed debug key
+  would ship an identity whose password is in the tree, which is what
+  `OFFSITE_KEYSTORE` exists to replace. The archive is 191,798 bytes (187 kB),
+  about 10 kB under the debug APK because `debug` writes the larger signing block;
+  both carry the same bundled sketches.
 - **The signing key ships with the tree.** `android-companion/keystore/debug.jks`
   is the project's own debug key — alias `androiddebugkey`, password `android`,
   RSA 2048, `CN=Android Debug` — committed so that two machines and two runs sign
@@ -843,9 +855,11 @@ padding still shows.
 
 ## Not verified
 
-- The **release** build type is unrun, and the shipped APK is debug-signed with
-  the project key in `android-companion/keystore/debug.jks` — a key the tree holds
-  and you can keep, not a release identity.
+- The shipped APK is debug-signed with the project key in
+  `android-companion/keystore/debug.jks` — a key the tree holds and you can keep,
+  not a release identity. `assembleRelease` itself has run (see Verified); what has
+  not is signing that archive with a key of your own, or installing either build
+  over an older debug install.
 - **Only the USB probe has run on a phone** (two probes, Android 17, CH340
   `1a86:7523`): tabs, SAF import, MediaStore save, clipboard, RSSI polling and the
   monitor layout are all unproven.

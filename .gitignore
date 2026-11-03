@@ -27,3 +27,11 @@ artifacts/renders/scroll.png
 # The published render bundle: copied from artifacts/renders/ by
 # publish_renders.py on every build, so it is output, not a second copy.
 artifacts/site/public/
+
+# The deck compilers write a per-FQBN cache beside the sketch when a compile runs
+# without --build-path, and check_headroom builds in place on purpose so its
+# figures are the ones the docs quote. That cache is output, not source: the
+# `tracked` step refuses a source file a clone would not have, and a compiler
+# cache is exactly the kind of file it should not be asked about.
+phone_deck_cyd24R/build/
+spotify_deck_cyd24R/build/
