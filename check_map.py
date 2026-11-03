@@ -87,10 +87,14 @@ def messages(path):
         if not isinstance(node, ast.Call):
             continue
         attr = getattr(node.func, "attr", "")
+        name = getattr(node.func, "id", "")
         text = None
         if attr == "append" and _sink(node.func.value):
             text = _message(node.args[0]) if node.args else None
-        elif attr == "print" and any(kw.arg == "file" for kw in node.keywords):
+        elif (attr == "print" or name == "print") and any(
+                kw.arg == "file" for kw in node.keywords):
+            # `print(..., file=sys.stderr)` is how a checker says a refusal without
+            # a problem list; the builtin has no `.attr`, so it is matched by name.
             text = next((t for t in (_message(arg) for arg in node.args) if t), None)
         if text and text not in found:
             found.append(text)

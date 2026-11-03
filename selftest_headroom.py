@@ -58,7 +58,8 @@ CASES = [
         name="numbers past the slot overflow even when the compiler exits 0",
         stub=report(1400000, 106, RAM_FREE_OK),
         want_code=1,
-        want=["flash OVER by 89,280 B - this deck needs huge_app"],
+        want=["flash OVER by 89,280 B - this deck needs huge_app",
+              "1 of 1 deck(s) failed the headroom check"],
         forbids=["build failed"],
     ),
     dict(
@@ -108,6 +109,19 @@ CASES = [
         want=["could not run"],
     ),
     dict(
+        name="a machine with no arduino-cli is an error, not a pass",
+        no_flag=True,
+        want_code=2,
+        want=["no arduino-cli found"],
+    ),
+    dict(
+        name="a floor that is not a number is an error, not a default",
+        stub=report(FLASH_OK, 88, RAM_FREE_OK),
+        env={"HEADROOM_MIN_FREE_KB": "lots"},
+        want_code=2,
+        want=["is not a number"],
+    ),
+    dict(
         name="a folder that is not a deck is an error, not a silent pass",
         deck="no_such_deck_cyd24R",
         want_code=2,
@@ -132,19 +146,16 @@ def main():
                 cli.write_text(case.get("stub", "#!/bin/sh\nexit 0\n"))
                 cli.chmod(cli.stat().st_mode | stat.S_IXUSR)
 
-            done = subprocess.run(
-                [
-                    sys.executable,
-                    str(CHECK),
-                    "--arduino-cli",
-                    str(cli),
-                    case.get("deck", DECK),
-                ],
-                capture_output=True,
-                text=True,
-                cwd=str(ROOT),
-                env=dict(base_env, **case.get("env", {})),
-            )
+            argv = [sys.executable, str(CHECK)]
+            env = dict(base_env, **case.get("env", {}))
+            if case.get("no_flag"):
+                env["PATH"] = ""      # nothing named arduino-cli can be found
+            else:
+                argv += ["--arduino-cli", str(cli)]
+            argv.append(case.get("deck", DECK))
+
+            done = subprocess.run(argv, capture_output=True, text=True,
+                                  cwd=str(ROOT), env=env)
             output = done.stdout + done.stderr
 
             problems = []

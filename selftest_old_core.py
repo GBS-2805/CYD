@@ -108,6 +108,17 @@ CASES = [
          want=["names a deck this tree does not hold"]),
     dict(name="a compiler that cannot be run is an error, not a pass",
          missing_cli=True, want_code=2, want=["could not run"]),
+    dict(name="no record at all is an error, not an empty comparison",
+         record=True, remove_record=True, want_code=2, want=["is missing"]),
+    dict(name="a record that is not an object is an error", record=True,
+         text="[]\n", want_code=2, want=["does not hold an object"]),
+    dict(name="a record with no decks is an error", record=True,
+         text='{"core": "2.0.17"}\n', want_code=2, want=["records no deck"]),
+    dict(name="a deck named here that the record does not hold",
+         record=True, args=["nope_cyd24R"], want_code=2,
+         want=["names no deck this tree holds"]),
+    dict(name="a machine with no arduino-cli is an error, not a pass",
+         no_flag=True, want_code=2, want=["no arduino-cli found"]),
     dict(name="a record that does not parse is an error, not a pass",
          text="{not json\n", want_code=2, want=["does not read as JSON"]),
 
@@ -161,12 +172,17 @@ def main():
                 else:
                     cli.write_text(stub())
                     cli.chmod(cli.stat().st_mode | stat.S_IXUSR)
-                argv = ["--arduino-cli", str(cli)]
+                argv = [] if case.get("no_flag") else ["--arduino-cli", str(cli)]
+            argv += case.get("args", [])
+            env = dict(base_env, **case.get("env", {}))
+            if case.get("no_flag"):
+                env["PATH"] = ""      # nothing named arduino-cli can be found
+            if case.get("remove_record"):
+                (dest / "old_core.json").unlink()
 
             done = subprocess.run(
                 [sys.executable, str(dest / "check_old_core.py")] + argv,
-                capture_output=True, text=True, cwd=str(dest),
-                env=dict(base_env, **case.get("env", {})),
+                capture_output=True, text=True, cwd=str(dest), env=env,
             )
             output = done.stdout + done.stderr
 

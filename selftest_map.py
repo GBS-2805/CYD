@@ -36,6 +36,10 @@ WANTS = [
     "selftest_x.py names no checker, so its branches pin no gate",
     "selftest_x.py names check_x.py, which this tree does not hold",
     "check_x.py has no selftest, so its refusals have no branch",
+    "error: no selftest_*.py found",
+    "pairing problem(s): a checker nothing exercises is a rule nobody runs",
+    "message(s) no branch asserts: write a branch's `want` from the checker's "
+    "own line, or the refusal is a rule nobody runs",
 ]
 
 
@@ -54,6 +58,12 @@ def tree(dest):
     (dest / "selftest_map.py").write_text(selftest("check_map.py"))
     (dest / "check_a.py").write_text(CHECKER)
     (dest / "selftest_a.py").write_text(selftest("check_a.py"))
+
+
+def no_selftests(dest):
+    """No selftest file at all, so there is no map to build."""
+    for path in dest.glob("selftest_*.py"):
+        path.unlink()
 
 
 def orphan_checker(dest):
@@ -88,6 +98,8 @@ CASES = [
          want=["check_a.py: 1 message(s) no branch repeats",
                "a sentence nothing repeats", "no branch asserts"],
          forbids=["pairing problem"]),
+    dict(name="a tree with no selftest at all is an error", mutate=no_selftests,
+         want_code=2, want=["no selftest_*.py found"]),
     dict(name="a checker with no selftest is refused", mutate=orphan_checker,
          want_code=1,
          want=["check_b.py has no selftest", "pairing problem(s)"]),

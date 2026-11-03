@@ -136,6 +136,26 @@ def pushed(dest):
     git(dest, "push", "-q", "origin", "feature")
 
 
+def unreachable_remote(dest):
+    """A remote that cannot be fetched: the warning, not a silent nothing."""
+    git(dest, "remote", "add", "origin", str(dest.parent / "gone.git"))
+
+
+def broken_ref(dest):
+    """A branch whose commit object cannot be read, so git fails loudly.
+
+    A ref of forty zeros is not this: `for-each-ref` skips it, so the checker
+    printed a quiet "nothing is pending" over a branch it could not read — the
+    quiet pass this case exists to refuse. A real commit sha whose loose object
+    is garbage is reached by `rev-list`, which fails.
+    """
+    branch(dest, "feature", {"new.txt": "fresh work\n"})
+    tip = git(dest, "rev-parse", "feature").strip()
+    loose = dest / ".git" / "objects" / tip[:2] / tip[2:]
+    loose.chmod(0o644)
+    loose.write_bytes(b"not a zlib stream\n")
+
+
 CASES = [
     dict(
         name="a repo with only main is quiet",
@@ -193,6 +213,20 @@ CASES = [
         mutate=pushed,
         want_code=1,
         want=["feature, origin/feature: 1 commit"],
+    ),
+    dict(
+        name="a fetch that cannot reach the remote warns and compares what is here",
+        mutate=unreachable_remote,
+        args=["--fetch"],
+        want_code=0,
+        want=["warning: fetch failed, comparing the refs already here"],
+    ),
+    dict(
+        name="a git command that fails is an error, not a quiet pass",
+        mutate=broken_ref,
+        want_code=2,
+        want=["error: git rev-list"],
+        forbids=["nothing is pending"],
     ),
     dict(
         name="a base that does not exist is an error, not a quiet pass",

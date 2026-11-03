@@ -215,17 +215,17 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   and the last three docs refusals were found by a reader, not by the check. Each
   `selftest_*.py` builds a throwaway repo in a temp directory — a stand-in
   `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
-  checker refuses: 39 docs branches, 9 asset branches, 8 margin branches, 15 old-core
-  ones, 9 branch ones (a patch already upstream, the same bytes under a new name, a folder a
+  checker refuses: 43 docs branches, 9 asset branches, 10 margin branches, 20 old-core
+  ones, 12 branch ones (a patch already upstream, the same bytes under a new name, a folder a
   merge would resurrect, a pushed branch and its local alias), 9 render ones (a
-  moved pixel, a wrong size, a corrupt PNG, a capture that failed) , 5 on the map itself
+  moved pixel, a wrong size, a corrupt PNG, a capture that failed) , 6 on the map itself
   (a checker with no selftest, a selftest naming a checker that is gone, a
   selftest with no checker, a tree where every pair is present, and a message
   no branch asserts) and 4 on
   the gate itself (a root that pins its directories, a root whose `env.sh` sets only
   `PATH`, the default root order, and a stale default root). Measured on
-  2026-11-03: 2.9 s, 0.6 s, 0.4 s, 1.1 s, 1.2 s, 0.9 s, 0.3 s and 0.3 s — all eight in
-  **7.7 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
+  2026-11-03: 2.9 s, 0.5 s, 0.5 s, 1.4 s, 1.3 s, 0.7 s, 0.4 s and 0.4 s — all eight in
+  **8.4 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
   VM the same command has also taken 4.4 s and 106.5 s an hour apart, which is
   the machine's load rather than the checkers', so read a slow run as load
   before assuming a checker got slower. The pre-commit hook runs
@@ -237,7 +237,10 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   refuses the pairing - a checker with no selftest, a selftest naming a checker
   that is gone, a selftest with no checker - and every message no branch
   asserts, which is why that list is empty today: a refusal with no branch
-  behind it fails the gate instead of sitting in a report. The match is word
+  behind it fails the gate instead of sitting in a report. That counts a
+  message appended to a problem list and one written with
+  `print(..., file=sys.stderr)`, so a refusal cannot slip past by choosing the
+  other way to say it. The match is word
   for word, with placeholders, sizes and md5s standing in for any one word,
   because a `want` string is a substring of a formatted message; a message a
   helper builds is invisible to it.

@@ -37,7 +37,8 @@ def git(*args, check=True):
     done = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True)
     if check and done.returncode != 0:
         # A check that cannot read the repo should say so, not print a traceback.
-        print(f"error: git {' '.join(args)} failed: {done.stderr.strip()}", file=sys.stderr)
+        print("error: git %s failed: %s" % (" ".join(args), done.stderr.strip()),
+              file=sys.stderr)
         raise SystemExit(2)
     return done
 

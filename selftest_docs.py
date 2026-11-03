@@ -65,12 +65,18 @@ def stub(used=USED):
     )
 
 
+SILENT = "#!/bin/sh\nexit 0\n"
+
+
 def full_digest():
     return hashlib.md5(SKETCH.encode()).hexdigest()
 
 
 def digest():
     return full_digest()[:8]
+
+
+FAILING = stub(USED).replace("exit 0", "exit 1")
 
 
 def tree(dest, used=USED):
@@ -246,7 +252,8 @@ CASES = [
         name="a flash size no deck builds to is refused",
         mutate=append_readme("\nAn older build was 1,999,999 B.\n"),
         want_code=1,
-        want=["quotes 1,999,999, which is not a size any deck builds to now"],
+        want=["quotes 1,999,999, which is not a size any deck builds to now",
+              "place(s) describe a build that no longer exists"],
     ),
     dict(
         name="a past build named in HISTORICAL stays allowed",
@@ -498,6 +505,25 @@ CASES = [
         forbids=["  - "],
     ),
     dict(
+        name="a stub that prints no size is a compile failure, not a pass",
+        mutate=None, cli_text=SILENT, want_code=1,
+        want=["did not print a size"],
+    ),
+    dict(
+        name="a build that prints its size and fails is refused",
+        mutate=None, cli_text=FAILING, want_code=1,
+        want=["failed to build"],
+    ),
+    dict(
+        name="a machine with no arduino-cli is an error, not a pass",
+        mutate=None, no_flag=True, want_code=2, want=["no arduino-cli found"],
+    ),
+    dict(
+        name="a compile that runs out of time is refused",
+        mutate=None, args=["--timeout", "0"], want_code=1,
+        want=["timed out after 0s"],
+    ),
+    dict(
         name="a compiler that cannot be run is an error, not a pass",
         mutate=None,
         missing_cli=True,
@@ -531,16 +557,19 @@ def main():
             if case.get("missing_cli"):
                 cli = dest / "no_such_arduino_cli"   # never created on purpose
             else:
-                cli.write_text(stub(used))
+                cli.write_text(case.get("cli_text", stub(used)))
                 cli.chmod(cli.stat().st_mode | stat.S_IXUSR)
 
-            done = subprocess.run(
-                [sys.executable, str(dest / "check_docs.py"), "--arduino-cli", str(cli)],
-                capture_output=True,
-                text=True,
-                cwd=str(dest),
-                env=base_env,
-            )
+            argv = [sys.executable, str(dest / "check_docs.py")]
+            env = dict(base_env, **case.get("env", {}))
+            if case.get("no_flag"):
+                env["PATH"] = ""      # nothing named arduino-cli can be found
+            else:
+                argv += ["--arduino-cli", str(cli)]
+            argv += case.get("args", [])
+
+            done = subprocess.run(argv, capture_output=True, text=True,
+                                  cwd=str(dest), env=env)
             output = done.stdout + done.stderr
 
             problems = []
