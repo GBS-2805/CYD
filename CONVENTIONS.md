@@ -254,6 +254,18 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   digest the image carries. Both decks then build byte for byte identically, and
   the image keeps its exact size either way, so a pinned build is still the build
   the figures come from.
+* **A release key never enters the tree.** The committed
+  `android-companion/keystore/debug.jks` exists so that two machines sign the same
+  bytes; its password is in the tree, which is what makes it a reproducibility
+  fixture and never an identity to publish under. A release signature is the other
+  way round: [`android-companion/release.sh`](android-companion/release.sh) keeps
+  the keystore, its password file and the signed archive under
+  `~/.offsite-release/` (`OFFSITE_RELEASE_HOME`), refuses any of those paths that
+  resolves inside the repository, and reads the signer back out of the archive so a
+  debug key cannot pass as a release one. Those bytes cannot be rebuilt from a
+  clone, because the key that made them is deliberately absent, so they are handed
+  over rather than committed — `HANDOFF.md` holds their size and the command that
+  printed it.
 * **The margin is checked, not assumed.** [`check_headroom.py`](check_headroom.py)
   compiles each deck with the deck FQBN and reads the compiler's own `Maximum is
   …` figures, so both ceilings — 1,310,720 B of flash and 327,680 B of DRAM —

@@ -652,20 +652,29 @@ Identical to the sketch, checked against its `onWrite` handlers:
   block that re-signing writes. A different keystore signs different bytes, so
   reproducible means this toolchain and this key; `OFFSITE_KEYSTORE` overrides
   both halves. Quote the size to the nearest kB (198 kB), never as a checksum.
-- **The release build type runs, and produces an unsigned archive.** Measured on
-  2026-11-03: `gradle assembleRelease` exited 0 in 17 s, ran 43 tasks including
-  `lintVitalRelease`, and wrote
-  `app/build/outputs/apk/release/app-release-unsigned.apk` — versionCode 1,
-  minSdk 26, targetSdk 35, and `apksigner verify` refusing it because `release`
-  has no `signingConfig`. So a release is one signing step away rather than
-  untested, and it needs a key of its own: signing it with the committed debug key
-  would ship an identity whose password is in the tree, which is what
-  `OFFSITE_KEYSTORE` exists to replace. The archive is 191,798 bytes (187 kB),
-  about 10 kB under the debug APK because `debug` writes the larger signing block;
-  both carry the same bundled sketches. That archive is build output rather than a
-  kept file: the next `toolchain.sh` run starts with `clean` and takes it with it,
-  and it is not committed anywhere, so it is rebuilt with `gradle assembleRelease`
-  when it is wanted and checked again then.
+- **The release build type runs, and its archive is signed by a key that is not in
+  the tree.** Measured on 2026-11-03: `clean assembleRelease` exits 0 in 16 s, 44
+  actionable tasks with 41 executed, including `lintVitalRelease`. The archive
+  Gradle writes is unsigned, because the release type has no `signingConfig`, so
+  [`release.sh`](release.sh) aligns and signs it. The unsigned file is 191,798
+  bytes, about 10 kB under the debug APK because `debug` writes the larger signing
+  block. The signed file is **206,447 bytes** (202 kB), 4,094 more again, because a
+  4096-bit key writes a bigger signing block than the debug key's 2048-bit one.
+  Two runs of the script produced the same signed bytes. It is versionCode 1,
+  minSdk 26, targetSdk 35, not debuggable, and it carries both sketches in its
+  assets. The signer is read back out of the archive and refused if it comes back
+  as the debug identity instead. The unsigned file is build output rather than a
+  kept one: the next `toolchain.sh` run starts with `clean` and takes it with it.
+- **The release key lives outside the repository, which is the opposite rule from
+  the debug key.** `release.sh --new-key` makes a PKCS12 keystore holding an RSA
+  4096 key under `~/.offsite-release/` — `release.jks`, a `pass` file beside it at
+  mode 600 whose value is generated and printed nowhere, and the signed archive in
+  `dist/` — and the script refuses a keystore or password path that resolves
+  inside the tree. Nothing about it is committed, so the signed bytes cannot be
+  rebuilt from a clone: they are a file to hand over, not an artifact to track, and
+  `~/.offsite-release/dist/PhoneDeckBridge-1.0-release.apk` is where this run put
+  them. A release-signed build also cannot install over a debug-signed one, since a
+  different certificate is exactly what an update refuses.
 - **The signing key ships with the tree.** `android-companion/keystore/debug.jks`
   is the project's own debug key — alias `androiddebugkey`, password `android`,
   RSA 2048, `CN=Android Debug` — committed so that two machines and two runs sign
@@ -858,11 +867,14 @@ padding still shows.
 
 ## Not verified
 
-- The shipped APK is debug-signed with the project key in
-  `android-companion/keystore/debug.jks` — a key the tree holds and you can keep,
-  not a release identity. `assembleRelease` itself has run (see Verified); what has
-  not is signing that archive with a key of your own, or installing either build
-  over an older debug install.
+- **Nothing has installed either build.** The shipped APK is debug-signed with the
+  project key in `android-companion/keystore/debug.jks` — a key the tree holds, so
+  it is a reproducibility fixture rather than an identity. A release archive is now
+  signed by a key `release.sh` made on this VM (see Verified), and neither archive
+  has been installed, on a phone or over an older debug install. That release key
+  is also this machine's: a release that outlives this VM needs a key you keep,
+  because a cloned tree cannot make the same signature. No store listing was
+  attempted.
 - **Only the USB probe has run on a phone** (two probes, Android 17, CH340
   `1a86:7523`): tabs, SAF import, MediaStore save, clipboard, RSSI polling and the
   monitor layout are all unproven.

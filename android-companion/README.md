@@ -292,9 +292,12 @@ false` on the debug type for exactly that reason. INTERNET is the one permission
 here that took a property away: the app can reach the network now, and the deck's
 own address is the only host it ever calls.
 
-The APK is still signed with the debug certificate, which only affects updates: a
-build made on a different machine carries a different key, so it will not install
-over the previous one. Uninstall first, or build on the machine that made it.
+The APK in `dist/` is signed with the debug certificate, which only affects
+updates: a build made on a different machine carries a different key, so it will
+not install over the previous one. Uninstall first, or build on the machine that
+made it. A release archive is signed by a key of its own — made and kept outside
+the tree by [`release.sh`](release.sh), which is why `dist/` never holds one — and
+for the same reason it installs over nothing that came before it.
 
 ## Setup on the phone
 
