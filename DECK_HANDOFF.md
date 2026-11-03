@@ -132,12 +132,12 @@ nothing to change in the app — but any deck size quoted in app docs now means 
 | deck | flash | share of its ceiling |
 | --- | --- | --- |
 | phone, default scheme | 1,168,314 B | 89 % of 1,310,720 |
-| Spotify, `huge_app` | 1,879,489 B | 59 % of 3,145,728 |
+| Spotify, `huge_app` | 1,880,101 B | 59 % of 3,145,728 |
 
 `check_headroom.py` read both of them on 2026-11-02 with the link in place, from
 `~/.arduino-cyd-3/env.sh` — the root those figures belong to, the one whose
 `env.sh` pins its own data and library dirs, and the one to source before quoting
 them ([build note](CONVENTIONS.md#build)). `~/.arduino-cyd/env.sh` sets only
 `PATH` and builds through `~/.arduino15`, where the same two sketches read
-1,168,282 B and 1,879,441 B — 32 B and 48 B under with the globals identical,
+1,168,282 B and 1,880,053 B — 32 B and 48 B under with the globals identical,
 which is the build path rather than the sketch.

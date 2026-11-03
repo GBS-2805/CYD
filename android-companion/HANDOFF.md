@@ -588,9 +588,9 @@ Identical to the sketch, checked against its `onWrite` handlers:
   branch, and the APK in `dist/` was rebuilt against it. That sketch also
   **compiles here**, measured on 2026-11-03 once `~/.arduino-cyd/env.sh` was
   sourced — `check_docs.py`'s gate built it on the `huge_app` partition and read
-  1,879,489 B with 69,100 B of globals, beside the phone deck's unchanged
+  1,880,101 B with 69,100 B of globals, beside the phone deck's unchanged
   1,168,314 B / 45,244 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
-  `PATH`, so that build goes through `~/.arduino15` and reads 1,879,441 B — 48 B
+  `PATH`, so that build goes through `~/.arduino15` and reads 1,880,053 B — 48 B
   under with the globals identical, the build-root sensitivity the docs record.
   The deck chat's root reads 1,878,661 B, 16 B over. Neither board has run it.
 - **The Spotify deck's sign-in finishes here.** `SpotifyCallbackActivity` is

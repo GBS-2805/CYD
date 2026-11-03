@@ -209,12 +209,12 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   end ever observed, and the next build printed 1,878,661 twice.
 * **A size names the root that printed it, and here that root is
   `~/.arduino-cyd-3`.** The current 3.3.12 figures in these docs — phone deck
-  1,168,314 B / 45,244 B of globals, the linked Spotify deck 1,879,489 B /
+  1,168,314 B / 45,244 B of globals, the linked Spotify deck 1,880,101 B /
   69,100 B on `huge_app`, the unlinked Spotify deck 1,125,781 B — are that
   root's, read through `arduino-cli` 1.5.2-rc.1 on 2026-11-02. It is the root
   worth naming because its `env.sh` pins its own data, download and user dirs;
   `~/.arduino-cyd/env.sh` sets only `PATH`, so sourcing it builds through
-  `~/.arduino15` and reads 1,168,282 B and 1,879,441 B — 32 B and 48 B under with
+  `~/.arduino15` and reads 1,168,282 B and 1,880,053 B — 32 B and 48 B under with
   the globals identical — while `/tmp/arduino-cyd-3` was read at 1,168,170 B and
   1,878,469 B, 144 B and 192 B under. None of that is sketch drift, because the
   md5s match: it is the build path, so source the `env.sh` whose figures you are

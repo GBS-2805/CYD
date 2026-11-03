@@ -127,9 +127,11 @@ HISTORICAL = {
     1125669: "the Spotify sketch through that same second root, 112 B under it",
     1267083: "not a build at all: the flash left beside an earlier 1,878,645 B "
              "Spotify build, its huge_app slot minus what the sketch used",
-    1879441: "the same linked Spotify sketch through ~/.arduino-cyd/env.sh, "
+    1880053: "the same linked Spotify sketch through ~/.arduino-cyd/env.sh, "
              "which sets only PATH so the build goes through ~/.arduino15: "
              "48 B under this root with the globals identical",
+    1879489: "the Spotify sketch with exact-rect chips and a connect-only "
+              "unpair, superseded the same day",
 }
 
 # Old sketch hashes, likewise labelled in the prose as past values.

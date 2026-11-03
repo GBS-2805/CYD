@@ -2661,7 +2661,7 @@ static void startBluetooth() {
   Serial.printf("[link] advertising as %s\n", name);
 }
 
-// Hang up on the phone and forget the bond. Without this the deck has no way out
+// Hang up on the phone and forget every stored bond. Without this the deck has no way out
 // of a link the phone re-opens on every advert: unpairing from the phone's own
 // Bluetooth settings leaves the deck still bonded, so it will not take a new
 // phone and the companion app cannot reconnect either. Held PLAY 3 s, or `unpair`
@@ -2670,14 +2670,32 @@ static void unpairLink() {
   linkConnected = false;
   linkChip = 0;
   linkChipMs = 0;
+  bool removed = false;
   if (linkPeerKnown) {
     esp_ble_gap_disconnect(linkPeerBda);
     esp_ble_remove_bond_device(linkPeerBda);
     linkPeerKnown = false;
-    Serial.println("[link] unpaired: bond removed, advertising again");
-  } else {
-    Serial.println("[link] no phone bonded; advertising again");
+    removed = true;
   }
+  // The connected peer is not the whole set: bonds outlive a connection and a
+  // reboot, and a deck that lost the app is bonded to a phone it is not talking
+  // to -- which is what keeps a second phone out. Sweep the list.
+  int count = esp_ble_get_bond_device_num();
+  if (count > 0) {
+    esp_ble_bond_dev_t *list = static_cast<esp_ble_bond_dev_t *>(
+        malloc(sizeof(esp_ble_bond_dev_t) * count));
+    if (list != nullptr) {
+      if (esp_ble_get_bond_device_list(&count, list) == ESP_OK) {
+        for (int i = 0; i < count; ++i) {
+          esp_ble_remove_bond_device(list[i].bd_addr);
+          removed = true;
+        }
+      }
+      free(list);
+    }
+  }
+  Serial.println(removed ? "[link] unpaired: bonds removed, advertising again"
+                         : "[link] no phone bonded; advertising again");
   BLEDevice::startAdvertising();
   drawNow();
 }
@@ -3123,14 +3141,14 @@ void loop() {
   }
 
   // Hold PLAY for 3 s to drop the bonded phone. The label changes at 1.5 s so a
-  // hold is visibly not a tap, and the gesture is skipped when nothing is linked.
-  if (down && pressedTarget == TARGET_TOGGLE && linkConnected &&
-      now - touchStartMs > 1500 && !unpairPromptShown) {
+  // hold is visibly not a tap. Deliberately independent of linkConnected: the
+  // case that needs it is a bond the deck cannot see a connection to.
+  if (down && pressedTarget == TARGET_TOGGLE && now - touchStartMs > 1500 &&
+      !unpairPromptShown) {
     unpairPromptShown = true;
     drawChip(PLAY_BTN, "UNPAIR", 1, false);
   }
-  if (down && pressedTarget == TARGET_TOGGLE && linkConnected &&
-      now - touchStartMs > 3000) {
+  if (down && pressedTarget == TARGET_TOGGLE && now - touchStartMs > 3000) {
     unpairPromptShown = false;
     pressedTarget = TARGET_NONE;
     ignoreTouchUntilRelease = true;
