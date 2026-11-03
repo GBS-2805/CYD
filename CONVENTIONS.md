@@ -113,13 +113,14 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   newest installed platform.
 * **The default path is proven end to end.** `ARDUINO_HOME=~/.arduino-cyd-3
   ./toolchain.sh` in a fresh root installed the core and libraries and built both
-  sketches, exit 0: phone deck 1,165,222 B (88 %) / 45,060 B globals, Spotify
-  1,122,281 B (85 %) / 53,572 B globals. Those are 48 B and 32 B above the same
-  sketches built straight through `arduino-cli` from another path — the build-root
-  sensitivity above, not a different toolchain. The mirror has since moved the
-  phone deck to 1,168,314 B (89 %) / 45,244 B globals and the Spotify deck to
-  1,125,781 B (85 %) / 53,636 B globals, as [`check_headroom.py`](check_headroom.py)
-  read both of them on 2026-11-01.
+  sketches, exit 0: phone deck 1,165,222 B, 88 % of 1,310,720, / 45,060 B
+  globals, Spotify 1,122,281 B, 85 % of 1,310,720, / 53,572 B globals. Those are
+  48 B and 32 B above the same sketches built straight through `arduino-cli` from
+  another path — the build-root sensitivity above, not a different toolchain. The
+  mirror has since moved the phone deck to 1,168,314 B, 89 % of 1,310,720, /
+  45,244 B globals and the Spotify deck to 1,125,781 B, 85 % of 1,310,720, /
+  53,636 B globals, as [`check_headroom.py`](check_headroom.py) read both of them
+  on 2026-11-01.
 * **The numbers in these docs are checked too.** [`check_docs.py`](check_docs.py)
   builds the decks and reads the markdown, and fails when a quoted flash size or
   sketch md5 is not one of today's builds — the drift that twice left a README
@@ -194,7 +195,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   and the last three docs refusals were found by a reader, not by the check. Each
   `selftest_*.py` builds a throwaway repo in a temp directory — a stand-in
   `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
-  checker refuses: 22 docs branches, 9 asset branches, 8 margin branches, 9 branch
+  checker refuses: 23 docs branches, 9 asset branches, 8 margin branches, 9 branch
   ones (a patch already upstream, the same bytes under a new name, a folder a
   merge would resurrect, a pushed branch and its local alias) and 9 render ones (a
   moved pixel, a wrong size, a corrupt PNG, a capture that failed). Measured on
@@ -274,8 +275,9 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
   1,162,8xx → 1,165,174 B (about **2.3 kB**), while the WiFi/TLS Spotify deck
-  grows 967,493 → 1,122,249 B (**+154,756 B**, 73 % → **85 %** of the default
-  app partition; the documented 2.0.17 build reads 967,413 on its own path,
+  grows 967,493 → 1,122,249 B (**+154,756 B**), 73 % → **85 %** of 1,310,720 —
+  the default app partition; the documented 2.0.17 build reads 967,413 on its
+  own path,
   because the build root moves the last digits). It is not mbedTLS getting
   fatter: named `mbedtls_*` symbols
   only go 83,854 → 91,309 B and `wifi`/`lwip` symbols 83,470 → 87,007 B. It is

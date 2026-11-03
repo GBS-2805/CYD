@@ -385,9 +385,10 @@ list of distinct devices rather than a row of identical entries.
 
 A compile in this repo, on 2026-10-30 and before the mirror, with `arduino-cli`
 1.5.2-rc.1:
-**core 2.0.17** 1,162,797–1,162,813 B (**88 %** flash) and 41,436 B (12 % RAM);
-**core 3.3.12** 1,163,930 B (88 %) and 45,004 B (13 %). The 2.x figure moves by
-~16 bytes with the build root, so read it as 1,135.6 kB rather than a fixed count.
+**core 2.0.17** 1,162,797–1,162,813 B, **88 %** of 1,310,720, and
+41,436 B, **12 %** of 327,680. **core 3.3.12** 1,163,930 B, 88 % of 1,310,720,
+and 45,004 B, 13 % of 327,680. The 2.x figure moves by ~16 bytes with the build
+root, so read it as 1,135.6 kB rather than a fixed count.
 Core 3.x costs 1–2.3 kB of flash and 3.7 kB of RAM for this sketch, depending on
 the build path.
 
@@ -412,7 +413,7 @@ or that leaves under **160 KiB** of DRAM — the last floor is just over the
 153,600 B a full 320x240 RGB565 framebuffer needs. So this deck has one
 framebuffer's worth of slack and 126 kB besides, and a single addition larger
 than about **139 KiB** overflows the slot: a 1,400,000-byte const table measured
-1,668,748 B (127 %), which is the overflow the refusal names rather than a bare
+1,668,748 B (127 % of 1,310,720), which is the overflow the refusal names rather than a bare
 `compile failed`. Re-measure with `python3 ../check_headroom.py phone_deck_cyd24R`
 from the repo root, after sourcing a toolchain.
 
@@ -420,13 +421,13 @@ from the repo root, after sourcing a toolchain.
 
 **Verified here** — none of this needs hardware:
 
-* Core **2.0.17** links the sketch at 1,162,797–1,162,813 bytes (88 %) with
+* Core **2.0.17** links the sketch at 1,162,797–1,162,813 bytes (88 % of 1,310,720) with
   41,436 bytes of RAM (12 %), measured on 2026-10-30; the spread is the build
   root, so read it as 1,135.6 kB. It is the A/B build now, not the default —
   `toolchain.sh` pins 3.3.12 — and it has **not** been re-measured since the
   mirror, so its current size is that pre-mirror figure plus an unknown amount,
   not a number to quote.
-* Core **3.3.12** links it at 1,168,314 bytes (89 %) with 45,244 bytes of RAM
+* Core **3.3.12** links it at 1,168,314 bytes (89 % of 1,310,720) with 45,244 bytes of RAM
   (13 %), `EXIT=0` under `--warnings all`, re-measured on 2026-11-01 after the
   mirror. An earlier 3.3.12 build on a shorter path reported 1,163,930 / 45,004,
   so 3.x is path-sensitive too — 1,137–1,141 kB, not a fixed count.

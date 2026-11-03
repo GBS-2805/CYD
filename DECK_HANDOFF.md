@@ -111,19 +111,24 @@ Java change to be correct; taking the commit anyway just keeps the two trees
 level, and the READMEs are how the next deck edit finds its numbers.
 
 The one way these docs can go stale in the app is if an app-side document quotes
-a deck's flash use. Say which core: the same Spotify sketch is 967,413 B on
-2.0.17 and 1,125,781 B on 3.3.12 — 73 % against 85 % of the 1,310,720-byte app
-slot. The deck READMEs hold the measured figures and the verified/unverified
-split, so point at them instead of copying numbers out.
+a deck's flash use. Say which core: 967,413 B is 73 % of 1,310,720 on 2.0.17,
+and 1,125,781 B is 85 % of 1,310,720 on 3.3.12. The deck READMEs hold the
+measured figures and the verified/unverified split, so point at them instead of
+copying numbers out.
 
 ## Both decks now default to core 3.3.12
 
 The deck `toolchain.sh` files pin `esp32:esp32@3.3.12`; 2.0.17 stays available as
 the A/B build in its own install root. No app file names a core, so there is
 nothing to change in the app — but any deck size quoted in app docs now means the
-3.3.12 build unless it says otherwise: 1,168,314 B for the phone deck on the
-default scheme (89 %) and 1,878,645 B for the Spotify deck on `huge_app` (59 %),
-as `check_headroom.py` read both of them on 2026-11-02 with the link in place, from
+3.3.12 build unless it says otherwise:
+
+| deck | flash | share of its ceiling |
+| --- | --- | --- |
+| phone, default scheme | 1,168,314 B | 89 % of 1,310,720 |
+| Spotify, `huge_app` | 1,878,645 B | 59 % of 3,145,728 |
+
+`check_headroom.py` read both of them on 2026-11-02 with the link in place, from
 `~/.arduino-cyd/env.sh` — the root those figures belong to, and the one to source
 before quoting them ([build note](CONVENTIONS.md#build)). The deck chat's root
 printed 1,878,661 B for the linked Spotify sketch, 16 B above with the globals

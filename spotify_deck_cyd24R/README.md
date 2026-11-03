@@ -11,7 +11,7 @@ active.
 
 This deck needs `PartitionScheme=huge_app`. Bluetooth does not fit beside WiFi,
 mbedTLS and the setup server in the default 1,310,720-byte app slot: the linked
-image is 1,878,645 bytes, 143 % of that slot and 59 % of this one. Flashing the
+image is 1,878,645 bytes, 143 % of the 1,310,720-byte slot and 59 % of 3,145,728.
 phone deck afterwards with the default scheme re-partitions the board back, so
 each upload has to carry the scheme its own sketch was built for.
 
@@ -332,7 +332,7 @@ measured the same way on the same machine, so dropping Bluedroid still pays for
 mbedTLS and a certificate chain per host. Under `PartitionScheme=huge_app` it is
 967,413 bytes, **30 %** of 3,145,728: a bigger room, not smaller code.
 
-An earlier version of this note recorded 1,114,485 bytes (85 %), 192 kB free and
+An earlier version of this note recorded 1,114,485 bytes (85 % of 1,310,720), 192 kB free and
 a 49 kB gap to the phone deck for the same sketch. That figure does not
 reproduce: the committed file links at 967,413 bytes with the same core, the same
 `arduino-cli` and `--warnings all`, on a clean build path, twice over, so the
@@ -406,11 +406,12 @@ sourcing a toolchain.
   `/deck.json` identity. 2.0.17 has not been re-measured since, so quote that as
   the pre-identity figure and not as the current size.
 * Re-measured on 2026-11-01 with `arduino-cli` 1.5.2-rc.1, core **3.3.12** links
-  the committed file at 1,125,781 bytes (85 %) with 53,636 bytes of globals
-  (16 %), `EXIT=0` under `--warnings all`. That is 2,540 B above the 1,123,241 an
-  earlier root measured, and the difference is not the build path: a comment-only
-  edit links to exactly the same size, while the identity characteristic the
-  sketch gained since moves it by kilobytes. Read the figure as 1,123,241–1,125,781 B
+  the committed file at 1,125,781 bytes, 85 % of 1,310,720, with
+  53,636 bytes of globals, 16 % of 327,680, `EXIT=0` under `--warnings all`. That
+  is 2,540 B above the 1,123,241 an earlier root measured, and the difference is
+  not the build path: a comment-only edit links to exactly the same size, while
+  the identity characteristic the sketch gained since moves it by kilobytes. Read
+  the figure as 1,123,241–1,125,781 B
   rather than a fixed count. The app callback path is **992 B** of it — 212 B for
   the second redirect URI and the `state` field, 780 B for the one-line answer the
   app now reads. The two cores differ
@@ -419,11 +420,11 @@ sourcing a toolchain.
   now, so that is where the release numbers come from, and 2.0.17 is kept as the
   A/B build rather than the shipping one.
 * **It needs `huge_app` now, and that is the scheme `toolchain.sh` pins.**
-  Without Bluetooth the 3.3.12 build was 1,125,781 bytes (85 % of the
-  1,310,720-byte default slot); with the link it is 1,878,645 bytes, which is
-  **143 %** of that slot and **59 %** of `huge_app`'s 3,145,728. An earlier pair of
-  runs differed by 48 B; the pre-commit hook and a direct compile both print
-  1,878,645 now, so the single figure is the measured one. `default.csv`
+  Without Bluetooth the 3.3.12 build was 1,125,781 bytes, 85 % of 1,310,720.
+  With the link it is 1,878,645 bytes: **143 %** of 1,310,720, **59 %** of 3,145,728.
+  An earlier pair of runs differed by 48 B; the pre-commit hook and a direct
+  compile both print 1,878,645 now, so the single figure is the measured one.
+  `default.csv`
   sizes `app0` and `app1` at 1,310,720 each, so on the default scheme this deck no
   longer links at all — not a tighter fit, a refusal. Uploading it re-partitions
   the board, and flashing the phone deck afterwards puts the default scheme back.

@@ -125,7 +125,7 @@ MIN_SIZE = 1000000
 # A percentage that has to agree with the bytes beside it, and the DRAM ceiling
 # the compiler prints, which no deck build here reports as a slot.
 PERCENT = re.compile(r"(?<![\w.])(\d{1,3})\s?%")
-COUNT = re.compile(r"(?<![\d.,])(\d{1,3}(?:,\d{3})+|\d{2,})(?![\d,])")
+COUNT = re.compile(r"(?<![\d.,])(\d{1,3}(?:,\d{3})+|\d{2,})(?!\d)")
 DRAM_CEILING = 327680
 # `[text](path)` and `![alt](path)`; the image form matters because the renders
 # live in artifacts/renders/ and a stale name there is just as invisible.
@@ -389,42 +389,52 @@ def apk_problem():
 
 
 def percentage_problems(path, text, ceilings):
-    """Refuse a percentage that none of the bytes beside it can produce.
+    """Refuse a percentage whose ceiling is missing, or disagrees with its bytes.
 
-    Deliberately narrow: a line is judged only when it names exactly one ceiling
-    and carries exactly one percentage. Widening it would mean deciding which
-    ceiling a wrapped sentence meant, and a guess there is worse than silence —
-    the row is where these numbers are written together, and a row is what this
-    can read without inventing context.
+    Every share of a size names that size inline — `143 % of the 1,310,720-byte
+    slot`, never `143 % of that slot` — and once it is named the arithmetic has to
+    work: the ceiling and a byte figure on the same line must divide to the
+    percentage, floor or round. A percentage on a line that quotes a build size
+    but names no ceiling is refused, because that is the shape that hid "142 % of
+    that slot" until a reader found it: the number was checkable only by carrying
+    a denominator across a sentence break, which nothing here can do without
+    guessing which slot the writer meant. Percentages that are not shares of a
+    size — 8% of a drawing's width, a 16 % wash, disk use — sit on lines with no
+    million-byte figure and are left alone.
     """
     problems = []
     for number, line in enumerate(text.splitlines(), start=1):
         percents = [int(match.group(1)) for match in PERCENT.finditer(line)]
-        if len(percents) != 1:
+        if not percents:
             continue
         counts = [
             int(match.group(1).replace(",", "")) for match in COUNT.finditer(line)
         ]
-        named = {value for value in counts if value in ceilings}
-        if len(named) != 1:
+        named = sorted({value for value in counts if value in ceilings})
+        if not named:
+            if any(value >= MIN_SIZE for value in counts):
+                problems.append(
+                    "%s:%d quotes %s %% beside a build size and names no ceiling; "
+                    "write the slot it is a share of on that line"
+                    % (shown(path), number, "/".join(str(p) for p in percents))
+                )
             continue
-        ceiling = named.pop()
         figures = [
             value for value in counts if value not in ceilings and value >= 1000
         ]
-        if not figures:
-            continue
-        ratios = set()
-        for value in figures:
-            exact = 100.0 * value / ceiling
-            ratios.add(int(exact))
-            ratios.add(int(round(exact)))
-        if percents[0] in ratios:
-            continue
-        problems.append(
-            "%s:%d quotes %d %%, which none of the figures beside it makes of %s"
-            % (shown(path), number, percents[0], "{:,}".format(ceiling))
-        )
+        for percent in percents:
+            exact = [100.0 * value / ceiling for ceiling in named for value in figures]
+            if any(percent in {int(v), int(round(v))} for v in exact):
+                continue
+            problems.append(
+                "%s:%d quotes %d %%, which none of the figures beside it makes of %s"
+                % (
+                    shown(path),
+                    number,
+                    percent,
+                    " or ".join("{:,}".format(c) for c in named),
+                )
+            )
     return problems
 
 

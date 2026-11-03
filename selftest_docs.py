@@ -148,6 +148,12 @@ CASES = [
         forbids=["  - "],
     ),
     dict(
+        name="a percentage beside a build size with no ceiling is refused",
+        mutate=append_readme("\nThe image is 1,168,314 B, which is 89 % of that slot.\n"),
+        want_code=1,
+        want=["quotes 89 % beside a build size and names no ceiling"],
+    ),
+    dict(
         name="a link to a renamed file is refused",
         mutate=append_readme("\nRead [the old page](gone.md).\n"),
         want_code=1,
