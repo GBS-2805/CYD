@@ -10,7 +10,7 @@
 #   ./check.sh --selftest  the checkers' own refusals        (~4 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
-# nobody exercises: --selftest runs the five selftest_*.py files, which hand each
+# nobody exercises: --selftest runs the six selftest_*.py files, which hand each
 # checker a throwaway repo and a stand-in (compiler, capture script, git repo) and
 # make it refuse.
 #
@@ -95,6 +95,7 @@ if [ "${1:-}" = "--selftest" ]; then
   step "margin selftest" 'branches of check_headroom'       python3 selftest_headroom.py
   step "branch selftest" 'branches of check_branches'       python3 selftest_branches.py
   step "render selftest" 'branches of check_renders'        python3 selftest_renders.py
+  step "gate selftest"   'branches of check.sh'            python3 selftest_gate.py
   echo
   if [ "$failures" -gt 0 ]; then
     echo "$failures step(s) failed"

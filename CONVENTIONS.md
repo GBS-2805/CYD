@@ -201,10 +201,12 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
   checker refuses: 23 docs branches, 9 asset branches, 8 margin branches, 9 branch
   ones (a patch already upstream, the same bytes under a new name, a folder a
-  merge would resurrect, a pushed branch and its local alias) and 9 render ones (a
-  moved pixel, a wrong size, a corrupt PNG, a capture that failed). Measured on
-  2026-11-02: 1.3 s, 0.4 s, 0.5 s, 1.1 s and 0.9 s — all five in **4.2 s** through
-  `./check.sh --selftest`, on a machine with no toolchain. The pre-commit hook runs
+  merge would resurrect, a pushed branch and its local alias), 9 render ones (a
+  moved pixel, a wrong size, a corrupt PNG, a capture that failed) and 4 on the
+  gate itself (a root that pins its directories, a root whose `env.sh` sets only
+  `PATH`, the default root order, and a stale default root). Measured on
+  2026-11-03: 1.5 s, 0.4 s, 0.4 s, 1.2 s, 0.8 s and 0.2 s — all six in **4.4 s**
+  through `./check.sh --selftest`, on a machine with no toolchain. The pre-commit hook runs
   that command whenever a `check_*.py` or `selftest_*.py` is staged, so a gate
   refactor cannot land having quietly stopped refusing. The decks themselves only
   ever walk the passing path; the overflow path was proved once with a 1.3 MB
@@ -484,7 +486,7 @@ other mention of it in this repo is a pointer back here.
   and the branch list as a note rather than a failure — and `./check.sh --full`
   adds deck headroom on both cores, the seven render captures and the APK build,
   and
-  `./check.sh --selftest` runs the five change-the-checker gates in about four
+  `./check.sh --selftest` runs the six `selftest_*.py` files in about four
   seconds. It also refuses a source file that is in the worktree but not in the
   index: every commit here stages tracked files, which cannot pick up a new one,
   and `LinkCommand.java` was referenced by two tracked classes for a day while a

@@ -500,17 +500,18 @@ Identical to the sketch, checked against its `onWrite` handlers:
   silent board — 57 s each — still try all five wirings and both windows. Measured
   on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 152 now green then, 135 now. `./check.sh`
   runs the fast set, `./check.sh --full` the release set.
-- **The checkers' refusals are tested too, without a compiler.** Five
+- **The checkers' refusals are tested too, without a compiler.** Six
   `selftest_*.py` files build a throwaway repo — a stand-in `arduino-cli`, a
   stand-in `capture.sh`, a real `git init` — and make each gate refuse what it
-  exists for: 54 branches over the five checkers, from a stale flash size, a
+  exists for: 63 branches over the six, from a stale flash size, a
   `HISTORICAL` size that must still pass, short and full md5s, a renamed link, an
   `ELSEWHERE` name, a moved source count and an undated reading, through asset
   drift and a descriptor naming a gone sketch, the branch verdicts (a patch
   already upstream, the same bytes renamed, a folder a merge would resurrect, a
-  pushed alias), to a render whose pixels moved and a capture that wrote nothing.
-  Measured on 2026-11-02: 1.3 s, 0.4 s, 0.5 s, 1.1 s and 0.9 s — all five in
-  **4.2 s** through `./check.sh --selftest`, and the pre-commit hook runs it when a
+  pushed alias), to a render whose pixels moved, a capture that wrote nothing and
+  a root whose `env.sh` sets only `PATH`. Measured on 2026-11-03: 1.5 s, 0.4 s,
+  0.4 s, 1.2 s, 0.8 s and 0.2 s — all six in **4.4 s** through
+  `./check.sh --selftest`, and the pre-commit hook runs it when a
   `check_*.py` or `selftest_*.py` is staged. That is the gap it closes: the three
   newest docs refusals were found by a reader, because nothing had ever run them.
 - **The committed tree builds on its own.** Measured on 2026-11-02: `git archive
