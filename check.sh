@@ -21,8 +21,9 @@
 #        note, and the nine render captures whenever a staged file could move a
 #        pixel.
 # Full:  the above, plus deck headroom on 3.3.12, the 2.0.17 decks compared with
-#        old_core.json, the nine render captures, and the APK build with its
-#        signature, alignment and bundled-sketch checks.
+#        old_core.json, the nine render captures, the APK build with its signature,
+#        alignment and bundled-sketch checks, and two more builds of that APK that
+#        must match it byte for byte.
 #
 # Each step takes the pattern of the line worth reading, so a passing step reports
 # its measurement rather than whatever the script said last.
@@ -100,6 +101,7 @@ if [ "${1:-}" = "--selftest" ]; then
   step "branch selftest" 'branches of check_branches'       python3 selftest_branches.py
   step "render selftest" 'branches of check_renders'        python3 selftest_renders.py
   step "screens selftest" 'branches of check_screens'       python3 selftest_screens.py
+  step "repro selftest" 'branches of check_repro'          python3 selftest_repro.py
   step "gate selftest"   'branches of check.sh'            python3 selftest_gate.py
   step "map selftest"    'branches of check_map'           python3 selftest_map.py
   echo
@@ -204,6 +206,10 @@ if [ "$full" -eq 1 ]; then
   fi
   step "renders"  'renders current'     python3 check_renders.py
   step "apk"      '[0-9] bytes'         bash android-companion/toolchain.sh
+  # One build can never say whether the archive reproduces: AGP restamped a block
+  # on every run until 2026-11-03 and nothing noticed for weeks. Two builds, twice
+  # the cost, and the only question is whether the bytes match.
+  step "repro"    'same bytes'          python3 check_repro.py
 fi
 
 echo

@@ -229,6 +229,15 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   refuses a root whose `env.sh` does not pin the directories — the copy this VM
   already held was written before they did, which is how one root name came to
   mean two builds.
+* **A build has to reproduce, and one build cannot say so.** [`check_repro.py`](check_repro.py)
+  builds the APK twice and refuses two different hashes; it is the full gate's
+  `repro` step and costs two builds, which is why the fast gate does not run it. On
+  2026-11-03 two builds of one tree differed in 179 bytes and nowhere else, all of
+  them inside AGP's *Dependency Info Block*, which it restamps on every run, so
+  `toolchain.sh` now rewrites the archive with `zipalign` and signs it again. That
+  is what makes the bytes reproducible against the tree's own key,
+  `android-companion/keystore/debug.jks`: a different keystore signs different
+  bytes, which is what a signature is, and `OFFSITE_KEYSTORE` overrides it.
 * **The margin is checked, not assumed.** [`check_headroom.py`](check_headroom.py)
   compiles each deck with the deck FQBN and reads the compiler's own `Maximum is
   …` figures, so both ceilings — 1,310,720 B of flash and 327,680 B of DRAM —
@@ -279,14 +288,17 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   merge would resurrect, a pushed branch and its local alias), 9 render ones (a
   moved pixel, a wrong size, a corrupt PNG, a capture that failed), 11 screen ones
   (a stale count written in words, in digits and with a hyphen, a right count in
-  the wrong paragraph, and frames that do not match the prose), 6 on the map itself
+  the wrong paragraph, and frames that do not match the prose), 4 repro ones (two
+  archives of different bytes, of different sizes, a build that fails and a build
+  that ships nothing), 6 on the map itself
   (a checker with no selftest, a selftest naming a checker that is gone, a
   selftest with no checker, a tree where every pair is present, and a message
   no branch asserts) and 4 on
   the gate itself (a root that pins its directories, a root whose `env.sh` sets only
   `PATH`, the default root order, and a stale default root). Measured on
-  2026-11-03: 3.1 s, 0.5 s, 0.5 s, 1.7 s, 1.4 s, 1.0 s, 0.7 s, 0.4 s and 0.3 s — all
-  nine in **9.8 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
+  2026-11-03: 3.0 s, 0.5 s, 0.5 s, 1.6 s, 1.4 s, 0.9 s, 0.7 s, 0.3 s, 0.4 s and
+  0.4 s — all ten in **10.0 s** through `./check.sh --selftest`, on a machine with no
+  toolchain. On this shared
   VM the same command has also taken 4.4 s and 106.5 s an hour apart, which is
   the machine's load rather than the checkers', so read a slow run as load
   before assuming a checker got slower. The pre-commit hook runs
@@ -595,8 +607,9 @@ other mention of it in this repo is a pointer back here.
   record's shape (no compiler needed), the host tests, and the branch list as a
   note rather than a failure — and `./check.sh --full`
   adds deck headroom on 3.3.12, the 2.0.17 decks compared with `old_core.json`,
-  the nine render captures and the APK build, and `./check.sh --selftest` runs
-  the nine `selftest_*.py` files in about ten seconds. It also refuses a source file that is in the worktree but not in the
+  the nine render captures, the APK build, and two more builds of that APK that
+  must match it byte for byte, and `./check.sh --selftest` runs the ten
+  `selftest_*.py` files in about ten seconds. It also refuses a source file that is in the worktree but not in the
   index: every commit here stages tracked files, which cannot pick up a new one,
   and `LinkCommand.java` was referenced by two tracked classes for a day while a
   clone of the branch would not have compiled. The individual

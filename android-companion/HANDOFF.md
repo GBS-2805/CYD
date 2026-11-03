@@ -513,14 +513,15 @@ Identical to the sketch, checked against its `onWrite` handlers:
 - **The checkers' refusals are tested too, without a compiler.** Eight
   `selftest_*.py` files build a throwaway repo — a stand-in `arduino-cli`, a
   stand-in `capture.sh`, a real `git init` — and make each gate refuse what it
-  exists for: 127 branches over the nine, from a stale flash size, a
+  exists for: 131 branches over the ten, from a stale flash size, a
   `HISTORICAL` size that must still pass, short and full md5s, a renamed link, an
   `ELSEWHERE` name, a moved source count and an undated reading, through asset
   drift and a descriptor naming a gone sketch, the branch verdicts (a patch
   already upstream, the same bytes renamed, a folder a merge would resurrect, a
   pushed alias), to a render whose pixels moved, a capture that wrote nothing, a stale screen
-  count and a root whose `env.sh` sets only `PATH`. Measured on 2026-11-03: 3.1 s, 0.5 s, 0.5 s, 1.7 s, 1.4 s, 1.0 s, 0.7 s, 0.4 s and
-0.3 s — all nine in **9.8 s** through
+  count, an archive that rebuilds differently and a root whose `env.sh` sets
+  only `PATH`. Measured on 2026-11-03: 3.0 s, 0.5 s, 0.5 s, 1.6 s, 1.4 s, 0.9 s, 0.7 s, 0.3 s, 0.4 s and
+0.4 s — all ten in **10.0 s** through
   `./check.sh --selftest`, and the pre-commit hook runs it when a
   `check_*.py` or `selftest_*.py` is staged. That is the gap it closes: the three
   newest docs refusals were found by a reader, because nothing had ever run them.
@@ -650,6 +651,15 @@ Identical to the sketch, checked against its `onWrite` handlers:
   block that re-signing writes. A different keystore signs different bytes, so
   reproducible means this toolchain and this key; `OFFSITE_KEYSTORE` overrides
   both halves. Quote the size to the nearest kB (198 kB), never as a checksum.
+- **The signing key ships with the tree.** `android-companion/keystore/debug.jks`
+  is the project's own debug key — alias `androiddebugkey`, password `android`,
+  RSA 2048, `CN=Android Debug` — committed so that two machines and two runs sign
+  the same bytes, which is what makes the reproducibility above mean something off
+  this VM. It is a debug key for a sideloaded app rather than a release identity,
+  and `OFFSITE_KEYSTORE` overrides it for a real one. One consequence to know:
+  every build before this was signed with whichever machine's debug key made it,
+  so installing this APK over one of those fails with a signature mismatch until
+  the old app is uninstalled.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set — now including
   `INTERNET`, the one outbound request to the deck —
@@ -834,7 +844,8 @@ padding still shows.
 ## Not verified
 
 - The **release** build type is unrun, and the shipped APK is debug-signed with
-  the throwaway Android debug keystore rather than a key you control.
+  the project key in `android-companion/keystore/debug.jks` — a key the tree holds
+  and you can keep, not a release identity.
 - **Only the USB probe has run on a phone** (two probes, Android 17, CH340
   `1a86:7523`): tabs, SAF import, MediaStore save, clipboard, RSSI polling and the
   monitor layout are all unproven.

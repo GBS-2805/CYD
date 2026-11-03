@@ -31,13 +31,6 @@ CMDLINE_TOOLS="${OFFSITE_CMDLINE_TOOLS:-11076708}"   # cmdline-tools 12.0
 COMPILE_SDK=35
 BUILD_TOOLS=35.0.0
 
-# Signing. AGP signs with the machine's debug key and the archive is signed again
-# below, from the same key, to drop the build-time block AGP stamps into it; both
-# halves have to name the same key or the rebuild below changes the signature.
-KEYSTORE="${OFFSITE_KEYSTORE:-$HOME/.android/debug.keystore}"
-KEYSTORE_PASS="${OFFSITE_KEYSTORE_PASS:-android}"
-KEYSTORE_ALIAS="${OFFSITE_KEYSTORE_ALIAS:-androiddebugkey}"
-
 SETUP_ONLY=0
 CLEAN=1
 for arg in "$@"; do
@@ -51,6 +44,16 @@ done
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # this script lives in android-companion
 APP_DIR="$HERE"
+
+# Signing. AGP signs with the machine's debug key, and the archive is signed again
+# below to drop the build-time block AGP stamps into it, so the key named here is
+# the only signature that ships. It is the project's own key, kept in the tree
+# with the standard debug password: a per-machine debug key would make the bytes
+# differ between machines, which is the one thing this script now promises not to
+# do. A real key overrides it.
+KEYSTORE="${OFFSITE_KEYSTORE:-$HERE/keystore/debug.jks}"
+KEYSTORE_PASS="${OFFSITE_KEYSTORE_PASS:-android}"
+KEYSTORE_ALIAS="${OFFSITE_KEYSTORE_ALIAS:-androiddebugkey}"
 APK_REL="app/build/outputs/apk/debug/app-debug.apk"
 DIST="$HERE/dist/PhoneDeckBridge-debug.apk"
 
@@ -213,7 +216,7 @@ BT="$ANDROID_SDK_ROOT/build-tools/$BUILD_TOOLS"
 # block on its way through, and apksigner adds back only signatures, which are
 # deterministic for an RSA key.
 say "strip the build-time signing block and sign again"
-[ -f "$KEYSTORE" ] || fail "no keystore at $KEYSTORE; AGP should have created the debug one"
+[ -f "$KEYSTORE" ] || fail "no keystore at $KEYSTORE; the project keeps one at android-companion/keystore/debug.jks"
 "$BT/zipalign" -f 4 "$APK" "$APK.rebuilt" || fail "zipalign could not rewrite the archive"
 "$BT/apksigner" sign --ks "$KEYSTORE" --ks-pass "pass:$KEYSTORE_PASS" \
   --key-pass "pass:$KEYSTORE_PASS" --ks-key-alias "$KEYSTORE_ALIAS" \
@@ -311,7 +314,8 @@ mkdir -p "$(dirname "$DIST")"
 cp "$APK" "$DIST"
 SIZE="$(wc -c < "$DIST" | tr -d ' ')"
 say "ship $DIST"
-printf '  %s bytes (%s kB)\n  sha256 %s\n' "$SIZE" "$(( (SIZE + 512) / 1024 ))" \
+printf '  %s bytes (%s kB)\n  signed with %s\n  sha256 %s\n' "$SIZE" "$(( (SIZE + 512) / 1024 ))" \
+  "$KEYSTORE" \
   "$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$DIST" | awk '{print $1}'; else shasum -a 256 "$DIST" | awk '{print $1}'; fi)"
 
 # The bytes are reproducible on one machine: the same sources, the pinned
