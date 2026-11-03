@@ -154,6 +154,31 @@ def stale_old_core(dest):
     )
 
 
+def twice(dest):
+    """A record that names one deck twice: json keeps the last row without a word.
+
+    Written as text because json.dumps cannot emit the duplicate that a hand edit
+    produces, and that duplicate is the thing the docs gate has to refuse.
+    """
+    path = dest / "old_core.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    entry = json.dumps(data["decks"][DECK])
+    path.write_text(
+        '{"core": "2.0.17", "decks": {"%s": %s, "%s": %s}}\n'
+        % (DECK, entry, DECK, entry),
+        encoding="utf-8",
+    )
+
+
+def stale_record_only(dest):
+    """A record whose md5 no longer matches, with no doc quoting the figure."""
+    path = dest / "old_core.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["decks"][DECK]["md5"] = "0" * 32
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8")
+
+
 def no_sketch(dest):
     shutil.rmtree(dest / DECK)
 
@@ -372,6 +397,19 @@ CASES = [
             "records md5 00000000",
             "quotes 1,200,000, which is not a size any deck builds to now",
         ],
+    ),
+    dict(
+        name="a stale record is refused even when no doc quotes its figure",
+        mutate=stale_record_only,
+        want_code=1,
+        want=["records md5 00000000"],
+        forbids=["quotes 1,200,000"],
+    ),
+    dict(
+        name="a deck named twice in old_core.json is refused",
+        mutate=twice,
+        want_code=1,
+        want=["names phone_deck_cyd24R twice, so a read keeps only one of the rows"],
     ),
     dict(
         name="a widget README without the current size is refused",
