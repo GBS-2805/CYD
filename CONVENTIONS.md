@@ -237,6 +237,10 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   checker that is gone, a selftest with no checker - and reports the rest,
   because a `want` string is a substring of a formatted message and coverage
   cannot honestly be decided from text.
+  It also lists, per checker, the messages no branch repeats: there a
+  branch's phrase, with its numbers and placeholders stood in for, is
+  looked for in the message's own words, so the list is short enough to
+  read and its misses are the untested refusals.
 * **Before you change a sketch, run both.** From the repo root:
 
   ```bash
