@@ -8,7 +8,7 @@
 #                       it needs all three toolchains — source
 #                       ~/.arduino-cyd/env.sh, ~/.arduino-cyd-2/env.sh or ~/.arduino15/env.sh for the old
 #                       core, and ~/.android-offsite/env.sh)
-#   ./check.sh --selftest  the checkers' own refusals        (~6 s, no toolchain)
+#   ./check.sh --selftest  the checkers' own refusals        (~7 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
 # nobody exercises: --selftest runs the seven selftest_*.py files, which hand each
@@ -16,9 +16,9 @@
 # make it refuse.
 #
 # Fast:  docs (figures, links, prose, the recorded APK bytes), widget assets, the
-#        index (no source file left outside it), the host tests, the branch list as
-#        a note, and the seven render captures whenever a staged file could move a
-#        pixel.
+#        index (no source file left outside it), the 2.0.17 record's shape (no
+#        compiler needed), the host tests, the branch list as a note, and the seven
+#        render captures whenever a staged file could move a pixel.
 # Full:  the above, plus deck headroom on 3.3.12, the 2.0.17 decks compared with
 #        old_core.json, the seven render captures, and the APK build with its
 #        signature, alignment and bundled-sketch checks.
@@ -134,6 +134,10 @@ else
   say "widgets" "no built assets yet, so there is no bundled copy to compare"
 fi
 step "tracked"    'index'             tracked_step
+# The old core's record is the one 2.0.17 number the fast gate can check, because
+# it needs no compiler: a deck it names, one row per deck, an md5 for a sketch a
+# clone would have. A build on that core is the slower question, in --full.
+step "old record" 'consistently'      python3 check_old_core.py --record
 # test.sh finds its own JDK — $JAVA_HOME, then android-companion/jdk, then the
 # off-site root, then PATH — so the gate looks in the same four places before it
 # says the suite did not run. Asking only PATH skipped the suite on a machine that

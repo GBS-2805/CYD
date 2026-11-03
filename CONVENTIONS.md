@@ -215,14 +215,14 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   and the last three docs refusals were found by a reader, not by the check. Each
   `selftest_*.py` builds a throwaway repo in a temp directory — a stand-in
   `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
-  checker refuses: 33 docs branches, 9 asset branches, 8 margin branches, 7 old-core
+  checker refuses: 33 docs branches, 9 asset branches, 8 margin branches, 13 old-core
   ones, 9 branch ones (a patch already upstream, the same bytes under a new name, a folder a
   merge would resurrect, a pushed branch and its local alias), 9 render ones (a
   moved pixel, a wrong size, a corrupt PNG, a capture that failed) and 4 on the
   gate itself (a root that pins its directories, a root whose `env.sh` sets only
   `PATH`, the default root order, and a stale default root). Measured on
-  2026-11-03: 2.3 s, 0.4 s, 0.4 s, 0.5 s, 1.2 s, 0.9 s and 0.2 s — all seven in
-  **5.9 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
+  2026-11-03: 2.3 s, 0.5 s, 0.4 s, 1.0 s, 1.2 s, 0.9 s and 0.3 s — all seven in
+  **6.6 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
   VM the same command has also taken 4.4 s and 106.5 s an hour apart, which is
   the machine's load rather than the checkers', so read a slow run as load
   before assuming a checker got slower. The pre-commit hook runs
@@ -292,7 +292,11 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
 
   `./check.sh --full` runs that build as its **`old core`** step and compares the
   result with `old_core.json`, so a figure cannot outlive the sketch that printed
-  it; it says so when no A/B root is found.
+  it; it says so when no A/B root is found. The file is also checked with no
+  compiler at all: `./check_old_core.py --record`, the fast gate's `old record`
+  step, requires every deck it names to be here with one row and an md5 for a
+  sketch that is in the index, because an md5 of a file a clone would not have
+  describes bytes nobody can check out.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
@@ -499,11 +503,12 @@ other mention of it in this repo is a pointer back here.
 
 * One widget per change. A change touching two widget folders is two changes.
 * **Run the gates from one command.** [`check.sh`](check.sh) is the fast set a
-  commit must pass — docs (figures, links, prose), widget assets, the host tests,
-  and the branch list as a note rather than a failure — and `./check.sh --full`
+  commit must pass — docs (figures, links, prose), widget assets, the 2.0.17
+  record's shape (no compiler needed), the host tests, and the branch list as a
+  note rather than a failure — and `./check.sh --full`
   adds deck headroom on 3.3.12, the 2.0.17 decks compared with `old_core.json`,
   the seven render captures and the APK build, and `./check.sh --selftest` runs
-  the seven `selftest_*.py` files in about six seconds. It also refuses a source file that is in the worktree but not in the
+  the seven `selftest_*.py` files in about seven seconds. It also refuses a source file that is in the worktree but not in the
   index: every commit here stages tracked files, which cannot pick up a new one,
   and `LinkCommand.java` was referenced by two tracked classes for a day while a
   clone of the branch would not have compiled. The individual

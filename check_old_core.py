@@ -14,6 +14,14 @@ Run it in a shell that holds the old core - `./check.sh --full` does this as its
 
   source ~/.arduino-cyd-2/env.sh
   ./check_old_core.py                  exit 0 when every deck still builds to it
+  ./check_old_core.py --record         the file alone: no compiler, no build
+
+`--record` is the fast gate's `old record` step. It needs no toolchain, so it
+runs on a machine that has none, and it answers a question the build cannot: is
+the file shaped so that a build would mean anything? Every deck it names must be
+a deck this tree holds with exactly one row, each row must carry a 32-digit md5,
+and that sketch must be in the git index - an md5 of a file a clone would not
+have describes bytes nobody can check out.
 
 A disagreement is not a broken tree: it is a measurement that moved, and the fix
 is either the sketch or the record. The row says which figures moved and by how
@@ -22,6 +30,8 @@ much, so re-measuring is one edit.
 import argparse
 import hashlib
 import json
+import os
+import re
 import shutil
 import subprocess
 import sys
@@ -32,6 +42,7 @@ import check_headroom as headroom  # noqa: E402  (same folder, same build rules)
 
 ROOT = Path(__file__).resolve().parent
 RECORD = ROOT / "old_core.json"
+MD5_RE = re.compile(r"^[0-9a-f]{32}$")
 
 
 def shown(path):
@@ -42,9 +53,23 @@ def shown(path):
 
 
 def load():
-    """The record, or None after saying why there is nothing to compare against."""
+    """The record with any key it repeats, or None after saying why it will not read.
+
+    json keeps the last of two equal keys without a word, so a deck named twice
+    reads as one deck and the other row is invisible. The hook below remembers it.
+    """
+    duplicates = []
+
+    def hook(pairs):
+        seen = {}
+        for key, value in pairs:
+            if key in seen:
+                duplicates.append(key)
+            seen[key] = value
+        return seen
+
     try:
-        data = json.loads(RECORD.read_text(encoding="utf-8"))
+        data = json.loads(RECORD.read_text(encoding="utf-8"), object_pairs_hook=hook)
     except (OSError, ValueError) as exc:
         print("error: %s does not read as JSON: %s" % (shown(RECORD), exc),
               file=sys.stderr)
@@ -53,7 +78,49 @@ def load():
             or not data["decks"]:
         print("error: %s records no deck" % shown(RECORD), file=sys.stderr)
         return None
-    return data
+    return data, duplicates
+
+
+def index_problem(sketch):
+    """None when git tracks this sketch, else why a clone would not have its bytes."""
+    rel = shown(sketch)
+    # A git hook exports GIT_INDEX_FILE (and sometimes GIT_DIR) for its own
+    # commit; the question here is this tree's committed index, so a caller's
+    # git environment is dropped rather than trusted.
+    env = {key: value for key, value in os.environ.items()
+           if not key.startswith("GIT_")}
+    try:
+        done = subprocess.run(
+            ["git", "-C", str(ROOT), "ls-files", "--error-unmatch", "--", rel],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+    except OSError:
+        return "git could not be run here, so the index cannot be read"
+    if done.returncode == 0:
+        return None
+    if "not a git repository" in (done.stderr or ""):
+        return "there is no git repository here, so the index cannot be read"
+    return "the sketch is not in the index, so a clone would not hold the bytes its md5 describes"
+
+
+def row_problems(name, entry, want_index):
+    """What is wrong with one deck's row, before any number in it is compared."""
+    sketch = ROOT / name / (name + ".ino")
+    if not sketch.is_file():
+        return ["names a deck this tree does not hold"]
+    if not isinstance(entry, dict):
+        return ["is not an object"]
+    out = []
+    digest = entry.get("md5")
+    if not isinstance(digest, str) or not MD5_RE.match(digest):
+        out.append("carries no 32-digit md5 for its sketch")
+    if want_index:
+        loose = index_problem(sketch)
+        if loose:
+            out.append(loose)
+    return out
 
 
 def moves(entry, used, globals_used, slot, digest):
@@ -74,6 +141,30 @@ def moves(entry, used, globals_used, slot, digest):
     return out
 
 
+def record_main(names, duplicates, data):
+    """The record's shape alone: no compiler, no build, no toolchain."""
+    print(f"{'deck':24s}  what the record says")
+    problems = 0
+    for name in names:
+        found = row_problems(name, data["decks"][name], want_index=True)
+        problems += 1 if found else 0
+        print(f"{name:24s}  {'; '.join(found) or 'one row, a sketch in the index, an md5'}")
+    for key in dict.fromkeys(duplicates):
+        # One top-level repeat costs the same as a deck named twice: a read keeps
+        # one of them and the other row is gone without a word.
+        problems += 1
+        print(f"{key:24s}  is named twice, so a read keeps only one of the rows")
+    if problems:
+        print("\n%d problem(s) in %s" % (problems, shown(RECORD)), file=sys.stderr)
+        return 1
+    print(
+        "\n%d deck%s recorded consistently: one row each, a sketch in the index, "
+        "an md5 for its bytes"
+        % (len(names), "" if len(names) == 1 else "s")
+    )
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Compile each deck and compare it with old_core.json."
@@ -82,11 +173,29 @@ def main():
         "decks", nargs="*", metavar="FOLDER",
         help="deck folders to compare (default: every deck the record names)",
     )
+    parser.add_argument(
+        "--record", action="store_true",
+        help="check the record alone - one row per deck, an md5 in the index - "
+             "without compiling anything",
+    )
     parser.add_argument("--arduino-cli", default=None,
                         help="arduino-cli to use (default: the one on PATH)")
     parser.add_argument("--timeout", type=int, default=600, metavar="SECONDS",
                         help="per-compile timeout (default: 600)")
     args = parser.parse_args()
+
+    loaded = load()
+    if loaded is None:
+        return 2
+    data, duplicates = loaded
+    wanted = set(args.decks)
+    names = [name for name in sorted(data["decks"]) if not wanted or name in wanted]
+    if not names:
+        print("error: %s names no deck this tree holds" % shown(RECORD),
+              file=sys.stderr)
+        return 2
+    if args.record:
+        return record_main(names, duplicates, data)
 
     cli = args.arduino_cli or shutil.which("arduino-cli")
     if not cli:
@@ -96,18 +205,7 @@ def main():
             file=sys.stderr,
         )
         return 2
-
-    data = load()
-    if data is None:
-        return 2
     core = data.get("core") or "an unnamed core"
-    wanted = set(args.decks)
-    names = [name for name in sorted(data["decks"]) if not wanted or name in wanted]
-    if not names:
-        print("error: %s names no deck this tree holds" % shown(RECORD),
-              file=sys.stderr)
-        return 2
-
     min_flash = headroom.env_kb(
         "HEADROOM_MIN_FREE_KB", headroom.DEFAULT_MIN_FREE_KB
     ) * 1024
@@ -120,17 +218,17 @@ def main():
         f"{'globals':>10s}{'ram free':>11s}  status"
     )
     problems = 0
+    for key in dict.fromkeys(duplicates):
+        print(f"{key:24s}  is named twice, so a read keeps only one of the rows")
+        problems += 1
     checked = 0
     for name in names:
         entry = data["decks"][name]
         folder = ROOT / name
         sketch = folder / (name + ".ino")
-        if not sketch.is_file():
-            print(f"{name:24s}  record names a deck this tree does not hold")
-            problems += 1
-            continue
-        if not isinstance(entry, dict):
-            print(f"{name:24s}  record is not an object")
+        loose = row_problems(name, entry, want_index=False)
+        if loose:
+            print(f"{name:24s}  {'; '.join(loose)}")
             problems += 1
             continue
         checked += 1
