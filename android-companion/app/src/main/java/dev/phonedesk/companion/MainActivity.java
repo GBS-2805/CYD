@@ -116,6 +116,15 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        // Two screens can import now, and each gets its own answer back.
+        if (requestCode == ProjectsTab.REQUEST_IMPORT) {
+            if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+                projectsTab.imported(false);
+                return;
+            }
+            projectsTab.imported(FlashLibrary.importUri(this, data.getData()));
+            return;
+        }
         if (requestCode != BoardTab.REQUEST_IMPORT) return;
         if (resultCode != RESULT_OK || data == null || data.getData() == null) {
             boardTab.imported(false);

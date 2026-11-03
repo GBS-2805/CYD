@@ -720,7 +720,10 @@ the front page needs no second navigation.
   image marked `PICKED FROM THE SHELF` and leaves the confirm to the flasher, the
   only screen that writes bytes to a board. The store keeps the file's *name*, not
   its bytes: a file deleted from FILES draws `Not in FILES any more` instead of a
-  button that fails on tap.
+  button that fails on tap. `IMPORT A FILE` sits in the picker, so the shelf can add
+  to FILES rather than only read it: the platform's document picker opens, its
+  result goes through `MainActivity` on a second request code, and the list is
+  rebuilt in place so the next tap is the new file rather than ATTACH again.
 * **Libraries are one disclaimer at the top of the shelf**, read from the widget
   descriptors and never retyped in Java. Each library is a button that copies the
   exact name ArduinoDroid's library list searches for, and the ArduinoBLE warning

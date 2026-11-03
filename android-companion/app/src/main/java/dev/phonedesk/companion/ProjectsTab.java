@@ -722,11 +722,19 @@ final class ProjectsTab extends ScrollView {
         card.addView(title);
 
         TextView hint = Ui.text(activity,
-                "A sketch copies into ArduinoDroid; a .bin image flashes from SERIAL. "
-                        + "Import one on SERIAL first.", 11, Ui.DIM);
+                "A sketch copies into ArduinoDroid; a .bin image flashes from SERIAL.",
+                11, Ui.DIM);
         hint.setPadding(0, Ui.dp(activity, 6), 0, 0);
         hint.setLineSpacing(Ui.dp(activity, 2), 1f);
         card.addView(hint);
+
+        // The one thing this picker could not do was add to what it lists: a card
+        // wanted a sketch, and the shelf sent the user to SERIAL to fetch it first.
+        Button bring = Ui.action(activity, "IMPORT A FILE", true);
+        bring.setOnClickListener(v -> importFile());
+        Ui.space(activity, bring, 8);
+        Ui.fullWidth(activity, bring);
+        card.addView(bring);
 
         int listed = 0;
         for (FlashLibrary.Entry entry : currentEntries) {
@@ -740,7 +748,7 @@ final class ProjectsTab extends ScrollView {
         }
         if (listed == 0) {
             TextView empty = Ui.text(activity,
-                    "FILES is empty. Import a .ino or a .bin on SERIAL.", 11, Ui.DIM);
+                    "FILES is empty. IMPORT A FILE above, or import on SERIAL.", 11, Ui.DIM);
             empty.setPadding(0, Ui.dp(activity, 8), 0, 0);
             card.addView(empty);
         }
@@ -792,6 +800,32 @@ final class ProjectsTab extends ScrollView {
             if (entry.name.equals(name)) return entry;
         }
         return null;
+    }
+
+    /** Beside the serial tab's own importer; the activity routes each one back. */
+    static final int REQUEST_IMPORT = 42;
+
+    /** The platform's document picker: the shelf can add to FILES, not just read it. */
+    private void importFile() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        try {
+            activity.startActivityForResult(intent, REQUEST_IMPORT);
+        } catch (Exception e) {
+            Actions.toast(activity, "No file picker");
+        }
+    }
+
+    /**
+     * What the picker came back with. The list is rebuilt in place rather than
+     * closed: the file was imported to be attached to this card, so the next tap
+     * should be the file, not ATTACH again.
+     */
+    void imported(boolean ok) {
+        Actions.toast(activity, ok ? "Imported. Tap it to attach." : "Import failed");
+        signature = "";
+        refresh();
     }
 
     /** The serial tab, reached through the activity that owns both screens. */

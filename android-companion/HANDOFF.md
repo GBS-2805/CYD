@@ -129,7 +129,8 @@ reason to add a resource pipeline.
   open the same form card — name, tagline, status, notes — and `DELETE` is offered
   only for records this app made (`user:` ids), because a widget's card belongs to
   its descriptor and would be seeded back on the next read. `ATTACH A FILE` opens
-  the picker as a card in its place, listing what FILES holds: a `.ino` becomes
+  the picker as a card in its place, listing what FILES holds and offering
+  `IMPORT A FILE` for what it does not: a `.ino` becomes
   `COPY SOURCE` (the text ArduinoDroid compiles) and a `.bin` becomes `FLASH`,
   which opens SERIAL with that image marked `PICKED FROM THE SHELF`. The writing
   is still the app's own uploader, which has never synced, so a card can reach the
