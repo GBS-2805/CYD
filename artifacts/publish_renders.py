@@ -9,7 +9,7 @@ are `artifacts/renders/`'s, and `check_renders.py` is what keeps those honest.
 
 The gallery is a **scroll**, not a contact sheet: one screen under the next at phone
 width, separated by a hairline and one line of caption, so opening it and dragging down
-walks the app from the front page to settings. A strip of seven thumbnails shows the
+walks the app from the front page to settings. A strip of eight thumbnails shows the
 shape of the app and nothing readable; this shows what the phone shows.
 
     python3 artifacts/publish_renders.py          # rebuild the bundle
@@ -30,6 +30,8 @@ SCREENS = [
     ("home-open", "BOARDS expanded", "the boards that hold projects, one row each"),
     ("projects", "The shelf", "alphabetical, folded, with the libraries note first"),
     ("projects-open", "One project open", "its notes, log, deck block and actions"),
+    ("projects-edit", "Adding a project",
+     "the form the shelf opens: name, tagline, status, notes, DELETE"),
     ("paired", "The link", "telemetry, the deck card, what is advertising, saved decks"),
     ("serial", "USB", "the flasher, its three retries, the monitor"),
     ("settings", "Settings", "permissions, the allowlist, the bridge"),

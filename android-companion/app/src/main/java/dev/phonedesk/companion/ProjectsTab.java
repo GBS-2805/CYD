@@ -48,6 +48,9 @@ final class ProjectsTab extends ScrollView {
     private List<FlashLibrary.Entry> currentEntries = new ArrayList<>();
     /** Ids whose details are showing; everything else stays folded. */
     private final Set<String> expanded = new HashSet<>();
+    /** The project whose card is the edit form, and whether that form adds a new one. */
+    private String editing;
+    private boolean creating;
 
     ProjectsTab(Activity activity) {
         super(activity);
@@ -191,11 +194,21 @@ final class ProjectsTab extends ScrollView {
 
         body.addView(filterRow(projects));
 
+        // Add and edit sit with the shelf, and the form is one of its cards rather
+        // than a dialog: a dialog is a second window, so the capture could not draw
+        // it and the render gate would have nothing to compare.
+        body.addView(addRow());
+        if (creating) body.addView(editorCard(null));
+
         int shown = 0;
         for (ProjectStore.Project project : projects) {
             if (activeFilter >= 0 && project.status != activeFilter) continue;
             if (!matches(project)) continue;
-            body.addView(projectCard(project));
+            if (!creating && project.id.equals(editing)) {
+                body.addView(editorCard(project));
+            } else {
+                body.addView(projectCard(project));
+            }
             ++shown;
         }
         if (shown == 0) {
@@ -438,15 +451,21 @@ final class ProjectsTab extends ScrollView {
                 primary.addView(save, spaced(8));
             }
         } else {
-            Button installer = Ui.action(activity, "INSTALLER", true);
-            installer.setOnClickListener(v -> Actions.openUrl(activity, project.installerUrl));
-            primary.addView(installer);
-
-            Button source = Ui.action(activity, "SOURCE", false);
-            source.setOnClickListener(v -> Actions.openUrl(activity, project.sourceUrl));
-            primary.addView(source, spaced(8));
+            // A project added here has no links yet, and a button that opens
+            // nothing is a lie about what the card can do.
+            if (!project.installerUrl.isEmpty()) {
+                Button installer = Ui.action(activity, "INSTALLER", true);
+                installer.setOnClickListener(v -> Actions.openUrl(activity, project.installerUrl));
+                primary.addView(installer);
+            }
+            if (!project.sourceUrl.isEmpty()) {
+                Button source = Ui.action(activity, "SOURCE", false);
+                source.setOnClickListener(v -> Actions.openUrl(activity, project.sourceUrl));
+                if (primary.getChildCount() == 0) primary.addView(source);
+                else primary.addView(source, spaced(8));
+            }
         }
-        card.addView(primary);
+        if (primary.getChildCount() > 0) card.addView(primary);
 
         LinearLayout secondary = Ui.row(activity);
         secondary.setPadding(0, Ui.dp(activity, 8), 0, 0);
@@ -460,6 +479,13 @@ final class ProjectsTab extends ScrollView {
         secondary.addView(state, spaced(8));
 
         if (!project.inside()) {
+            Button edit = Ui.action(activity, "EDIT", false);
+            edit.setOnClickListener(v -> startEdit(project));
+            secondary.addView(edit, spaced(8));
+        }
+        // A recipe is an esptool line for a prebuilt image; a sketch has no image
+        // to merge, so the button would describe a flash that cannot happen.
+        if (project.kind == ProjectStore.KIND_IMAGE) {
             Button recipe = Ui.action(activity, "RECIPE", false);
             recipe.setOnClickListener(v -> copyRecipe(project));
             secondary.addView(recipe, spaced(8));
@@ -467,6 +493,158 @@ final class ProjectsTab extends ScrollView {
         card.addView(secondary);
         Ui.space(activity, card, 8);
         return card;
+    }
+
+    /** The one affordance the shelf was missing: a way to put something on it. */
+    private LinearLayout addRow() {
+        LinearLayout row = Ui.row(activity);
+        row.setPadding(0, Ui.dp(activity, 6), 0, 0);
+        Button add = Ui.action(activity, "ADD A PROJECT", false);
+        add.setOnClickListener(v -> startCreate());
+        Ui.fullWidth(activity, add);
+        row.addView(add);
+        return row;
+    }
+
+    private void startCreate() {
+        creating = true;
+        editing = null;
+        signature = "";
+        refresh();
+    }
+
+    private void startEdit(ProjectStore.Project project) {
+        creating = false;
+        editing = project.id;
+        signature = "";
+        refresh();
+    }
+
+    private void closeEditor() {
+        creating = false;
+        editing = null;
+        signature = "";
+        refresh();
+    }
+
+    /**
+     * Add and edit, in place.
+     *
+     * The fields are the record's own: name, tagline, status and notes. Name and
+     * tagline are descriptor-owned on a card that ships inside the app, which is
+     * why those cards offer no EDIT - a save there would be overwritten by the
+     * next read, and a control that forgets is worse than one that is absent.
+     */
+    private LinearLayout editorCard(ProjectStore.Project project) {
+        final boolean fresh = project == null;
+        LinearLayout card = Ui.card(activity);
+
+        TextView title = Ui.text(activity, fresh ? "NEW PROJECT" : "EDIT PROJECT", 10,
+                Ui.ACCENT);
+        title.setLetterSpacing(0.14f);
+        card.addView(title);
+
+        EditText name = input("Name, e.g. Kitchen sensor", fresh ? "" : project.name);
+        Ui.space(activity, name, 8);
+        card.addView(name);
+
+        EditText tagline = input("One line: what it is", fresh ? "" : project.tagline);
+        Ui.space(activity, tagline, 6);
+        card.addView(tagline);
+
+        Spinner status = new Spinner(activity);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(activity,
+                android.R.layout.simple_spinner_item, ProjectStore.STATUS_LABELS);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        status.setAdapter(adapter);
+        status.setSelection(fresh ? ProjectStore.STATUS_WANT : project.status);
+        Ui.space(activity, status, 6);
+        card.addView(status);
+
+        EditText notes = input("Notes: what it needs, what broke", fresh ? "" : project.notes);
+        notes.setSingleLine(false);
+        notes.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        notes.setMinLines(3);
+        notes.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        Ui.space(activity, notes, 6);
+        card.addView(notes);
+
+        LinearLayout buttons = Ui.row(activity);
+        buttons.setPadding(0, Ui.dp(activity, 10), 0, 0);
+
+        Button save = Ui.action(activity, fresh ? "ADD" : "SAVE", true);
+        save.setOnClickListener(v -> saveEditor(project, name, tagline, status, notes));
+        buttons.addView(save);
+
+        Button cancel = Ui.action(activity, "CANCEL", false);
+        cancel.setOnClickListener(v -> closeEditor());
+        buttons.addView(cancel, spaced(8));
+
+        if (!fresh) {
+            Button remove = Ui.action(activity, "DELETE", false);
+            remove.setOnClickListener(v -> confirmDelete(project));
+            buttons.addView(remove, spaced(8));
+        }
+        card.addView(buttons);
+        Ui.space(activity, card, 8);
+        return card;
+    }
+
+    /** One text field, styled like the search box so the form reads as the shelf. */
+    private EditText input(String hint, String value) {
+        EditText field = new EditText(activity);
+        field.setHint(hint);
+        field.setText(value);
+        field.setSingleLine(true);
+        field.setInputType(InputType.TYPE_CLASS_TEXT);
+        field.setTextSize(13);
+        field.setTypeface(Typeface.MONOSPACE);
+        field.setTextColor(Ui.TEXT);
+        field.setHintTextColor(Ui.DIM);
+        field.setBackground(Ui.rounded(activity, Ui.CARD_HI, Ui.EDGE, 8));
+        field.setPadding(Ui.dp(activity, 10), Ui.dp(activity, 6),
+                Ui.dp(activity, 10), Ui.dp(activity, 6));
+        return field;
+    }
+
+    private void saveEditor(ProjectStore.Project project, EditText name, EditText tagline,
+                            Spinner status, EditText notes) {
+        String title = name.getText().toString().trim();
+        if (title.isEmpty()) {
+            Actions.toast(activity, "A project needs a name");
+            return;
+        }
+        ProjectStore.Project record = project == null
+                ? new ProjectStore.Project() : new ProjectStore.Project(project);
+        if (project == null) {
+            // An app-made record, which is also the kind this app may delete: a
+            // widget's card belongs to its descriptor and would simply come back.
+            record.id = "user:" + System.currentTimeMillis();
+            record.kind = ProjectStore.KIND_SKETCH;
+            record.touch = FirmwareNotes.TOUCH_UNTESTED;
+        }
+        record.name = title;
+        record.tagline = tagline.getText().toString().trim();
+        record.notes = notes.getText().toString().trim();
+        record.status = status.getSelectedItemPosition();
+        record.updatedMs = System.currentTimeMillis();
+        ProjectStore.write(activity, record);
+        closeEditor();
+        Actions.toast(activity, project == null ? "Added " + title : "Saved " + title);
+    }
+
+    private void confirmDelete(ProjectStore.Project project) {
+        new AlertDialog.Builder(activity)
+                .setTitle("Delete " + project.name + "?")
+                .setMessage("The card and its log go with it. A project that ships inside "
+                        + "the app has no DELETE: it is the descriptor's, not the shelf's.")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    ProjectStore.remove(activity, project.id);
+                    closeEditor();
+                    Actions.toast(activity, "Deleted " + project.name);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void toggle(String id) {

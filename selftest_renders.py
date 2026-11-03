@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise every refusal of check_renders.py without Android or a device.
 
-check_renders.py only ever passes here: all seven frames are current, so the
+check_renders.py only ever passes here: all eight frames are current, so the
 refusals — a PNG that no longer matches the pixels, one at the wrong size, a
 committed render that is gone, a capture that wrote nothing, a capture that
 failed, a screen the capture does not know — have never run. The one time a render
@@ -32,7 +32,8 @@ except ImportError:  # the gate cannot run without it either
 
 ROOT = Path(__file__).resolve().parent
 CHECK = ROOT / "check_renders.py"
-SCREENS = ["home", "home-open", "paired", "projects", "projects-open", "serial", "settings"]
+SCREENS = ["home", "home-open", "paired", "projects", "projects-open", "projects-edit",
+           "serial", "settings"]
 SIZE = (6, 4)
 INK = (10, 20, 30)
 
@@ -92,16 +93,16 @@ def no_script(dest):
 
 CASES = [
     dict(
-        name="seven current frames pass",
+        name="eight current frames pass",
         mutate=None,
         want_code=0,
-        want=["7 renders current: what is committed is what the app shows"],
+        want=["8 renders current: what is committed is what the app shows"],
     ),
     dict(
         name="a pixel the app no longer draws is refused",
         mutate=diverge,
         want_code=1,
-        want=["artifacts/renders/home.png no longer matches the app", "1 of 7 renders stale"],
+        want=["artifacts/renders/home.png no longer matches the app", "1 of 8 renders stale"],
     ),
     dict(
         name="a frame at the wrong size is refused with both sizes",

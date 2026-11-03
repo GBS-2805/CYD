@@ -79,6 +79,8 @@ public final class CaptureTest {
         capture("projects", MainActivity.SECTION_PROJECTS, new ProjectsTab(host), null);
         capture("projects-open", MainActivity.SECTION_PROJECTS, new ProjectsTab(host),
                 firstName());
+        capture("projects-edit", MainActivity.SECTION_PROJECTS, new ProjectsTab(host),
+                "ADD A PROJECT");
         capture("serial", MainActivity.SECTION_SERIAL, new BoardTab(host), null);
         capture("settings", MainActivity.SECTION_SETTINGS, new SetupTab(host), null);
     }

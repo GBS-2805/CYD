@@ -125,9 +125,14 @@ reason to add a resource pipeline.
   than resetting them.
 - The bundled deck is a project of kind INSIDE: its card carries COPY DROID and
   SAVE, and the LIBRARIES card hangs off it.
-- **Not built yet**: creating, editing and deleting projects, and attaching a
-  file to a card. The catalogue is the four seeded projects plus anything
-  imported into FILES.
+- **Add, edit and delete are built; attaching a file to a card is not.** `ADD A
+  PROJECT` and the `EDIT` chip open the same form card — name, tagline, status,
+  notes — and `DELETE` is offered only for records this app made (`user:` ids),
+  because a widget's card belongs to its descriptor and would be seeded back on
+  the next read. A project added here has no file yet, so its card carries no
+  COPY, FLASH or RECIPE; wiring an imported sketch to a card is the next gap.
+  The catalogue is the seeded cards, plus whatever this app added, plus whatever
+  is imported into FILES.
 
 ## Third-party firmware: catalogue, do not bundle
 
@@ -500,17 +505,17 @@ Identical to the sketch, checked against its `onWrite` handlers:
   silent board — 57 s each — still try all five wirings and both windows. Measured
   on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 152 now green then, 135 now. `./check.sh`
   runs the fast set, `./check.sh --full` the release set.
-- **The checkers' refusals are tested too, without a compiler.** Six
+- **The checkers' refusals are tested too, without a compiler.** Eight
   `selftest_*.py` files build a throwaway repo — a stand-in `arduino-cli`, a
   stand-in `capture.sh`, a real `git init` — and make each gate refuse what it
-  exists for: 63 branches over the six, from a stale flash size, a
+  exists for: 116 branches over the eight, from a stale flash size, a
   `HISTORICAL` size that must still pass, short and full md5s, a renamed link, an
   `ELSEWHERE` name, a moved source count and an undated reading, through asset
   drift and a descriptor naming a gone sketch, the branch verdicts (a patch
   already upstream, the same bytes renamed, a folder a merge would resurrect, a
   pushed alias), to a render whose pixels moved, a capture that wrote nothing and
-  a root whose `env.sh` sets only `PATH`. Measured on 2026-11-03: 1.5 s, 0.4 s,
-  0.4 s, 1.2 s, 0.8 s and 0.2 s — all six in **4.4 s** through
+  a root whose `env.sh` sets only `PATH`. Measured on 2026-11-03: 3.0 s, 0.5 s,
+  0.5 s, 1.5 s, 1.4 s, 0.8 s, 0.3 s and 0.3 s — all eight in **8.4 s** through
   `./check.sh --selftest`, and the pre-commit hook runs it when a
   `check_*.py` or `selftest_*.py` is staged. That is the gap it closes: the three
   newest docs refusals were found by a reader, because nothing had ever run them.
