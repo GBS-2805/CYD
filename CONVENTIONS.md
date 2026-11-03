@@ -101,6 +101,55 @@ sketch and the descriptor `id`, which always move together:
   few pixels of slop. The panel is resistive and single-touch: a second tap while
   one is latched is a bounce, not input.
 
+### The first session with a board
+
+No sketch here has run on hardware, so the first evening has an order: the deck that
+needs the least to prove itself goes first, and each step records the one fact the
+next depends on. Write every result into that widget's `README.md` under *Verified*
+with the date and the command that printed it, because a number without a run behind
+it is the drift this file exists to stop.
+
+1. **The phone deck, on the default partition.** BLE only, so no partition switch
+   and no network, at 1,168,314 B, 89 % of its 1,310,720 B slot.
+   Compile it in ArduinoDroid with Adafruit GFX, Adafruit ILI9341 and
+   XPT2046_Touchscreen, and record the `Sketch uses …` line and the `md5sum` of the
+   file the phone compiled — the size belongs to the compiler, the md5 to the bytes.
+2. **Flash it, and record the upload.** The phone + OTG + ArduinoDroid path is the
+   one with a successful precedent; note the board it offered, the baud it used and
+   whether the reset was automatic. Never flash with ArduinoBLE installed.
+3. **First boot.** What the glass shows in the first five seconds, the state of the
+   RGB LED (all three driven HIGH at boot, so a lit channel means that pin is LOW),
+   and whether the backlight switch matters. A first screen that never arrives is
+   worth more written down than diagnosed twice.
+4. **Touch, before anything that needs it.** The panel mapping has never been read
+   on this board: run the calibration and record whether taps land at all, then the
+   fit it computed. A control that ignores taps is usually this, not the control.
+5. **The Bluetooth link.** Point the app at the board and record the advertised name
+   and its tag, whether the identity document reads whole at MTU 185, that time,
+   battery and notice all answer (the app refuses a link missing any of them), and
+   the `PAIRED` row's `tag · linked <age>`.
+6. **Two phones.** Which one binds, and what the second is told — the claim has never
+   been exercised with two handsets.
+7. **A power cycle.** Identity and touch fit come back without a rescan or a
+   recalibration; that is NVS doing its job, and it is the last cheap check before
+   the expensive deck.
+8. **Only then the Spotify deck, on `huge_app`.** The first sketch here whose
+   partition scheme has to be flashed with it: 1,878,645 B, 59 % of its 3,145,728 B
+   slot. Record the switch, the boot, the setup access point, that
+   `GET /deck.json` and `GET /auth?app=1&json=1` answer, and **the heap during the
+   TLS handshake** — the one number this repo has never had, with 53,636 B of globals
+   leaving 268 kB for mbedTLS 3.x. Then the Bluetooth link beside the player, then
+   the touch paths.
+9. **The app's own USB flasher, separately.** It is expected to fail — 552 B left
+   the phone per round at 115200, 57600, 230400, 460800 and 74880 in both DTR/RTS
+   polarities, with no sync — so run it as an experiment with the log kept, and never
+   let its result stand in for the sketch's. ArduinoDroid proved that the phone, the
+   adapter and the board can flash; it did not prove that either deck runs.
+
+A board that answers every step is a deck that can be called working. One that fails
+at 3 or 4 is a board or a panel problem, and steps 5 to 8 would have blamed the
+sketch for it.
+
 ## Build
 
 ```bash
