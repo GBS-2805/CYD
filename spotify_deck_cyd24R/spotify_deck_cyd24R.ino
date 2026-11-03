@@ -75,6 +75,7 @@
 // still a WiFi client; the phone in the room is now a second source, because the
 // Spotify Web API wants a developer app and that door is shut.
 #include <BLEDevice.h>
+#include <esp_gap_ble_api.h>
 #include <BLE2902.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
@@ -2343,6 +2344,10 @@ static volatile bool linkCharging = false;
 // clears it, and the mirror line that moved is what proves the phone answered.
 static volatile uint8_t linkChip = 0;
 static volatile uint32_t linkChipMs = 0;
+// Who holds the link, so a hold can hang up on them and delete the bond. Kept
+// as bytes rather than a String: it is read from a Bluedroid callback.
+static uint8_t linkPeerBda[6] = {0, 0, 0, 0, 0, 0};
+static volatile bool linkPeerKnown = false;
 
 static bool mirroredFresh(uint32_t withinMs) {
   if (!linkConnected) return false;
@@ -2417,6 +2422,18 @@ static const Rect WORDMARK = {0, 0, 220, 32};
 // resistive panel needs a target a finger cannot miss at the screen's edge.
 static const Rect SETUP_BTN = {200, 206, 112, 30};
 static bool setupChipLit = false;
+
+// Where a tap counts, as opposed to where the chip is drawn. A resistive panel
+// reports a tap several pixels off and its x mapping is least linear at the
+// screen's edges, so the three transport chips own the whole row -- the 8 px
+// gaps are split between the neighbours -- and the footer chip takes 24 px of
+// slack on its inner edge, the one facing the panel's middle. The phone deck
+// pads its back buttons the same way for the same reason.
+static const Rect PREV_HIT = {0, 144, 108, 68};
+static const Rect PLAY_HIT = {108, 144, 104, 68};
+static const Rect NEXT_HIT = {212, 144, 108, 68};
+static const Rect SETUP_HIT = {176, 198, 144, 42};
+static bool unpairPromptShown = false;
 
 static void formatMs(uint32_t ms, char *out, size_t outLen) {
   const uint32_t total = ms / 1000UL;
@@ -2574,6 +2591,8 @@ class LinkServerCallbacks : public BLEServerCallbacks {
     // 7.5–15 ms with no slave latency, so a tap does not wait three connection
     // intervals to reach the phone. The phone may grant more; this is a request.
     server->updateConnParams(param->connect.remote_bda, 6, 12, 0, 400);
+    memcpy(linkPeerBda, param->connect.remote_bda, 6);
+    linkPeerKnown = true;
     Serial.println("[link] phone connected");
   }
 
@@ -2640,6 +2659,27 @@ static void startBluetooth() {
   advertising->setMaxPreferred(0x12);
   BLEDevice::startAdvertising();
   Serial.printf("[link] advertising as %s\n", name);
+}
+
+// Hang up on the phone and forget the bond. Without this the deck has no way out
+// of a link the phone re-opens on every advert: unpairing from the phone's own
+// Bluetooth settings leaves the deck still bonded, so it will not take a new
+// phone and the companion app cannot reconnect either. Held PLAY 3 s, or `unpair`
+// at 115200. Pressed, PLAY is still play/pause.
+static void unpairLink() {
+  linkConnected = false;
+  linkChip = 0;
+  linkChipMs = 0;
+  if (linkPeerKnown) {
+    esp_ble_gap_disconnect(linkPeerBda);
+    esp_ble_remove_bond_device(linkPeerBda);
+    linkPeerKnown = false;
+    Serial.println("[link] unpaired: bond removed, advertising again");
+  } else {
+    Serial.println("[link] no phone bonded; advertising again");
+  }
+  BLEDevice::startAdvertising();
+  drawNow();
 }
 
 // Ask the phone to do something. False means no phone is listening, so a caller
@@ -2844,6 +2884,10 @@ static void pumpSerialCommand() {
         startSetupWizard();
         return;
       }
+      if (strcasecmp(cmdLine, "unpair") == 0) {
+        Serial.println();
+        unpairLink();
+      }
       cmdLen = 0;
     } else if (c >= 32 && c < 127 && cmdLen + 1 < sizeof(cmdLine)) {
       cmdLine[cmdLen++] = c;
@@ -3043,13 +3087,13 @@ void loop() {
 
   if (down && !wasTouched) {
     touchStartMs = now;
-    if (inside(x, y, PREV_BTN)) {
+    if (inside(x, y, PREV_HIT)) {
       pressedTarget = TARGET_PREV;
-    } else if (inside(x, y, PLAY_BTN)) {
+    } else if (inside(x, y, PLAY_HIT)) {
       pressedTarget = TARGET_TOGGLE;
-    } else if (inside(x, y, NEXT_BTN)) {
+    } else if (inside(x, y, NEXT_HIT)) {
       pressedTarget = TARGET_NEXT;
-    } else if (inside(x, y, SETUP_BTN)) {
+    } else if (inside(x, y, SETUP_HIT)) {
       pressedTarget = TARGET_SETUP;
     } else {
       pressedTarget = TARGET_NONE;
@@ -3078,12 +3122,32 @@ void loop() {
     }
   }
 
+  // Hold PLAY for 3 s to drop the bonded phone. The label changes at 1.5 s so a
+  // hold is visibly not a tap, and the gesture is skipped when nothing is linked.
+  if (down && pressedTarget == TARGET_TOGGLE && linkConnected &&
+      now - touchStartMs > 1500 && !unpairPromptShown) {
+    unpairPromptShown = true;
+    drawChip(PLAY_BTN, "UNPAIR", 1, false);
+  }
+  if (down && pressedTarget == TARGET_TOGGLE && linkConnected &&
+      now - touchStartMs > 3000) {
+    unpairPromptShown = false;
+    pressedTarget = TARGET_NONE;
+    ignoreTouchUntilRelease = true;
+    unpairLink();
+    return;
+  }
+
   // Release fires the command, so a hold is never mistaken for a tap.
   if (!down && wasTouched && pressedTarget != TARGET_NONE) {
     if (pressedTarget == TARGET_SETUP) {
       // Released too early: nothing started, so just put the chip back.
       setupChipLit = false;
       drawSetupChip(false);
+    } else if (unpairPromptShown) {
+      // Released before the hold finished: no command, just the label back.
+      unpairPromptShown = false;
+      drawNow();
     } else if (now - lastActionMs > 180) {
       lastActionMs = now;
       // Whichever source is live takes the tap. A linked phone is the player, so

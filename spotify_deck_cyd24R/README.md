@@ -11,7 +11,7 @@ active.
 
 This deck needs `PartitionScheme=huge_app`. Bluetooth does not fit beside WiFi,
 mbedTLS and the setup server in the default 1,310,720-byte app slot: the linked
-image is 1,878,645 bytes, 143 % of the 1,310,720-byte slot and 59 % of 3,145,728.
+image is 1,879,489 bytes, 143 % of the 1,310,720-byte slot and 59 % of 3,145,728.
 phone deck afterwards with the default scheme re-partitions the board back, so
 each upload has to carry the scheme its own sketch was built for.
 
@@ -228,12 +228,22 @@ Spotify says `invalid_grant`.
 | Tap `\|<<` | previous track |
 | Tap `PLAY` / `PAUSE` | start or stop on the active device |
 | Tap `>>\|` | next track |
-| Tap the wordmark | redraw immediately |
+| Hold `PLAY` 3 s | forget the paired phone: disconnect, delete the bond, advertise again |
+| Tap the wordmark | nothing; hold it to calibrate |
 | Hold the wordmark 1.5 s | touch calibration |
 | Hold the footer `SETUP` chip 1.5 s | the setup page, for another network or account |
 | Touch the screen at boot | touch calibration |
 | Hold the screen 4 s at boot | forget the stored WiFi and token |
 | `setup` + Enter in the monitor | WiFi and Spotify questions again |
+
+**A chip's target is larger than its face.** A resistive panel reports a tap a few
+pixels from where the finger landed, and its x mapping is least linear at the
+screen's edges, so the three transport chips own the whole row — the 8 px gaps
+are split between the neighbours — and the footer `SETUP` chip takes 24 px of
+slack on the side facing the panel's middle. The drawn faces are unchanged. The
+first flash of this deck, on 2026-11-03, found the corner chips hard to hit with
+exact rects, which is what this answers; the change itself has not been flashed
+back yet.
 
 Starting playback when nothing is active first transfers playback to the last
 known device (`PUT /v1/me/player` with `device_ids`), then sends the command. If
@@ -282,7 +292,7 @@ scheme**; see the measurement below for why that is enough.
 
 Both decks are ordinary Arduino sketches and both travel on the phone: the app
 bundles this one too (`check_widget_assets.py` prints `2 widgets bundled, every
-copy matches`, with this sketch at md5 `3b17f04a…`), so it can be pulled from the
+copy matches`, with this sketch at md5 `006aac39…`), so it can be pulled from the
 same shelf as its sibling.
 
 From a computer, `toolchain.sh` has already compiled it:
@@ -330,7 +340,7 @@ the 2026-10-31 sketch. Rebuilt on 2026-11-03 through a fresh 2.0.17 root at
 this repo's path, that same file prints 967,493 bytes, 80 B higher for ten
 characters of path — which is the 967,493 `CONVENTIONS.md` uses as its
 baseline. Today's committed sketch, which grew the Bluetooth link and the
-`/deck.json` identity after that day, prints 1,748,037 bytes on the same core:
+`/deck.json` identity after that day, prints 1,748,765 bytes on the same core:
 past the 1,310,720-byte default slot, so it needs `huge_app` on 2.0.17 too.
 
 That includes the setup web server, the PKCE exchange, the redrawn setup card and
@@ -359,8 +369,10 @@ change and the greedy wrap truncating where it intends to. The default warning
 level hides both sets, and an incremental rebuild can also report a stale,
 smaller link — these numbers come from a fresh build path.
 
-**Nothing here has run on the board.** No flash of this sketch has been confirmed
-and no request has ever left this chip. Specifically unverified: the access point and the setup
+**Almost nothing here has run on the board.** The owner flashed the 2026-11-03 build
+and reported the corner chips hard to hit — the larger hit rects and the `UNPAIR`
+hold are the answer to that and have not been flashed back — but no request has
+been confirmed leaving this chip. Specifically unverified: the access point and the setup
 page on a real phone (including whether the phone keeps mobile data for the
 Spotify tab while joined to the deck), the S256 challenge as Spotify receives it,
 the code exchange and its pinned-certificate handshake to
@@ -384,16 +396,16 @@ compiler:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,878,645 | **1,267,083** | 3,145,728 (59 % used) |
-| DRAM | 69,092 globals | **258,588** | 327,680 |
+| flash | 1,879,489 | **1,266,239** | 3,145,728 (59 % used) |
+| DRAM | 69,100 globals | **258,580** | 327,680 |
 
-The two figures are this tree's own build through `~/.arduino-cyd/env.sh`, the
-root whose `env.sh` pins its own data and library dirs. While that script set only
-`PATH` the same build went through `~/.arduino15` and printed **1,878,613 B**, 48 B
-under with the globals identical, and the deck chat's root reads **1,878,661 B**,
-16 B over — the build-root sensitivity
+The two figures are this tree's own build through `~/.arduino-cyd-3/env.sh` on
+2026-11-02, the root whose `env.sh` pins its own data and library dirs. Sourcing
+`~/.arduino-cyd/env.sh` instead sets only `PATH`, so that build goes through
+`~/.arduino15` and prints **1,879,441 B** for the same sketch, 48 B under with the
+globals identical — the build-root sensitivity
 [`../CONVENTIONS.md`](../CONVENTIONS.md#build) records, not a different sketch, since
-both read md5 `3b17f04a…`. Quote the root you measured on rather than reconciling the
+both read md5 `006aac39…`. Quote the root you measured on rather than reconciling the
 last two digits.
 
 Without Bluetooth the sketch was 1,125,781 bytes on the default scheme — the
@@ -423,7 +435,7 @@ sourcing a toolchain.
   2026-10-31 file, taken before the deck grew its `/deck.json` identity and its
   Bluetooth link. Rebuilt through `~/.arduino-cyd-2` on 2026-11-03 that file
   prints 967,493 bytes at this repo's path, so the 967,413 is history and
-  967,493 is the same file here — not today's, which reads 1,748,037 bytes on
+  967,493 is the same file here — not today's, which reads 1,748,765 bytes on
   that core.
 * Re-measured on 2026-11-01 with `arduino-cli` 1.5.2-rc.1, core **3.3.12** links
   the committed file at 1,125,781 bytes, 85 % of 1,310,720, with
@@ -442,9 +454,9 @@ sourcing a toolchain.
 * **It needs `huge_app` now, and that is the scheme `toolchain.sh` pins.**
   Without Bluetooth the 3.3.12 build was 1,125,781 bytes, 85 % of 1,310,720:
   measured from the pre-link sketch (`00bb1560`), not a flag on today's file.
-  With the link it is 1,878,645 bytes: **143 %** of 1,310,720, **59 %** of 3,145,728.
+  With the link it is 1,879,489 bytes: **143 %** of 1,310,720, **59 %** of 3,145,728.
   An earlier pair of runs differed by 48 B; the pre-commit hook and a direct
-  compile both print 1,878,645 now, so the single figure is the measured one.
+  compile both print 1,879,489 now, so the single figure is the measured one.
   `default.csv`
   sizes `app0` and `app1` at 1,310,720 each, so on the default scheme this deck no
   longer links at all — not a tighter fit, a refusal. Uploading it re-partitions
@@ -639,6 +651,7 @@ trouble table below applies. It needs `openssl` and nothing else.
 | `NO ACTIVE DEVICE` | nothing is playing anywhere | start Spotify on the phone or desktop first |
 | bars do not fill | the firmware was built before a change | recompile; nothing is read from the app at runtime |
 | taps land in the wrong place | the stored fit is from another panel | hold the wordmark 1.5 s and re-tap the three dots |
+| a second phone cannot pair, or the app will not reconnect | the deck is still bonded to the first phone | hold `PLAY` 3 s on the deck, or type `unpair` at 115200, then pair again |
 
 ## widget.json: how the app finds this widget
 

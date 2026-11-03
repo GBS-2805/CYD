@@ -125,8 +125,11 @@ HISTORICAL = {
              "the 1,878,645 these docs quote, and 192 B under the deck chat's "
              "1,878,661",
     1125669: "the Spotify sketch through that same second root, 112 B under it",
-    1267083: "not a build at all: the flash left beside the 1,878,645 B Spotify "
-             "build, its huge_app slot minus what the sketch used",
+    1267083: "not a build at all: the flash left beside an earlier 1,878,645 B "
+             "Spotify build, its huge_app slot minus what the sketch used",
+    1879441: "the same linked Spotify sketch through ~/.arduino-cyd/env.sh, "
+             "which sets only PATH so the build goes through ~/.arduino15: "
+             "48 B under this root with the globals identical",
 }
 
 # Old sketch hashes, likewise labelled in the prose as past values.
@@ -135,6 +138,8 @@ HISTORICAL_MD5 = {
     "f234b68b": "the Spotify sketch before its header was rewritten",
     "eca02e93": "the Spotify sketch before the callback change",
     "49f29bcb": "the Spotify sketch before the one-line answer",
+    "3b17f04a": "the Spotify sketch before the 2026-11-03 larger hit rects "
+                "and the UNPAIR hold, quoted where a date matters",
 }
 
 # Figures no committed sketch produces: a build taken from a working tree nobody

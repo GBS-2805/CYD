@@ -208,68 +208,21 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   measured at one end: `1,878,613-1,878,661` sat in five places with only the top
   end ever observed, and the next build printed 1,878,661 twice.
 * **A size names the root that printed it, and here that root is
-  `~/.arduino-cyd`.** The current 3.3.12 figures in these docs — phone deck
-  1,168,314 B / 45,244 B of globals and the linked Spotify deck 1,878,645 B /
-  69,092 B on `huge_app` — are that root's, rebuilt through it on 2026-11-03 with
-  `arduino-cli` 1.5.2-rc.1. It is the root worth naming because its `env.sh` pins
-  its own data, download and user dirs; it did not always, and while the script
-  set only `PATH` the same build went through `~/.arduino15` and read 1,168,282 B
-  and 1,878,613 B — 32 B and 48 B under with the globals identical. The deck
-  chat's `~/.arduino-cyd-3` reads 1,168,314 B and 1,878,661 B, 16 B over on the
-  linked deck, and `/tmp/arduino-cyd-3` was read at 1,168,170 B and 1,878,469 B,
-  144 B and 176 B under. None of that is sketch drift, because the
-  md5s match: it is where the root is installed, not where the sketch sits — on
-  2026-11-03 the same linked sketch, compiled from `/tmp/probeA`, from a longer
-  `/tmp/probeB/` path and in place in this repo, printed 1,878,645 B through
-  `~/.arduino-cyd` all three times, while these two roots stay 176 B apart on the
-  same bytes. So source the `env.sh` whose figures you are quoting, say which
-  root when two disagree, and re-measure a merged number here instead of
-  accepting another tree's last two digits. The unlinked Spotify figure
-  belongs to a sketch rather than to a root: it is the pre-link file
-  (`00bb1560`), not a flag on today's, and rebuilt from that file on 2026-11-03 it
-  printed 1,125,781 B, 85 % of 1,310,720, with 53,636 B of globals; through
-  `/tmp/arduino-cyd-3` the same file reads 1,125,669 B, the globals identical.
-  Both deck toolchains write that file byte for byte identically, and the gate
-  refuses a root whose `env.sh` does not pin the directories — the copy this VM
-  already held was written before they did, which is how one root name came to
-  mean two builds.
-* **A build has to reproduce, and one build cannot say so.** [`check_repro.py`](check_repro.py)
-  builds the APK twice and refuses two different hashes; it is the full gate's
-  `repro` step and costs two builds, which is why the fast gate does not run it. On
-  2026-11-03 two builds of one tree differed in 179 bytes and nowhere else, all of
-  them inside AGP's *Dependency Info Block*, which it restamps on every run, so
-  `toolchain.sh` now rewrites the archive with `zipalign` and signs it again. That
-  is what makes the bytes reproducible against the tree's own key,
-  `android-companion/keystore/debug.jks`: a different keystore signs different
-  bytes, which is what a signature is, and `OFFSITE_KEYSTORE` overrides it.
-* **The sketches reproduce too, once the clock is out of the way.** A sketch's
-  image carries its own build time, so [`check_sketch_repro.py`](check_sketch_repro.py)
-  compiles each deck twice and refuses two images that differ — the full gate's
-  `sketch repro` step, four compiles in all, which is most of the gate's rise
-  from four minutes to seven. On 2026-11-03 the phone deck's two builds differed
-  in **69 bytes**: the image's 32-byte copy of the ELF's SHA-256, four digits of
-  `19:42` against `20:29` in `.rodata`, and the image's trailing 33-byte hash and
-  checksum — and the ELF differed in exactly those four digits, so nothing else
-  had moved. One compile cannot say whether a build reproduces, and the same build
-  path twice cannot either: the second run is answered from the first one's cache
-  and matches by construction. The core honours `SOURCE_DATE_EPOCH`, so the
-  checker pins the clock and clears one build path between its two runs, because
-  the path is written into the ELF's debug info and a different path changes the
-  digest the image carries. Both decks then build byte for byte identically, and
-  the image keeps its exact size either way, so a pinned build is still the build
-  the figures come from.
-* **A release key never enters the tree.** The committed
-  `android-companion/keystore/debug.jks` exists so that two machines sign the same
-  bytes; its password is in the tree, which is what makes it a reproducibility
-  fixture and never an identity to publish under. A release signature is the other
-  way round: [`android-companion/release.sh`](android-companion/release.sh) keeps
-  the keystore, its password file and the signed archive under
-  `~/.offsite-release/` (`OFFSITE_RELEASE_HOME`), refuses any of those paths that
-  resolves inside the repository, and reads the signer back out of the archive so a
-  debug key cannot pass as a release one. Those bytes cannot be rebuilt from a
-  clone, because the key that made them is deliberately absent, so they are handed
-  over rather than committed — `HANDOFF.md` holds their size and the command that
-  printed it.
+  `~/.arduino-cyd-3`.** The current 3.3.12 figures in these docs — phone deck
+  1,168,314 B / 45,244 B of globals, the linked Spotify deck 1,879,489 B /
+  69,100 B on `huge_app`, the unlinked Spotify deck 1,125,781 B — are that
+  root's, read through `arduino-cli` 1.5.2-rc.1 on 2026-11-02. It is the root
+  worth naming because its `env.sh` pins its own data, download and user dirs;
+  `~/.arduino-cyd/env.sh` sets only `PATH`, so sourcing it builds through
+  `~/.arduino15` and reads 1,168,282 B and 1,879,441 B — 32 B and 48 B under with
+  the globals identical — while `/tmp/arduino-cyd-3` was read at 1,168,170 B and
+  1,878,469 B, 144 B and 192 B under. None of that is sketch drift, because the
+  md5s match: it is the build path, so source the `env.sh` whose figures you are
+  quoting, say which root when two disagree, and re-measure a merged number here
+  instead of accepting another tree's last two digits. Both deck toolchains write
+  that file byte for byte identically, and the gate refuses a root whose `env.sh`
+  does not pin the directories — the copy this VM already held was written before
+  they did, which is how one root name came to mean two builds.
 * **The margin is checked, not assumed.** [`check_headroom.py`](check_headroom.py)
   compiles each deck with the deck FQBN and reads the compiler's own `Maximum is
   …` figures, so both ceilings — 1,310,720 B of flash and 327,680 B of DRAM —
@@ -447,7 +400,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   the partition before assuming a sketch still fits. The Spotify README's 967,413
   is the 2026-10-31 file (`ef0681b`) on a path ten characters shorter; at this
   repo's path it prints 967,493, and the committed Spotify sketch, which has
-  grown the Bluetooth link and the identity since, prints 1,748,037 B on 2.0.17
+  grown the Bluetooth link and the identity since, prints 1,748,765 B on 2.0.17
   — over the 1,310,720-byte default slot.
 * **Why 3.x is the default, and what would reverse it.** Core 2.0.17 ships
   mbedTLS 2.28.7, a branch that reached end of life at the end of 2024, and the

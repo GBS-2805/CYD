@@ -439,7 +439,7 @@ from the repo root, after sourcing a toolchain.
   so 3.x is path-sensitive too — 1,137–1,141 kB, not a fixed count.
 * The bundled copy matches byte for byte after `:app:syncWidgets`;
   `check_widget_assets.py` prints `2 widgets bundled, every copy matches`
-  (this sketch md5 `62c7e6c3…`, the Spotify one `3b17f04a…`).
+  (this sketch md5 `62c7e6c3…`, the Spotify one `006aac39…`).
 * Core 3.x costs this sketch ~2.3 kB of flash and ~3.7 kB of RAM over 2.0.17 —
   nothing like the Spotify deck's 155 kB gap, which is that sketch's network
   stack rather than the core (see the build note in
