@@ -123,4 +123,8 @@ the A/B build in its own install root. No app file names a core, so there is
 nothing to change in the app — but any deck size quoted in app docs now means the
 3.3.12 build unless it says otherwise: 1,168,314 B for the phone deck on the
 default scheme (89 %) and 1,878,645 B for the Spotify deck on `huge_app` (59 %),
-as `check_headroom.py` read both of them on 2026-11-02 with the link in place.
+as `check_headroom.py` read both of them on 2026-11-02 with the link in place, from
+`~/.arduino-cyd/env.sh` — the root those figures belong to, and the one to source
+before quoting them ([build note](CONVENTIONS.md#build)). The deck chat's root
+printed 1,878,661 B for the linked Spotify sketch, 16 B above with the globals
+identical, which is the build path rather than the sketch.

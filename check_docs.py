@@ -87,6 +87,8 @@ HISTORICAL = {
     1878661: "the top end of a 2026-11-02 range, kept as the rule's example of a "
              "figure that was never all observed",
     1168170: "the phone sketch through a second install root, 144 B under this one",
+    1878469: "the linked Spotify sketch through that same second root, 176 B under "
+             "this one",
     1125669: "the Spotify sketch through that same second root, 112 B under it",
     1267083: "not a build at all: the flash left beside the 1,878,645 B Spotify "
              "build, which is its huge_app slot minus what the sketch used",

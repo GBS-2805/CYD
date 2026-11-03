@@ -401,6 +401,12 @@ core **3.3.12**, default partition scheme:
 | flash | 1,168,314 | **142,406** | 1,310,720 (89 % used) |
 | DRAM | 45,244 globals | **282,436** | 327,680 |
 
+The root behind those figures is `~/.arduino-cyd/env.sh`: `check_docs.py
+--refresh` re-read 1,168,314 B and 45,244 B from it on 2026-11-02. The second
+3.3.12 root here, `/tmp/arduino-cyd-3`, prints 1,168,170 B for the same sketch —
+144 B apart with the globals identical — so quote the root with the number (see
+[the build note](../CONVENTIONS.md#build)).
+
 The check refuses a deck that overflows, that drops under **64 KiB** of free flash
 or that leaves under **160 KiB** of DRAM — the last floor is just over the
 153,600 B a full 320x240 RGB565 framebuffer needs. So this deck has one

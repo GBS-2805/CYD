@@ -137,6 +137,18 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   one the doc quotes, or quote the one you can repeat. Never publish a span
   measured at one end: `1,878,613-1,878,661` sat in five places with only the top
   end ever observed, and the next build printed 1,878,661 twice.
+* **A size names the root that printed it, and here that root is `~/.arduino-cyd`.**
+  The current 3.3.12 figures in these docs — phone deck 1,168,314 B / 45,244 B of
+  globals, the linked Spotify deck 1,878,645 B / 69,092 B on `huge_app`, the
+  unlinked Spotify deck 1,125,781 B — are that root's, read through `arduino-cli`
+  1.5.2-rc.1 on 2026-11-02. The other 3.3.12 root on this VM,
+  `/tmp/arduino-cyd-3`, prints 1,168,170 B and 1,878,469 B for the same two
+  sketches — 144 B and 176 B lower with the globals identical — and the deck
+  chat's root printed 1,878,661 B for the linked one, 16 B above. None of that is
+  sketch drift, because the md5s match: it is the build path, so source the
+  `env.sh` whose figures you are quoting, say which root when two disagree, and
+  re-measure a merged number here instead of accepting the other tree's last two
+  digits.
 * **The margin is checked, not assumed.** [`check_headroom.py`](check_headroom.py)
   compiles each deck with the deck FQBN and reads the compiler's own `Maximum is
   …` figures, so both ceilings — 1,310,720 B of flash and 327,680 B of DRAM —
