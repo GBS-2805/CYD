@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Exercise check_map.py's pairing refusals against a throwaway repo.
+"""Exercise check_map.py's refusals against a throwaway repo.
 
 check_map passes here because every checker really does have a fixture, so the
 day one is renamed, or a checker lands without one, the report would go on
 looking green. Each case builds a temp repo with a stand-in checker and its
-selftest, then removes one half of the pair.
+selftest, then removes one half of the pair, or adds a message no branch repeats.
 
   python3 selftest_map.py     exit 0 when every branch still behaves
 """
@@ -16,7 +16,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 CHECK = ROOT / "check_map.py"
-GATE = "check_map.py"
 
 
 CHECKER = (
@@ -81,62 +80,6 @@ def ghost_checker(dest):
     (dest / "selftest_c.py").write_text(selftest("check_c.py"))
 
 
-def helper_return(dest):
-    """A refusal a shared helper returns, with the caller naming the row.
-
-    `row_shape` answers `["names a deck this tree does not hold"], None`: the
-    sentence is written in the helper, so a map that only reads `append` never
-    sees it, and a branch that is not written cannot pin it.
-    """
-    path = dest / "check_a.py"
-    path.write_text(path.read_text(encoding="utf-8") + (
-        "\n\ndef row_reason(name):\n"
-        '    return ["a row shape nothing repeats"], None\n'
-    ), encoding="utf-8")
-
-
-def helper_return_asserted(dest):
-    helper_return(dest)
-    (dest / "selftest_a.py").write_text(
-        selftest("check_a.py", WANTS + ["a row shape nothing repeats"]))
-
-
-def formatted_message(dest):
-    """A message built with str.format, which used to read as a call, not a literal."""
-    path = dest / "check_a.py"
-    path.write_text(
-        path.read_text(encoding="utf-8") +
-        '    problems.append("a {:,} B floor nothing repeats".format(204800))\n',
-        encoding="utf-8",
-    )
-
-
-def variable_message(dest):
-    """A refusal chosen into a name, then appended: two steps, one sentence."""
-    path = dest / "check_a.py"
-    path.write_text(path.read_text(encoding="utf-8") + (
-        '    why = "a two-step refusal nothing repeats"\n'
-        "    problems.append(why)\n"
-    ), encoding="utf-8")
-
-
-def variable_asserted(dest):
-    variable_message(dest)
-    (dest / "selftest_a.py").write_text(
-        selftest("check_a.py", WANTS + ["a two-step refusal nothing repeats"]))
-
-
-def variable_branches(dest):
-    """Two literals into one name: either can print, so both must be asserted."""
-    path = dest / "check_a.py"
-    path.write_text(path.read_text(encoding="utf-8") + (
-        '    why = "one sentence built in a branch"\n'
-        "    if digest:\n"
-        '        why = "another sentence built in a branch"\n'
-        "    problems.append(why)\n"
-    ), encoding="utf-8")
-
-
 def nameless(dest):
     (dest / "selftest_d.py").write_text(
         'CASES = [{"name": "a branch", "want": ["x"]}]\n'
@@ -164,33 +107,6 @@ CASES = [
          want=["selftest_c.py names check_c.py, which this tree does not hold"]),
     dict(name="a selftest with no checker is refused", mutate=nameless,
          want_code=1, want=["selftest_d.py names no checker"]),
-    dict(name="a message a shared helper returns is refused like an appended one",
-         mutate=helper_return, want_code=1,
-         want=["check_a.py: 1 message(s) no branch repeats",
-               "a row shape nothing repeats"],
-         forbids=["pairing problem"]),
-    dict(name="a helper's returned message passes when a branch asserts it",
-         mutate=helper_return_asserted, want_code=0,
-         want=["check_a.py: every appended message is repeated by a branch"],
-         forbids=["no branch repeats", "pairing problem"]),
-    dict(name="a message built with str.format is seen, not skipped",
-         mutate=formatted_message, want_code=1,
-         want=["a … B floor nothing repeats"],
-         forbids=["pairing problem"]),
-    dict(name="a message chosen into a variable is refused like an inline one",
-         mutate=variable_message, want_code=1,
-         want=["check_a.py: 1 message(s) no branch repeats",
-               "a two-step refusal nothing repeats"],
-         forbids=["pairing problem"]),
-    dict(name="a variable's message passes when a branch asserts it",
-         mutate=variable_asserted, want_code=0,
-         want=["check_a.py: every appended message is repeated by a branch"],
-         forbids=["no branch repeats", "pairing problem"]),
-    dict(name="every literal a variable holds counts, not just the last one",
-         mutate=variable_branches, want_code=1,
-         want=["one sentence built in a branch",
-               "another sentence built in a branch"],
-         forbids=["pairing problem"]),
 ]
 
 

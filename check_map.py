@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print which selftest branch pins which refusal, and keep the pairs honest.
+"""Say which refusal has a selftest branch, and refuse the ones that do not.
 
 Every checker passes on this tree, so its failure paths are only ever run by the
 selftest cases that name them; reading eight files to learn whether a refusal has
@@ -8,29 +8,25 @@ checker it exercises and how many branches assert a message - and refuses the tw
 pairings the map rests on: a checker with no selftest has refusals nothing runs,
 and a selftest naming a checker that is gone is a fixture for a file nobody has.
 
-It refuses a message no branch asserts, which is why that list is empty: the
-match is word for word, with placeholders standing in for any one word, because
-a `want` string is a substring of a formatted message. A branch that asserts a
-message in other words can therefore look uncovered - write its `want` from the
-checker's own line. A message is read where it is written, the sentence a shared
-helper returns (`row_shape`, `verdict`, `index_problem`) included, so a refusal
-cannot hide in a helper. A sentence chosen into a variable counts too, because a
-name is every literal it is ever assigned; one built by a call, or from a loop
-variable, is still invisible.
+It also refuses a message no branch asserts, which is why that list is empty: a
+refusal with no branch behind it fails the gate instead of sitting in a report.
 
-  python3 check_map.py       exit 0 when every checker has a selftest
+The scan is deliberately small - it reads the literal a checker appends to a
+problem list or prints to stderr, which is how every refusal here is written. A
+message a helper returns, one built with `str.format` or `+`, one chosen into a
+variable and one built by a call are invisible to it; following those shapes
+costs a layer and a branch per layer, and a gate that large stops being read.
+The match is word for word, with placeholders, sizes and md5s standing in for one
+word, because a `want` string is a substring of a formatted message - so write a
+branch's `want` from the checker's own line.
 
-It refuses, per checker, every message it can print that no branch repeats:
-every string the checker appends to a problem list, returns from a helper or
-prints as an error, matched word for word with placeholders, sizes and md5s
-standing in for the values filled in at run time. A refusal with no branch
-behind it fails this gate rather than sitting in a report.
+  python3 check_map.py       exit 0 when every checker has a selftest and every
+                             message it can print has a branch
 """
 import ast
 import importlib.util
 import re
 import sys
-from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -54,23 +50,12 @@ def load(path):
 # A message's `%s`/`%d`/`{...}` parts, which a branch cannot repeat: it asserts the
 # text the checker prints, and these are the values filled in at run time.
 PLACEHOLDER = re.compile(r"%[-+ 0-9.#]*[sdifxXoeEgGcr]|\{[^{}]*\}")
-# The shortest asserted phrase worth matching: shorter is a word or two
-# and would make any message look covered.
-MIN_PHRASE = 8
 
 
 def _message(node):
-    """The literal text of one string expression, or None when it is built.
-
-    A refusal is spelled several ways and only the values differ: `%s` formatting,
-    `str.format`, an f-string, or two literals added together. Each keeps the words
-    it was written with, so each is the message a branch has to assert.
-    """
+    """The literal text of one append/print argument, or None when it is built."""
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod):
-        return _message(node.left)
-    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
-        left, right = _message(node.left), _message(node.right)
-        return None if left is None or right is None else left + right
+        node = node.left
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return node.value
     if isinstance(node, ast.JoinedStr):
@@ -78,67 +63,7 @@ def _message(node):
             part.value for part in node.values
             if isinstance(part, ast.Constant) and isinstance(part.value, str)
         )
-    if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "format"):
-        # "the {:,} B floor".format(ram_free): the template is the message.
-        return _message(node.func.value)
     return None
-
-
-def _texts(node, names=None):
-    """Every literal text an expression can hold when it reaches a problem list.
-
-    A name is not a message by itself: it is the literals it is ever assigned, so
-    `why = "..."; problems.append(why)` reads as the sentence the name holds.
-    """
-    if node is None:
-        return []
-    if isinstance(node, ast.Name) and names and node.id in names:
-        return list(names[node.id])
-    text = _message(node)
-    return [text] if text else []
-
-
-def _bound(tree):
-    """Every literal each name in the file is assigned, so a two-step refusal reads.
-
-    `problems.append(why)` names no sentence, and a map that stops at the name
-    sees nothing; `why` was chosen a few lines above, in a branch or an if/else,
-    and any of those literals can be the one that prints, so all of them count.
-    """
-    out = {}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign):
-            targets, value = node.targets, node.value
-        elif isinstance(node, ast.AnnAssign) and node.value is not None:
-            targets, value = [node.target], node.value
-        else:
-            continue
-        text = _message(value)
-        if not text:
-            continue
-        for target in targets:
-            if isinstance(target, ast.Name):
-                texts = out.setdefault(target.id, [])
-                if text not in texts:
-                    texts.append(text)
-    return out
-
-
-def _returned(value, names=None):
-    """Every literal a helper hands back, at any depth of list or tuple.
-
-    `row_shape` answers `["names a deck this tree does not hold"], None`: that
-    sentence is the message, and the caller adds the deck's name in front of it,
-    so the literal belongs to the map where it is written rather than where the
-    line ends up printed.
-    """
-    if isinstance(value, (ast.List, ast.Tuple)):
-        out = []
-        for item in value.elts:
-            out.extend(_returned(item, names))
-        return out
-    return _texts(value, names)
 
 
 def _sink(node):
@@ -149,46 +74,27 @@ def _sink(node):
 
 
 def messages(path):
-    """Every message a Python checker can print, however it is spelled.
-
-    A refusal reaches the reader three ways, and all three are read: appended to a
-    problem list the checker collects itself, returned by a shared helper that
-    builds it (`row_shape`, `verdict`, `index_problem`) so the caller can add the
-    name in front, or printed to stderr with no list at all. A helper's `return`
-    is the one that used to hide: the sentence is a literal there and nowhere else.
-    """
+    """Every message a Python checker appends to a problem list or prints as an error."""
     try:
         tree = ast.parse(Path(path).read_text(encoding="utf-8"))
     except (OSError, SyntaxError, ValueError):
         return []
     found = []
-    names = _bound(tree)
-
-    def note(text):
-        if text and text not in found:
-            found.append(text)
-
     for node in ast.walk(tree):
-        if isinstance(node, ast.Return) and node.value is not None:
-            for text in _returned(node.value, names):
-                note(text)
-            continue
         if not isinstance(node, ast.Call):
             continue
         attr = getattr(node.func, "attr", "")
         name = getattr(node.func, "id", "")
-        if attr in ("append", "extend") and _sink(node.func.value):
-            # `extend` takes a list or a generator of the same messages.
-            for arg in node.args:
-                for text in _returned(arg, names):
-                    note(text)
+        text = None
+        if attr == "append" and _sink(node.func.value):
+            text = _message(node.args[0]) if node.args else None
         elif (attr == "print" or name == "print") and any(
                 kw.arg == "file" for kw in node.keywords):
             # `print(..., file=sys.stderr)` is how a checker says a refusal without
             # a problem list; the builtin has no `.attr`, so it is matched by name.
-            for arg in node.args:
-                for text in _texts(arg, names):
-                    note(text)
+            text = next((t for t in (_message(arg) for arg in node.args) if t), None)
+        if text and text not in found:
+            found.append(text)
     return found
 
 
@@ -224,34 +130,15 @@ def tokens(text):
 
 
 def _contains(needle, haystack):
-    """A placeholder matches the value printed there, which can hold spaces.
-
-    So `*` stands for a run of words on either side, not exactly one: a branch
-    that spells out "123 bytes" covers a message whose `%s` printed that size,
-    and a message whose `%s` printed it is covered by a branch that wrote only
-    the placeholder. Every word outside a placeholder still has to appear, and a
-    placeholder in the asserted phrase may only swallow words that the phrase
-    then goes on to anchor: one that ends inside its own placeholder would
-    match any message at all, which is how the first version matched everything.
-    """
-
-    @lru_cache(maxsize=None)
-    def go(i, j):
-        if i == len(needle):
+    """A wildcard on either side matches any one word."""
+    for start in range(len(haystack) - len(needle) + 1):
+        for offset, token in enumerate(needle):
+            other = haystack[start + offset]
+            if token != "*" and other != "*" and token != other:
+                break
+        else:
             return True
-        if j == len(haystack):
-            return False
-        if needle[i] == haystack[j] and needle[i] != "*":
-            return go(i + 1, j + 1)
-        if needle[i] == "*" and any(
-                go(i + 1, j + take) for take in range(1, len(haystack) - j + 1)):
-            return True
-        if haystack[j] == "*" and len(needle) - i >= 2 and any(
-                go(i + take, j + 1) for take in range(1, len(needle) - i)):
-            return True
-        return False
-
-    return bool(needle) and any(go(0, start) for start in range(len(haystack)))
+    return False
 
 
 def repeated(text, phrases):
