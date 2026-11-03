@@ -87,6 +87,9 @@ HISTORICAL = {
              "over the shorter one that first printed it",
     1167409: "today's phone sketch on 2.0.17; the prose's 2.0.17 figures are "
              "the 2026-10-30 file",
+    1748037: "today's Spotify sketch on 2.0.17 through ~/.arduino-cyd-2, "
+             "measured 2026-11-03; the gate builds 3.3.12 only, so nothing it "
+             "builds produces this one",
     1168282: "~/.arduino-cyd/env.sh's phone build while that script set only "
              "PATH, so ~/.arduino15's dirs",
     1163930: "an earlier 3.3.12 phone build on a shorter path",

@@ -325,9 +325,13 @@ Sketch uses 967413 bytes (73%) of program storage space. Maximum is 1310720 byte
 Global variables use 50324 bytes (15%) of dynamic memory, leaving 277356 bytes for local variables. Maximum is 327680 bytes.
 ```
 
-That block is the path it ran on: the same file rebuilt on 2026-11-03 through a
-fresh 2.0.17 root prints 967,493 bytes at this repo's path, 80 B higher for ten
-characters of path — which is the 967,493 `CONVENTIONS.md` uses as its baseline.
+That block is the path it ran on, and its file, not today's: it is `ef0681b`'s,
+the 2026-10-31 sketch. Rebuilt on 2026-11-03 through a fresh 2.0.17 root at
+this repo's path, that same file prints 967,493 bytes, 80 B higher for ten
+characters of path — which is the 967,493 `CONVENTIONS.md` uses as its
+baseline. Today's committed sketch, which grew the Bluetooth link and the
+`/deck.json` identity after that day, prints 1,748,037 bytes on the same core:
+past the 1,310,720-byte default slot, so it needs `huge_app` on 2.0.17 too.
 
 That includes the setup web server, the PKCE exchange, the redrawn setup card and
 both pinned roots (about 2.7 kB of PEM), and leaves **335 kB** of the default
@@ -337,8 +341,9 @@ per host. Under `PartitionScheme=huge_app` it is 967,413 bytes, **30 %** of
 
 History, kept because other docs quote it: 1,164,489 B was a phone build "without
 Bluetooth", which no committed file produces — the phone deck carries its BLE link
-from `d53664ec` on. The pair that rebuilds is 967,493 B against 1,162,877 B on
-2.0.17, 195,384 B (191 kB) apart.
+from `d53664ec` on. The pair that rebuilds is `ef0681b`'s Spotify file at
+967,493 B against 1,162,877 B for the 2026-10-30 phone file, both on 2.0.17
+through `~/.arduino-cyd-2`, 195,384 B (191 kB) apart.
 
 An earlier note's 1,114,485 B (85 % of 1,310,720, 192 kB free, a 49 kB gap to the
 phone deck) never reproduced: the committed file links at 967,413 with the same
@@ -412,11 +417,13 @@ sourcing a toolchain.
 
 **Verified here** — none of this needs hardware:
 
-* The committed sketch links under the documented core **2.0.17** at 967,413
-  bytes (73 %), the measurement above, taken before the deck grew its
-  `/deck.json` identity, on a path ten characters shorter. Rebuilt through
-  `~/.arduino-cyd-2` on 2026-11-03 the same file prints 967,493 bytes here, so
-  the 967,413 is history and 967,493 is what the repo path reads today.
+* The sketch in that block links under the documented core **2.0.17** at
+  967,413 bytes (73 %), on a path ten characters shorter. It is `ef0681b`'s
+  2026-10-31 file, taken before the deck grew its `/deck.json` identity and its
+  Bluetooth link. Rebuilt through `~/.arduino-cyd-2` on 2026-11-03 that file
+  prints 967,493 bytes at this repo's path, so the 967,413 is history and
+  967,493 is the same file here — not today's, which reads 1,748,037 bytes on
+  that core.
 * Re-measured on 2026-11-01 with `arduino-cli` 1.5.2-rc.1, core **3.3.12** links
   the committed file at 1,125,781 bytes, 85 % of 1,310,720, with
   53,636 bytes of globals, 16 % of 327,680, `EXIT=0` under `--warnings all`. That

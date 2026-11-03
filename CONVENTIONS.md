@@ -294,7 +294,10 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   in headers, so the sketch's own object grows with it. So never scale one
   deck's core delta onto another: recompile and quote `Sketch uses …`, and check
   the partition before assuming a sketch still fits. The Spotify README's 967,413
-  is this file on a path ten characters shorter; here it prints 967,493.
+  is the 2026-10-31 file (`ef0681b`) on a path ten characters shorter; at this
+  repo's path it prints 967,493, and the committed Spotify sketch, which has
+  grown the Bluetooth link and the identity since, prints 1,748,037 B on 2.0.17
+  — over the 1,310,720-byte default slot.
 * **Why 3.x is the default, and what would reverse it.** Core 2.0.17 ships
   mbedTLS 2.28.7, a branch that reached end of life at the end of 2024, and the
   Spotify deck's whole job is TLS to a third party — an unpatched TLS stack
