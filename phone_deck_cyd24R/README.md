@@ -402,12 +402,13 @@ core **3.3.12**, default partition scheme:
 | flash | 1,168,314 | **142,406** | 1,310,720 (89 % used) |
 | DRAM | 45,244 globals | **282,436** | 327,680 |
 
-The root behind those figures is `~/.arduino-cyd-3/env.sh`, the one whose `env.sh`
+The root behind those figures is `~/.arduino-cyd/env.sh`, the one whose `env.sh`
 pins its own data and library dirs: `check_docs.py --refresh` re-read 1,168,314 B
-and 45,244 B from it on 2026-11-02. `~/.arduino-cyd/env.sh` sets only `PATH`, so
-that build goes through `~/.arduino15` and prints 1,168,282 B for the same sketch —
-32 B under with the globals identical — while `/tmp/arduino-cyd-3` was read at
-1,168,170 B, 144 B under. Quote the root with the number (see
+and 45,244 B from it on 2026-11-03. While that script set only `PATH` the same
+build went through `~/.arduino15` and printed 1,168,282 B — 32 B under with the
+globals identical — the deck chat's root prints the same 1,168,314 B, and
+`/tmp/arduino-cyd-3` was read at 1,168,170 B, 144 B under. Quote the root with the
+number (see
 [the build note](../CONVENTIONS.md#build)).
 
 The check refuses a deck that overflows, that drops under **64 KiB** of free flash

@@ -139,15 +139,17 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   measured at one end: `1,878,613-1,878,661` sat in five places with only the top
   end ever observed, and the next build printed 1,878,661 twice.
 * **A size names the root that printed it, and here that root is
-  `~/.arduino-cyd-3`.** The current 3.3.12 figures in these docs — phone deck
-  1,168,314 B / 45,244 B of globals, the linked Spotify deck 1,878,661 B /
+  `~/.arduino-cyd`.** The current 3.3.12 figures in these docs — phone deck
+  1,168,314 B / 45,244 B of globals, the linked Spotify deck 1,878,645 B /
   69,092 B on `huge_app`, the unlinked Spotify deck 1,125,781 B — are that
-  root's, read through `arduino-cli` 1.5.2-rc.1 on 2026-11-02. It is the root
-  worth naming because its `env.sh` pins its own data, download and user dirs;
-  `~/.arduino-cyd/env.sh` sets only `PATH`, so sourcing it builds through
-  `~/.arduino15` and reads 1,168,282 B and 1,878,613 B — 32 B and 48 B under with
-  the globals identical — while `/tmp/arduino-cyd-3` was read at 1,168,170 B and
-  1,878,469 B, 144 B and 176 B under. None of that is sketch drift, because the
+  root's, rebuilt through it on 2026-11-03 with `arduino-cli` 1.5.2-rc.1. It is
+  the root worth naming because its `env.sh` pins its own data, download and user
+  dirs; it did not always, and while the script set only `PATH` the same build
+  went through `~/.arduino15` and read 1,168,282 B and 1,878,613 B — 32 B and
+  48 B under with the globals identical. The deck chat's `~/.arduino-cyd-3` reads
+  1,168,314 B and 1,878,661 B, 16 B over on the linked deck, and
+  `/tmp/arduino-cyd-3` was read at 1,168,170 B and 1,878,469 B, 144 B and 176 B
+  under. None of that is sketch drift, because the
   md5s match: it is the build path, so source the `env.sh` whose figures you are
   quoting, say which root when two disagree, and re-measure a merged number here
   instead of accepting another tree's last two digits. Both deck toolchains write

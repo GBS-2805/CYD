@@ -3,7 +3,7 @@
 
 CONVENTIONS.md says a published size is a measurement, never a guess, and the
 READMEs quote the build of the day: 1,168,314 B for the phone deck and
-1,878,661 B for the Spotify one, plus the md5 that check_widget_assets.py
+1,878,645 B for the Spotify one, plus the md5 that check_widget_assets.py
 compares. Nothing kept those honest. A comment that cost 32 bytes, or a header
 rewrite that changed the hash, left every doc a version behind - twice now, and
 both times a reader noticed before a check did.
@@ -16,7 +16,7 @@ before the Bluetooth link"). An md5 that is not one of today's sketches fails
 the same way.
 
 What counts as a flash size here: a grouped number of 7 digits or more, like
-1,878,661. That is deliberately narrow. The APK, an mbedTLS margin and a
+1,878,645. That is deliberately narrow. The APK, an mbedTLS margin and a
 globals delta are all quoted in these docs as byte counts too, and flagging them
 would bury the one number this check exists for.
 
@@ -82,8 +82,8 @@ HISTORICAL = {
     1164489: "the phone sketch without Bluetooth, measured the same day",
     1162797: "the phone sketch on core 2.0.17; the size follows the build root",
     1162813: "the phone sketch on core 2.0.17, the other end of that spread",
-    1168282: "~/.arduino-cyd/env.sh's phone build, PATH only, so ~/.arduino15's "
-             "dirs",
+    1168282: "~/.arduino-cyd/env.sh's phone build while that script set only "
+             "PATH, so ~/.arduino15's dirs",
     1163930: "an earlier 3.3.12 phone build on a shorter path",
     1165174: "the phone sketch through one arduino-cli root",
     1165222: "the same phone sketch through toolchain.sh's root",
@@ -91,16 +91,17 @@ HISTORICAL = {
     1668748: "what that 1,400,000-byte table actually linked to",
     1878581: "one run of the linked Spotify deck, 48 B under its sibling run",
     1878629: "the other side of that 48 B disagreement, quoted as a rule's example",
-    1878613: "what ~/.arduino-cyd/env.sh prints: it sets only PATH, so that build "
-             "goes through ~/.arduino15",
-    1878661: "the linked Spotify sketch through ~/.arduino-cyd-3/env.sh; first seen "
-             "as the top of a 2026-11-02 range, now the figure these docs quote",
+    1878613: "what ~/.arduino-cyd/env.sh printed while it set only PATH, so the "
+             "build went through ~/.arduino15",
+    1878661: "the linked Spotify sketch through the deck chat's "
+             "~/.arduino-cyd-3/env.sh, 16 B over this root; first seen as the top "
+             "of a 2026-11-02 range",
     1168170: "the phone sketch through a second install root, 144 B under this one",
     1878469: "the linked Spotify sketch through that same second root, 176 B under "
              "this one",
     1125669: "the Spotify sketch through that same second root, 112 B under it",
-    1267083: "not a build at all: the flash left beside an earlier 1,878,645 B "
-             "Spotify build, its huge_app slot minus what the sketch used",
+    1267083: "not a build at all: the flash left beside the 1,878,645 B Spotify "
+             "build, its huge_app slot minus what the sketch used",
 }
 
 # Old sketch hashes, likewise labelled in the prose as past values.

@@ -126,12 +126,13 @@ nothing to change in the app — but any deck size quoted in app docs now means 
 | deck | flash | share of its ceiling |
 | --- | --- | --- |
 | phone, default scheme | 1,168,314 B | 89 % of 1,310,720 |
-| Spotify, `huge_app` | 1,878,661 B | 59 % of 3,145,728 |
+| Spotify, `huge_app` | 1,878,645 B | 59 % of 3,145,728 |
 
-`check_headroom.py` read both of them on 2026-11-02 with the link in place, from
-`~/.arduino-cyd-3/env.sh` — the root those figures belong to, the one whose
-`env.sh` pins its own data and library dirs, and the one to source before quoting
-them ([build note](CONVENTIONS.md#build)). `~/.arduino-cyd/env.sh` sets only
-`PATH` and builds through `~/.arduino15`, where the same two sketches read
-1,168,282 B and 1,878,613 B — 32 B and 48 B under with the globals identical,
-which is the build path rather than the sketch.
+`check_headroom.py` read both of them with the link in place, from
+`~/.arduino-cyd/env.sh` — the root those figures belong to, and the one to source
+before quoting them ([build note](CONVENTIONS.md#build)). That script pins the
+root's own data, download and user dirs, so the build cannot fall through to
+`~/.arduino15`; while it set only `PATH` the same two sketches read 1,168,282 B
+and 1,878,613 B there — 32 B and 48 B under with the globals identical — and the
+deck chat's root reads 1,878,661 B for the linked one, 16 B over. That is the
+build path rather than the sketch.
