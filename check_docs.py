@@ -79,7 +79,9 @@ HISTORICAL = {
     1114485: "an earlier note's Spotify figure, which did not reproduce",
     1123241: "the Spotify sketch on 3.3.12 from an earlier root",
     1125781: "the Spotify sketch without Bluetooth, on the default scheme",
-    1164489: "the phone sketch without Bluetooth, measured the same day",
+    1164489: "a phone sketch with no link, quoted once against the Spotify "
+             "build; all five committed phone sketches carry BLE, so it cannot "
+             "be rebuilt and stays history only",
     1162797: "the phone sketch on core 2.0.17; the size follows the build root",
     1162813: "the phone sketch on core 2.0.17, the other end of that spread",
     1162877: "the 2026-10-30 phone sketch on 2.0.17, rebuilt at this repo's "

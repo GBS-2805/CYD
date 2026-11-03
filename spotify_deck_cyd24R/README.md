@@ -331,10 +331,14 @@ characters of path — which is the 967,493 `CONVENTIONS.md` uses as its baselin
 
 That includes the setup web server, the PKCE exchange, the redrawn setup card and
 both pinned roots (about 2.7 kB of PEM), and leaves **335 kB** of the default
-scheme free — 192 kB under the phone deck's Bluetooth build, 1,164,489 bytes
-measured the same way on the same machine, so dropping Bluedroid still pays for
-mbedTLS and a certificate chain per host. Under `PartitionScheme=huge_app` it is
-967,413 bytes, **30 %** of 3,145,728: a bigger room, not smaller code.
+scheme free, so dropping Bluedroid still pays for mbedTLS and a certificate chain
+per host. Under `PartitionScheme=huge_app` it is 967,413 bytes, **30 %** of
+3,145,728: a bigger room, not smaller code.
+
+The 192 kB gap this paragraph used to draw against a phone build "without
+Bluetooth" rested on 1,164,489 bytes, which no committed file produces: the
+phone deck carries its BLE link from `d53664ec` on. The pair that rebuilds is
+967,493 B above against 1,162,877 B on 2.0.17 — 195,384 B, 191 kB.
 
 An earlier version of this note recorded 1,114,485 bytes (85 % of 1,310,720), 192 kB free and
 a 49 kB gap to the phone deck for the same sketch. That figure does not
