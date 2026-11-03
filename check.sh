@@ -4,13 +4,14 @@
 #
 #   ./check.sh          what a commit must pass            (~3 s)
 #   ./check.sh --full   what a release must pass           (~4 min: the decks on
-#                       both cores, so it needs all three toolchains — source
+#                       both cores, the old ones compared with old_core.json, so
+#                       it needs all three toolchains — source
 #                       ~/.arduino-cyd/env.sh, ~/.arduino-cyd-2/env.sh or ~/.arduino15/env.sh for the old
 #                       core, and ~/.android-offsite/env.sh)
-#   ./check.sh --selftest  the checkers' own refusals        (~9 s, no toolchain)
+#   ./check.sh --selftest  the checkers' own refusals        (~6 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
-# nobody exercises: --selftest runs the six selftest_*.py files, which hand each
+# nobody exercises: --selftest runs the seven selftest_*.py files, which hand each
 # checker a throwaway repo and a stand-in (compiler, capture script, git repo) and
 # make it refuse.
 #
@@ -18,8 +19,9 @@
 #        index (no source file left outside it), the host tests, the branch list as
 #        a note, and the seven render captures whenever a staged file could move a
 #        pixel.
-# Full:  the above, plus deck headroom on both cores, the seven render captures,
-#        and the APK build with its signature, alignment and bundled-sketch checks.
+# Full:  the above, plus deck headroom on 3.3.12, the 2.0.17 decks compared with
+#        old_core.json, the seven render captures, and the APK build with its
+#        signature, alignment and bundled-sketch checks.
 #
 # Each step takes the pattern of the line worth reading, so a passing step reports
 # its measurement rather than whatever the script said last.
@@ -93,6 +95,7 @@ if [ "${1:-}" = "--selftest" ]; then
   step "docs selftest"   'branches of check_docs'           python3 selftest_docs.py
   step "assets selftest" 'branches of check_widget_assets'  python3 selftest_widgets.py
   step "margin selftest" 'branches of check_headroom'       python3 selftest_headroom.py
+  step "core selftest"   'branches of check_old_core'       python3 selftest_old_core.py
   step "branch selftest" 'branches of check_branches'       python3 selftest_branches.py
   step "render selftest" 'branches of check_renders'        python3 selftest_renders.py
   step "gate selftest"   'branches of check.sh'            python3 selftest_gate.py
@@ -173,15 +176,17 @@ if [ "$full" -eq 1 ]; then
   step "headroom" 'deck\(s\) fit'       python3 check_headroom.py "${cli_args[@]}"
   # The old core is a separate question, not a second opinion: a deck that fits on
   # 3.3.12 can still overflow on 2.0.17, and that root carries its own data dir and
-  # its own Python path, so it is built in a shell that sourced its env.sh.
+  # its own Python path, so it is built in a shell that sourced its env.sh. The
+  # build is then compared with old_core.json: a figure the docs quote is only as
+  # good as the last run behind it, and nothing else rebuilds 2.0.17.
   abroot=""
   for candidate in "$HOME/.arduino-cyd-2/env.sh" "$HOME/.arduino15/env.sh"; do
     if [ -f "$candidate" ]; then abroot="$candidate"; break; fi
   done
   if [ -n "$abroot" ]; then
-    step "headroom 2.0.17" 'deck\(s\) fit' bash -c '. "$0" && exec python3 check_headroom.py' "$abroot"
+    step "old core" 'old_core.json' bash -c '. "$0" && exec python3 check_old_core.py' "$abroot"
   else
-    say "headroom 2.0.17" "no A/B root in ~/.arduino-cyd-2 or ~/.arduino15, so the old core was NOT built"
+    say "old core" "no A/B root in ~/.arduino-cyd-2 or ~/.arduino15, so the old core was NOT built"
   fi
   step "renders"  'renders current'     python3 check_renders.py
   step "apk"      '[0-9] bytes'         bash android-companion/toolchain.sh

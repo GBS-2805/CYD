@@ -30,6 +30,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 FQBN = "esp32:esp32:esp32"
 
+# The two floors, in KiB. They live here so `--help` and the environment agree,
+# and check_old_core.py applies the same words to an old-core build.
+DEFAULT_MIN_FREE_KB = 64
+DEFAULT_MIN_RAM_KB = 160
+
 # A deck that has outgrown the default scheme says so here, and the ceiling still
 # comes from the compiler rather than this table: with huge_app it prints
 # 3,145,728, so the same floors are applied to a bigger slot. Only the Spotify
@@ -84,6 +89,32 @@ def env_kb(name, fallback):
         raise SystemExit(2)
 
 
+def verdict(used, slot, ram_free, min_flash, min_ram):
+    """Every way a deck misses its margin, in the order a reader wants them.
+
+    One home for the two floors: the gate's `old core` step builds on 2.0.17 and
+    compares against old_core.json instead of against today's core, but a deck
+    that no longer fits is a deck that no longer fits on either.
+    """
+    problems = []
+    flash_free = slot - used
+    if flash_free < 0:
+        problems.append(
+            "flash OVER by {:,} B - this deck needs huge_app".format(-flash_free)
+        )
+    elif flash_free < min_flash:
+        problems.append(
+            "flash tight: {:,} B is under the {:,} B floor".format(
+                flash_free, min_flash
+            )
+        )
+    if ram_free < min_ram:
+        problems.append(
+            "RAM tight: {:,} B is under the {:,} B floor".format(ram_free, min_ram)
+        )
+    return problems
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Compile each deck and check its flash and RAM headroom."
@@ -102,14 +133,14 @@ def main():
     parser.add_argument(
         "--min-free-kb",
         type=int,
-        default=env_kb("HEADROOM_MIN_FREE_KB", 64),
+        default=env_kb("HEADROOM_MIN_FREE_KB", DEFAULT_MIN_FREE_KB),
         metavar="KB",
         help="free flash each deck must keep, in KiB (default: 64)",
     )
     parser.add_argument(
         "--min-free-ram-kb",
         type=int,
-        default=env_kb("HEADROOM_MIN_RAM_KB", 160),
+        default=env_kb("HEADROOM_MIN_RAM_KB", DEFAULT_MIN_RAM_KB),
         metavar="KB",
         help="DRAM each deck must leave for the stack and its buffers, in KiB "
         "(default: 160, just over the 153,600 B a full framebuffer needs)",
@@ -180,14 +211,7 @@ def main():
             # A link that fails still prints the size it could not place, so read
             # the numbers and say what happened instead of a bare "compile failed".
             problems.append("build failed")
-        if flash_free < 0:
-            problems.append(f"flash OVER by {-flash_free:,} B - this deck needs huge_app")
-        elif flash_free < min_flash:
-            problems.append(
-                f"flash tight: {flash_free:,} B is under the {min_flash:,} B floor"
-            )
-        if ram_free < min_ram:
-            problems.append(f"RAM tight: {ram_free:,} B is under the {min_ram:,} B floor")
+        problems.extend(verdict(used, slot, ram_free, min_flash, min_ram))
         if problems:
             status = "; ".join(problems)
             failures += 1
