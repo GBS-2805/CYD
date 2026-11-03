@@ -630,14 +630,16 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **192,970 bytes** on 2026-11-02, the rebuild carrying two bundled sketches, the
+  **197,986 bytes** on 2026-11-03, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror, the three-step probe, the owner's logo as the icon, the mark
   centred on the top bar at 26dp as one PNG per density rather than above the
-  drawer's wordmark, and the gear and chevrons drawn as shapes. That is 10,732
-  bytes above the previous 182,238, and the rebuild overwrote that file, so the
+  drawer's wordmark, the gear and chevrons drawn as shapes, and the shelf that
+  adds, edits, deletes and attaches a project and imports a file from its own
+  picker. That is 15,748 bytes above the previous 182,238, and the rebuild
+  overwrote that file, so the
   difference is not itemised here — the archive is not byte-reproducible either. Quote the size to the nearest kB
-  (~188 kB), never as a checksum.
+  (~193 kB), never as a checksum.
 - `aapt2 dump badging` reports package `dev.phonedesk.companion`, versionCode 1,
   minSdk 26, targetSdk 35, the expected permission set — now including
   `INTERNET`, the one outbound request to the deck —

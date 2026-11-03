@@ -572,7 +572,7 @@ other mention of it in this repo is a pointer back here.
   that measured the numbers.
 * Nothing is pushed or deployed without being asked. The repo stays private.
 * **One kB is 1,024 bytes, and it is written down once, here.** Every size in
-  these docs is binary: 192,970 B is "188 kB", 343,307 B is "335 kB", rounded to
+  these docs is binary: 197,986 B is "193 kB", 343,307 B is "335 kB", rounded to
   the nearest kB with the exact bytes beside it in a table or in `HANDOFF.md`.
   Decimal kilobytes crept in and read as plausible — 343 kB for 343,307 B, 753 kB
   for 752,864 B, and "1,123–1,126 kB" for a range that was in bytes — so the
