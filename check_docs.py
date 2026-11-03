@@ -83,9 +83,11 @@ import check_old_core  # noqa: E402  (the one reader for old_core.json)
 ROOT = Path(__file__).resolve().parent
 SKIP_DIRS = {".git", ".gradle", "build", "node_modules"}
 
-# Numbers the docs quote on purpose because they are history: a build that no
-# longer exists, kept as the "it used to be this" side of a comparison. Each one
-# names why, so a new stale figure cannot hide in here by accident.
+# Numbers the docs quote on purpose because this gate cannot print them: a build
+# that no longer exists, kept as the "it used to be this" side of a comparison, or
+# the same sketch through a root installed under another home, which shifts the
+# binary by a few bytes. Each one names why, so a new stale figure cannot hide in
+# here by accident.
 HISTORICAL = {
     1122249: "the Spotify sketch on 2.0.17 on its own path, before the 3.x jump",
     1122281: "the Spotify sketch on 2.0.17 through toolchain.sh's root",
@@ -113,6 +115,11 @@ HISTORICAL = {
     1878661: "the linked Spotify sketch through the deck chat's "
              "~/.arduino-cyd-3/env.sh, 16 B over this root; first seen as the top "
              "of a 2026-11-02 range",
+    1878645: "the linked Spotify sketch through ~/.arduino-cyd under this chat's "
+             "26-character home id: 32 B over the same root under a 24-character "
+             "one and 16 B under that tree's ~/.arduino-cyd-3. The figure the "
+             "docs quote, and a probe on 2026-11-03 showed it does not move with "
+             "the sketch's own path - only with where the root is installed",
     1168170: "the phone sketch through a second install root, 144 B under this one",
     1878469: "the linked Spotify sketch through /tmp/arduino-cyd-3: 176 B under "
              "the 1,878,645 these docs quote, and 192 B under the deck chat's "

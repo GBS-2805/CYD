@@ -181,7 +181,13 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   its FQBN and the compiler behind it are all unchanged, so a prose-only commit
   costs a second instead of a minute; `--refresh` rebuilds anyway, and every run
   names the decks that came from the file. A past build may stay in the prose,
-  but only by name in that file's `HISTORICAL` table, next to the reason, and
+  but only by name in that file's `HISTORICAL` table, next to the reason. The
+  table holds two cases and the reason says which: the file that printed a number
+  is gone, or this root cannot print it — the same committed sketch through a
+  root installed under another home differs by tens of bytes, so a tree whose
+  home id is a different length prints a different number for identical bytes.
+  That is registered, not deleted, because a reader on that root has the prose
+  and the build in front of them and needs the difference named. And
   a sentence that calls one rebuildable has to deny it within a dozen words of
   the number and of the verb — punctuation between them is not a word, and a
   path counts once: the builds in `NO_SKETCH` have no committed sketch behind
@@ -208,9 +214,13 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   chat's `~/.arduino-cyd-3` reads 1,168,314 B and 1,878,661 B, 16 B over on the
   linked deck, and `/tmp/arduino-cyd-3` was read at 1,168,170 B and 1,878,469 B,
   144 B and 176 B under. None of that is sketch drift, because the
-  md5s match: it is the build path, so source the `env.sh` whose figures you are
-  quoting, say which root when two disagree, and re-measure a merged number here
-  instead of accepting another tree's last two digits. The unlinked Spotify figure
+  md5s match: it is where the root is installed, not where the sketch sits — on
+  2026-11-03 the same linked sketch, compiled from `/tmp/probeA`, from a longer
+  `/tmp/probeB/` path and in place in this repo, printed 1,878,645 B through
+  `~/.arduino-cyd` all three times, while these two roots stay 176 B apart on the
+  same bytes. So source the `env.sh` whose figures you are quoting, say which
+  root when two disagree, and re-measure a merged number here instead of
+  accepting another tree's last two digits. The unlinked Spotify figure
   belongs to a sketch rather than to a root: it is the pre-link file
   (`00bb1560`), not a flag on today's, and rebuilt from that file on 2026-11-03 it
   printed 1,125,781 B, 85 % of 1,310,720, with 53,636 B of globals; through
