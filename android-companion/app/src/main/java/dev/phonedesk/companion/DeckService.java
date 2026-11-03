@@ -161,6 +161,19 @@ public class DeckService extends Service {
         if (svc != null) svc.connectManually(mac);
     }
 
+    /**
+     * User unlinked a deck: drop the link and the preference, and stop linking by
+     * itself. The scan keeps running, so a LINK tap is always one row away.
+     */
+    public static void unlink(Context context, String mac) {
+        DeckService svc = instance;
+        if (svc != null) {
+            svc.unlinkDeck(mac);
+        } else if (mac != null && !mac.isEmpty()) {
+            DeckStore.setPreferred(context, "");
+        }
+    }
+
     public static boolean notificationAccess(Context context) {
         String flat = Settings.Secure.getString(context.getContentResolver(),
                 "enabled_notification_listeners");
@@ -232,6 +245,13 @@ public class DeckService extends Service {
     private boolean scanning;
     private boolean connecting;
     private boolean writing;
+
+    /**
+     * Set by UNLINK: keep the scan (so NEARBY stays honest) but never link on my
+     * own until LINK is tapped. Without it, unlinking a deck in range links it
+     * straight back in the next scan and the row the user just forgot returns.
+     */
+    private volatile boolean paused;
 
     private volatile String preferredMac = "";
     private volatile String linkedMac = "";
@@ -483,6 +503,7 @@ public class DeckService extends Service {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        paused = false;
         preferredMac = DeckStore.preferred(this);
         createChannel();
         startForeground(FOREGROUND_ID, buildForegroundNotification());
@@ -636,6 +657,7 @@ public class DeckService extends Service {
         if (result == null) return;
         if (!looksLikeDeck(result)) return;
         recordNearby(result);
+        if (paused) return;
         if (gatt != null || connecting) return;
 
         String mac = result.getDevice().getAddress();
@@ -708,6 +730,7 @@ public class DeckService extends Service {
 
     private void connectManually(String mac) {
         if (mac == null || mac.isEmpty()) return;
+        paused = false;
         preferredMac = mac;
         DeckStore.setPreferred(this, mac);
 
@@ -732,6 +755,17 @@ public class DeckService extends Service {
         } catch (SecurityException e) {
             setStatus("Bluetooth permission needed");
         }
+    }
+
+    /** Drops the link to one board, if that is the board the link is holding. */
+    private void unlinkDeck(String mac) {
+        if (mac == null || mac.isEmpty() || !mac.equalsIgnoreCase(linkedMac)) return;
+        paused = true;
+        preferredMac = "";
+        DeckStore.setPreferred(this, "");
+        stopScan();
+        releaseGatt();
+        setStatus("Unlinked \u2014 tap LINK to connect a deck");
     }
 
     /** The platform's values, decided in {@link BondAdvice}, which the host suite can run. */

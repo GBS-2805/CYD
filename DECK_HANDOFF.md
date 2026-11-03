@@ -113,10 +113,10 @@ level, and the READMEs are how the next deck edit finds its numbers.
 The one way these docs can go stale in the app is if an app-side document quotes
 a deck's flash use. Say which core and which file: 967,413 B is 73 % of 1,310,720
 on 2.0.17, and it is the 2026-10-31 Spotify sketch (`ef0681b`) that printed it,
-not today's, which reads 1,748,765 B on that core, past the default slot. On
+not today's, which reads 1,749,309 B on that core, past the default slot. On
 3.3.12, 1,125,781 B is 85 % of 1,310,720 for the pre-link file (`00bb1560`), while
-today's linked sketch is 1,878,645 B, 59 % of 3,145,728, on `huge_app`.
-`old_core.json` records the 2.0.17 pair — 1,748,765 B for Spotify beside the md5
+today's linked sketch is 1,880,101 B, 59 % of 3,145,728, on `huge_app`.
+`old_core.json` records the 2.0.17 pair — 1,749,309 B for Spotify beside the md5
 of the sketch that printed it — so read a 2.0.17 figure there, never by pairing
 that row with a number from another file. The deck READMEs hold the measured
 figures and the verified/unverified split, so point at them instead of copying

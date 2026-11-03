@@ -56,6 +56,15 @@ reason to add a resource pipeline.
 - Tapping LINK calls `connectTo(mac)`, which writes the MAC to `DeckStore` as the
   preferred deck. When a preference exists the scanner ignores other decks, so a
   neighbouring board cannot steal the connection.
+- **UNLINK is a deliberate stop, not just a disconnect.** It forgets the record,
+  clears the preference, closes the GATT link and sets a `paused` flag the scan
+  callback reads: NEARBY keeps refreshing, but nothing links by itself until LINK
+  is tapped or the service restarts. Without that flag the next scan re-linked the
+  board the user had just forgotten and `DeckStore.remember` wrote the row straight
+  back. A saved deck that is not linked carries FORGET instead of UNLINK, and
+  `DeckRegistry.forget` runs beside `DeckStore.forget` so a network deck's shelf
+  card goes with its row. The deck has the mirror-image control: `UNPAIR`, a hold
+  on the footer chip, drops the phone's bond from the board's side.
 - `snapshot()` also carries `writes` (acknowledged GATT writes), `notices`
   (notifications forwarded), `connectedAtMs`, `lastWriteMs` and `rssi`
   (`readRemoteRssi()` every 10 s).
@@ -632,7 +641,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **202,353 bytes** on 2026-11-03, the rebuild carrying two bundled sketches, the
+  **206,449 bytes** on 2026-11-03, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror, the three-step probe, the owner's logo as the icon, the mark
   centred on the top bar at 26dp as one PNG per density rather than above the
@@ -648,19 +657,21 @@ Identical to the sketch, checked against its `onWrite` handlers:
   AOSP issue 268071369). `toolchain.sh` now rewrites the archive with `zipalign`,
   which drops the signing block, and signs it again from the pinned debug key,
   whose RSA signatures are deterministic. Two full runs then shipped the same
-  file, byte for byte: **202,353 bytes**, 4,367 of them the bigger signing
+  file, byte for byte: **202,353 bytes** in the run before the deck chat's chips,
+  4,367 of them the bigger signing
   block that re-signing writes. A different keystore signs different bytes, so
   reproducible means this toolchain and this key; `OFFSITE_KEYSTORE` overrides
-  both halves. Quote the size to the nearest kB (198 kB), never as a checksum.
+  both halves. Quote the size to the nearest kB (202 kB), never as a checksum.
 - **The release build type runs, and its archive is signed by a key that is not in
   the tree.** Measured on 2026-11-03: `clean assembleRelease` exits 0 in 16 s, 44
   actionable tasks with 41 executed, including `lintVitalRelease`. The archive
   Gradle writes is unsigned, because the release type has no `signingConfig`, so
-  [`release.sh`](release.sh) aligns and signs it. The unsigned file is 191,798
-  bytes, about 10 kB under the debug APK because `debug` writes the larger signing
-  block. The signed file is **206,447 bytes** (202 kB), 4,094 more again, because a
-  4096-bit key writes a bigger signing block than the debug key's 2048-bit one.
-  Two runs of the script produced the same signed bytes. It is versionCode 1,
+  [`release.sh`](release.sh) aligns and signs it. The unsigned file is 193,862
+  bytes, 12,587 under the debug APK because `debug` writes the larger signing
+  block. The signed file is **206,447 bytes** (202 kB), 12,585 more again from a
+  4096-bit key's bigger signing block, and 2 bytes *under* the debug APK — the two
+  archives sit within a rounding error of each other, so the debug figure is no
+  guide to the release one. It is versionCode 1,
   minSdk 26, targetSdk 35, not debuggable, and it carries both sketches in its
   assets. The signer is read back out of the archive and refused if it comes back
   as the debug identity instead. The unsigned file is build output rather than a

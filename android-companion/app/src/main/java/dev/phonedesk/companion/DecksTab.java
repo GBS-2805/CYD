@@ -116,6 +116,12 @@ final class DecksTab extends ScrollView {
                     + Ui.ago(snapshot.lastWriteMs, System.currentTimeMillis()), 12, Ui.DIM);
             mac.setPadding(0, Ui.dp(activity, 4), 0, 0);
             deck.addView(mac);
+            // The way out of a link from the card that shows it, so an unlink never
+            // depends on finding the row for this board further down the page.
+            Button unlink = Ui.action(activity, "UNLINK", false);
+            unlink.setOnClickListener(v -> unlinkLinked(snapshot));
+            Ui.space(activity, unlink, 10);
+            deck.addView(unlink);
             Ui.space(activity, deck, 10);
             body.addView(deck);
         }
@@ -198,14 +204,55 @@ final class DecksTab extends ScrollView {
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
         if (deck.mac.equalsIgnoreCase(snapshot.deviceMac)) {
-            card.addView(Ui.text(activity, "LINKED", 11, Ui.GOOD));
+            // The card above already says LINKED; here the useful control is the way
+            // out, which drops the link and forgets the row in one tap.
+            Button unlink = Ui.action(activity, "UNLINK", false);
+            unlink.setOnClickListener(v -> unlink(deck, true));
+            card.addView(unlink);
         } else {
             Button link = Ui.action(activity, "LINK", false);
             link.setOnClickListener(v -> DeckService.connectTo(deck.mac));
             card.addView(link);
+
+            Button forget = Ui.action(activity, "FORGET", false);
+            forget.setOnClickListener(v -> unlink(deck, false));
+            LinearLayout.LayoutParams spare =
+                    new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT);
+            spare.leftMargin = Ui.dp(activity, 8);
+            card.addView(forget, spare);
         }
         Ui.space(activity, card, 8);
         body.addView(card);
+    }
+
+    /**
+     * UNLINK and FORGET are one write and an optional disconnection, in that order:
+     * the record is gone even when the bridge is stopped, so a forgotten deck stays
+     * forgotten.
+     */
+    private void unlink(DeckStore.Known deck, boolean linked) {
+        DeckStore.forget(activity, deck.key());
+        if (!deck.id.isEmpty()) DeckRegistry.forget(activity, deck.id);
+        if (linked) DeckService.unlink(activity, deck.mac);
+        Actions.toast(activity, (linked ? "Unlinked " : "Forgot ") + deck.name);
+        signature = "";
+        refresh();
+    }
+
+    /** The card above carries no {@link DeckStore.Known}, so it forgets by address. */
+    private void unlinkLinked(DeckService.Snapshot snapshot) {
+        DeckStore.Known known = DeckStore.byMac(activity, snapshot.deviceMac);
+        if (known != null) {
+            unlink(known, true);
+            return;
+        }
+        DeckStore.forget(activity, snapshot.deviceMac);
+        if (!snapshot.deviceId.isEmpty()) DeckRegistry.forget(activity, snapshot.deviceId);
+        DeckService.unlink(activity, snapshot.deviceMac);
+        Actions.toast(activity, "Unlinked " + snapshot.deviceName);
+        signature = "";
+        refresh();
     }
 
     @Override

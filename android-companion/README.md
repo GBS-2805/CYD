@@ -28,6 +28,11 @@ from guesswork: `linked 4m 12s · -62 dBm · 18 packets · 5 notices`.
   CYD in range never steals the connection; the choice survives restarts.
 - Every deck that links is remembered under **SAVED DECKS** with its last-seen
   time, so a board that is switched off still shows up.
+- **UNLINK** drops the link and forgets the row in one tap — on the linked deck's
+  card, or on its SAVED DECKS row where it replaces the `LINKED` badge. The scan
+  keeps running but stops linking by itself until you tap LINK, so the board you
+  just forgot is not taken straight back. A deck that is only remembered carries
+  **FORGET**, which removes the record and leaves the current link alone.
 - The header pill reads `LINKED`, `SCANNING` or `IDLE`, and the monitor refreshes
   once a second. RSSI is polled from the live link every 10 s.
 
@@ -259,7 +264,7 @@ through Gradle; a raw `javac` build produces an APK-less class check and the
 BOARDS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
-[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (198 kB,
+[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (202 kB,
 package `dev.phonedesk.companion`, debug-signed). Install it with
 `adb install -r dist/PhoneDeckBridge-debug.apk`, or copy it to the phone and open
 it with "install unknown apps" allowed.

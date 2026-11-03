@@ -103,9 +103,12 @@ sketch and the descriptor `id`, which always move together:
 
 ### The first session with a board
 
-No sketch here has run on hardware, so the first evening has an order: the deck that
-needs the least to prove itself goes first, and each step records the one fact the
-next depends on. Write every result into that widget's `README.md` under *Verified*
+The Spotify deck's Bluetooth half ran on 2026-11-03 — flashed on `huge_app`, it
+linked to the companion app, mirrored the phone's line and started playback from a
+chip, with the corner chips awkward to hit — and nothing else here has run on
+hardware. The first evening with a board still has an order: the deck that needs
+the least to prove itself goes first, and each step records the one fact the next
+depends on. Write every result into that widget's `README.md` under *Verified*
 with the date and the command that printed it, because a number without a run behind
 it is the drift this file exists to stop.
 
@@ -133,13 +136,17 @@ it is the drift this file exists to stop.
 7. **A power cycle.** Identity and touch fit come back without a rescan or a
    recalibration; that is NVS doing its job, and it is the last cheap check before
    the expensive deck.
-8. **Only then the Spotify deck, on `huge_app`.** The first sketch here whose
-   partition scheme has to be flashed with it: 1,878,645 B, 59 % of its 3,145,728 B
-   slot. Record the switch, the boot, the setup access point, that
-   `GET /deck.json` and `GET /auth?app=1&json=1` answer, and **the heap during the
-   TLS handshake** — the one number this repo has never had, with 53,636 B of globals
-   leaving 268 kB for mbedTLS 3.x. Then the Bluetooth link beside the player, then
-   the touch paths.
+8. **The Spotify deck, on `huge_app` — Bluetooth half done on 2026-11-03.** The
+   first sketch here whose partition scheme has to be flashed with it:
+   1,880,101 B, 59 % of its 3,145,728 B slot. Flashed, it linked to the companion app,
+   drew the phone's line and started playback from a chip, so the scheme, the
+   advertise, the identity read, the mirror and the command notify all answered at
+   once; the corner chips were hard to hit, which is why `10bb4b7` enlarged their
+   rects and added the `UNPAIR` hold — neither has been flashed back yet. What that
+   step still owes is the network half: the setup access point, that
+   `GET /deck.json` and `GET /auth?app=1&json=1` answer, the code exchange, and
+   **the heap during the TLS handshake** — the one number this repo has never had,
+   with 53,636 B of globals leaving 268 kB for mbedTLS 3.x.
 9. **The app's own USB flasher, separately.** It is expected to fail — 552 B left
    the phone per round at 115200, 57600, 230400, 460800 and 74880 in both DTR/RTS
    polarities, with no sync — so run it as an experiment with the log kept, and never
@@ -400,7 +407,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   the partition before assuming a sketch still fits. The Spotify README's 967,413
   is the 2026-10-31 file (`ef0681b`) on a path ten characters shorter; at this
   repo's path it prints 967,493, and the committed Spotify sketch, which has
-  grown the Bluetooth link and the identity since, prints 1,748,765 B on 2.0.17
+  grown the Bluetooth link and the identity since, prints 1,749,309 B on 2.0.17
   — over the 1,310,720-byte default slot.
 * **Why 3.x is the default, and what would reverse it.** Core 2.0.17 ships
   mbedTLS 2.28.7, a branch that reached end of life at the end of 2024, and the

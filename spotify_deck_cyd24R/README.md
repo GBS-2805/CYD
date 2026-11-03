@@ -340,7 +340,7 @@ the 2026-10-31 sketch. Rebuilt on 2026-11-03 through a fresh 2.0.17 root at
 this repo's path, that same file prints 967,493 bytes, 80 B higher for ten
 characters of path — which is the 967,493 `CONVENTIONS.md` uses as its
 baseline. Today's committed sketch, which grew the Bluetooth link and the
-`/deck.json` identity after that day, prints 1,748,765 bytes on the same core:
+`/deck.json` identity after that day, prints 1,749,309 bytes on the same core:
 past the 1,310,720-byte default slot, so it needs `huge_app` on 2.0.17 too.
 
 That includes the setup web server, the PKCE exchange, the redrawn setup card and
@@ -370,9 +370,10 @@ level hides both sets, and an incremental rebuild can also report a stale,
 smaller link — these numbers come from a fresh build path.
 
 **Almost nothing here has run on the board.** The owner flashed the 2026-11-03 build
-and reported the corner chips hard to hit — the larger hit rects and the `UNPAIR`
-hold are the answer to that and have not been flashed back — but no request has
-been confirmed leaving this chip. Specifically unverified: the access point and the setup
+and it linked to the companion app, mirrored the phone's line and started playback
+from a chip, with the corner chips hard to hit — the larger hit rects and the
+`UNPAIR` hold are the answer to that and have not been flashed back. No request has
+been confirmed leaving this chip for Spotify. Specifically unverified: the access point and the setup
 page on a real phone (including whether the phone keeps mobile data for the
 Spotify tab while joined to the deck), the S256 challenge as Spotify receives it,
 the code exchange and its pinned-certificate handshake to
@@ -435,7 +436,7 @@ sourcing a toolchain.
   2026-10-31 file, taken before the deck grew its `/deck.json` identity and its
   Bluetooth link. Rebuilt through `~/.arduino-cyd-2` on 2026-11-03 that file
   prints 967,493 bytes at this repo's path, so the 967,413 is history and
-  967,493 is the same file here — not today's, which reads 1,748,765 bytes on
+  967,493 is the same file here — not today's, which reads 1,749,309 bytes on
   that core.
 * Re-measured on 2026-11-01 with `arduino-cli` 1.5.2-rc.1, core **3.3.12** links
   the committed file at 1,125,781 bytes, 85 % of 1,310,720, with

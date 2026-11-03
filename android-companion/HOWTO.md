@@ -29,6 +29,18 @@ board, tap **LINK** on that board's row.
 Saved decks keep their last-seen time, so you can identify a board that is
 currently switched off. Bring it near the phone and tap LINK again.
 
+## Unlink, or forget a deck
+
+**UNLINK** is on the linked deck's own card at the top of PAIRED, and replaces the
+`LINKED` badge on its SAVED DECKS row. One tap drops the link, removes the row and
+stops the bridge linking by itself — which is the point: a board you flashed is
+typically sitting right there, and an unlink that re-links in the next scan is not
+an unlink. The scan keeps running, so **LINK** on any NEARBY row takes a deck again
+whenever you want one.
+
+A deck that is only remembered, not linked, shows **FORGET** instead: it removes
+the record and leaves whatever link is up alone.
+
 ## Check the link health
 
 The **PAIRED** status card shows, live:

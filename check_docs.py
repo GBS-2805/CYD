@@ -3,7 +3,7 @@
 
 CONVENTIONS.md says a published size is a measurement, never a guess, and the
 READMEs quote the build of the day: 1,168,314 B for the phone deck and
-1,878,645 B for the Spotify one, plus the md5 that check_widget_assets.py
+1,880,101 B for the Spotify one, plus the md5 that check_widget_assets.py
 compares. Nothing kept those honest. A comment that cost 32 bytes, or a header
 rewrite that changed the hash, left every doc a version behind - twice now, and
 both times a reader noticed before a check did.
@@ -21,12 +21,12 @@ sketch that printed it, and stops vouching for it the moment that sketch
 moves - which is when the figure would have wanted re-measuring anyway.
 
 What counts as a flash size here: a grouped number of 7 digits or more, like
-1,878,645. That is deliberately narrow. The APK, an mbedTLS margin and a
+1,880,101. That is deliberately narrow. The APK, an mbedTLS margin and a
 globals delta are all quoted in these docs as byte counts too, and flagging them
 would bury the one number this check exists for.
 
 A percentage is judged only where its ceiling is on the same line — `| flash |
-1,878,645 | **1,267,083** | 3,145,728 (59 % used) |` — and only when that line
+1,880,101 | **1,265,627** | 3,145,728 (59 % used) |` — and only when that line
 names one ceiling and carries one percentage. Anything looser ("143 % of that
 slot") would need the checker to decide which slot the sentence meant, and a
 checker that guesses is one people learn to skip.
@@ -122,10 +122,10 @@ HISTORICAL = {
              "the sketch's own path - only with where the root is installed",
     1168170: "the phone sketch through a second install root, 144 B under this one",
     1878469: "the linked Spotify sketch through /tmp/arduino-cyd-3: 176 B under "
-             "the 1,878,645 these docs quote, and 192 B under the deck chat's "
+             "the 1,880,101 these docs quote, and 192 B under the deck chat's "
              "1,878,661",
     1125669: "the Spotify sketch through that same second root, 112 B under it",
-    1267083: "not a build at all: the flash left beside an earlier 1,878,645 B "
+    1267083: "not a build at all: the flash left beside an earlier 1,880,101 B "
              "Spotify build, its huge_app slot minus what the sketch used",
     1880053: "the same linked Spotify sketch through ~/.arduino-cyd/env.sh, "
              "which sets only PATH so the build goes through ~/.arduino15: "
