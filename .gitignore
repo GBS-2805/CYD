@@ -16,9 +16,8 @@ artifacts/launcher-preview-masked.png
 artifacts/launcher-preview-squircle.png
 
 # Compositions of frames that are already committed beside them: a tall scroll of
-# the seven screens and a strip of them, rebuilt on demand rather than tracked.
+# the nine screens and a strip of them, rebuilt on demand rather than tracked.
 artifacts/renders/scroll.png
-artifacts/renders/seven-screens.png
 
 # check_docs.py's last measurement of each deck: local, machine-specific,
 # and discarded the moment a sketch or the compiler changes.
