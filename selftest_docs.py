@@ -249,9 +249,19 @@ CASES = [
         ),
         want_code=1,
         want=[
-            "calls 1,162,877 B rebuildable, but no committed sketch makes it",
+            "calls 1,162,877 B rebuildable with no denial within 12 words of it",
             "the 2026-10-30 phone sketch, which no commit here holds",
         ],
+    ),
+    dict(
+        name="a denial thirty words from the figure does not excuse it",
+        mutate=append_readme(
+            "\n1,162,877 B is the 2026-10-30 phone file, and the deck draws a "
+            "header, a panel, a track list, a progress bar, a battery line and "
+            "a clock; that file cannot be rebuilt because nobody kept it.\n"
+        ),
+        want_code=1,
+        want=["calls 1,162,877 B rebuildable with no denial within 12 words of it"],
     ),
     dict(
         name="that claim wrapped across two lines is still refused whole",

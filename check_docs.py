@@ -30,7 +30,8 @@ One claim needs the whole sentence rather than one line: a figure the prose says
 can be rebuilt. "The pair that rebuilds" once named 967,493 B against 1,162,877 B
 for a phone sketch no commit holds, and a reader who went looking for the file
 found nothing to compile. So a sentence that pairs a rebuild word with a figure
-in NO_SKETCH, and denies it nowhere in that sentence, is refused: the prose may
+in NO_SKETCH, and denies it nowhere within a dozen words of
+that number, is refused: the prose may
 keep such a number as history, but never as something to build again.
 
 A relative link is the same failure in another form: a doc pointing at a file
@@ -150,6 +151,11 @@ REBUILD_DENIED = re.compile(
     r"\b(cannot|can not|can't|never|nobody|no|not|without|used to|gone|record)\b",
     re.I,
 )
+
+# How many words a denial may sit from the figure it corrects. Twelve keeps
+# "which the docs used to rebuild at 1,162,877 B" legal and refuses a correction
+# parked a clause away, where a reader skimming the number never meets it.
+DENIAL_WORDS = 12
 # A sentence ends at `.`, `?` or `!` followed by space and something that starts
 # one — a capital, a backtick, a bold mark, an opening bracket. That leaves
 # 1,135.6 and `.build_figures.json` alone.
@@ -531,29 +537,42 @@ def rebuild_problems(path, text):
     phone file was written as a pair both halves of which rebuild, and one half
     never could: that phone sketch is in no commit, so a reader who believed the
     sentence found nothing to check out. A rebuild word beside a NO_SKETCH figure
-    is therefore only allowed in a sentence that says it cannot be rebuilt — where
-    the claim and its correction are read together, not a paragraph apart.
+    is therefore only allowed where a denial reaches the number itself and a
+    rebuild verb, both within DENIAL_WORDS: a correction parked a clause away is
+    one a reader skimming the figure never sees, which is how the sentence read
+    as true for as long as it did.
     """
+    def window(index):
+        low = max(0, index - DENIAL_WORDS)
+        return " ".join(m.group(0) for m in words[low:index + DENIAL_WORDS + 1])
+
     problems = []
     for number, sentence in sentences(text):
         if not REBUILD_WORD.search(sentence):
             continue
-        figures = [
-            int(match.group(1).replace(",", "")) for match in SIZE.finditer(sentence)
-        ]
-        missing = [value for value in figures if value in NO_SKETCH]
-        if not missing or REBUILD_DENIED.search(sentence):
-            continue
-        problems.append(
-            "%s:%d calls %s rebuildable, but no committed sketch makes it (%s); "
-            "say in that sentence that it cannot be rebuilt"
-            % (
-                shown(path),
-                number,
-                " and ".join("{:,} B".format(value) for value in missing),
-                "; ".join(NO_SKETCH[value] for value in missing),
+        words = list(re.finditer(r"\S+", sentence))
+        verbs = [i for i, m in enumerate(words) if REBUILD_WORD.search(m.group(0))]
+        verb_denied = any(REBUILD_DENIED.search(window(i)) for i in verbs)
+        for index, match in enumerate(words):
+            digits = re.sub(r"[^\d,]", "", match.group(0))
+            if not re.fullmatch(r"\d{1,3}(?:,\d{3})+", digits):
+                continue
+            value = int(digits.replace(",", ""))
+            if value not in NO_SKETCH:
+                continue
+            if verb_denied and REBUILD_DENIED.search(window(index)):
+                continue
+            problems.append(
+                "%s:%d calls %s rebuildable with no denial within %d words of it "
+                "(%s); say beside the figure that it cannot be rebuilt"
+                % (
+                    shown(path),
+                    number,
+                    "{:,} B".format(value),
+                    DENIAL_WORDS,
+                    NO_SKETCH[value],
+                )
             )
-        )
     return problems
 
 
