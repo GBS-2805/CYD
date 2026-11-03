@@ -132,6 +132,22 @@ CASES = [
         forbids=["  - "],
     ),
     dict(
+        name="a slot percentage the bytes beside it do not make is refused",
+        mutate=append_readme(
+            "\n| flash | 1,168,314 | 142,406 | 1,310,720 (74 % used) |\n"
+        ),
+        want_code=1,
+        want=["quotes 74 %, which none of the figures beside it makes of 1,310,720"],
+    ),
+    dict(
+        name="a slot percentage that matches those bytes passes",
+        mutate=append_readme(
+            "\n| flash | 1,168,314 | 142,406 | 1,310,720 (89 % used) |\n"
+        ),
+        want_code=0,
+        forbids=["  - "],
+    ),
+    dict(
         name="a link to a renamed file is refused",
         mutate=append_readme("\nRead [the old page](gone.md).\n"),
         want_code=1,

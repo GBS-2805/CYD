@@ -231,7 +231,7 @@ sketch inside the APK against the file its descriptor names
 
 The size is not byte-stable: two builds of the same sources differ by a dozen
 bytes because the dex files carry build-time data. Treat the printed number as
-"about 190 kB", not as a checksum.
+"about 188 kB", not as a checksum.
 
 ## Flash an image from the phone over USB
 

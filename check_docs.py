@@ -20,6 +20,12 @@ What counts as a flash size here: a grouped number of 7 digits or more, like
 globals delta are all quoted in these docs as byte counts too, and flagging them
 would bury the one number this check exists for.
 
+A percentage is judged only where its ceiling is on the same line — `| flash |
+1,878,645 | **1,267,083** | 3,145,728 (59 % used) |` — and only when that line
+names one ceiling and carries one percentage. Anything looser ("143 % of that
+slot") would need the checker to decide which slot the sentence meant, and a
+checker that guesses is one people learn to skip.
+
 A relative link is the same failure in another form: a doc pointing at a file
 somebody renamed describes a tree that no longer exists, and no number check can
 see it. So every `](path)` in a doc has to resolve from that doc's own folder;
@@ -116,6 +122,11 @@ URL = re.compile(r"\S*://\S+")
 # check's business.
 SIZE = re.compile(r"(?<![\d.,])(\d{1,3}(?:,\d{3})+)(?![\d,])")
 MIN_SIZE = 1000000
+# A percentage that has to agree with the bytes beside it, and the DRAM ceiling
+# the compiler prints, which no deck build here reports as a slot.
+PERCENT = re.compile(r"(?<![\w.])(\d{1,3})\s?%")
+COUNT = re.compile(r"(?<![\d.,])(\d{1,3}(?:,\d{3})+|\d{2,})(?![\d,])")
+DRAM_CEILING = 327680
 # `[text](path)` and `![alt](path)`; the image form matters because the renders
 # live in artifacts/renders/ and a stale name there is just as invisible.
 LINK = re.compile(r"\]\(([^)\s]+)\)")
@@ -377,6 +388,46 @@ def apk_problem():
     ]
 
 
+def percentage_problems(path, text, ceilings):
+    """Refuse a percentage that none of the bytes beside it can produce.
+
+    Deliberately narrow: a line is judged only when it names exactly one ceiling
+    and carries exactly one percentage. Widening it would mean deciding which
+    ceiling a wrapped sentence meant, and a guess there is worse than silence —
+    the row is where these numbers are written together, and a row is what this
+    can read without inventing context.
+    """
+    problems = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        percents = [int(match.group(1)) for match in PERCENT.finditer(line)]
+        if len(percents) != 1:
+            continue
+        counts = [
+            int(match.group(1).replace(",", "")) for match in COUNT.finditer(line)
+        ]
+        named = {value for value in counts if value in ceilings}
+        if len(named) != 1:
+            continue
+        ceiling = named.pop()
+        figures = [
+            value for value in counts if value not in ceilings and value >= 1000
+        ]
+        if not figures:
+            continue
+        ratios = set()
+        for value in figures:
+            exact = 100.0 * value / ceiling
+            ratios.add(int(exact))
+            ratios.add(int(round(exact)))
+        if percents[0] in ratios:
+            continue
+        problems.append(
+            "%s:%d quotes %d %%, which none of the figures beside it makes of %s"
+            % (shown(path), number, percents[0], "{:,}".format(ceiling))
+        )
+    return problems
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Check that docs quote the sizes and md5s of the current build."
@@ -446,6 +497,7 @@ def main():
         )
 
     sizes = allowed_sizes(built)
+    ceilings = {deck["slot"] for deck in built} | {DRAM_CEILING}
     hashes = {deck["md5"][:8] for deck in built}
     full_hashes = {deck["md5"] for deck in built}
     problems = []
@@ -455,6 +507,7 @@ def main():
         text = path.read_text(encoding="utf-8", errors="replace")
         problems.extend(link_problems(path, text))
         problems.extend(prose_problems(path, text))
+        problems.extend(percentage_problems(path, text, ceilings))
         for number, line in enumerate(text.splitlines(), start=1):
             for match in SIZE.finditer(line):
                 value = int(match.group(1).replace(",", ""))

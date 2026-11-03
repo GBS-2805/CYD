@@ -387,8 +387,8 @@ A compile in this repo, on 2026-10-30 and before the mirror, with `arduino-cli`
 1.5.2-rc.1:
 **core 2.0.17** 1,162,797–1,162,813 B (**88 %** flash) and 41,436 B (12 % RAM);
 **core 3.3.12** 1,163,930 B (88 %) and 45,004 B (13 %). The 2.x figure moves by
-~16 bytes with the build root, so read it as 1,162.8 kB rather than a fixed count.
-Core 3.x costs 1–2.4 kB of flash and 3.6 kB of RAM for this sketch, depending on
+~16 bytes with the build root, so read it as 1,135.6 kB rather than a fixed count.
+Core 3.x costs 1–2.3 kB of flash and 3.7 kB of RAM for this sketch, depending on
 the build path.
 
 ### Headroom
@@ -410,7 +410,7 @@ The root behind those figures is `~/.arduino-cyd/env.sh`: `check_docs.py
 The check refuses a deck that overflows, that drops under **64 KiB** of free flash
 or that leaves under **160 KiB** of DRAM — the last floor is just over the
 153,600 B a full 320x240 RGB565 framebuffer needs. So this deck has one
-framebuffer's worth of slack and 129 kB besides, and a single addition larger
+framebuffer's worth of slack and 126 kB besides, and a single addition larger
 than about **139 KiB** overflows the slot: a 1,400,000-byte const table measured
 1,668,748 B (127 %), which is the overflow the refusal names rather than a bare
 `compile failed`. Re-measure with `python3 ../check_headroom.py phone_deck_cyd24R`
@@ -422,18 +422,18 @@ from the repo root, after sourcing a toolchain.
 
 * Core **2.0.17** links the sketch at 1,162,797–1,162,813 bytes (88 %) with
   41,436 bytes of RAM (12 %), measured on 2026-10-30; the spread is the build
-  root, so read it as 1,162.8 kB. It is the A/B build now, not the default —
+  root, so read it as 1,135.6 kB. It is the A/B build now, not the default —
   `toolchain.sh` pins 3.3.12 — and it has **not** been re-measured since the
   mirror, so its current size is that pre-mirror figure plus an unknown amount,
   not a number to quote.
 * Core **3.3.12** links it at 1,168,314 bytes (89 %) with 45,244 bytes of RAM
   (13 %), `EXIT=0` under `--warnings all`, re-measured on 2026-11-01 after the
   mirror. An earlier 3.3.12 build on a shorter path reported 1,163,930 / 45,004,
-  so 3.x is path-sensitive too — 1,164–1,168 kB, not a fixed count.
+  so 3.x is path-sensitive too — 1,137–1,141 kB, not a fixed count.
 * The bundled copy matches byte for byte after `:app:syncWidgets`;
   `check_widget_assets.py` prints `2 widgets bundled, every copy matches`
   (this sketch md5 `62c7e6c3…`, the Spotify one `3b17f04a…`).
-* Core 3.x costs this sketch ~2.4 kB of flash and ~3.6 kB of RAM over 2.0.17 —
+* Core 3.x costs this sketch ~2.3 kB of flash and ~3.7 kB of RAM over 2.0.17 —
   nothing like the Spotify deck's 155 kB gap, which is that sketch's network
   stack rather than the core (see the build note in
   [CONVENTIONS](../CONVENTIONS.md#build)).

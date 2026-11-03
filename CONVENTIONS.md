@@ -194,7 +194,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   and the last three docs refusals were found by a reader, not by the check. Each
   `selftest_*.py` builds a throwaway repo in a temp directory — a stand-in
   `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
-  checker refuses: 19 docs branches, 9 asset branches, 8 margin branches, 9 branch
+  checker refuses: 22 docs branches, 9 asset branches, 8 margin branches, 9 branch
   ones (a patch already upstream, the same bytes under a new name, a folder a
   merge would resurrect, a pushed branch and its local alias) and 9 render ones (a
   moved pixel, a wrong size, a corrupt PNG, a capture that failed). Measured on
@@ -202,7 +202,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   `./check.sh --selftest`, on a machine with no toolchain. The pre-commit hook runs
   that command whenever a `check_*.py` or `selftest_*.py` is staged, so a gate
   refactor cannot land having quietly stopped refusing. The decks themselves only
-  ever walk the passing path; the overflow path was proved once with a 1.4 MB
+  ever walk the passing path; the overflow path was proved once with a 1.3 MB
   throwaway sketch, and that is not a test anyone can rerun.
 * **Before you change a sketch, run both.** From the repo root:
 
@@ -273,7 +273,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
-  1,162,8xx → 1,165,174 B (about **2.4 kB**), while the WiFi/TLS Spotify deck
+  1,162,8xx → 1,165,174 B (about **2.3 kB**), while the WiFi/TLS Spotify deck
   grows 967,493 → 1,122,249 B (**+154,756 B**, 73 % → **85 %** of the default
   app partition; the documented 2.0.17 build reads 967,413 on its own path,
   because the build root moves the last digits). It is not mbedTLS getting
@@ -294,12 +294,12 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   Espressif's own 2.0.x support ended in July 2024; and no flash of either deck
   has been confirmed, so today is the cheapest this migration will ever be — both
   already link clean on both cores. The price is **155 kB** in the WiFi deck
-  (343 kB → 185 kB of its app slot) and ~3 kB of RAM; the Bluetooth deck pays
-  2.4 kB. Reverse only for a measured reason: if the WiFi deck runs out of flash,
+  (335 kB → 181 kB of its app slot) and ~3 kB of RAM; the Bluetooth deck pays
+  2.3 kB. Reverse only for a measured reason: if the WiFi deck runs out of flash,
   use `huge_app` (3 MB slot, 36 % used today) rather than an unsupported TLS
   stack. **Still unmeasured: heap during the TLS handshake on 3.x** — the first
   thing to watch when the Spotify deck reaches hardware, since 53,636 B of
-  globals leaves 274 kB and mbedTLS 3.x is the larger consumer.
+  globals leaves 268 kB and mbedTLS 3.x is the larger consumer.
 * Libraries, and only these unless the widget genuinely needs more: `Adafruit GFX
   Library`, `Adafruit ILI9341`, `XPT2046_Touchscreen`.
 * **Never install ArduinoBLE.** Its `BLEDevice.h` shadows the core's header and
@@ -515,6 +515,15 @@ other mention of it in this repo is a pointer back here.
   bring the folder back — read the paths before merging one, and prefer the branch
   that measured the numbers.
 * Nothing is pushed or deployed without being asked. The repo stays private.
+* **One kB is 1,024 bytes, and it is written down once, here.** Every size in
+  these docs is binary: 192,970 B is "188 kB", 343,307 B is "335 kB", rounded to
+  the nearest kB with the exact bytes beside it in a table or in `HANDOFF.md`.
+  Decimal kilobytes crept in and read as plausible — 343 kB for 343,307 B, 753 kB
+  for 752,864 B, and "1,123–1,126 kB" for a range that was in bytes — so the
+  unit is stated rather than assumed. `KiB` is never used, because it would say
+  the same thing twice. A figure that is an estimate with no byte count behind it
+  (`~300 kB` of heap) stays as it was measured, and disk sizes are whatever `du`
+  printed (7.8 G), because neither is flash.
 * Numbers in docs are one board's measurements, not a contract. Say which.
 * **Every commit sweeps every file for what it just made untrue.** A sketch, a
   doc, a README, a script comment and these rules are all descriptions of

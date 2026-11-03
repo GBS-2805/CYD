@@ -326,14 +326,14 @@ Global variables use 50324 bytes (15%) of dynamic memory, leaving 277356 bytes f
 ```
 
 That includes the setup web server, the PKCE exchange, the redrawn setup card and
-both pinned roots (about 2.7 kB of PEM), and leaves **343 kB** of the default
-scheme free — 197 kB under the phone deck's Bluetooth build, 1,164,489 bytes
+both pinned roots (about 2.7 kB of PEM), and leaves **335 kB** of the default
+scheme free — 192 kB under the phone deck's Bluetooth build, 1,164,489 bytes
 measured the same way on the same machine, so dropping Bluedroid still pays for
 mbedTLS and a certificate chain per host. Under `PartitionScheme=huge_app` it is
 967,413 bytes, **30 %** of 3,145,728: a bigger room, not smaller code.
 
-An earlier version of this note recorded 1,114,485 bytes (85 %), 191 kB free and
-a 47 kB gap to the phone deck for the same sketch. That figure does not
+An earlier version of this note recorded 1,114,485 bytes (85 %), 192 kB free and
+a 49 kB gap to the phone deck for the same sketch. That figure does not
 reproduce: the committed file links at 967,413 bytes with the same core, the same
 `arduino-cli` and `--warnings all`, on a clean build path, twice over, so the
 smaller number is the one that belongs here. The seven warnings below still
@@ -383,7 +383,7 @@ both read md5 `3b17f04a…`. Quote the root you measured on rather than reconcil
 last two digits.
 
 Without Bluetooth the same sketch was 1,125,781 bytes on the default scheme; the
-link costs **about 753 kB** of flash and 15,456 B of globals, which is Bluedroid, not
+link costs **about 735 kB** of flash and 15,456 B of globals, which is Bluedroid, not
 this sketch's own code. On the default scheme the linked build reads 143 % and
 will not link at all — that is the measurement that forced `huge_app`, and
 [`toolchain.sh`](toolchain.sh) now pins it.
@@ -410,7 +410,7 @@ sourcing a toolchain.
   (16 %), `EXIT=0` under `--warnings all`. That is 2,540 B above the 1,123,241 an
   earlier root measured, and the difference is not the build path: a comment-only
   edit links to exactly the same size, while the identity characteristic the
-  sketch gained since moves it by kilobytes. Read the figure as 1,123–1,126 kB
+  sketch gained since moves it by kilobytes. Read the figure as 1,123,241–1,125,781 B
   rather than a fixed count. The app callback path is **992 B** of it — 212 B for
   the second redirect URI and the `state` field, 780 B for the one-line answer the
   app now reads. The two cores differ
