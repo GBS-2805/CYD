@@ -96,8 +96,8 @@ HISTORICAL = {
     1878661: "the linked Spotify sketch through ~/.arduino-cyd-3/env.sh; first seen "
              "as the top of a 2026-11-02 range, now the figure these docs quote",
     1168170: "the phone sketch through a second install root, 144 B under this one",
-    1878469: "the linked Spotify sketch through that same second root, 176 B under "
-             "this one",
+    1878469: "the linked Spotify sketch through that same second root: 192 B under "
+             "today's 1,878,661, and 176 B under the 1,878,645 these docs quoted then",
     1125669: "the Spotify sketch through that same second root, 112 B under it",
     1267083: "not a build at all: the flash left beside an earlier 1,878,645 B "
              "Spotify build, its huge_app slot minus what the sketch used",

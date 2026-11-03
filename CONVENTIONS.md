@@ -147,7 +147,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   `~/.arduino-cyd/env.sh` sets only `PATH`, so sourcing it builds through
   `~/.arduino15` and reads 1,168,282 B and 1,878,613 B — 32 B and 48 B under with
   the globals identical — while `/tmp/arduino-cyd-3` was read at 1,168,170 B and
-  1,878,469 B, 144 B and 176 B under. None of that is sketch drift, because the
+  1,878,469 B, 144 B and 192 B under. None of that is sketch drift, because the
   md5s match: it is the build path, so source the `env.sh` whose figures you are
   quoting, say which root when two disagree, and re-measure a merged number here
   instead of accepting another tree's last two digits. Both deck toolchains write
