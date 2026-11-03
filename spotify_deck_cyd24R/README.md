@@ -384,7 +384,10 @@ globals identical — the build-root sensitivity
 both read md5 `3b17f04a…`. Quote the root you measured on rather than reconciling the
 last two digits.
 
-Without Bluetooth the same sketch was 1,125,781 bytes on the default scheme; the
+Without Bluetooth the sketch was 1,125,781 bytes on the default scheme — the
+pre-link file, md5 `00bb1560`, since today's has the link compiled in and there
+is no flag to switch it off; rebuilt from that file on 2026-11-03 and it still
+prints 1,125,781 B with 53,636 B of globals. The
 link costs **about 735 kB** of flash and 15,456 B of globals, which is Bluedroid, not
 this sketch's own code. On the default scheme the linked build reads 143 % and
 will not link at all — that is the measurement that forced `huge_app`, and
@@ -422,7 +425,8 @@ sourcing a toolchain.
   now, so that is where the release numbers come from, and 2.0.17 is kept as the
   A/B build rather than the shipping one.
 * **It needs `huge_app` now, and that is the scheme `toolchain.sh` pins.**
-  Without Bluetooth the 3.3.12 build was 1,125,781 bytes, 85 % of 1,310,720.
+  Without Bluetooth the 3.3.12 build was 1,125,781 bytes, 85 % of 1,310,720:
+  measured from the pre-link sketch (`00bb1560`), not a flag on today's file.
   With the link it is 1,878,661 bytes: **143 %** of 1,310,720, **59 %** of 3,145,728.
   An earlier pair of runs differed by 48 B; the pre-commit hook and a direct
   compile both print 1,878,661 now, so the single figure is the measured one.
