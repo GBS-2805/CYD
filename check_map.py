@@ -14,8 +14,9 @@ a `want` string is a substring of a formatted message. A branch that asserts a
 message in other words can therefore look uncovered - write its `want` from the
 checker's own line. A message is read where it is written, the sentence a shared
 helper returns (`row_shape`, `verdict`, `index_problem`) included, so a refusal
-cannot hide in a helper; one assembled at run time from variables is still
-invisible.
+cannot hide in a helper. A sentence chosen into a variable counts too, because a
+name is every literal it is ever assigned; one built by a call, or from a loop
+variable, is still invisible.
 
   python3 check_map.py       exit 0 when every checker has a selftest
 
@@ -84,7 +85,47 @@ def _message(node):
     return None
 
 
-def _returned(value):
+def _texts(node, names=None):
+    """Every literal text an expression can hold when it reaches a problem list.
+
+    A name is not a message by itself: it is the literals it is ever assigned, so
+    `why = "..."; problems.append(why)` reads as the sentence the name holds.
+    """
+    if node is None:
+        return []
+    if isinstance(node, ast.Name) and names and node.id in names:
+        return list(names[node.id])
+    text = _message(node)
+    return [text] if text else []
+
+
+def _bound(tree):
+    """Every literal each name in the file is assigned, so a two-step refusal reads.
+
+    `problems.append(why)` names no sentence, and a map that stops at the name
+    sees nothing; `why` was chosen a few lines above, in a branch or an if/else,
+    and any of those literals can be the one that prints, so all of them count.
+    """
+    out = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            targets, value = node.targets, node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets, value = [node.target], node.value
+        else:
+            continue
+        text = _message(value)
+        if not text:
+            continue
+        for target in targets:
+            if isinstance(target, ast.Name):
+                texts = out.setdefault(target.id, [])
+                if text not in texts:
+                    texts.append(text)
+    return out
+
+
+def _returned(value, names=None):
     """Every literal a helper hands back, at any depth of list or tuple.
 
     `row_shape` answers `["names a deck this tree does not hold"], None`: that
@@ -95,10 +136,9 @@ def _returned(value):
     if isinstance(value, (ast.List, ast.Tuple)):
         out = []
         for item in value.elts:
-            out.extend(_returned(item))
+            out.extend(_returned(item, names))
         return out
-    text = _message(value)
-    return [text] if text else []
+    return _texts(value, names)
 
 
 def _sink(node):
@@ -122,6 +162,7 @@ def messages(path):
     except (OSError, SyntaxError, ValueError):
         return []
     found = []
+    names = _bound(tree)
 
     def note(text):
         if text and text not in found:
@@ -129,20 +170,25 @@ def messages(path):
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Return) and node.value is not None:
-            for text in _returned(node.value):
+            for text in _returned(node.value, names):
                 note(text)
             continue
         if not isinstance(node, ast.Call):
             continue
         attr = getattr(node.func, "attr", "")
         name = getattr(node.func, "id", "")
-        if attr == "append" and _sink(node.func.value):
-            note(_message(node.args[0]) if node.args else None)
+        if attr in ("append", "extend") and _sink(node.func.value):
+            # `extend` takes a list or a generator of the same messages.
+            for arg in node.args:
+                for text in _returned(arg, names):
+                    note(text)
         elif (attr == "print" or name == "print") and any(
                 kw.arg == "file" for kw in node.keywords):
             # `print(..., file=sys.stderr)` is how a checker says a refusal without
             # a problem list; the builtin has no `.attr`, so it is matched by name.
-            note(next((t for t in (_message(arg) for arg in node.args) if t), None))
+            for arg in node.args:
+                for text in _texts(arg, names):
+                    note(text)
     return found
 
 

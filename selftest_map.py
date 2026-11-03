@@ -111,6 +111,32 @@ def formatted_message(dest):
     )
 
 
+def variable_message(dest):
+    """A refusal chosen into a name, then appended: two steps, one sentence."""
+    path = dest / "check_a.py"
+    path.write_text(path.read_text(encoding="utf-8") + (
+        '    why = "a two-step refusal nothing repeats"\n'
+        "    problems.append(why)\n"
+    ), encoding="utf-8")
+
+
+def variable_asserted(dest):
+    variable_message(dest)
+    (dest / "selftest_a.py").write_text(
+        selftest("check_a.py", WANTS + ["a two-step refusal nothing repeats"]))
+
+
+def variable_branches(dest):
+    """Two literals into one name: either can print, so both must be asserted."""
+    path = dest / "check_a.py"
+    path.write_text(path.read_text(encoding="utf-8") + (
+        '    why = "one sentence built in a branch"\n'
+        "    if digest:\n"
+        '        why = "another sentence built in a branch"\n'
+        "    problems.append(why)\n"
+    ), encoding="utf-8")
+
+
 def nameless(dest):
     (dest / "selftest_d.py").write_text(
         'CASES = [{"name": "a branch", "want": ["x"]}]\n'
@@ -150,6 +176,20 @@ CASES = [
     dict(name="a message built with str.format is seen, not skipped",
          mutate=formatted_message, want_code=1,
          want=["a … B floor nothing repeats"],
+         forbids=["pairing problem"]),
+    dict(name="a message chosen into a variable is refused like an inline one",
+         mutate=variable_message, want_code=1,
+         want=["check_a.py: 1 message(s) no branch repeats",
+               "a two-step refusal nothing repeats"],
+         forbids=["pairing problem"]),
+    dict(name="a variable's message passes when a branch asserts it",
+         mutate=variable_asserted, want_code=0,
+         want=["check_a.py: every appended message is repeated by a branch"],
+         forbids=["no branch repeats", "pairing problem"]),
+    dict(name="every literal a variable holds counts, not just the last one",
+         mutate=variable_branches, want_code=1,
+         want=["one sentence built in a branch",
+               "another sentence built in a branch"],
          forbids=["pairing problem"]),
 ]
 

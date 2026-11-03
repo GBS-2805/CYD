@@ -218,15 +218,15 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   checker refuses: 43 docs branches, 9 asset branches, 10 margin branches, 23 old-core
   ones, 12 branch ones (a patch already upstream, the same bytes under a new name, a folder a
   merge would resurrect, a pushed branch and its local alias), 9 render ones (a
-  moved pixel, a wrong size, a corrupt PNG, a capture that failed), 9 on the map itself
+  moved pixel, a wrong size, a corrupt PNG, a capture that failed), 12 on the map itself
   (a checker with no selftest, a selftest naming a checker that is gone, a
   selftest with no checker, a tree where every pair is present, a message
-  no branch asserts, one a shared helper returns from a list, and one built
-  with `str.format`) and 4 on
+  no branch asserts, one a shared helper returns from a list, one built with
+  `str.format`, and one chosen into a variable) and 4 on
   the gate itself (a root that pins its directories, a root whose `env.sh` sets only
   `PATH`, the default root order, and a stale default root). Measured on
-  2026-11-03: 3.0 s, 0.6 s, 0.6 s, 1.9 s, 1.7 s, 1.0 s, 0.5 s and 0.6 s — all eight in
-  **8.6 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
+  2026-11-03: 3.1 s, 0.6 s, 0.5 s, 1.7 s, 1.9 s, 0.9 s, 0.4 s and 0.7 s — all eight in
+  **9.8 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
   VM the same command has also taken 4.4 s and 106.5 s an hour apart, which is
   the machine's load rather than the checkers', so read a slow run as load
   before assuming a checker got slower. The pre-commit hook runs
@@ -246,8 +246,9 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   in at run time — a run of words, because a printed size can be "123 bytes" —
   because a `want` string is a substring of a formatted message. A message is
   read where it is written, the sentence a shared helper returns included, so
-  `row_shape`, `verdict` and `index_problem` cannot hide one; a message
-  assembled at run time from variables is still invisible.
+  `row_shape`, `verdict` and `index_problem` cannot hide one, and a name holds
+  every literal it is ever assigned, so a sentence chosen into a variable counts
+  too. A message built by a call, or from a loop variable, is still invisible.
 * **Before you change a sketch, run both.** From the repo root:
 
   ```bash
