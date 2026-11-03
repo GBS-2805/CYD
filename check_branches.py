@@ -46,8 +46,9 @@ def git(*args, check=True):
 def base_branch(named):
     """The branch this worktree has, so already-merged work is not called pending.
 
-    origin/main reads well only while everything is pushed, and nothing in this
-    repo is: the remote lags both chats, so work merged here days ago came back as
+    origin/main reads well only while everything is pushed, and this history is
+    not pushed as it lands: the two chats commit on their own branches, so work
+    merged here days ago came back as
     "10 commits on top of origin/main, 11 paths it has no bytes for" — twice, and
     both times a person had to check by hand that the merge had happened. The
     branch checked out here is the tree the answer is about; the old names stay as

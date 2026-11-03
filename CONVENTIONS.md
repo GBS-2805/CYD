@@ -622,8 +622,10 @@ other mention of it in this repo is a pointer back here.
   its short-named ref nor origin's copy holds anything this tree lacks. The same
   branch read as "10 commits past `origin/main`, 11 paths it has no bytes for"
   only because `origin/main` lags both trees while nothing is pushed, which is
-  why the base is the worktree now. `origin/main` still lags because nothing in
-  either tree is pushed. Read the paths before merging anyway: an older branch can
+  why the base is the worktree now. That reading is dated 2026-11-02; on
+  2026-11-03 this chat pushed, so `origin/freebuff/e9252a57…` and this worktree
+  agree and `origin/main` is the base both trees grew from rather than a copy of
+  either. Read the paths before merging anyway: an older branch can
   *look* like work and be a downgrade, which is what `app/phone-deck-build` was at
   87 commits back, 21 paths under `cyd_phone_deck/`, a folder this tree renamed
   away. The check names that folder instead of guessing, because merging it would

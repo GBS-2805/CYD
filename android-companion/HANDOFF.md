@@ -538,8 +538,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
   `git merge-base --is-ancestor b3e8362 HEAD` exits 0, the deck branch holds no
   commit this branch lacks, and neither the short-named ref nor origin's copy holds
   anything either — the merge of `b3e8362` was already complete. What was wrong was
-  the reading: `check_branches.py` compared against `origin/main`, which lags both
-  chats because nothing is pushed, so merged work kept coming back as "10 commits on
+  the reading: `check_branches.py` compared against `origin/main`, which lagged both
+  chats because nothing was pushed, so merged work kept coming back as "10 commits on
   top of origin/main, 11 paths it has no bytes for". It now compares against the
   branch checked out here, and a self-test case pins that a merged branch stays
   quiet even when `origin/main` is deliberately left behind.
