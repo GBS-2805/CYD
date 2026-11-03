@@ -32,6 +32,10 @@ WANTS = [
     "a.png is 6x4 but the app draws 7x4; run capture.sh",
     "quotes 74 % of the slot",
     "quotes md5 deadbeef\u2026, which is not a sketch here now",
+    # check_map.py is parsed too, so the stub speaks its refusals as well.
+    "selftest_x.py names no checker, so its branches pin no gate",
+    "selftest_x.py names check_x.py, which this tree does not hold",
+    "check_x.py has no selftest, so its refusals have no branch",
 ]
 
 
@@ -79,10 +83,10 @@ CASES = [
          want=["every checker has a selftest (2 checked)",
                "check_a.py: every appended message is repeated by a branch"],
          forbids=["pairing problem"]),
-    dict(name="a message no branch asserts is reported, not refused",
-         mutate=unasserted, want_code=0,
+    dict(name="a message no branch asserts is refused", mutate=unasserted,
+         want_code=1,
          want=["check_a.py: 1 message(s) no branch repeats",
-               "a sentence nothing repeats"],
+               "a sentence nothing repeats", "no branch asserts"],
          forbids=["pairing problem"]),
     dict(name="a checker with no selftest is refused", mutate=orphan_checker,
          want_code=1,

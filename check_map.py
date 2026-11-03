@@ -8,9 +8,11 @@ checker it exercises and how many branches assert a message - and refuses the tw
 pairings the map rests on: a checker with no selftest has refusals nothing runs,
 and a selftest naming a checker that is gone is a fixture for a file nobody has.
 
-It does not try to decide coverage from the text. A `want` string is a substring
-of a formatted message, so a branch that stops refusing is caught by running it,
-which `./check.sh --selftest` does; which refusal it pinned is what this adds.
+It refuses a message no branch asserts, which is why that list is empty: the
+match is word for word, with placeholders standing in for any one word, because
+a `want` string is a substring of a formatted message. A branch that asserts a
+message in other words can therefore look uncovered - write its `want` from the
+checker's own line - and a message a helper builds is invisible to the scan.
 
   python3 check_map.py       exit 0 when every checker has a selftest
 
@@ -220,6 +222,7 @@ def main():
     print("%d branches across %d selftests: %d assert a message, %d assert only an "
           "exit code" % (total, len(files), asserting, silent))
     print()
+    uncovered = 0
     for path, phrases in sorted(spoken.items(), key=lambda pair: pair[0].name):
         if Path(path).suffix != ".py" or not Path(path).is_file():
             continue
@@ -227,6 +230,7 @@ def main():
         if not missing:
             print("%s: every appended message is repeated by a branch" % shown(path))
             continue
+        uncovered += len(missing)
         print("%s: %d message(s) no branch repeats" % (shown(path), len(missing)))
         for text in missing[:10]:
             print("  ? %s" % re.sub(r"\s+", " ", PLACEHOLDER.sub("\u2026", text)))
@@ -237,6 +241,11 @@ def main():
     if problems:
         print("\n%d pairing problem(s): a checker nothing exercises is a rule "
               "nobody runs" % len(problems), file=sys.stderr)
+        return 1
+    if uncovered:
+        print("\n%d message(s) no branch asserts: write a branch's `want` from the "
+              "checker's own line, or the refusal is a rule nobody runs" % uncovered,
+              file=sys.stderr)
         return 1
     print("every checker has a selftest (%d checked)" % len(checkers()))
     return 0

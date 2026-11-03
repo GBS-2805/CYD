@@ -193,6 +193,16 @@ def no_readme(dest):
     (dest / DECK / "README.md").unlink()
 
 
+def missing_record_quote(dest):
+    """No old_core.json, and a README still quoting the figure it vouched for."""
+    (dest / "old_core.json").unlink()
+    readme = dest / "README.md"
+    readme.write_text(
+        readme.read_text(encoding="utf-8")
+        + "\nAn older 2.0.17 build printed 1,200,000 B for it.\n"
+    )
+
+
 def no_record(dest):
     """No old_core.json at all, while the prose still quotes 2.0.17 figures."""
     (dest / "old_core.json").unlink()
@@ -435,6 +445,14 @@ CASES = [
         mutate=no_core,
         want_code=1,
         want=["names no core, so no figure in it names a build"],
+    ),
+    dict(
+        name="a 2.0.17 figure with no record behind it is refused",
+        mutate=missing_record_quote,
+        want_code=1,
+        want=["is missing, so the 2.0.17 figures in the prose have nothing behind "
+              "them",
+              "quotes 1,200,000, which is not a size any deck builds to now"],
     ),
     dict(
         name="a widget README that is gone is refused by name",
