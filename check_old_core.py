@@ -15,6 +15,7 @@ Run it in a shell that holds the old core - `./check.sh --full` does this as its
   source ~/.arduino-cyd-2/env.sh
   ./check_old_core.py                  exit 0 when every deck still builds to it
   ./check_old_core.py --record         the file alone: no compiler, no build
+                                       (it still hashes the sketch)
 
 `--record` is the fast gate's `old record` step. It needs no toolchain, so it
 runs on a machine that has none, and it answers a question the build cannot: is
@@ -158,6 +159,18 @@ def index_problem(sketch):
     return "the sketch is not in the index, so a clone would not hold the bytes its md5 describes"
 
 
+def moved_md5(name, entry):
+    """(recorded, now) when the row's md5 is not this sketch's bytes, else None.
+
+    One home for the comparison: the docs gate asks whether a figure is still
+    quotable, the record check whether the file describes this tree, and both mean
+    the same digest of the same file - so neither can decide it differently.
+    """
+    recorded = entry.get("md5") if isinstance(entry, dict) else None
+    now = headroom.md5(headroom.sketch_of(ROOT / name))
+    return (recorded, now) if recorded != now else None
+
+
 def row_problems(name, entry, want_index):
     """What is wrong with one deck's row, before any build is compared with it."""
     found, _ = row_shape(name, entry)
@@ -197,8 +210,17 @@ def record_main(names, duplicates, data):
     """The record's shape alone: no compiler, no build, no toolchain."""
     print(f"{'deck':24s}  what the record says")
     problems = 0
+    core = data.get("core") or "an unnamed core"
     for name in names:
         found = row_problems(name, data["decks"][name], want_index=True)
+        if not found:
+            moved = moved_md5(name, data["decks"][name])
+            if moved:
+                found = [
+                    "records md5 %s but the sketch is %s now, so rebuild on core "
+                    "%s and update the file"
+                    % (moved[0], moved[1][:8] + "\u2026", core)
+                ]
         problems += 1 if found else 0
         print(f"{name:24s}  {'; '.join(found) or 'one row, a sketch in the index, an md5'}")
     for key in dict.fromkeys(duplicates):

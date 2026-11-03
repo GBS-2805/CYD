@@ -419,12 +419,12 @@ def old_core_figures():
         problems.extend("%s %s" % (where, reason) for reason in found)
         if figures is None:
             continue
-        recorded, now = entry.get("md5"), md5(headroom.sketch_of(ROOT / name))
-        if recorded != now:
+        moved = check_old_core.moved_md5(name, entry)
+        if moved:
             problems.append(
                 "%s records md5 %s but the sketch is %s now; rebuild it on "
                 "core %s and update the file"
-                % (where, recorded, now[:8] + "\u2026", core)
+                % (where, moved[0], moved[1][:8] + "\u2026", core)
             )
             continue
         allowed[figures["used"]] = "the %s build on core %s" % (name, core)

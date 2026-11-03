@@ -215,21 +215,24 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   and the last three docs refusals were found by a reader, not by the check. Each
   `selftest_*.py` builds a throwaway repo in a temp directory — a stand-in
   `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
-  checker refuses: 35 docs branches, 9 asset branches, 8 margin branches, 13 old-core
+  checker refuses: 35 docs branches, 9 asset branches, 8 margin branches, 14 old-core
   ones, 9 branch ones (a patch already upstream, the same bytes under a new name, a folder a
   merge would resurrect, a pushed branch and its local alias), 9 render ones (a
   moved pixel, a wrong size, a corrupt PNG, a capture that failed) and 4 on the
   gate itself (a root that pins its directories, a root whose `env.sh` sets only
   `PATH`, the default root order, and a stale default root). Measured on
-  2026-11-03: 2.4 s, 0.6 s, 0.4 s, 0.9 s, 1.2 s, 0.8 s and 0.3 s — all seven in
-  **6.6 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
+  2026-11-03: 2.6 s, 0.5 s, 0.5 s, 1.1 s, 1.2 s, 0.9 s and 0.4 s — all seven in
+  **7.2 s** through `./check.sh --selftest`, on a machine with no toolchain. On this shared
   VM the same command has also taken 4.4 s and 106.5 s an hour apart, which is
   the machine's load rather than the checkers', so read a slow run as load
   before assuming a checker got slower. The pre-commit hook runs
   that command whenever a `check_*.py` or `selftest_*.py` is staged, so a gate
   refactor cannot land having quietly stopped refusing. The decks themselves only
   ever walk the passing path; the overflow path was proved once with a 1.3 MB
-  throwaway sketch, and that is not a test anyone can rerun.
+  throwaway sketch, and that is not a test anyone can rerun. `check_map.py`
+  prints which branch pins which refusal, as the fast gate's `map` step: it
+  reports rather than refuses, because a `want` string is a substring of a
+  formatted message and coverage cannot honestly be decided from text.
 * **Before you change a sketch, run both.** From the repo root:
 
   ```bash
@@ -296,7 +299,9 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   compiler at all: `./check_old_core.py --record`, the fast gate's `old record`
   step, requires every deck it names to be here with one row and an md5 for a
   sketch that is in the index, because an md5 of a file a clone would not have
-  describes bytes nobody can check out. Both gates read the file through
+  describes bytes nobody can check out, and it hashes that sketch and compares:
+  a record that still describes an older file is refused with no compiler at
+  all. Both gates read the file through
   `check_old_core.read_record()` and judge its rows with `row_shape()`, so a
   rule about the record cannot hold in one gate and not the other. The same
   holds for which file a deck is: every checker asks `check_headroom.sketch_of()`

@@ -153,6 +153,9 @@ else
   say "host tests" "no javac, so the host suite did NOT run"
 fi
 report "branches" python3 check_branches.py
+# Not a failure: the branches are the check. This is the index from a failing
+# case back to the refusal it pins, so a red --selftest names a rule.
+step   "map"      'assert a message'   python3 check_map.py
 
 # A commit that can change a pixel has to leave a picture of it behind, and a rule
 # nobody runs is a paragraph. The fast gate draws the frames whenever the staged
