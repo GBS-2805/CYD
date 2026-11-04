@@ -1474,11 +1474,12 @@ static const Rect NOW_BACK = {12, 202, 296, 30};
 
 // Half the brightness card each. Two 54px chips were pushed to the card's outer
 // edges, where the panel's x mapping is least linear: "-" landed, "+" did not.
+// The notifications card that sat between brightness and calibration is gone, so
+// those two and CLOSE moved up into the space it held.
 static const Rect SET_BRI_DOWN = {22, 64, 134, 28};
 static const Rect SET_BRI_UP = {164, 64, 134, 28};
-static const Rect SET_CLEAR = {226, 106, 72, 26};
-static const Rect SET_CAL = {12, 146, 296, 32};
-static const Rect SET_CLOSE = {12, 186, 296, 34};
+static const Rect SET_CAL = {12, 104, 296, 32};
+static const Rect SET_CLOSE = {12, 144, 296, 34};
 
 // Front page: a status line, the wordmark, two pills, three numbered tabs. The
 // clock and battery moved up out of the bottom strip, so the page now ends in a
@@ -2545,18 +2546,10 @@ static void drawStatusCard() {
   tft.drawRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD, C_EDGE);
 
   drawTextAt("$ sys.status --", r.x + CARD_PAD, r.y + 7, 1, C_DIM, C_TILE);
-  const bool linked = phoneLinked();
-  const char *state = linked ? "READY // ONLINE"
-                             : (ownerKnown ? "STANDBY // OFFLINE"
-                                           : "BIND // FIRST PHONE");
-  int16_t bx = 0, by = 0;
-  uint16_t bw = 0, bh = 0;
-  tft.setFont(fontFor(1));
-  tft.getTextBounds(state, 0, 0, &bx, &by, &bw, &bh);
-  const int textRight = r.x + r.w - CARD_PAD;
-  drawTextRight(state, textRight, r.y + 7, 1, linked ? C_ACCENT : C_DIM, C_TILE);
-  tft.fillCircle(textRight - static_cast<int>(bw) - 9, r.y + 11, 3,
-                 linked ? C_ACCENT : C_PINK);
+  // The right end of this row used to carry READY // ONLINE (or STANDBY, or BIND
+  // FIRST PHONE). The header shows LINKED on every page now, so the line told a
+  // reader the same thing twice on one screen; the row keeps its rule, and the
+  // clock below it, and nothing else.
   tft.drawFastHLine(r.x + CARD_PAD, r.y + 20, r.w - 2 * CARD_PAD, C_EDGE);
 
   if (clockValid) {
@@ -2619,7 +2612,12 @@ static void drawStatusCard() {
 // state, and a numbered tab list where only the pressed row goes solid. No
 // graphic: a lens-shaped heat band sat under the tabs and was removed, because a
 // tinted strip there read as decoration competing with the wordmark.
-static const char *const TAB_LABELS[3] = {"MESSAGES", "SETTINGS", "CALIBRATE"};
+// Rows: messages, the mirrored now-playing page, settings. Calibration came off
+// this page because settings already carries it, which left the middle row free
+// for the Spotify deck's now page as far as this deck can honestly be it: the
+// title, artist and progress the phone sends, and no transport buttons, because
+// nothing here can ask Spotify anything on its own.
+static const char *const TAB_LABELS[3] = {"MESSAGES", "SPOTIFY", "SETTINGS"};
 
 // Unlit rows are ink on black; the pressed row inverts, which is the page's
 // only state.
@@ -2911,15 +2909,6 @@ static void drawSettings() {
   drawButton(SET_BRI_DOWN, "-", 3, false);
   drawButton(SET_BRI_UP, "+", 3, false);
 
-  // Notifications.
-  tft.fillRoundRect(12, 102, 296, 38, CORNER_CARD, C_TILE);
-  tft.drawRoundRect(12, 102, 296, 38, CORNER_CARD, C_EDGE);
-  char count[28];
-  snprintf(count, sizeof(count), "%d waiting", noticeCount);
-  drawTextAt("NOTIFICATIONS", 22, 108, 1, C_DIM, C_TILE);
-  drawTextAt(count, 22, 120, 1, C_TEXT, C_TILE);
-  drawButton(SET_CLEAR, "CLEAR", 1, false);
-
   drawButton(SET_CAL, "CALIBRATE TOUCH", 1, false);
   drawButton(SET_CLOSE, "CLOSE", 2, true);
   drawTextAt(ownerKnown ? ownerLabel : "no phone bound", 12, 226, 1,
@@ -3110,11 +3099,6 @@ static void handleSettingsTap(int x, int y) {
     drawSettings();
     return;
   }
-  if (inside(x, y, SET_CLEAR)) {
-    noticeCount = 0;
-    drawSettings();
-    return;
-  }
   if (inside(x, y, SET_CAL)) {
     startCalibration();
     return;
@@ -3133,8 +3117,8 @@ static void handleHomeTap(int x, int y) {
     delay(90);
     switch (i) {
       case 0: drawBoard(); break;
-      case 1: openSettings(); break;
-      default: startCalibration(); break;
+      case 1: drawNow(); break;
+      default: openSettings(); break;
     }
     return;
   }

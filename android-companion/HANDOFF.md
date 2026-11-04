@@ -607,7 +607,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   sketches they name are inside the APK, `assets/widgets/phone_deck_cyd24R/` and
   `assets/widgets/spotify_deck_cyd24R/`, and `check_widget_assets.py` in the repo
   root compares those copies with `../<folder>/<sketch>.ino` byte for byte (phone
-  deck md5 `ebb57c81…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
+  deck md5 `7d3d5676…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
   header rewrite, and `00bb1560…`, `eca02e93…`, `49f29bcb…` before the Bluetooth
   link, the callback change and the one-line answer — both in sync on 2026-11-02).
   The rewrite makes the phone-over-Bluetooth source the deck's first one and
@@ -616,7 +616,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   **compiles here**, measured on 2026-11-04 once `~/.arduino-cyd/env.sh` was
   sourced — `check_docs.py`'s gate built it on the `huge_app` partition and read
   1,890,609 B with 69,124 B of globals, beside the phone deck's unchanged
-  1,178,450 B / 45,284 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
+  1,177,926 B / 45,284 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
   `PATH`, so that build goes through `~/.arduino15` and reads 1,880,053 B — 48 B
   under with the globals identical, the build-root sensitivity the docs record.
   The root that first printed that figure reads 1,878,661 B, 16 B over. Neither board has run it.
@@ -685,7 +685,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the tree.** Measured on 2026-11-03: `clean assembleRelease` exits 0 in 16 s, 44
   actionable tasks with 41 executed, including `lintVitalRelease`. The archive
   Gradle writes is unsigned, because the release type has no `signingConfig`, so
-  [`release.sh`](release.sh) aligns and signs it. Rebuilt on 2026-11-04 after the typeface change: the unsigned file is 215,574
+  [`release.sh`](release.sh) aligns and signs it. Rebuilt on 2026-11-04 after the typeface change: the unsigned file is 215,730
   bytes, 11,091 under the debug APK because `debug` writes the larger signing
   block. The signed file is **231,023 bytes** (226 kB), 15,445 more again from a
   4096-bit key's bigger signing block, and 4,094 *over* the debug APK — the two

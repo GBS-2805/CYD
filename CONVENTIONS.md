@@ -85,7 +85,7 @@ sketch and the descriptor `id`, which always move together:
   still proves nothing, because `esp32:esp32:esp32` defaults to `PSRAM=disabled`.
   Read the marking, never a product listing.
 * **Budget for 4 MB of flash and no PSRAM.** The default partition scheme gives
-  the app 1,310,720 bytes and the deck takes 1,178,450 of them (89 % as reported
+  the app 1,310,720 bytes and the deck takes 1,177,926 of them (89 % as reported
   by the compiler, after the mirror). DRAM is 327,680 bytes with ~300 kB of heap
   free at boot once the display and touch drivers are up; a 320x240 RGB565
   framebuffer is 153,600, so there is room for one, not two. Treat "it fits" as a
@@ -114,7 +114,7 @@ with the date and the command that printed it, because a number without a run be
 it is the drift this file exists to stop.
 
 1. **The phone deck, on the default partition.** BLE only, so no partition switch
-   and no network, at 1,178,450 B, 89 % of its 1,310,720 B slot.
+   and no network, at 1,177,926 B, 89 % of its 1,310,720 B slot.
    Compile it in ArduinoDroid with Adafruit GFX, Adafruit ILI9341 and
    XPT2046_Touchscreen, and record the `Sketch uses …` line and the `md5sum` of the
    file the phone compiled — the size belongs to the compiler, the md5 to the bytes.
@@ -178,7 +178,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   globals, Spotify 1,122,281 B, 85 % of 1,310,720, / 53,572 B globals. Those are
   48 B and 32 B above the same sketches built straight through `arduino-cli` from
   another path — the build-root sensitivity above, not a different toolchain. The
-  mirror has since moved the phone deck to 1,178,450 B, 89 % of 1,310,720, /
+  mirror has since moved the phone deck to 1,177,926 B, 89 % of 1,310,720, /
   45,284 B globals and the Spotify sketch to 1,125,781 B, 85 % of 1,310,720, /
   53,636 B globals, as [`check_headroom.py`](check_headroom.py) read both of them
   on 2026-11-01 — that Spotify file is the one before the Bluetooth link
@@ -217,7 +217,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   end ever observed, and the next build printed 1,878,661 twice.
 * **A size names the root that printed it, and here that root is
   `~/.arduino-cyd-3`.** The current 3.3.12 figures in these docs — phone deck
-  1,178,450 B / 45,284 B of globals, the linked Spotify deck 1,890,609 B /
+  1,177,926 B / 45,284 B of globals, the linked Spotify deck 1,890,609 B /
   69,124 B on `huge_app`, the unlinked Spotify deck 1,125,781 B — are that
   root's, read through `arduino-cli` 1.5.2-rc.1 on 2026-11-02. It is the root
   worth naming because its `env.sh` pins its own data, download and user dirs;
@@ -334,7 +334,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   silently build the wrong core and report 73 % where the release reads 85 %.
   Both together took **18 s** here, on core 3.3.12 with the build cache warm; on
   2026-11-01, after the mirror, `check_headroom.py` over both decks read
-  1,178,450 B (142,406 B free) and 1,125,781 B (184,939 B free), exit 0. A second
+  1,177,926 B (142,406 B free) and 1,125,781 B (184,939 B free), exit 0. A second
   install root read 1,168,170 B (142,550 B free) and 1,125,669 B (185,051 B free)
   for the same two sketches — 144 B and 112 B lower with the globals identical,
   which is the build-root sensitivity above rather than drift in the sketches.

@@ -221,15 +221,14 @@ PHONE_SET_LINK_PILL = (232, 6, 76, 22)
 PHONE_STATUS_CARD = (12, 40, 296, 76)
 PHONE_NOTIF_ROW = [(12, 134, 296, 32), (12, 168, 296, 32), (12, 202, 296, 32)]
 PHONE_HOME_TAB = [(12, 72, 296, 34), (12, 110, 296, 34), (12, 148, 296, 34)]
-PHONE_TABS = ["MESSAGES", "SETTINGS", "CALIBRATE"]
+PHONE_TABS = ["MESSAGES", "SPOTIFY", "SETTINGS"]
 PHONE_DETAIL_DISMISS = (12, 202, 148, 30)
 PHONE_DETAIL_BACK = (168, 202, 140, 30)
 PHONE_NOW_BACK = (12, 202, 296, 30)
 PHONE_SET_BRI_DOWN = (22, 64, 134, 28)
 PHONE_SET_BRI_UP = (164, 64, 134, 28)
-PHONE_SET_CLEAR = (226, 106, 72, 26)
-PHONE_SET_CAL = (12, 146, 296, 32)
-PHONE_SET_CLOSE = (12, 186, 296, 34)
+PHONE_SET_CAL = (12, 104, 296, 32)
+PHONE_SET_CLOSE = (12, 144, 296, 34)
 PHONE_BRIGHTNESS = 70
 
 
@@ -275,10 +274,6 @@ def phone_status_card(p):
     p.fill_round(r, CORNER_CARD, "tile")
     p.ring(r, CORNER_CARD, "edge")
     p.text_at("$ sys.status --", r[0] + CARD_PAD, r[1] + 7, 1, "dim", "tile")
-    state = "READY // ONLINE"
-    text_right = r[0] + r[2] - CARD_PAD
-    p.text_right(state, text_right, r[1] + 7, 1, "accent", "tile")
-    p.fill_circle(text_right - p.width(state, 1) - 9, r[1] + 11, 3, "accent")
     p.hline(r[0] + CARD_PAD, r[1] + 20, r[2] - 2 * CARD_PAD, "edge")
 
     hh, mm, ss = CLOCK
@@ -422,12 +417,6 @@ def page_phone_settings(p):
     p.text_right("%d%%" % PHONE_BRIGHTNESS, 298, 46, 2, "accent", "tile")
     phone_button(p, PHONE_SET_BRI_DOWN, "-", 3, False)
     phone_button(p, PHONE_SET_BRI_UP, "+", 3, False)
-
-    p.fill_round((12, 102, 296, 38), CORNER_CARD, "tile")
-    p.ring((12, 102, 296, 38), CORNER_CARD, "edge")
-    p.text_at("NOTIFICATIONS", 22, 108, 1, "dim", "tile")
-    p.text_at("%d waiting" % len(NOTICES), 22, 120, 1, "text", "tile")
-    phone_button(p, PHONE_SET_CLEAR, "CLEAR", 1, False)
 
     phone_button(p, PHONE_SET_CAL, "CALIBRATE TOUCH", 1, False)
     phone_button(p, PHONE_SET_CLOSE, "CLOSE", 2, True)

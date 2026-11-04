@@ -74,28 +74,36 @@ Module board menu offers the option (there is nothing to map).
 ## Front page
 
 The deck boots into a front page: a status line across the top (clock left,
-battery and gear right), a `PHONE DECK` wordmark with the link state beside it, an
-outlined pill with the unread count, a solid pill naming the palette the board is
-on, and three numbered tabs. The gear opens settings from here and from
+battery and gear right), a `PHONE DECK` wordmark with the link state beside it,
+three numbered tabs, and a footer line carrying the unread count on the left and
+the live palette on the right. The gear opens settings from here and from
 the messages board; holding it for a second forgets the bound phone. The palette
-pill is a label, not a control: the switch lives in the companion app (see
+name is a label, not a control: the switch lives in the companion app (see
 *Phone Link service*), so a deck changes palette without a re-flash.
 
 * **01 MESSAGES** opens the notification board. Its `<` chip, and every settings
   path, come back here.
-* **02 SETTINGS** is brightness (two buttons, one half of the card each), clear
-  and calibration.
-* **03 CALIBRATE** starts the three-tap calibration; saving or cancelling returns
-  to the front page.
+* **02 SPOTIFY** opens the now-playing page: the title, artist and progress the
+  phone mirrors, and no transport buttons, because the deck cannot ask Spotify
+  anything on its own. It is the Spotify deck's now page as far as this board can
+  honestly carry it, and it says `nothing playing` when the phone is not.
+* **03 SETTINGS** is brightness (two buttons, one half of the card each) and
+  calibration. The notifications card it used to carry is gone: a count with no
+  action behind it held a row a control could use, and clearing the inbox is
+  waiting on a home of its own. The unread count still sits in the front page's
+  footer.
+
+Calibration is reached from settings, by holding the title for 1.5 s, or by
+touching the screen at boot, so it no longer needs a row of its own here.
 
 The THEME page is gone. It was a contact sheet that could only say "set
 `THEME_INDEX`, then reflash", and the app now writes the palette down the link
 instead, so the board needs no page of its own for it and the fourth row was
 dropped rather than repurposed.
 
-The front page carries no graphic: the three tabs measure 300x30 at y 84, 118
-and 152 under a hairline at 78, and a closing rule runs at 224 — the air where
-the fourth row sat is the only trace of it. The clock and
+The front page carries no graphic: the three tabs measure 296x34 at y 72, 110
+and 148 under a rule at 64, and a closing rule runs at 192 with the footer line
+beneath it — the air where the THEME row sat is the only trace of it. The clock and
 battery began in a strip along the bottom at 222; they now sit at y 6, above the
 wordmark, so a glance does not have to travel past the tabs to find them. An
 earlier version drew a lens-shaped heat band under the tabs; it was removed
@@ -332,7 +340,7 @@ asyncio.run(main())
 | Tap a notification | Full title and message |
 | Hold a notification (0.7 s) | Remove it from the deck |
 | Tap `DISMISS` in the detail view | Remove it from the deck |
-| Tap the gear (top right) | Brightness, clear notifications, calibrate touch |
+| Tap the gear (top right) | Brightness and calibrate touch |
 | Hold the title for 1.5 s | Touch calibration |
 | Touch the screen at boot | Touch calibration |
 
@@ -442,14 +450,14 @@ core **3.3.12**, default partition scheme:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,178,450 | **141,602** | 1,310,720 (89 % used) |
+| flash | 1,177,926 | **141,602** | 1,310,720 (89 % used) |
 | DRAM | 45,284 globals | **282,396** | 327,680 |
 
 The root behind those figures is `~/.arduino-cyd/env.sh`, the one whose `env.sh`
-pins its own data and library dirs: `check_docs.py --refresh` re-read 1,178,450 B
+pins its own data and library dirs: `check_docs.py --refresh` re-read 1,177,926 B
 and 45,284 B from it on 2026-11-03. While that script set only `PATH` the same
 build went through `~/.arduino15` and printed 1,168,282 B — 32 B under with the
-globals identical — another worktree's root prints the same 1,178,450 B, and
+globals identical — another worktree's root prints the same 1,177,926 B, and
 `/tmp/arduino-cyd-3` was read at 1,168,170 B, 144 B under. Quote the root with the
 number (see
 [the build note](../CONVENTIONS.md#build)).
@@ -480,12 +488,12 @@ from the repo root, after sourcing a toolchain.
     [`old_core.json`](../old_core.json) — size, globals and md5 together, measured
     2026-11-04 through `~/.arduino-cyd-2` — because a 2.0.17 figure quoted here
     would be checked against the 3.3.12 build and refused.
-* Core **3.3.12** links it at 1,178,450 bytes (89 % of 1,310,720) with 45,284 bytes of RAM
+* Core **3.3.12** links it at 1,177,926 bytes (89 % of 1,310,720) with 45,284 bytes of RAM
   (13 % of 327,680), `EXIT=0` under `--warnings all`, re-measured on 2026-11-04 with the new typeface. An earlier 3.3.12 build on a shorter path reported 1,163,930 / 45,004,
   so 3.x is path-sensitive too — 1,137–1,141 kB, not a fixed count.
 * The bundled copy matches byte for byte after `:app:syncWidgets`;
   `check_widget_assets.py` prints `2 widgets bundled, every copy matches`
-  (this sketch md5 `ebb57c81…`, the Spotify one `fb40e042…`).
+  (this sketch md5 `7d3d5676…`, the Spotify one `fb40e042…`).
 * Core 3.x costs this sketch ~0.8 kB of flash and ~3.6 kB of RAM over 2.0.17 —
   nothing like the Spotify deck's 155 kB gap, which is that sketch's network
   stack rather than the core (see the build note in
@@ -526,5 +534,5 @@ The first flash of a new board is the test of those, not a formality.
 ## Measured
 
 `check_headroom.py` built this sketch on 2026-11-04 with core 3.3.12 and read
-`Sketch uses 1,178,450 bytes` and `45,284 bytes` of globals; this folder's sketch
-md5 is `ebb57c81…`.
+`Sketch uses 1,177,926 bytes` and `45,284 bytes` of globals; this folder's sketch
+md5 is `7d3d5676…`.
