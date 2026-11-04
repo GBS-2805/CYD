@@ -119,7 +119,8 @@ final class FlashLibrary {
         return file.delete();
     }
 
-    static boolean importUri(Context context, Uri uri) {
+    /** The imported entry, or null: the shelf needs a yes, the editor needs its name. */
+    static Entry importEntry(Context context, Uri uri) {
         String name = queryName(context, uri);
         if (name == null || name.trim().isEmpty()) name = "imported.ino";
         name = sanitize(name);
@@ -132,17 +133,21 @@ final class FlashLibrary {
         OutputStream out = null;
         try {
             in = context.getContentResolver().openInputStream(uri);
-            if (in == null) return false;
+            if (in == null) return null;
             out = new FileOutputStream(target);
             copy(in, out);
-            return true;
+            return new Entry(target.getName(), target.length(), null);
         } catch (IOException e) {
             target.delete();
-            return false;
+            return null;
         } finally {
             closeQuietly(in);
             closeQuietly(out);
         }
+    }
+
+    static boolean importUri(Context context, Uri uri) {
+        return importEntry(context, uri) != null;
     }
 
     /** Downloads is the folder ArduinoDroid's file picker can reach. */

@@ -890,7 +890,13 @@ the front page needs no second navigation.
   was told. `EDIT` and `DELETE` exist only for records this app made (`user:`
   ids) for the same reason, and a record added here is `SKETCH` kind, which is
   why `INSTALLER` and `SOURCE` appear only when a link is set and `RECIPE` only
-  on an `IMAGE`.
+  on an `IMAGE`. A new record can also start from the sketch: `IMPORT A .INO`
+  opens the same document picker, its answer seeds the form with the file's own
+  name (extension dropped, underscores read as spaces) and attaches that file on
+  `ADD`,
+  so the card is made knowing what it runs instead of needing `ATTACH` next. An
+  existing card attaches from `ATTACH A FILE`; the two share one request code and
+  `pendingSketch` says which of them asked, so a sketch never lands as an image.
 * **A card can name a file, and the kind follows the file.** `ATTACH A FILE` opens
   the picker as a card in place of the project's own — the same reason the editor
   is a card — listing what FILES already holds, because a second picker window is

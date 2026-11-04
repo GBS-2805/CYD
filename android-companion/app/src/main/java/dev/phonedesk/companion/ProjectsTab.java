@@ -53,6 +53,10 @@ final class ProjectsTab extends ScrollView {
     private boolean creating;
     /** The project whose file picker is showing, or null for none. */
     private String picking;
+    /** A sketch a fresh record will be made from, and the import that answers it. */
+    private String seedFile = "";
+    private String seedName = "";
+    private boolean pendingSketch;
     /** Where a card sends a file it cannot flash itself; null in a JVM capture. */
     private Handoff handoff;
 
@@ -559,6 +563,9 @@ final class ProjectsTab extends ScrollView {
         creating = true;
         editing = null;
         signature = "";
+        seedFile = "";
+        seedName = "";
+        pendingSketch = false;
         refresh();
     }
 
@@ -573,6 +580,9 @@ final class ProjectsTab extends ScrollView {
         creating = false;
         editing = null;
         signature = "";
+        seedFile = "";
+        seedName = "";
+        pendingSketch = false;
         refresh();
     }
 
@@ -593,7 +603,34 @@ final class ProjectsTab extends ScrollView {
         title.setLetterSpacing(0.14f);
         card.addView(title);
 
-        EditText name = input("Name, e.g. Kitchen sensor", fresh ? "" : project.name);
+        // A new project can start from the sketch rather than from its name: the
+        // file is what the card is for, and retyping its name is the step that gets
+        // skipped. An existing card attaches from its own ATTACH A FILE instead.
+        if (fresh) {
+            if (seedFile.isEmpty()) {
+                Button sketch = Ui.action(activity, "IMPORT A .INO", false);
+                sketch.setOnClickListener(v -> openSketchPicker());
+                Ui.space(activity, sketch, 8);
+                Ui.fullWidth(activity, sketch);
+                card.addView(sketch);
+                TextView hint = Ui.text(activity,
+                        "Optional. A sketch names the card and stays attached to it.",
+                        11, Ui.DIM);
+                hint.setPadding(0, Ui.dp(activity, 6), 0, 0);
+                hint.setLineSpacing(Ui.dp(activity, 2), 1f);
+                card.addView(hint);
+            } else {
+                TextView line = Ui.text(activity, "SKETCH  " + seedFile, 11, Ui.ACCENT);
+                line.setTypeface(Typeface.MONOSPACE);
+                card.addView(line);
+                Button another = Ui.action(activity, "CHANGE SKETCH", false);
+                another.setOnClickListener(v -> openSketchPicker());
+                Ui.space(activity, another, 6);
+                card.addView(another);
+            }
+        }
+
+        EditText name = input("Name, e.g. Kitchen sensor", fresh ? seedName : project.name);
         Ui.space(activity, name, 8);
         card.addView(name);
 
@@ -672,6 +709,9 @@ final class ProjectsTab extends ScrollView {
             record.kind = ProjectStore.KIND_SKETCH;
             record.touch = FirmwareNotes.TOUCH_UNTESTED;
         }
+        // The sketch arrived before the record did, so it is attached here: ADD is
+        // the moment the card gains a file, and the kind already says sketch.
+        if (project == null && !seedFile.isEmpty()) record.fileName = seedFile;
         record.name = title;
         record.tagline = tagline.getText().toString().trim();
         record.notes = notes.getText().toString().trim();
@@ -844,15 +884,38 @@ final class ProjectsTab extends ScrollView {
     static final int REQUEST_IMPORT = 42;
 
     /** The platform's document picker: the shelf can add to FILES, not just read it. */
-    private void importFile() {
+    private boolean importFile() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("*/*");
         try {
             activity.startActivityForResult(intent, REQUEST_IMPORT);
+            return true;
         } catch (Exception e) {
             Actions.toast(activity, "No file picker");
+            return false;
         }
+    }
+
+    /**
+     * The editor's picker. It shares the attach picker's request code because both
+     * answers put a file in FILES; {@code pendingSketch} is what tells the answer
+     * which of the two asked.
+     */
+    private void openSketchPicker() {
+        pendingSketch = true;
+        if (!importFile()) pendingSketch = false;
+    }
+
+    /** "kitchen_sensor.ino" offers "Kitchen sensor": a default that can be typed over. */
+    private static String suggestName(String fileName) {
+        String base = fileName;
+        int dot = base.lastIndexOf('.');
+        if (dot > 0) base = base.substring(0, dot);
+        base = base.replace('_', ' ').replace('-', ' ').trim().replaceAll("\\s+", " ");
+        if (base.isEmpty()) return "";
+        String lower = base.toLowerCase(Locale.US);
+        return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
     }
 
     /**
@@ -860,8 +923,27 @@ final class ProjectsTab extends ScrollView {
      * closed: the file was imported to be attached to this card, so the next tap
      * should be the file, not ATTACH again.
      */
-    void imported(boolean ok) {
-        Actions.toast(activity, ok ? "Imported. Tap it to attach." : "Import failed");
+    void imported(FlashLibrary.Entry entry) {
+        if (pendingSketch) {
+            // The editor's import: a sketch it can be named after, or a refusal that
+            // says so rather than a card that quietly gained an image as its "sketch".
+            pendingSketch = false;
+            seedFile = "";
+            seedName = "";
+            if (entry == null) {
+                Actions.toast(activity, "Import failed");
+            } else if (!entry.textual()) {
+                Actions.toast(activity, entry.name + " is not a sketch");
+            } else {
+                seedFile = entry.name;
+                seedName = suggestName(entry.name);
+                Actions.toast(activity, "Sketch imported");
+            }
+            signature = "";
+            refresh();
+            return;
+        }
+        Actions.toast(activity, entry != null ? "Imported. Tap it to attach." : "Import failed");
         signature = "";
         refresh();
     }

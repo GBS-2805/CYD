@@ -169,7 +169,9 @@ the same string, read from the same declaration on the board.
   `IMPORT A FILE` for what it does not: a `.ino` becomes
   `COPY SOURCE` (the text ArduinoDroid compiles) and a `.bin` becomes `FLASH`,
   which opens SERIAL with that image marked `PICKED FROM THE SHELF`, and a folded
-  card carries a `FILE` badge when it names one. The writing
+  card carries a `FILE` badge when it names one. A new record can start from the
+  sketch instead: `IMPORT A .INO` in the form seeds the name from the file's own
+  name and attaches it on `ADD`. The writing
   is still the app's own uploader, which has never synced, so a card can reach the
   flasher but cannot make it work — that gap is unchanged. The catalogue is the
   seeded cards, plus whatever this app added, plus whatever is imported into
@@ -768,14 +770,15 @@ Identical to the sketch, checked against its `onWrite` handlers:
   Gradle writes is unsigned, because the release type has no `signingConfig`, so
   [`release.sh`](release.sh) aligns and signs it. Rebuilt on 2026-11-04 after the label, once for the phone deck and again for
   the Spotify one twice more, for the bond self-heal, again after the now page's
-  taps were mapped to its own BACK controls, and again when both cards began
-  naming the 3 MB partition, and again when the library box began refusing
-  NimBLE-Arduino: the unsigned file is
-  226,638 bytes, `release.sh` signs it with a 4096-bit key and writes
-  **239,215 bytes** (235 kB), and the debug APK in `dist/` is
-  239,217 bytes. The three hold the
-  same code and differ only in their signing blocks, so no one figure is a guide
-  to the others. It is versionCode 1,
+  taps were mapped to its own BACK controls, again when both cards began naming
+  the 3 MB partition, again when the library box began refusing NimBLE-Arduino, and
+  again when a new project could start from an imported sketch: the unsigned file
+  is 227,458 bytes, `release.sh` signs it with a 4096-bit key and writes
+  **243,311 bytes** (238 kB), and the debug APK in `dist/` is
+  239,217 bytes. The code is the same in both archives — `classes.dex` is 249,492
+  bytes and `resources.arsc` 1,980 bytes either way — so the 4,094-byte difference
+  is packaging, alignment and the signing block rather than a different build, and
+  no one figure is a guide to the others. It is versionCode 1,
   minSdk 26, targetSdk 35, not debuggable, and it carries both sketches in its
   assets. The signer is read back out of the archive and refused if it comes back
   as the debug identity instead. The unsigned file is build output rather than a

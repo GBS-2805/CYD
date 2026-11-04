@@ -106,8 +106,9 @@ links it needs.
 - **FILES** holds imports. **IMPORT A FILE** takes any `.ino`/`.bin` through the
   system picker and keeps the copy inside the app, with COPY / SAVE / FLASH /
   DELETE. The bundled decks are read-only.
-- The catalogue is still fixed at the four seeded projects: adding, editing and
-  deleting projects, and attaching a file to a card, is the next step.
+- Adding, editing and deleting projects, attaching a file to a card, and starting a
+  new project from an imported `.ino` are all on the shelf: `ADD A PROJECT` can
+  take the sketch first, name the card from it, and attach it on save.
 
 ## Direct USB
 
