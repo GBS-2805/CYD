@@ -53,8 +53,8 @@ PAGE = """<!doctype html>
 <title>Off-site — the app, scrolling</title>
 <style>
   :root {{
-    --field: #3f4e96; --band: #d9d9d9; --ink: #000000;
-    --on: #d9d9d9; --dim: rgba(217, 217, 217, .70); --rule: rgba(217, 217, 217, .26);
+    --field: #000000; --band: #e4e3de; --ink: #000000;
+    --on: #f1f0eb; --dim: rgba(241, 240, 235, .70); --rule: rgba(241, 240, 235, .23);
   }}
   * {{ box-sizing: border-box; }}
   body {{

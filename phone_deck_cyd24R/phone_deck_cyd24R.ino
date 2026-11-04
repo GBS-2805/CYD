@@ -100,11 +100,11 @@ static constexpr int SCREEN_W = 320;
 static constexpr int SCREEN_H = 240;
 
 // ---------------------------------------------------------------- palette ---
-// Two palettes, both monochrome: 0 PAPER is black on white, 1 INK is white on
-// black. One ink, one ground, and the six accent slots become a grey ramp so the
-// same draw calls still say "this one, not that one" without hue. New widgets
-// start from these two instead of inventing another colour scheme; add a theme
-// only when a screen genuinely cannot be read in mono.
+// Two themes, and nothing in between: 0 PAPER is black ink on an off-white page,
+// 1 INK is the same page inverted. One ink, one ground, and the last six slots
+// step that ink so the same draw calls still say "this one, not that one" without
+// hue. A new widget starts from these two; add a theme only when a screen cannot
+// be read in mono at all.
 //
 // The first six are ground, panel, lifted panel, hairline, ink and dim ink. The
 // last six keep their jobs and lose their colours: accent for the link, the
@@ -126,38 +126,44 @@ struct Palette {
 };
 
 static constexpr Palette THEMES[] = {
-  // 0 PAPER - black on white: paper ground, black ink, greys in between
-  { 0xFFFF /* #ffffff */, 0xF7BE /* #f4f4f4 */, 0xEF5D /* #e8e8e8 */,
-    0xCE59 /* #c8c8c8 */, 0x0000 /* #000000 */, 0x6B6D /* #6f6f6f */,
-    0x0000 /* #000000 */, 0xB596 /* #b0b0b0 */, 0x2945 /* #2b2b2b */,
-    0x8C51 /* #8a8a8a */, 0x0000 /* #000000 */, 0x52AA /* #555555 */ },
-  // 1 INK - white on black: the same ramp inverted, for a dark room
-  { 0x0000 /* #000000 */, 0x0861 /* #0e0e0e */, 0x18E3 /* #1c1c1c */,
-    0x3186 /* #333333 */, 0xFFFF /* #ffffff */, 0x8C71 /* #8c8c8c */,
-    0xFFFF /* #ffffff */, 0x4A69 /* #4d4d4d */, 0xD6BA /* #d4d4d4 */,
-    0x738E /* #707070 */, 0xFFFF /* #ffffff */, 0xA514 /* #a0a0a0 */ },
+  // 0 PAPER - black ink on an off-white page
+  { 0xF79D /* #f1f0eb */, 0xEF3C /* #e8e7e2 */, 0xDEFA /* #dddcd7 */, 0xCE38 /* #c8c7c2 */,
+    0x0000 /* #000000 */, 0x5ACA /* #5b5a56 */, 0x0000 /* #000000 */, 0xAD54 /* #a9a8a3 */,
+    0x18C3 /* #1a1a18 */, 0x7BCE /* #7a7974 */, 0x0000 /* #000000 */, 0x4A69 /* #4e4d49 */ },
+  // 1 INK - the same page inverted: off-white ink on black
+  { 0x0000 /* #000000 */, 0x1082 /* #101010 */, 0x18E3 /* #1c1c1a */, 0x39C6 /* #3a3a37 */,
+    0xF79D /* #f1f0eb */, 0xAD34 /* #a8a7a2 */, 0xF79D /* #f1f0eb */, 0x6B4C /* #6a6a66 */,
+    0xFFFF /* #ffffff */, 0x8C50 /* #8c8b86 */, 0xF79D /* #f1f0eb */, 0xB5B6 /* #b6b5b0 */ },
 };
 
 static constexpr uint8_t THEME_COUNT = sizeof(THEMES) / sizeof(THEMES[0]);
-// Pick a palette here; a settings row can change it at runtime later.
-static constexpr uint8_t THEME_INDEX = 1;  // INK
-static_assert(THEME_INDEX < THEME_COUNT,
-              "THEME_INDEX is past the end of THEMES");
+// The palette is a setting now, not a build flag. The companion app writes it
+// over the link and the board keeps it in NVS, so a deck follows its phone
+// without a re-flash; 1 INK is the default because a dark room is the usual one.
+static constexpr uint8_t THEME_DEFAULT = 1;  // INK
+static uint8_t themeIndex = THEME_DEFAULT;
 
-// The twelve names the drawing code already uses, loaded from the chosen theme.
-// Plain variables rather than constexpr, so a picker can reassign them later.
-static uint16_t C_BG         = THEMES[THEME_INDEX].bg;
-static uint16_t C_TILE       = THEMES[THEME_INDEX].tile;
-static uint16_t C_TILE_HI    = THEMES[THEME_INDEX].tileHi;
-static uint16_t C_EDGE       = THEMES[THEME_INDEX].edge;
-static uint16_t C_TEXT       = THEMES[THEME_INDEX].text;
-static uint16_t C_DIM        = THEMES[THEME_INDEX].dim;
-static uint16_t C_ACCENT     = THEMES[THEME_INDEX].accent;
-static uint16_t C_ACCENT_DIM = THEMES[THEME_INDEX].accentDim;
-static uint16_t C_PINK       = THEMES[THEME_INDEX].pink;
-static uint16_t C_PURPLE     = THEMES[THEME_INDEX].purple;
-static uint16_t C_YELLOW     = THEMES[THEME_INDEX].yellow;
-static uint16_t C_GREEN      = THEMES[THEME_INDEX].green;
+// The twelve names the drawing code already uses. Plain variables rather than
+// constexpr, so a write from the phone can reassign them without touching a
+// draw call; applyTheme() is the only place that does.
+static uint16_t C_BG;
+static uint16_t C_TILE;
+static uint16_t C_TILE_HI;
+static uint16_t C_EDGE;
+static uint16_t C_TEXT;
+static uint16_t C_DIM;
+static uint16_t C_ACCENT;
+static uint16_t C_ACCENT_DIM;
+static uint16_t C_PINK;
+static uint16_t C_PURPLE;
+static uint16_t C_YELLOW;
+static uint16_t C_GREEN;
+
+// One palette into the twelve names, and the only place they all change at
+// once: a half-applied theme is a screen drawn in two greys. Defined beside the
+// settings below, because the generated prototypes land before the first
+// function in this file and every type they mention must already be above that.
+static void applyTheme(uint8_t index);
 
 static constexpr uint8_t CORNER_CARD = 10;
 static constexpr uint8_t CORNER_BUTTON = 8;
@@ -188,7 +194,7 @@ struct TouchMapping {
 
 // The front page comes first: everything else is opened from it.
 enum Screen : uint8_t { SCR_HOME, SCR_BOARD, SCR_DETAIL, SCR_NOW, SCR_SETTINGS,
-                       SCR_THEME, SCR_CAL };
+                       SCR_CAL };
 
 // Where the wall clock came from. A phone-supplied time beats a notification
 // date, because the date is only as fresh as the last notification.
@@ -236,6 +242,7 @@ enum EventType : uint8_t {
   EVT_BATTERY,
   EVT_TIME,
   EVT_NOW,
+  EVT_THEME,
 };
 
 struct UiEvent {
@@ -246,6 +253,7 @@ struct UiEvent {
   int16_t battery;
   uint8_t charging;
   time_t epoch;
+  uint8_t theme;
 };
 
 // ----------------------------------------------------------- calibration ---
@@ -411,16 +419,39 @@ static void disableOnboardLed() {
   }
 }
 
+static void applyTheme(uint8_t index) {
+  if (index >= THEME_COUNT) index = THEME_DEFAULT;
+  themeIndex = index;
+  const Palette &theme = THEMES[index];
+  C_BG         = theme.bg;
+  C_TILE       = theme.tile;
+  C_TILE_HI    = theme.tileHi;
+  C_EDGE       = theme.edge;
+  C_TEXT       = theme.text;
+  C_DIM        = theme.dim;
+  C_ACCENT     = theme.accent;
+  C_ACCENT_DIM = theme.accentDim;
+  C_PINK       = theme.pink;
+  C_PURPLE     = theme.purple;
+  C_YELLOW     = theme.yellow;
+  C_GREEN      = theme.green;
+}
+
 static void loadSettings() {
   settingsPrefs.begin("settings", true);
   brightness = settingsPrefs.getUChar("bri", 80);
+  const uint8_t saved = settingsPrefs.getUChar("theme", THEME_DEFAULT);
   settingsPrefs.end();
   brightness = constrain(brightness, BRI_MIN, BRI_MAX);
+  // Clamped on the way in, so a corrupt byte cannot leave the deck with a
+  // palette that does not exist and no way back to one that does.
+  applyTheme(saved);
 }
 
 static void saveSettings() {
   settingsPrefs.begin("settings", false);
   settingsPrefs.putUChar("bri", brightness);
+  settingsPrefs.putUChar("theme", themeIndex);
   settingsPrefs.end();
 }
 
@@ -753,6 +784,8 @@ static BLEUUID UUID_LINK_IDENTITY("6f2d0005-9a3c-4b57-9d21-6a1e0c4f8b10");
 // What the phone is playing. One write, one line, display only: the deck has no
 // way to ask Spotify anything by itself, so nothing here is a transport button.
 static BLEUUID UUID_LINK_NOW("6f2d0006-9a3c-4b57-9d21-6a1e0c4f8b10");
+// The palette, one byte, read and written by the companion app.
+static BLEUUID UUID_LINK_THEME("6f2d0008-9a3c-4b57-9d21-6a1e0c4f8b10");
 
 // Apple's ANCS UUID in little-endian byte order, used as the 128-bit service
 // solicitation in the advertising packet. This is what makes an iPhone offer
@@ -1269,6 +1302,32 @@ class LinkNowCallbacks : public BLECharacteristicCallbacks {
   }
 };
 
+// 0 PAPER or 1 INK, one byte. The write is handed to the UI queue rather than
+// applied here: the panel belongs to the loop task, and a redraw from the BLE
+// task is two tasks drawing at once. The read answers where the board actually
+// is, so the app can light the right chip without guessing.
+class LinkThemeCallbacks : public BLECharacteristicCallbacks {
+ public:
+  void onWrite(BLECharacteristic *characteristic) override {
+    if (!peerAllowed) return;
+    const auto value = characteristic->getValue();
+    if (value.length() < 1) return;
+    const uint8_t index = static_cast<uint8_t>(value[0]);
+    if (index >= THEME_COUNT) return;
+    UiEvent ev = {};
+    ev.type = EVT_THEME;
+    ev.theme = index;
+    pushEvent(ev);
+  }
+
+  void onRead(BLECharacteristic *characteristic) override {
+    // Not const: core 2.0.17's setValue() takes a uint8_t*, and this sketch has
+    // to link on both cores.
+    uint8_t index = themeIndex;
+    characteristic->setValue(&index, 1);
+  }
+};
+
 static void startPhoneLink(BLEServer *server) {
   BLEService *service = server->createService(UUID_LINK_SERVICE);
 
@@ -1289,6 +1348,16 @@ static void startPhoneLink(BLEServer *server) {
   BLECharacteristic *nowPlaying = service->createCharacteristic(
       UUID_LINK_NOW, BLECharacteristic::PROPERTY_WRITE);
   nowPlaying->setCallbacks(new LinkNowCallbacks());
+
+  // The palette. Read-write because the app lights a chip from the board's own
+  // answer, and a deck flashed before this existed simply has no such
+  // characteristic: the app treats the switch as absent rather than broken.
+  BLECharacteristic *theme = service->createCharacteristic(
+      UUID_LINK_THEME,
+      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+  theme->setCallbacks(new LinkThemeCallbacks());
+  uint8_t themeNow = themeIndex;
+  theme->setValue(&themeNow, 1);
 
   // Who this board is. Written once: the tag cannot change without a re-flash,
   // and a read-only characteristic is all a reader needs.
@@ -1403,12 +1472,14 @@ static const Rect SET_CLEAR = {232, 106, 72, 26};
 static const Rect SET_CAL = {8, 146, 304, 32};
 static const Rect SET_CLOSE = {8, 186, 304, 34};
 
-// Front page: a status line, the wordmark, two pills, four numbered tabs. The
+// Front page: a status line, the wordmark, two pills, three numbered tabs. The
 // clock and battery moved up out of the bottom strip, so the page now ends in a
-// closing rule. A tab is 300x30, the widest target the panel can give.
+// closing rule. A tab is 300x30, the widest target the panel can give. The
+// fourth row was THEME, a contact sheet; the switch lives in the app now, so the
+// three rows keep their places and the page ends higher.
 static const Rect HEADER_BACK = {6, 3, 34, 28};
-static const Rect HOME_TAB[4] = {{10, 84, 300, 30}, {10, 118, 300, 30},
-                                 {10, 152, 300, 30}, {10, 186, 300, 30}};
+static const Rect HOME_TAB[3] = {{10, 84, 300, 30}, {10, 118, 300, 30},
+                                 {10, 152, 300, 30}};
 static const Rect HOME_PILL_A = {10, 52, 96, 18};
 static const Rect HOME_PILL_B = {114, 52, 96, 18};
 
@@ -1637,11 +1708,7 @@ static void drawStatusCard() {
 // state, and a numbered tab list where only the pressed row goes solid. No
 // graphic: a lens-shaped heat band sat under the tabs and was removed, because a
 // tinted strip there read as decoration competing with the wordmark.
-static const char *const TAB_LABELS[4] = {"MESSAGES", "SETTINGS", "THEME",
-                                          "CALIBRATE"};
-static const char *const THEME_NAMES[] = {"PAPER", "INK"};
-static_assert(sizeof(THEME_NAMES) / sizeof(THEME_NAMES[0]) == THEME_COUNT,
-              "THEME_NAMES and THEMES[] have drifted apart");
+static const char *const TAB_LABELS[3] = {"MESSAGES", "SETTINGS", "CALIBRATE"};
 
 // Unlit rows are ink on black; the pressed row inverts, which is the page's
 // only state.
@@ -1698,8 +1765,9 @@ static void drawHome() {
   else tft.drawCircle(dotX, 36, 4, C_DIM);
   drawTextRight(state, badgeRight, 32, 1, linked ? C_ACCENT : C_DIM, C_BG);
 
-  // Pill one: the unread count, outlined. Pill two: the palette this build is
-  // baked with, solid, the way the sheet fills one pill and outlines the other.
+  // Pill one: the unread count, outlined. Pill two: the palette the board is on
+  // now, solid, the way the sheet fills one pill and outlines the other. It is a
+  // label, not a control: the switch is in the companion app.
   tft.fillRoundRect(HOME_PILL_A.x, HOME_PILL_A.y, HOME_PILL_A.w, HOME_PILL_A.h,
                     9, C_BG);
   tft.drawRoundRect(HOME_PILL_A.x, HOME_PILL_A.y, HOME_PILL_A.w, HOME_PILL_A.h,
@@ -1715,50 +1783,16 @@ static void drawHome() {
   tft.fillRoundRect(HOME_PILL_B.x, HOME_PILL_B.y, HOME_PILL_B.w, HOME_PILL_B.h,
                     9, C_TEXT);
   char theme[16];
-  snprintf(theme, sizeof(theme), "THEME %02d", THEME_INDEX);
+  snprintf(theme, sizeof(theme), "THEME %02d", themeIndex);
   drawTextCentered(theme, HOME_PILL_B, 1, C_BG, C_TEXT);
 
   tft.drawFastHLine(10, 78, SCREEN_W - 20, C_EDGE);
 
-  for (int i = 0; i < 4; ++i) drawHomeTab(i, false);
+  for (int i = 0; i < 3; ++i) drawHomeTab(i, false);
 
   // Closing rule where the status strip used to sit; the page ends in air now.
   tft.drawFastHLine(10, 224, SCREEN_W - 20, C_EDGE);
 
-}
-
-// Every palette on its own ground: a contact sheet, not a picker. The palette is
-// compile-time, so the page says where to change it instead of pretending to
-// have a switch.
-static void drawThemeSheet() {
-  screen = SCR_THEME;
-  tft.fillScreen(C_BG);
-  tft.drawFastHLine(0, HEADER_H - 1, SCREEN_W, C_EDGE);
-  tft.fillRoundRect(BACK_BTN.x, BACK_BTN.y, BACK_BTN.w, BACK_BTN.h, 6, C_TILE);
-  tft.drawRoundRect(BACK_BTN.x, BACK_BTN.y, BACK_BTN.w, BACK_BTN.h, 7, C_EDGE);
-  drawTextCentered("<", BACK_BTN, 2, C_TEXT, C_TILE);
-  drawTextAt("THEMES", 48, 8, 2, C_TEXT, C_BG);
-
-  char count[16];
-  snprintf(count, sizeof(count), "%02d BAKED IN", THEME_COUNT);
-  drawTextRight(count, SCREEN_W - 12, 13, 1, C_DIM, C_BG);
-
-  for (int i = 0; i < THEME_COUNT; ++i) {
-    const Palette &theme = THEMES[i];
-    const Rect r = {8, static_cast<int16_t>(56 + i * 30), 304, 26};
-    tft.fillRect(r.x, r.y, r.w, r.h, theme.bg);
-    tft.drawRect(r.x, r.y, r.w, r.h, i == THEME_INDEX ? theme.accent : theme.edge);
-    char number[4];
-    snprintf(number, sizeof(number), "%02d", i);
-    drawTextAt(number, r.x + 8, r.y + 9, 1,
-               i == THEME_INDEX ? theme.accent : theme.dim, theme.bg);
-    drawTextAt(THEME_NAMES[i], r.x + 30, r.y + 5, 2, theme.text, theme.bg);
-    tft.fillCircle(r.x + r.w - 16, r.y + 13, 4, theme.pink);
-  }
-
-  drawTextAt("READ ONLY: SET THEME_INDEX, THEN REFLASH", 10, 212, 1, C_DIM, C_BG);
-  drawTextAt("12 SLOTS A THEME, ONE GREY RAMP", 10, 224, 1,
-             C_ACCENT_DIM, C_BG);
 }
 
 static void formatAge(time_t at, char *out, size_t outLen) {
@@ -2187,22 +2221,17 @@ static void handleSettingsTap(int x, int y) {
 
 // The tab inverts under the finger, holds long enough to read, then opens.
 static void handleHomeTap(int x, int y) {
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < 3; ++i) {
     if (!inside(x, y, HOME_TAB[i])) continue;
     drawHomeTab(i, true);
     delay(90);
     switch (i) {
       case 0: drawBoard(); break;
       case 1: openSettings(); break;
-      case 2: drawThemeSheet(); break;
       default: startCalibration(); break;
     }
     return;
   }
-}
-
-static void handleThemeTap(int x, int y) {
-  if (insideBack(x, y)) drawHome();
 }
 
 // Opened by uid, not by row: a notification arriving between the press and the
@@ -2265,6 +2294,16 @@ static void applyUiEvent(const UiEvent &ev) {
     case EVT_NOW:
       nowTrack = ev.now;
       if (screen == SCR_BOARD) drawStatusCard();
+      else if (screen == SCR_NOW) drawNow();
+      break;
+
+    case EVT_THEME:
+      // The phone owns the switch. This board repaints in the palette it was
+      // just told to use and keeps it, so the next power-up agrees with the app.
+      applyTheme(ev.theme);
+      saveSettings();
+      if (screen == SCR_SETTINGS) drawSettings();
+      else if (screen == SCR_BOARD || screen == SCR_DETAIL) drawBoard();
       else if (screen == SCR_NOW) drawNow();
       break;
 
@@ -2451,20 +2490,6 @@ void loop() {
       if (now - lastActionMs > 150) {
         lastActionMs = now;
         openSettings();
-      }
-    }
-    wasTouched = down;
-    delay(10);
-    return;
-  }
-
-  // ----------------------------------------------------------------- theme --
-  if (screen == SCR_THEME) {
-    if (down && !wasTouched) {
-      touchStartMs = now;
-      if (now - lastActionMs > 150) {
-        lastActionMs = now;
-        handleThemeTap(x, y);
       }
     }
     wasTouched = down;

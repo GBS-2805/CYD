@@ -336,26 +336,26 @@ URL and a flashing note. Decisions behind it:
   `ets Jul 29 2019 12:21:46` because the boot-mode line sat past the 32nd byte;
   the ROM's date and `boot:0x13` versus `boot:0x3` are what identify the chip and
   whether IO0 took effect.
-- **Theme**: the compress sheet the owner pasted — `#3f4e96` as the field every
-  screen sits on, `#d9d9d9` as the band the top bar and every primary action use,
-  black as the ink on that band, and the band grey's own alpha steps where the INK
-  theme kept a ramp: `GOOD` .78, `DIM` .70, `VIOLET` .66, `EDGE` .26, with `PINK`
-  the single value above the band at `#e8e8e8`, so a status still separates by
-  luminance rather than hue. A card is a **hairline cell on the field** now
-  (`Ui.CARD` is the field), which is how the sheet draws its grid; the surfaces
-  that need a fill of their own — a secondary action, a chip off, the search
-  field, the drawer's board row — use `Ui.CARD_HI`, a 16 % black wash. The live
-  pill is the one filled shape on the band: black fill, band-grey text.
-  Monospace did not move: the deck is a terminal, so the font stayed.
-- **The ramp has a floor, and it is measured.** `Palette` holds the values (so the
+- **Theme**: two themes and nothing else — **DARK** is off-white ink on black,
+  **LIGHT** is black ink on the off-white page. The band is a shade of that same
+  off-white in both, because the owner's mark is drawn in black on a light ground:
+  it keeps black ink and the artwork needs no plate behind it. Every other ink is
+  the page's opposite at an alpha — `GOOD` .78, `DIM` .70, `VIOLET` .66, the
+  hairline .23 — with `PINK` the one step above the text (pure white on black,
+  black on paper), so a status separates by luminance. A card is a **hairline cell
+  on the page** (`Ui.CARD` is the page); surfaces that need a fill of their own —
+  a secondary action, a chip off, the search field, the drawer's board row — use
+  `Ui.CARD_HI`, a 12 % wash in the opposite ink. The live pill is the one filled
+  shape on the band: black fill, band-paper text. Monospace did not move: the deck
+  is a terminal, so the font stayed.
+- **The floors are measured, not assumed.** `Palette` holds both themes (so the
   host suite can read them without Android) and `Contrast` does WCAG 2.1 arithmetic
-  on them; `HostTests.contrast()` walks every ink the app draws and holds body ink
-  to 4.5:1, hints and status words to 3:1, and a hairline to 1.5:1 as a line rather
-  than a word. Its first run found `VIOLET` at 2.48:1 — the sheet's own .48 — so the
-  ink moved to .66 (3.32:1) and `DIM` to .70 (3.52:1), which keeps the order
-  FLASHED 5.43 > WORKING 3.97 > PARKED 3.56 > WANT TO TRY 3.32. The check also
-  refuses a deliberately too-quiet ink, so a future palette cannot pass by being
-  unreadable.
+  on them; `HostTests.contrast()` walks each theme's inks and holds body ink to
+  4.5:1, hints and status words to 3:1, and a hairline to 1.5:1 as a line rather
+  than a word, then checks the ramp still runs quietest to loudest. It also refuses
+  a quarter-strength ink, so a theme cannot pass by making every value the same.
+  **171 checks**, up from 164 when the second theme and the decks' palettes
+  arrived.
 - **Probe always restores the board.** `probeUsb()` calls `hardReset()` in both
   paths, success and failure, because leaving the ESP32 in download mode is
   exactly the black-screen-with-red-LED state a user reads as a brick. The same
@@ -516,7 +516,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   deadline and every pause reads the clock, `test.sh` installs a virtual one and
   the stub port advances it, so the two checks that ran the real probe against a
   silent board — 57 s each — still try all five wirings and both windows. Measured
-  on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 153 now. `./check.sh`
+  on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 171 now. `./check.sh`
   runs the fast set, `./check.sh --full` the release set.
 - **The checkers' refusals are tested too, without a compiler.** Ten
   `selftest_*.py` files build a throwaway repo — a stand-in `arduino-cli`, a
@@ -532,10 +532,20 @@ Identical to the sketch, checked against its `onWrite` handlers:
   `./check.sh --selftest`, and the pre-commit hook runs it when a
   `check_*.py` or `selftest_*.py` is staged. That is the gap it closes: the three
   newest docs refusals were found by a reader, because nothing had ever run them.
+- **The app has two palettes, and the light one is measured, not eyeballed.**
+  SETTINGS carries an APPEARANCE card with DARK and LIGHT; the choice is stored in
+  its own `appearance` preferences file and applied before the first view exists, and
+  switching recreates the activity because every colour in this app is read when a
+  view is constructed. The band keeps its value in both palettes on purpose — it is
+  the ground the owner's mark was drawn on, so a dark band would put a white plate
+  behind artwork that has none — which is why `ACCENT` turns from a light fill into
+  the darkest ink and a primary action carries band grey for its label. The paper
+  inks are held to the same floors as the blue ones: 171 host checks, eleven of them
+  the light palette against field, fill and hairline.
 - **The committed tree builds on its own.** Measured on 2026-11-02: `git archive
   HEAD` into an empty directory plus a fresh `git init` — no built assets, no
   `.build_figures.json`, nothing in `dist/` the commit does not hold — passed the
-  fast gate, compiled all 34 sources (**152 host checks**), and `toolchain.sh`
+  fast gate, compiled every source (**152 host checks**), and `toolchain.sh`
   built the APK to **180,126 bytes**, sha256 beginning `dd5b475f`; the gate was green
   afterwards, widget bundles and recorded bytes included. The docs step took
   **123 s** on that first run and ~1 s after, because `.build_figures.json` is a
@@ -566,7 +576,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
 - The last `javac 17` type check against the Android 14 (API 34) framework
   classes (`android-all`) covered the pre-split sources: 9 files, 22 classes, only
   deprecation notes from the pre-Android-13 `setValue`/`setWriteType` path.
-  **That check predates the split into sections.** The current 34 sources are
+  **That check predates the split into sections.** The current sources are
   covered by `gradle assembleDebug` instead, which is what produced the shipped
   APK.
 - Every relative Markdown link across the repo resolves.
@@ -588,7 +598,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   sketches they name are inside the APK, `assets/widgets/phone_deck_cyd24R/` and
   `assets/widgets/spotify_deck_cyd24R/`, and `check_widget_assets.py` in the repo
   root compares those copies with `../<folder>/<sketch>.ino` byte for byte (phone
-  deck md5 `62c7e6c3…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
+  deck md5 `7047e587…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
   header rewrite, and `00bb1560…`, `eca02e93…`, `49f29bcb…` before the Bluetooth
   link, the callback change and the one-line answer — both in sync on 2026-11-02).
   The rewrite makes the phone-over-Bluetooth source the deck's first one and
@@ -596,8 +606,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
   folded in on 2026-11-03, and the APK in `dist/` was rebuilt against it. That sketch also
   **compiles here**, measured on 2026-11-03 once `~/.arduino-cyd/env.sh` was
   sourced — `check_docs.py`'s gate built it on the `huge_app` partition and read
-  1,880,101 B with 69,100 B of globals, beside the phone deck's unchanged
-  1,168,314 B / 45,244 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
+  1,881,093 B with 69,124 B of globals, beside the phone deck's unchanged
+  1,169,118 B / 45,284 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
   `PATH`, so that build goes through `~/.arduino15` and reads 1,880,053 B — 48 B
   under with the globals identical, the build-root sensitivity the docs record.
   The root that first printed that figure reads 1,878,661 B, 16 B over. Neither board has run it.

@@ -5,7 +5,7 @@
   "sketch": "phone_deck_cyd24R.ino",
   "board": "2432S024R",
   "tagline": "INSIDE APP",
-  "body": "A desk dashboard for your phone: clock, battery and notifications, set like a woodblock print in two monochrome themes \u2014 black ink on paper, or white ink on black.",
+  "body": "A desk dashboard for your phone: clock, battery and notifications, set like a woodblock print in two monochrome themes: black ink on an off-white page, or the same page inverted.",
   "notes": "Bundled with the app: copy it into ArduinoDroid and compile, there is nothing to download. With the bridge linked, whatever is playing on the phone is mirrored onto the deck over the same link, with no Spotify sign-in.",
   "libraries": [
     "Adafruit GFX Library",

@@ -61,6 +61,7 @@ final class DecksTab extends ScrollView {
         sb.append(snapshot.running).append('|').append(snapshot.linked).append('|')
                 .append(snapshot.status).append('|').append(snapshot.deviceMac).append('|')
                 .append(snapshot.deviceId).append('|')
+                .append(snapshot.theme).append('|')
                 .append(snapshot.rssi / 5).append('|');
         for (DeckService.Nearby nearby : snapshot.nearby) {
             sb.append(nearby.mac).append(':').append(nearby.rssi / 5).append(';');
@@ -112,7 +113,9 @@ final class DecksTab extends ScrollView {
             final String where = snapshot.deviceTag.isEmpty()
                     ? snapshot.deviceMac
                     : snapshot.deviceTag + " \u00B7 " + snapshot.deviceMac;
-            TextView mac = Ui.text(activity, where + " \u00B7 packet "
+            final String palette = snapshot.theme == DeckTheme.UNKNOWN
+                    ? "" : " \u00B7 " + DeckTheme.name(snapshot.theme);
+            TextView mac = Ui.text(activity, where + palette + " \u00B7 packet "
                     + Ui.ago(snapshot.lastWriteMs, System.currentTimeMillis()), 12, Ui.DIM);
             mac.setPadding(0, Ui.dp(activity, 4), 0, 0);
             deck.addView(mac);
@@ -199,11 +202,13 @@ final class DecksTab extends ScrollView {
                 12, Ui.DIM);
         detail.setPadding(0, Ui.dp(activity, 2), 0, 0);
         labels.addView(detail);
+        final boolean linked = deck.mac.equalsIgnoreCase(snapshot.deviceMac);
+        labels.addView(themePair(deck, snapshot, linked));
 
         card.addView(labels, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        if (deck.mac.equalsIgnoreCase(snapshot.deviceMac)) {
+        if (linked) {
             // The card above already says LINKED; here the useful control is the way
             // out, which drops the link and forgets the row in one tap.
             Button unlink = Ui.action(activity, "UNLINK", false);
@@ -224,6 +229,44 @@ final class DecksTab extends ScrollView {
         }
         Ui.space(activity, card, 8);
         body.addView(card);
+    }
+
+    /**
+     * The palette pair for one deck. Every row carries it, because every board
+     * keeps its own palette in NVS; only the linked one can be written, since the
+     * link carries one deck at a time, so an unlinked row says what it needs first
+     * instead of a chip that would write nowhere.
+     */
+    private LinearLayout themePair(DeckStore.Known deck, DeckService.Snapshot snapshot,
+                                   boolean linked) {
+        LinearLayout row = Ui.row(activity);
+        row.setPadding(0, Ui.dp(activity, 8), 0, 0);
+        final int live = linked ? snapshot.theme : DeckTheme.UNKNOWN;
+        row.addView(chip(DeckTheme.PAPER, live, deck, linked));
+        row.addView(chip(DeckTheme.INK, live, deck, linked));
+        if (!linked) {
+            TextView hint = Ui.text(activity, "link to set", 11, Ui.DIM);
+            hint.setPadding(Ui.dp(activity, 8), 0, 0, 0);
+            row.addView(hint);
+        }
+        return row;
+    }
+
+    /** One palette chip: filled when the deck is on it, dead when the deck is not linked. */
+    private Button chip(int theme, int live, DeckStore.Known deck, boolean linked) {
+        Button chip = Ui.action(activity, DeckTheme.name(theme), live == theme);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.leftMargin = Ui.dp(activity, 8);
+        chip.setLayoutParams(params);
+        if (linked) {
+            chip.setOnClickListener(v -> DeckService.setDeckTheme(deck.mac, theme));
+        } else {
+            chip.setAlpha(0.45f);
+            chip.setEnabled(false);
+        }
+        return chip;
     }
 
     /**

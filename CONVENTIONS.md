@@ -85,7 +85,7 @@ sketch and the descriptor `id`, which always move together:
   still proves nothing, because `esp32:esp32:esp32` defaults to `PSRAM=disabled`.
   Read the marking, never a product listing.
 * **Budget for 4 MB of flash and no PSRAM.** The default partition scheme gives
-  the app 1,310,720 bytes and the deck takes 1,168,314 of them (89 % as reported
+  the app 1,310,720 bytes and the deck takes 1,169,118 of them (89 % as reported
   by the compiler, after the mirror). DRAM is 327,680 bytes with ~300 kB of heap
   free at boot once the display and touch drivers are up; a 320x240 RGB565
   framebuffer is 153,600, so there is room for one, not two. Treat "it fits" as a
@@ -114,7 +114,7 @@ with the date and the command that printed it, because a number without a run be
 it is the drift this file exists to stop.
 
 1. **The phone deck, on the default partition.** BLE only, so no partition switch
-   and no network, at 1,168,314 B, 89 % of its 1,310,720 B slot.
+   and no network, at 1,169,118 B, 89 % of its 1,310,720 B slot.
    Compile it in ArduinoDroid with Adafruit GFX, Adafruit ILI9341 and
    XPT2046_Touchscreen, and record the `Sketch uses …` line and the `md5sum` of the
    file the phone compiled — the size belongs to the compiler, the md5 to the bytes.
@@ -139,7 +139,7 @@ it is the drift this file exists to stop.
    the expensive deck.
 8. **The Spotify deck, on `huge_app` — Bluetooth half done on 2026-11-03.** The
    first sketch here whose partition scheme has to be flashed with it:
-   1,880,101 B, 59 % of its 3,145,728 B slot. Flashed, it linked to the companion app,
+   1,881,093 B, 59 % of its 3,145,728 B slot. Flashed, it linked to the companion app,
    drew the phone's line and started playback from a chip, so the scheme, the
    advertise, the identity read, the mirror and the command notify all answered at
    once; the corner chips were hard to hit, which is why `10bb4b7` enlarged their
@@ -178,8 +178,8 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   globals, Spotify 1,122,281 B, 85 % of 1,310,720, / 53,572 B globals. Those are
   48 B and 32 B above the same sketches built straight through `arduino-cli` from
   another path — the build-root sensitivity above, not a different toolchain. The
-  mirror has since moved the phone deck to 1,168,314 B, 89 % of 1,310,720, /
-  45,244 B globals and the Spotify sketch to 1,125,781 B, 85 % of 1,310,720, /
+  mirror has since moved the phone deck to 1,169,118 B, 89 % of 1,310,720, /
+  45,284 B globals and the Spotify sketch to 1,125,781 B, 85 % of 1,310,720, /
   53,636 B globals, as [`check_headroom.py`](check_headroom.py) read both of them
   on 2026-11-01 — that Spotify file is the one before the Bluetooth link
   (`00bb1560`), not a flag on today's.
@@ -217,8 +217,8 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   end ever observed, and the next build printed 1,878,661 twice.
 * **A size names the root that printed it, and here that root is
   `~/.arduino-cyd-3`.** The current 3.3.12 figures in these docs — phone deck
-  1,168,314 B / 45,244 B of globals, the linked Spotify deck 1,880,101 B /
-  69,100 B on `huge_app`, the unlinked Spotify deck 1,125,781 B — are that
+  1,169,118 B / 45,284 B of globals, the linked Spotify deck 1,881,093 B /
+  69,124 B on `huge_app`, the unlinked Spotify deck 1,125,781 B — are that
   root's, read through `arduino-cli` 1.5.2-rc.1 on 2026-11-02. It is the root
   worth naming because its `env.sh` pins its own data, download and user dirs;
   `~/.arduino-cyd/env.sh` sets only `PATH`, so sourcing it builds through
@@ -245,7 +245,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   installs a virtual clock and the stub port advances it, so a check that runs the
   real probe against a silent board still tries all five wirings and both windows
   without waiting for them. Measured on 2026-11-02: 179 s before the seam, 1.45 s
-  after, the same 126 checks then, 153 now. The seam exists because the alternative — a shorter
+  after, the same 126 checks then, 171 now. The seam exists because the alternative — a shorter
   window in the test — would test a different probe.
 * **That check runs on commit.** [`.githooks/pre-commit`](.githooks/pre-commit)
   runs the whole fast gate — [`check.sh`](check.sh) — on every commit, so no
@@ -334,7 +334,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   silently build the wrong core and report 73 % where the release reads 85 %.
   Both together took **18 s** here, on core 3.3.12 with the build cache warm; on
   2026-11-01, after the mirror, `check_headroom.py` over both decks read
-  1,168,314 B (142,406 B free) and 1,125,781 B (184,939 B free), exit 0. A second
+  1,169,118 B (142,406 B free) and 1,125,781 B (184,939 B free), exit 0. A second
   install root read 1,168,170 B (142,550 B free) and 1,125,669 B (185,051 B free)
   for the same two sketches — 144 B and 112 B lower with the globals identical,
   which is the build-root sensitivity above rather than drift in the sketches.
@@ -406,8 +406,10 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   the partition before assuming a sketch still fits. The Spotify README's 967,413
   is the 2026-10-31 file (`ef0681b`) on a path ten characters shorter; at this
   repo's path it prints 967,493, and the committed Spotify sketch, which has
-  grown the Bluetooth link and the identity since, prints 1,749,309 B on 2.0.17
-  — over the 1,310,720-byte default slot.
+  grown the Bluetooth link and the identity since, prints past 1,310,720 B on
+  2.0.17 — over the default slot; the exact figure and md5 are in
+  [`old_core.json`](old_core.json), because a 2.0.17 number quoted in prose is
+  checked against the 3.3.12 build.
 * **Why 3.x is the default, and what would reverse it.** Core 2.0.17 ships
   mbedTLS 2.28.7, a branch that reached end of life at the end of 2024, and the
   Spotify deck's whole job is TLS to a third party — an unpatched TLS stack
@@ -457,9 +459,9 @@ Widgets that draw a UI keep their palette **in the sketch**, as a table:
 
 ```cpp
 static constexpr Palette THEMES[] = {
-  { 0x10A1 /* #14150f */, 0x2103 /* #20211a */, /* ... twelve entries */ },
+  { 0xF7DF /* #f1f0eb */, 0xE71C /* #e8e7e2 */, /* ... twelve entries */ },
 };
-static constexpr uint8_t THEME_INDEX = 1;   // which one is live
+static uint8_t themeIndex = 1;   // which one is live; the app writes it
 ```
 
 * Twelve fields, fixed order and fixed jobs: ground, panel, lifted panel,
@@ -469,14 +471,23 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
 * Status rules must keep the last three distinguishable in every theme, by
   luminance rather than hue: charging strongest against the ground, the warning
   state next, the healthy state quietest.
-* **Ship monochrome.** Two themes: 0 PAPER (black on white) and 1 INK (white on
-  black), six accent roles as a grey ramp, so a new widget needs no colour
-  decisions to be readable. A widget that genuinely needs colour adds a theme to
+* **Ship monochrome.** Two themes: 0 PAPER (black ink on an off-white page) and
+  1 INK (the same page inverted), the last six roles stepping that one ink, so a
+  new widget needs no colour decisions to be readable. A widget that genuinely needs colour adds a theme to
   its own table and says why in its README.
+* **The theme is chosen at runtime, by the app.** A Phone Link deck carries a
+  read-write palette characteristic (`6f2d0008-…`, one byte, `0` PAPER or `1`
+  INK), applies it, stores it in the `settings` namespace and repaints; the app
+  writes it and reads it back, so a chip is lit by the board's answer rather than
+  by what the phone last sent. A deck keeps **no theme page of its own**: a page
+  that can only say "reflash" is a page that lies about being a control. The
+  compile-time index is gone with it.
 * Keep the `0x5655 /* #rrggbb */` shape: the comment is how the palette is read
   and reviewed, and a reformat that drops it leaves a wall of numbers.
-* The twelve `C_` names are plain variables loaded from the chosen theme, so a
-  picker can reassign them at runtime without touching a draw call.
+* The twelve `C_` names are plain variables loaded through `applyTheme()`, so a
+  write from the phone can reassign them without touching a draw call. Every
+  change goes through that one function, because a half-applied palette is a
+  screen drawn in two greys.
 
 ## NVS
 
@@ -563,7 +574,7 @@ deleted. What is left is the part that was never about the count.
   `git cherry-pick <sha>` needs nothing pushed — a push is a publish, not a hand-off.
   A copy silently drops whichever version was written second; a merge shows both
   sides of the disagreement. Re-measure what a merge brings, because a figure
-  belongs to the root that printed it: the 1,880,101 B above is a branch's
+  belongs to the root that printed it: the 1,881,093 B above is a branch's
   1,879,489 B read again through this root, not a number copied across.
 * **A rule has one home.** Anything true of the whole board or of the app lives in
   this file; anything true of one widget lives in that widget's `README.md`;
@@ -693,7 +704,15 @@ the names behind them did not move — `DecksTab`, `ProjectsTab`, `SECTION_DECKS
 the screens are — so a grep for the old words finds code, not copy.
 `SETTINGS` is deliberately not a fourth: it is configuration rather
 than navigation, so it hangs off the gear at the outer end of the top bar, past
-the link pill. The bottom tab bar is gone on purpose, because a drawer that *is*
+the link pill. The one appearance choice — **DARK** or **LIGHT** — lives there in
+its own card: `Ui` holds the live inks as mutable statics, `Ui.applyTheme` swaps
+them, and the switch stores the answer with `Appearance` and recreates the
+activity, because a colour is read when a view is built and a screen already on
+show would otherwise keep the theme it was drawn in. DARK is off-white ink on
+black, LIGHT is black ink on the off-white page; the band is a shade of that same
+off-white in both, because it is the ground the mark was drawn on and a band that
+turned with the theme would put a plate behind artwork that has none. The same
+choice is written to the linked deck, and each deck keeps its own pair on PAIRED. The bottom tab bar is gone on purpose, because a drawer that *is*
 the front page needs no second navigation.
 
 * **The top bar carries the owner's mark, centred on the band.** `TopBar` puts

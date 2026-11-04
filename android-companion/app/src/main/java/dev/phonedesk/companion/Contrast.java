@@ -3,7 +3,7 @@ package dev.phonedesk.companion;
 /**
  * WCAG 2.1 relative luminance and contrast, on ARGB ints, with no Android in sight.
  *
- * The palette is a grey ramp at four alphas, and an alpha can be nudged one value
+ * The inks are one value at four alphas, and an alpha can be nudged one value
  * at a time until a hint is no longer a hint but a ghost. Prose cannot catch that;
  * this can, which is why it is plain arithmetic instead of a paragraph in the docs.
  */

@@ -167,6 +167,37 @@ final class SetupTab extends ScrollView {
         Ui.space(activity, backgroundCard, 10);
         body.addView(backgroundCard);
 
+        body.addView(Ui.section(activity, "APPEARANCE"));
+
+        LinearLayout themeCard = Ui.card(activity);
+        themeCard.addView(Ui.text(activity,
+                "Two themes over the same screens: black ink on an off-white page, and the "
+                        + "same page inverted. The band stays light either way, because it is "
+                        + "the ground the mark was drawn on.",
+                13, Ui.DIM));
+        LinearLayout themeActions = Ui.row(activity);
+        themeActions.setPadding(0, Ui.dp(activity, 10), 0, 0);
+
+        // The live palette is the filled button, so the row says which one is on
+        // without a second label. Switching rebuilds the activity: a colour here is
+        // read when a view is constructed, and screens already built keep theirs.
+        final int live = Appearance.get(activity);
+        Button dark = Ui.action(activity, "DARK", live == Ui.DARK);
+        dark.setOnClickListener(v -> pickTheme(Ui.DARK));
+        themeActions.addView(dark, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        Button light = Ui.action(activity, "LIGHT", live == Ui.LIGHT);
+        light.setOnClickListener(v -> pickTheme(Ui.LIGHT));
+        LinearLayout.LayoutParams lightParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lightParams.leftMargin = Ui.dp(activity, 8);
+        themeActions.addView(light, lightParams);
+
+        themeCard.addView(themeActions);
+        Ui.space(activity, themeCard, 10);
+        body.addView(themeCard);
+
         body.addView(Ui.section(activity, "BRIDGE"));
 
         toggle = Ui.action(activity, "START BRIDGE", true);
@@ -192,6 +223,19 @@ final class SetupTab extends ScrollView {
         crashCard.setVisibility(GONE);
         Ui.space(activity, crashCard, 18);
         body.addView(crashCard);
+    }
+
+    /**
+     * Store the choice, tell the linked deck and rebuild, so every screen is drawn
+     * in the palette picked. One theme over both ends is the point: the board is
+     * the half a person looks at from across the room. A deck that should stay on
+     * the other palette gets it from its own pair on PAIRED.
+     */
+    private void pickTheme(int theme) {
+        if (theme == Appearance.get(activity)) return;
+        Appearance.set(activity, theme);
+        DeckService.pushTheme(theme);
+        activity.recreate();
     }
 
     void refresh() {

@@ -87,6 +87,7 @@ public final class HostTests {
         deckAddresses();
         nowPacket();
         linkCommand();
+        deckTheme();
 
         System.out.println();
         if (failures.isEmpty()) {
@@ -886,53 +887,72 @@ public final class HostTests {
      * a 48 % ink FAILS, so the check cannot quietly pass everything.
      */
     private static void contrast() {
-        // Whole numbers in the names: a reader should not have to run this to know
-        // how close a value sits to the floor.
-        for (int ink : Palette.ON_FIELD) {
-            check("contrast: " + percent(ink) + " ink on the field clears 3:1 ("
-                            + tenths(Contrast.ratio(ink, Palette.FIELD)) + ")",
-                    Contrast.ratio(ink, Palette.FIELD) >= Contrast.QUIET);
-        }
-        for (int ink : new int[] {Palette.TEXT, Palette.ACCENT, Palette.PINK}) {
-            check("contrast: " + percent(ink) + " ink on the field carries body text at 4.5:1 ("
-                            + tenths(Contrast.ratio(ink, Palette.FIELD)) + ")",
-                    Contrast.ratio(ink, Palette.FIELD) >= Contrast.BODY);
-        }
+        inks("dark", Palette.DARK_FIELD, Palette.DARK_PRIMARY, Palette.DARK_ON_FIELD,
+                new int[] {Palette.DARK_TEXT, Palette.DARK_PRIMARY, Palette.DARK_ALOUD},
+                Palette.DARK_ON_ACTION, Palette.DARK_RULES);
+        inks("light", Palette.LIGHT_FIELD, Palette.LIGHT_PRIMARY, Palette.LIGHT_ON_FIELD,
+                new int[] {Palette.LIGHT_TEXT, Palette.LIGHT_PRIMARY, Palette.LIGHT_ALOUD},
+                Palette.LIGHT_ON_ACTION, Palette.LIGHT_RULES);
         for (int ink : Palette.ON_BAND) {
             check("contrast: " + percent(ink) + " on the band clears 3:1 ("
                             + tenths(Contrast.ratio(ink, Palette.BAND)) + ")",
                     Contrast.ratio(ink, Palette.BAND) >= Contrast.QUIET);
         }
-        check("contrast: ink on the band carries body text at 4.5:1 ("
+        check("contrast: black ink on the band carries body text at 4.5:1 ("
                         + tenths(Contrast.ratio(Palette.INK, Palette.BAND)) + ")",
                 Contrast.ratio(Palette.INK, Palette.BAND) >= Contrast.BODY);
-        check("contrast: the black pill's band-grey text clears 4.5:1 ("
+        check("contrast: the band's own paper reads under black ink at 4.5:1 ("
                         + tenths(Contrast.ratio(Palette.BAND, Palette.INK)) + ")",
                 Contrast.ratio(Palette.BAND, Palette.INK) >= Contrast.BODY);
-        for (int fill : Palette.ON_ACCENT) {
-            check("contrast: ink on a filled action clears 4.5:1 ("
-                            + tenths(Contrast.ratio(fill, Palette.ACCENT)) + ")",
-                    Contrast.ratio(fill, Palette.ACCENT) >= Contrast.BODY);
+        // The refusal: this is the ink strength the sheet shipped that read as a
+        // hairline, and the reason the check exists. If it ever passes, the floor
+        // stopped meaning anything.
+        check("contrast: a quarter-strength ink on the off-white is refused ("
+                        + tenths(Contrast.ratio(0x40000000, Palette.LIGHT_FIELD)) + " < 3.0)",
+                Contrast.ratio(0x40000000, Palette.LIGHT_FIELD) < Contrast.QUIET);
+    }
+
+    /**
+     * One theme's floors: every ink that carries a word on the page, the ones that
+     * carry body text, the ones that sit on a filled action, and the hairline. The
+     * page is two values, so the ramp order is what stops a theme that keeps every
+     * floor while collapsing two steps into one.
+     */
+    private static void inks(String name, int field, int primary, int[] onField,
+                             int[] body, int[] onAction, int[] rules) {
+        for (int ink : onField) {
+            check("contrast: " + name + " " + percent(ink) + " ink on the page clears 3:1 ("
+                            + tenths(Contrast.ratio(ink, field)) + ")",
+                    Contrast.ratio(ink, field) >= Contrast.QUIET);
         }
-        for (int rule : Palette.RULES) {
-            check("contrast: the hairline is visible on the field at 1.5:1 ("
-                            + tenths(Contrast.ratio(rule, Palette.FIELD)) + ")",
-                    Contrast.ratio(rule, Palette.FIELD) >= Contrast.RULE);
+        for (int ink : body) {
+            check("contrast: " + name + " " + percent(ink)
+                            + " ink carries body text at 4.5:1 ("
+                            + tenths(Contrast.ratio(ink, field)) + ")",
+                    Contrast.ratio(ink, field) >= Contrast.BODY);
         }
-        // The order the docs promise: FLASHED, WORKING, PARKED, WANT TO TRY. A ramp
-        // that keeps every floor but collapses two steps into one is still a bug.
-        double flashed = Contrast.ratio(Palette.ACCENT, Palette.FIELD);
-        double working = Contrast.ratio(Palette.GOOD, Palette.FIELD);
-        double parked = Contrast.ratio(Palette.DIM, Palette.FIELD);
-        double want = Contrast.ratio(Palette.VIOLET, Palette.FIELD);
-        check("contrast: the four status inks stay in order (" + tenths(flashed) + " > "
-                        + tenths(working) + " > " + tenths(parked) + " > " + tenths(want) + ")",
-                flashed > working && working > parked && parked > want);
-        // And the refusal: this is the alpha the sheet shipped, and the reason the
-        // check exists. If it ever passes, the floor stopped meaning anything.
-        check("contrast: the sheet's own .48 ink is refused ("
-                        + tenths(Contrast.ratio(0x7AD9D9D9, Palette.FIELD)) + " < 3.0)",
-                Contrast.ratio(0x7AD9D9D9, Palette.FIELD) < Contrast.QUIET);
+        for (int fill : onAction) {
+            check("contrast: " + name + " ink on a filled action clears 4.5:1 ("
+                            + tenths(Contrast.ratio(fill, primary)) + ")",
+                    Contrast.ratio(fill, primary) >= Contrast.BODY);
+        }
+        for (int rule : rules) {
+            check("contrast: the " + name + " hairline is visible at 1.5:1 ("
+                            + tenths(Contrast.ratio(rule, field)) + ")",
+                    Contrast.ratio(rule, field) >= Contrast.RULE);
+        }
+        // Quietest first, so each step has to be at least as loud as the one before.
+        double previous = 0;
+        boolean ordered = true;
+        final StringBuilder ramp = new StringBuilder();
+        for (int ink : onField) {
+            final double ratio = Contrast.ratio(ink, field);
+            ordered &= ratio >= previous;
+            previous = ratio;
+            ramp.append(tenths(ratio)).append(' ');
+        }
+        check("contrast: the " + name + " ramp stays in order, quietest first ("
+                        + ramp.toString().trim() + ")", ordered);
     }
 
     /** {@code 0xA8D9D9D9} reads as "66 %", which is how the palette is described. */
@@ -942,6 +962,30 @@ public final class HostTests {
 
     private static String tenths(double ratio) {
         return String.format(java.util.Locale.US, "%.2f:1", ratio);
+    }
+
+    /**
+     * The palette byte is the one thing both ends must agree on: 0 PAPER, 1 INK,
+     * nothing else written and nothing else accepted. The app draws "PAPER" on a
+     * chip that sends 0 to a board whose own table calls 0 PAPER, so a swap here
+     * is a switch that lies in both directions at once.
+     */
+    private static void deckTheme() {
+        check("theme: PAPER is the byte 0 the board's table calls paper",
+                DeckTheme.payload(DeckTheme.PAPER)[0] == 0);
+        check("theme: INK is the byte 1 the board's table calls ink",
+                DeckTheme.payload(DeckTheme.INK)[0] == 1);
+        check("theme: a read of 0 decodes to PAPER",
+                DeckTheme.decode(new byte[] {0}) == DeckTheme.PAPER);
+        check("theme: a read of 1 decodes to INK",
+                DeckTheme.decode(new byte[] {1}) == DeckTheme.INK);
+        check("theme: a palette the board does not have is unknown, not guessed",
+                DeckTheme.decode(new byte[] {2}) == DeckTheme.UNKNOWN
+                        && DeckTheme.decode(new byte[0]) == DeckTheme.UNKNOWN
+                        && DeckTheme.decode(null) == DeckTheme.UNKNOWN);
+        check("theme: the chips are named the way the deck's table spells them",
+                DeckTheme.name(DeckTheme.PAPER).equals("PAPER")
+                        && DeckTheme.name(DeckTheme.INK).equals("INK"));
     }
 
     private static void check(String name, boolean ok) {

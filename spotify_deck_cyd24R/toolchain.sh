@@ -41,7 +41,7 @@ CLI_VERSION="${ARDUINO_CLI_VERSION:-latest}"
 CORE="${ARDUINO_CORE:-esp32:esp32@3.3.12}"
 # huge_app, not the default scheme: Bluetooth does not fit beside WiFi, TLS and the
 # setup server in 1,310,720 bytes. Measured on core 3.3.12: the linked image is
-# 1,878,645 B, which is 143% of the default slot and 59% of this one. Flashing the
+# 1,881,093 B, which is 143% of the default slot and 59% of this one. Flashing the
 # phone deck afterwards with the default scheme re-partitions the board back, so
 # each flash has to carry the scheme its own sketch needs.
 FQBN="${ARDUINO_FQBN:-esp32:esp32:esp32:PartitionScheme=huge_app}"

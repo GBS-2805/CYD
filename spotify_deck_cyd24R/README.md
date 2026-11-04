@@ -11,14 +11,17 @@ active.
 
 This deck needs `PartitionScheme=huge_app`. Bluetooth does not fit beside WiFi,
 mbedTLS and the setup server in the default 1,310,720-byte app slot: the linked
-image is 1,880,101 bytes, 143 % of the 1,310,720-byte slot and 59 % of 3,145,728.
+image is 1,881,093 bytes, 143 % of the 1,310,720-byte slot and 59 % of 3,145,728.
 phone deck afterwards with the default scheme re-partitions the board back, so
 each upload has to carry the scheme its own sketch was built for.
 
 It is the same board as its sibling — **ESP32-2432S024R**, 2.4" resistive CYD —
-and the same palette: two monochrome themes of twelve slots each. `THEME_INDEX =
-1` selects **INK**, white ink on black; `0` selects **PAPER**. The six accent
-slots are a grey ramp rather than hues, so the transport chip, an error and the
+and the same palette: two monochrome themes of twelve slots each. **INK** (white
+ink on black) is the default and **PAPER** (black ink on an off-white page) is the
+other; the companion app switches either way down the link (`6f2d0008-…`, one byte)
+and the board keeps the choice in NVS, so this deck has no theme page of its own.
+The last six slots step that one ink rather than hue, so the transport chip, an
+error and the
 WiFi state separate by luminance instead of colour. Spotify's green is not on
 this screen.
 
@@ -292,7 +295,7 @@ scheme**; see the measurement below for why that is enough.
 
 Both decks are ordinary Arduino sketches and both travel on the phone: the app
 bundles this one too (`check_widget_assets.py` prints `2 widgets bundled, every
-copy matches`, with this sketch at md5 `a9a6e8e7…`), so it can be pulled from the
+copy matches`, with this sketch at md5 `c446f31a…`), so it can be pulled from the
 same shelf as its sibling.
 
 From a computer, `toolchain.sh` has already compiled it:
@@ -340,8 +343,9 @@ the 2026-10-31 sketch. Rebuilt on 2026-11-03 through a fresh 2.0.17 root at
 this repo's path, that same file prints 967,493 bytes, 80 B higher for ten
 characters of path — which is the 967,493 `CONVENTIONS.md` uses as its
 baseline. Today's committed sketch, which grew the Bluetooth link and the
-`/deck.json` identity after that day, prints 1,749,309 bytes on the same core:
-past the 1,310,720-byte default slot, so it needs `huge_app` on 2.0.17 too.
+`/deck.json` identity after that day, prints past 1,310,720 bytes on the same core — its
+figure and md5 are in [`old_core.json`](../old_core.json) — so it needs `huge_app`
+on 2.0.17 too.
 
 That includes the setup web server, the PKCE exchange, the redrawn setup card and
 both pinned roots (about 2.7 kB of PEM), and leaves **335 kB** of the default
@@ -397,8 +401,8 @@ compiler:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,880,101 | **1,265,627** | 3,145,728 (59 % used) |
-| DRAM | 69,100 globals | **258,580** | 327,680 |
+| flash | 1,881,093 | **1,264,635** | 3,145,728 (59 % used) |
+| DRAM | 69,124 globals | **258,556** | 327,680 |
 
 The two figures are this tree's own build through `~/.arduino-cyd-3/env.sh` on
 2026-11-02, the root whose `env.sh` pins its own data and library dirs. Sourcing
@@ -406,7 +410,7 @@ The two figures are this tree's own build through `~/.arduino-cyd-3/env.sh` on
 `~/.arduino15` and prints **1,880,053 B** for the same sketch, 48 B under with the
 globals identical — the build-root sensitivity
 [`../CONVENTIONS.md`](../CONVENTIONS.md#build) records, not a different sketch, since
-both read md5 `a9a6e8e7…`. Quote the root you measured on rather than reconciling the
+both read md5 `c446f31a…`. Quote the root you measured on rather than reconciling the
 last two digits.
 
 Without Bluetooth the sketch was 1,125,781 bytes on the default scheme — the
@@ -431,13 +435,20 @@ sourcing a toolchain.
 
 **Verified here** — none of this needs hardware:
 
+* The palette is one byte the app writes and the board keeps: `applyTheme()` is the
+  only writer of the twelve names, `loadTheme()` clamps the stored byte to
+  `0..THEME_COUNT-1`, and the write is applied on the loop task rather than in the
+  Bluedroid callback, so a repaint cannot catch the twelve colours half changed.
+  **Not** verified on a board: no write from a phone has reached a real deck.
+
 * The sketch in that block links under the documented core **2.0.17** at
   967,413 bytes (73 %), on a path ten characters shorter. It is `ef0681b`'s
   2026-10-31 file, taken before the deck grew its `/deck.json` identity and its
   Bluetooth link. Rebuilt through `~/.arduino-cyd-2` on 2026-11-03 that file
   prints 967,493 bytes at this repo's path, so the 967,413 is history and
-  967,493 is the same file here — not today's, which reads 1,749,309 bytes on
-  that core.
+  967,493 is the same file here — not today's, whose 2.0.17 build is recorded in
+  [`old_core.json`](../old_core.json) beside its md5, because a figure quoted
+  here is checked against the 3.3.12 build and refused.
 * Re-measured on 2026-11-01 with `arduino-cli` 1.5.2-rc.1, core **3.3.12** links
   the committed file at 1,125,781 bytes, 85 % of 1,310,720, with
   53,636 bytes of globals, 16 % of 327,680, `EXIT=0` under `--warnings all`. That
@@ -455,9 +466,9 @@ sourcing a toolchain.
 * **It needs `huge_app` now, and that is the scheme `toolchain.sh` pins.**
   Without Bluetooth the 3.3.12 build was 1,125,781 bytes, 85 % of 1,310,720:
   measured from the pre-link sketch (`00bb1560`), not a flag on today's file.
-  With the link it is 1,880,101 bytes: **143 %** of 1,310,720, **59 %** of 3,145,728.
+  With the link it is 1,881,093 bytes: **143 %** of 1,310,720, **59 %** of 3,145,728.
   An earlier pair of runs differed by 48 B; the pre-commit hook and a direct
-  compile both print 1,880,101 now, so the single figure is the measured one.
+  compile both print 1,881,093 now, so the single figure is the measured one.
   `default.csv`
   sizes `app0` and `app1` at 1,310,720 each, so on the default scheme this deck no
   longer links at all — not a tighter fit, a refusal. Uploading it re-partitions

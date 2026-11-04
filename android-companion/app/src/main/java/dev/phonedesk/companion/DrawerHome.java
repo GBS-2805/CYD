@@ -19,7 +19,7 @@ import java.util.Map;
  *
  * A slide-out panel behind a button would hide the only navigation this app has,
  * so the menu is the screen. The owner's mark leads the top bar — the band is the
- * white the artwork was drawn on — so the wordmark opens the field itself, the
+ * light ground the artwork was drawn on — so the wordmark opens the field itself, the
  * three sections hang below it, and BOARDS expands in
  * place to name the boards
  * that hold projects, each row opening the shelf they live on.

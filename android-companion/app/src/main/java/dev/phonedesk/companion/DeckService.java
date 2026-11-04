@@ -75,6 +75,13 @@ public class DeckService extends Service {
      * has no such characteristic, and such a deck still links.
      */
     static final UUID COMMAND_UUID = UUID.fromString("6f2d0007-9a3c-4b57-9d21-6a1e0c4f8b10");
+    /**
+     * The deck's palette: one byte, {@code 0} PAPER or {@code 1} INK, read and
+     * write. Optional like the rest — a deck flashed before the app owned the
+     * switch has no such characteristic, and its row says so rather than a chip
+     * that writes nowhere.
+     */
+    static final UUID THEME_UUID = UUID.fromString("6f2d0008-9a3c-4b57-9d21-6a1e0c4f8b10");
     /** The client-characteristic-configuration descriptor every notify carries. */
     private static final UUID CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
 
@@ -123,6 +130,8 @@ public class DeckService extends Service {
         /** {@code phone_deck_cyd24R-A1B2C3}, or "" until the deck names itself. */
         public String deviceId = "";
         public String deviceTag = "";
+        /** The palette the deck says it is on, or {@link DeckTheme#UNKNOWN}. */
+        public int theme = DeckTheme.UNKNOWN;
         public int rssi;
         public int writes;
         public int notices;
@@ -153,6 +162,25 @@ public class DeckService extends Service {
     public static void publishNowPlaying(String packet) {
         final DeckService svc = instance;
         if (svc != null) svc.enqueueNowPlaying(packet);
+    }
+
+    /**
+     * The palette chosen in SETTINGS, for the phone and the deck it is linked
+     * to: one theme over both ends, because the board is the half a person looks
+     * at from across the room. A deck that wants the other palette gets it from
+     * its own pair on PAIRED, which changes that board alone.
+     */
+    static void pushTheme(int uiTheme) {
+        final DeckService svc = instance;
+        if (svc != null) svc.writeTheme(uiTheme == Ui.LIGHT ? DeckTheme.PAPER : DeckTheme.INK);
+    }
+
+    /** One deck's own palette from its row on PAIRED. Ignored unless it is the linked board. */
+    static void setDeckTheme(String mac, int deckTheme) {
+        final DeckService svc = instance;
+        if (svc != null && mac != null && mac.equalsIgnoreCase(svc.linkedMac)) {
+            svc.writeTheme(deckTheme);
+        }
     }
 
     /** User picked a deck in the monitor; remember it and link to it now. */
@@ -241,6 +269,7 @@ public class DeckService extends Service {
     private BluetoothGattCharacteristic identityChar;
     private BluetoothGattCharacteristic nowChar;
     private BluetoothGattCharacteristic commandChar;
+    private BluetoothGattCharacteristic themeChar;
 
     private boolean scanning;
     private boolean connecting;
@@ -263,6 +292,8 @@ public class DeckService extends Service {
     private volatile long lastWriteMs;
     private volatile int writesSent;
     private volatile int noticesForwarded;
+    /** The palette the linked deck answered with, or {@link DeckTheme#UNKNOWN}. */
+    private volatile int linkedTheme = DeckTheme.UNKNOWN;
 
     private String lastNotice = "";
     private long lastNoticeMs;
@@ -393,6 +424,9 @@ public class DeckService extends Service {
             identityChar = service.getCharacteristic(IDENTITY_UUID);
             nowChar = service.getCharacteristic(NOW_UUID);
             commandChar = service.getCharacteristic(COMMAND_UUID);
+            // Optional: a deck flashed before the palette moved to the app has
+            // no theme characteristic, and the switch then says so.
+            themeChar = service.getCharacteristic(THEME_UUID);
             if (timeChar == null || batteryChar == null || noticeChar == null) {
                 setStatus("Deck characteristics missing");
                 releaseGatt();
@@ -418,6 +452,7 @@ public class DeckService extends Service {
             }
             pushTime();
             pushBattery();
+            readTheme();
             // The mirror only runs while a deck that can take it is linked: it
             // costs a media-session read a second, and there is nothing to send
             // it to otherwise.
@@ -492,7 +527,15 @@ public class DeckService extends Service {
         @Override
         public void onCharacteristicRead(BluetoothGatt g, BluetoothGattCharacteristic ch,
                                          int statusCode) {
-            if (ch == null || !IDENTITY_UUID.equals(ch.getUuid())) return;
+            if (ch == null) return;
+            // The palette read is how the app knows which chip to light: the
+            // board's own answer, not the last thing the phone told it.
+            if (THEME_UUID.equals(ch.getUuid())) {
+                linkedTheme = statusCode == BluetoothGatt.GATT_SUCCESS
+                        ? DeckTheme.decode(ch.getValue()) : DeckTheme.UNKNOWN;
+                return;
+            }
+            if (!IDENTITY_UUID.equals(ch.getUuid())) return;
             final byte[] raw = statusCode == BluetoothGatt.GATT_SUCCESS ? ch.getValue() : null;
             rememberIdentity(DeckIdentity.parse(
                     raw == null ? "" : new String(raw, StandardCharsets.UTF_8)));
@@ -548,6 +591,7 @@ public class DeckService extends Service {
         snapshot.rssi = linkedRssi;
         snapshot.writes = writesSent;
         snapshot.notices = noticesForwarded;
+        snapshot.theme = linkedTheme;
         snapshot.connectedAtMs = connectedAtMs;
         snapshot.lastWriteMs = lastWriteMs;
 
@@ -872,6 +916,8 @@ public class DeckService extends Service {
         identityChar = null;
         nowChar = null;
         commandChar = null;
+        themeChar = null;
+        linkedTheme = DeckTheme.UNKNOWN;
         // A rebooted deck starts its counter again at 1, so a new link forgets the
         // last one it ran rather than judging the first tap a repeat.
         lastCommandSerial = 0;
@@ -1080,6 +1126,30 @@ public class DeckService extends Service {
             // status line is the only way a person learns the tap landed nowhere.
             setStatus("Tap arrived, nothing to play");
         }
+    }
+
+    // ----------------------------------------------------------------- theme ---
+
+    /** Asks the linked deck which palette it is on; nothing to ask on an older flash. */
+    private void readTheme() {
+        if (gatt == null || themeChar == null) return;
+        try {
+            if (!gatt.readCharacteristic(themeChar)) linkedTheme = DeckTheme.UNKNOWN;
+        } catch (SecurityException e) {
+            linkedTheme = DeckTheme.UNKNOWN;
+        }
+    }
+
+    /**
+     * One palette byte through the shared queue, in order with the time, the
+     * battery and the mirror. The chip lights on the write rather than on a
+     * read-back, so a tap answers at once; the next read corrects it if the
+     * board disagreed.
+     */
+    private void writeTheme(int deckTheme) {
+        if (themeChar == null || gatt == null) return;
+        if (!DeckTheme.known(deckTheme)) return;
+        if (enqueue(themeChar, DeckTheme.payload(deckTheme))) linkedTheme = deckTheme;
     }
 
     // --------------------------------------------------------------- windows ---

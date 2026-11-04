@@ -3,18 +3,18 @@
   "core": "2.0.17",
   "decks": {
     "phone_deck_cyd24R": {
-      "globals": 41660,
-      "md5": "62c7e6c3447f214d9c8af75fd995345b",
+      "globals": 41716,
+      "md5": "7047e587ab864d6de9462239401c631f",
       "slot": 1310720,
-      "used": 1167409
+      "used": 1168305
     },
     "spotify_deck_cyd24R": {
-      "globals": 63252,
-      "md5": "a9a6e8e72079dc43f0773e46befe3639",
+      "globals": 63276,
+      "md5": "c446f31a27a95207ea3800c1376c60bd",
       "slot": 3145728,
-      "used": 1749309
+      "used": 1750145
     }
   },
-  "measured": "2026-11-03",
+  "measured": "2026-11-04",
   "root": "~/.arduino-cyd-2"
 }

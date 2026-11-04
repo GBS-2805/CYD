@@ -13,10 +13,18 @@ settings:
 | **PAIRED** | Live link: what is connected, signal, uptime, packets, nearby decks |
 | **BOARDS** | Alphabetical shelf: every project folded to its name, kind and status, opening to its body, log, links and actions, under one libraries disclaimer |
 | **SERIAL** | Target board, OTG connection, bootloader probe, image flashing, serial monitor |
-| **SETTINGS** (gear, top bar) | Permissions, battery, bridge switch, last crash |
+| **SETTINGS** (gear, top bar) | Permissions, notifications, battery, the dark/light theme, bridge switch, last crash |
 
 Ask it anything about the deck's state and it answers from the link itself, not
 from guesswork: `linked 4m 12s · -62 dBm · 18 packets · 5 notices`.
+
+**Two themes, one app.** DARK is off-white ink on black; **SETTINGS → APPEARANCE
+→ LIGHT** turns the same screens into black ink on an off-white page. The choice is
+stored, survives a restart, and switching rebuilds the screen because every colour
+is read when a view is built. The same choice also goes down the link to the deck
+that is linked, and every deck keeps its own PAPER/INK pair on PAIRED. The top band
+stays light either way: it is the ground the mark was drawn on, so it needs no
+plate behind it.
 
 ## Monitoring your CYDs
 
@@ -201,6 +209,16 @@ ROM protocol: SLIP framing, sync, register reads, `FLASH_BEGIN`/`FLASH_DATA`/
 | Notification | `6f2d0004-…` | UTF-8 `App\|Title\|Text`, truncated to 120 bytes |
 | Identity | `6f2d0005-…` | **read** — the deck's one line of JSON, parsed by `DeckIdentity`; a network deck answers the same document at `GET /deck.json` |
 | Now playing | `6f2d0006-…` | UTF-8 `state\|position\|duration\|title\|artist\|album`, whole seconds, state `play`/`pause`/`stop`, written once a second while something plays |
+| Theme | `6f2d0008-…` | **read/write**, 1 byte: `0` PAPER, `1` INK. SETTINGS writes the linked deck too, so the phone and the board share one palette; each deck's own pair on PAIRED changes that board alone |
+
+The palette is the one setting that lives at both ends. Choosing DARK or LIGHT in
+SETTINGS stores the app's palette and writes the same one to the linked deck, so
+the phone and the board match; every deck row on PAIRED carries its own PAPER and
+INK pair, because each board keeps its palette in NVS and two decks can honestly
+differ. Only the linked row can be written — the link carries one deck at a time —
+and the chip that is filled is the palette the board answered with, not the last
+one tapped. A deck flashed before `6f2d0008-…` existed has no palette
+characteristic, and its pair stays dark rather than writing nowhere.
 
 Service UUID is `6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10`; full UUIDs are in
 [`DeckService.java`](app/src/main/java/dev/phonedesk/companion/DeckService.java).

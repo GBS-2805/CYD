@@ -54,14 +54,15 @@ NOTES = {
 
 
 def colours():
-    """The app's palette, read out of `Palette.java` so this file cannot disagree with it.
+    """The app's theme, read out of `Palette.java` so this file cannot disagree with it.
 
-    Constants are ARGB: `0xFFD9D9D9` is opaque, `0xA3D9D9D9` is the band grey at an
+    Constants are ARGB: `0xFFF1F0EB` is opaque, `0xA8F1F0EB` is the off-white at an
     alpha. A translucent ink is composited over the ground here, because a caption
     strip is a painted rectangle and the app's own draw does the same blend. The keys
-    are this file's own names (BG is `Palette.FIELD`, the page ground).
+    are this file's own names (BG is `Palette.DARK_FIELD`, the dark page).
     """
-    wanted = {"FIELD": "BG", "EDGE": "EDGE", "TEXT": "TEXT", "DIM": "DIM"}
+    wanted = {"DARK_FIELD": "BG", "DARK_EDGE": "EDGE", "DARK_TEXT": "TEXT",
+              "DARK_DIM": "DIM"}
     found = {}
     with open(UI, encoding="utf-8") as handle:
         for name, argb in re.findall(

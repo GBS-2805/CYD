@@ -79,6 +79,10 @@ public class MainActivity extends Activity {
         // Before any view is built: a crash with no adb attached is otherwise just
         // a system dialog with no trace. SETTINGS shows what this records.
         CrashLog.install(this);
+        // Before any view exists: every colour below is read when one is built.
+        Appearance.apply(this);
+        // The bars are the system's, not ours, so they need telling.
+        Ui.applySystemBars(this);
         setContentView(buildUi());
         requestBluetoothPermissions();
     }

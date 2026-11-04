@@ -1,5 +1,6 @@
 package dev.phonedesk.companion;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -8,9 +9,11 @@ import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
+import android.os.Build;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -27,19 +30,52 @@ final class Ui {
     // Android; these names are what every screen still uses, and they keep their
     // jobs — ACCENT is the fill a primary action carries, PINK the one error ink,
     // GOOD success, VIOLET the quietest status.
-    static final int BG = Palette.FIELD;
-    static final int CARD = Palette.FIELD;
-    static final int CARD_HI = Palette.WASH;    static final int EDGE = Palette.EDGE;
-    static final int TEXT = Palette.TEXT;
-    static final int DIM = Palette.DIM;
-    static final int ACCENT = Palette.ACCENT;
-    static final int VIOLET = Palette.VIOLET;
-    static final int PINK = Palette.PINK;
-    static final int GOOD = Palette.GOOD;
-    static final int BAND = Palette.BAND;
-    static final int INK = Palette.INK;
-    static final int BAND_DIM = Palette.BAND_DIM;
-    static final int BAND_RULE = Palette.BAND_RULE;
+    static int BG = Palette.DARK_FIELD;
+    static int CARD = Palette.DARK_FIELD;
+    static int CARD_HI = Palette.DARK_WASH;
+    static int EDGE = Palette.DARK_EDGE;
+    static int TEXT = Palette.DARK_TEXT;
+    static int DIM = Palette.DARK_DIM;
+    static int ACCENT = Palette.DARK_PRIMARY;
+    static int VIOLET = Palette.DARK_QUIET;
+    static int PINK = Palette.DARK_ALOUD;
+    static int GOOD = Palette.DARK_OK;
+    static int BAND = Palette.BAND;
+    static int INK = Palette.INK;
+    static int BAND_DIM = Palette.BAND_DIM;
+    static int BAND_RULE = Palette.BAND_RULE;
+    /** Text on a filled primary action: the page's own ink, so it is always the
+     * opposite of the fill — black on the off-white button, off-white on the black. */
+    static int ON_FILL = Palette.DARK_FIELD;
+
+    /** The two palettes, by the name the switch uses. */
+    static final int DARK = 0;
+    static final int LIGHT = 1;
+
+    /**
+     * Swap every ink for the chosen palette. Called before the first view is built,
+     * and again after the switch stores its answer — which is why the switch
+     * recreates the activity: a colour here is read when a view is constructed, so a
+     * screen already on show keeps the palette it was built in.
+     */
+    static void applyTheme(int theme) {
+        final boolean light = theme == LIGHT;
+        BG = light ? Palette.LIGHT_FIELD : Palette.DARK_FIELD;
+        CARD = BG;
+        CARD_HI = light ? Palette.LIGHT_WASH : Palette.DARK_WASH;
+        EDGE = light ? Palette.LIGHT_EDGE : Palette.DARK_EDGE;
+        TEXT = light ? Palette.LIGHT_TEXT : Palette.DARK_TEXT;
+        DIM = light ? Palette.LIGHT_DIM : Palette.DARK_DIM;
+        ACCENT = light ? Palette.LIGHT_PRIMARY : Palette.DARK_PRIMARY;
+        VIOLET = light ? Palette.LIGHT_QUIET : Palette.DARK_QUIET;
+        PINK = light ? Palette.LIGHT_ALOUD : Palette.DARK_ALOUD;
+        GOOD = light ? Palette.LIGHT_OK : Palette.DARK_OK;
+        BAND = Palette.BAND;
+        INK = Palette.INK;
+        BAND_DIM = Palette.BAND_DIM;
+        BAND_RULE = Palette.BAND_RULE;
+        ON_FILL = light ? Palette.LIGHT_FIELD : Palette.DARK_FIELD;
+    }
 
     private Ui() {
     }
@@ -150,9 +186,35 @@ final class Ui {
             final ColorStateList tint = ((GradientDrawable) fill).getColor();
             if (tint != null) surface = tint.getDefaultColor();
         }
-        final int luminance = (int) (0.299 * Color.red(surface)
-                + 0.587 * Color.green(surface) + 0.114 * Color.blue(surface));
-        return (0x40 << 24) | (luminance > 0x80 ? 0x000000 : 0xFFFFFF);
+        return (0x40 << 24) | (luminance(surface) > 0x80 ? 0x000000 : 0xFFFFFF);
+    }
+
+    /**
+     * The window chrome is part of the palette too. Below Android 15 the system
+     * paints the status and navigation bars itself, so a paper page sat under a
+     * black strip; and even edge to edge it picks the bar icons' own colour, so a
+     * light icon on the paper field disappeared. Both bars take the field, and the
+     * icons turn over with its luminance. Called once, before the first view.
+     */
+    static void applySystemBars(Activity activity) {
+        final Window window = activity.getWindow();
+        window.setStatusBarColor(BG);
+        window.setNavigationBarColor(BG);
+        final boolean paper = luminance(BG) > 0x80;
+        int flags = window.getDecorView().getSystemUiVisibility();
+        flags = paper ? flags | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                : flags & ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            flags = paper ? flags | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+                    : flags & ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        }
+        window.getDecorView().setSystemUiVisibility(flags);
+    }
+
+    /** 0..255, the arithmetic both the ripple and the bar icons decide on. */
+    private static int luminance(int argb) {
+        return (int) (0.299 * Color.red(argb) + 0.587 * Color.green(argb)
+                + 0.114 * Color.blue(argb));
     }
 
     static Button action(Context context, String label, boolean primary) {        Button button = new Button(context);
@@ -160,7 +222,7 @@ final class Ui {
         button.setAllCaps(false);
         button.setTypeface(Typeface.MONOSPACE);
         button.setTextSize(13);
-        button.setTextColor(primary ? Ui.INK : Ui.TEXT);
+        button.setTextColor(primary ? ON_FILL : TEXT);
         button.setBackground(rounded(context, primary ? ACCENT : CARD_HI,
                 primary ? ACCENT : EDGE, 10));
         pressable(context, button, 10);

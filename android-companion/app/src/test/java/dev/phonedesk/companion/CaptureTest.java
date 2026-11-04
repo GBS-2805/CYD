@@ -86,7 +86,12 @@ public final class CaptureTest {
         captureTaps("projects-file", MainActivity.SECTION_PROJECTS, new ProjectsTab(host),
                 firstUnfiled(), "ATTACH A FILE");
         capture("serial", MainActivity.SECTION_SERIAL, new BoardTab(host), null);
+        // SETTINGS is drawn in the paper palette on purpose: it is the screen the
+        // switch lives on, so one frame shows the control and what it does, and the
+        // light theme is in the gate instead of only in a description of it.
+        Ui.applyTheme(Ui.LIGHT);
         capture("settings", MainActivity.SECTION_SETTINGS, new SetupTab(host), null);
+        Ui.applyTheme(Ui.DARK);
     }
 
     /**
@@ -120,6 +125,9 @@ public final class CaptureTest {
         snapshot.deviceMac = DECK_MAC;
         snapshot.deviceId = DECK_ID;
         snapshot.deviceTag = DECK_TAG;
+        // The palette the board answers with, so the PAIRED rows draw a lit chip
+        // rather than a pair that says nothing about this deck.
+        snapshot.theme = DeckTheme.INK;
         snapshot.rssi = -61;
         snapshot.writes = 214;
         snapshot.notices = 3;

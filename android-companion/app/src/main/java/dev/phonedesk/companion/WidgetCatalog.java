@@ -213,8 +213,8 @@ final class WidgetCatalog {
         widget.board = "2432S024R";
         widget.tagline = "INSIDE APP";
         widget.body = "A desk dashboard for your phone: clock, battery and notifications, "
-                + "set like a woodblock print in two monochrome themes — black ink on paper, "
-                + "or white ink on black.";
+                + "set like a woodblock print in two monochrome themes: black ink on an "
+                + "off-white page, or the same page inverted.";
         widget.notes = "Bundled with the app: copy it into ArduinoDroid and compile, there is "
                 + "nothing to download.";
         widget.assetPath = "widgets/phone_deck_cyd24R/phone_deck_cyd24R.ino";

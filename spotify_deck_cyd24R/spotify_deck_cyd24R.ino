@@ -114,10 +114,10 @@ static constexpr int SCREEN_W = 320;
 static constexpr int SCREEN_H = 240;
 
 // ---------------------------------------------------------------- palette ---
-// The same two monochrome themes the phone deck ships, because that is the house
-// palette: 0 PAPER is black on white, 1 INK is white on black, and the six
-// accent slots are a grey ramp rather than hues. A Spotify deck does not get to
-// spend colour on green just because the service has one.
+// The same two themes the phone deck ships: 0 PAPER is black ink on an off-white
+// page, 1 INK is the same page inverted, and the last six slots step the ink
+// rather than hue. Nothing here spends a colour on green just because the service
+// has one.
 //
 // The first six are ground, panel, lifted panel, hairline, ink and dim ink. The
 // last six keep their jobs: accent for the status line, accentDim for that
@@ -134,38 +134,41 @@ struct Palette {
 };
 
 static constexpr Palette THEMES[] = {
-  // 0 PAPER - black on white: paper ground, black ink, greys in between
-  { 0xFFFF /* #ffffff */, 0xF7BE /* #f4f4f4 */, 0xEF5D /* #e8e8e8 */,
-    0xCE59 /* #c8c8c8 */, 0x0000 /* #000000 */, 0x6B6D /* #6f6f6f */,
-    0x0000 /* #000000 */, 0xB596 /* #b0b0b0 */, 0x2945 /* #2b2b2b */,
-    0x8C51 /* #8a8a8a */, 0x0000 /* #000000 */, 0x52AA /* #555555 */ },
-  // 1 INK - white on black: the same ramp inverted, for a dark room
-  { 0x0000 /* #000000 */, 0x0861 /* #0e0e0e */, 0x18E3 /* #1c1c1c */,
-    0x3186 /* #333333 */, 0xFFFF /* #ffffff */, 0x8C71 /* #8c8c8c */,
-    0xFFFF /* #ffffff */, 0x4A69 /* #4d4d4d */, 0xD6BA /* #d4d4d4 */,
-    0x738E /* #707070 */, 0xFFFF /* #ffffff */, 0xA514 /* #a0a0a0 */ },
+  // 0 PAPER - black ink on an off-white page
+  { 0xF79D /* #f1f0eb */, 0xEF3C /* #e8e7e2 */, 0xDEFA /* #dddcd7 */, 0xCE38 /* #c8c7c2 */,
+    0x0000 /* #000000 */, 0x5ACA /* #5b5a56 */, 0x0000 /* #000000 */, 0xAD54 /* #a9a8a3 */,
+    0x18C3 /* #1a1a18 */, 0x7BCE /* #7a7974 */, 0x0000 /* #000000 */, 0x4A69 /* #4e4d49 */ },
+  // 1 INK - the same page inverted: off-white ink on black
+  { 0x0000 /* #000000 */, 0x1082 /* #101010 */, 0x18E3 /* #1c1c1a */, 0x39C6 /* #3a3a37 */,
+    0xF79D /* #f1f0eb */, 0xAD34 /* #a8a7a2 */, 0xF79D /* #f1f0eb */, 0x6B4C /* #6a6a66 */,
+    0xFFFF /* #ffffff */, 0x8C50 /* #8c8b86 */, 0xF79D /* #f1f0eb */, 0xB5B6 /* #b6b5b0 */ },
 };
 
 static constexpr uint8_t THEME_COUNT = sizeof(THEMES) / sizeof(THEMES[0]);
-// Pick a palette here; a settings row can change it at runtime later.
-static constexpr uint8_t THEME_INDEX = 1;  // INK
-static_assert(THEME_INDEX < THEME_COUNT,
-              "THEME_INDEX is past the end of THEMES");
+// The palette is a setting the companion app writes, not a build flag: the board
+// keeps it in NVS and repaints, so both decks follow one phone without a
+// re-flash. 1 INK is the default because a dark room is the usual one.
+static constexpr uint8_t THEME_DEFAULT = 1;  // INK
+static uint8_t themeIndex = THEME_DEFAULT;
 
-// The twelve names the drawing code already uses, loaded from the chosen theme.
-// Plain variables rather than constexpr, so a picker can reassign them later.
-static uint16_t C_BG         = THEMES[THEME_INDEX].bg;
-static uint16_t C_TILE       = THEMES[THEME_INDEX].tile;
-static uint16_t C_TILE_HI    = THEMES[THEME_INDEX].tileHi;
-static uint16_t C_EDGE       = THEMES[THEME_INDEX].edge;
-static uint16_t C_TEXT       = THEMES[THEME_INDEX].text;
-static uint16_t C_DIM        = THEMES[THEME_INDEX].dim;
-static uint16_t C_ACCENT     = THEMES[THEME_INDEX].accent;
-static uint16_t C_ACCENT_DIM = THEMES[THEME_INDEX].accentDim;
-static uint16_t C_PINK       = THEMES[THEME_INDEX].pink;
-static uint16_t C_PURPLE     = THEMES[THEME_INDEX].purple;
-static uint16_t C_YELLOW     = THEMES[THEME_INDEX].yellow;
-static uint16_t C_GREEN      = THEMES[THEME_INDEX].green;
+// The twelve names the drawing code already uses. Plain variables rather than
+// constexpr, so a write from the phone can reassign them without touching a draw
+// call; applyTheme() is the only place that does, and it is defined below the
+// types because the generated prototypes land before the first function here.
+static uint16_t C_BG;
+static uint16_t C_TILE;
+static uint16_t C_TILE_HI;
+static uint16_t C_EDGE;
+static uint16_t C_TEXT;
+static uint16_t C_DIM;
+static uint16_t C_ACCENT;
+static uint16_t C_ACCENT_DIM;
+static uint16_t C_PINK;
+static uint16_t C_PURPLE;
+static uint16_t C_YELLOW;
+static uint16_t C_GREEN;
+
+static void applyTheme(uint8_t index);
 
 static constexpr uint8_t CORNER_CARD = 10;
 static constexpr uint8_t CORNER_BUTTON = 8;
@@ -2335,6 +2338,12 @@ static constexpr char LINK_NOTICE[] = "6f2d0004-9a3c-4b57-9d21-6a1e0c4f8b10";
 static constexpr char LINK_IDENTITY[] = "6f2d0005-9a3c-4b57-9d21-6a1e0c4f8b10";
 static constexpr char LINK_NOW[] = "6f2d0006-9a3c-4b57-9d21-6a1e0c4f8b10";
 static constexpr char LINK_CMD[] = "6f2d0007-9a3c-4b57-9d21-6a1e0c4f8b10";
+// The palette, one byte, read and written by the companion app.
+static constexpr char LINK_THEME[] = "6f2d0008-9a3c-4b57-9d21-6a1e0c4f8b10";
+// Set from the Bluedroid task, applied by the loop: two tasks assigning the same
+// twelve colours is how a page ends up half paper and half ink.
+static constexpr uint8_t THEME_PENDING_NONE = 0xFF;
+static volatile uint8_t themePending = THEME_PENDING_NONE;
 
 static volatile bool linkConnected = false;
 static volatile uint32_t linkMirrorMs = 0;
@@ -2580,6 +2589,25 @@ class LinkNowCallbacks : public BLECharacteristicCallbacks {
   }
 };
 
+// 0 PAPER or 1 INK, one byte. The write only records which palette was asked for;
+// the loop applies it, saves it and repaints. The read answers where the board
+// actually is, so the app can light the right chip without guessing.
+class LinkThemeCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *c) override {
+    const uint8_t *raw = c->getData();
+    if (raw == nullptr || c->getLength() < 1) return;
+    if (raw[0] >= THEME_COUNT) return;
+    themePending = raw[0];
+  }
+
+  void onRead(BLECharacteristic *c) override {
+    // Not const: core 2.0.17's setValue() takes a uint8_t*, and this sketch has to
+    // link on both cores.
+    uint8_t index = themeIndex;
+    c->setValue(&index, 1);
+  }
+};
+
 static BLECharacteristic *linkCommandChar = nullptr;
 static uint32_t linkSerial = 0;
 
@@ -2638,6 +2666,15 @@ static void startBluetooth() {
   notice->setCallbacks(new LinkNoticeCallbacks());
   BLECharacteristic *now = service->createCharacteristic(LINK_NOW, write);
   now->setCallbacks(new LinkNowCallbacks());
+
+  // The palette. Read-write because the app lights a chip from the board's own
+  // answer; a deck flashed before this existed simply has no such characteristic.
+  BLECharacteristic *theme = service->createCharacteristic(
+      LINK_THEME,
+      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+  theme->setCallbacks(new LinkThemeCallbacks());
+  uint8_t themeNow = themeIndex;
+  theme->setValue(&themeNow, 1);
 
   char document[192];
   buildLinkIdentity(document, sizeof(document));
@@ -2945,6 +2982,54 @@ static bool bootHoldForgets() {
   return true;  // not reached
 }
 
+static Preferences themePrefs;
+
+// One palette into the twelve names, and the only place they all change at once.
+static void applyTheme(uint8_t index) {
+  if (index >= THEME_COUNT) index = THEME_DEFAULT;
+  themeIndex = index;
+  const Palette &theme = THEMES[index];
+  C_BG         = theme.bg;
+  C_TILE       = theme.tile;
+  C_TILE_HI    = theme.tileHi;
+  C_EDGE       = theme.edge;
+  C_TEXT       = theme.text;
+  C_DIM        = theme.dim;
+  C_ACCENT     = theme.accent;
+  C_ACCENT_DIM = theme.accentDim;
+  C_PINK       = theme.pink;
+  C_PURPLE     = theme.purple;
+  C_YELLOW     = theme.yellow;
+  C_GREEN      = theme.green;
+}
+
+// Clamped on the way in, so a corrupt byte cannot leave the deck with a palette
+// that does not exist and no way back to one that does.
+static void loadTheme() {
+  themePrefs.begin("settings", true);
+  const uint8_t saved = themePrefs.getUChar("theme", THEME_DEFAULT);
+  themePrefs.end();
+  applyTheme(saved);
+}
+
+static void saveTheme() {
+  themePrefs.begin("settings", false);
+  themePrefs.putUChar("theme", themeIndex);
+  themePrefs.end();
+}
+
+// Runs on the loop task, where the panel is: apply, keep, and ask for a repaint.
+static void applyPendingTheme() {
+  const uint8_t wanted = themePending;
+  themePending = THEME_PENDING_NONE;
+  if (wanted >= THEME_COUNT) return;
+  applyTheme(wanted);
+  saveTheme();
+  // The setup page and the calibration screen redraw themselves on their own
+  // ticks; the player page is drawn by the loop, so ask it for a full repaint.
+  if (!setupActive && screen != SCR_CAL) drawNow();
+}
+
 void setup() {
   Serial.begin(115200);
   disableOnboardLed();
@@ -2957,6 +3042,8 @@ void setup() {
   tft.begin();
   tft.setRotation(1);
   tft.setTextWrap(false);
+  // Before the first fill: every draw below reads the twelve colours this sets.
+  loadTheme();
   tft.fillScreen(C_BG);
 
   touch.begin(SPI);
@@ -3006,6 +3093,9 @@ void setup() {
 
 void loop() {
   const uint32_t now = millis();
+
+  // A palette written over the link is applied here, before anything draws.
+  if (themePending != THEME_PENDING_NONE) applyPendingTheme();
 
   if (setupActive) {
     // DNS first: the phone blocks on the name before it ever opens the socket.
