@@ -42,6 +42,45 @@ def argb(source, name):
     return "#" + found.group(1)[2:].lower() if found else None
 
 
+DECKS = ROOT / "artifacts/decks"
+RENDER_DECKS = ROOT / "artifacts/deck_screens.py"
+
+
+def deck_page_problems():
+    """Every page both decks can show is drawn, and the copies on disk are today's.
+
+    The app's nine frames are held to the source by check_renders.py; the decks had
+    no such gate, so a sketch could change and leave a picture of the old glass
+    behind. This draws every page again into a temp dir and compares bytes.
+    """
+    problems = []
+    if not RENDER_DECKS.is_file() or not DECKS.is_dir():
+        return problems
+    import subprocess
+    import tempfile
+    with tempfile.TemporaryDirectory() as temp:
+        drawn = Path(temp)
+        done = subprocess.run([sys.executable, str(RENDER_DECKS), "--out", str(drawn)],
+                              capture_output=True, text=True)
+        if done.returncode != 0:
+            tail = (done.stderr or done.stdout).strip().splitlines()
+            problems.append("%s failed, so no deck page could be checked: %s"
+                            % (shown(RENDER_DECKS), tail[-1] if tail else "no output"))
+            return problems
+        pages = sorted(drawn.glob("*.png"))
+        if not pages:
+            problems.append("%s drew nothing" % shown(RENDER_DECKS))
+        for page in pages:
+            on_disk = DECKS / page.name
+            if not on_disk.is_file():
+                problems.append("%s is missing; draw it with artifacts/deck_screens.py"
+                                % shown(on_disk))
+            elif on_disk.read_bytes() != page.read_bytes():
+                problems.append("%s is stale: md5 %s drawn now, %s on disk"
+                                % (shown(on_disk), md5(page), md5(on_disk)))
+    return problems
+
+
 def palette_problems(folders):
     """Both decks draw the same two pages the app draws, or say which disagrees.
 
@@ -142,7 +181,9 @@ def main():
         problems.extend(stale)
 
     palette = palette_problems(list(widget_folders()))
+    pages = deck_page_problems()
     problems.extend(palette)
+    problems.extend(pages)
 
     if not rows:
         print("no widget.json found under %s" % shown(ROOT))
@@ -157,7 +198,7 @@ def main():
               % (shown(ASSETS / name), name))
 
     broken = (sum(1 for row in rows if row[3] != "in sync")
-              + len(on_disk - expected) + len(palette))
+              + len(on_disk - expected) + len(palette) + len(pages))
     if broken:
         print("\n%d problem%s. The app build re-syncs from the widget folder, so "
               "run one, or copy the named file(s) over."

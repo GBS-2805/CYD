@@ -361,7 +361,10 @@ URL and a flashing note. Decisions behind it:
   The decks' copies of those two pages are held to the app's by
   `check_widget_assets.py` (its two extra selftest branches break one page on
   purpose), and `artifacts/deck_palette.py` draws each deck's table at 320x240 into
-  `artifacts/decks/` — a palette proof, not a capture of the glass.
+  `artifacts/decks/` — a palette proof, not a capture of the glass. Both decks'
+  pages are drawn too: `artifacts/deck_screens.py` ports the nine pages the two
+  sketches can show into eighteen pages, one per theme, and `check_widget_assets.py`
+  refuses a committed one that is not today's drawing.
 - **Probe always restores the board.** `probeUsb()` calls `hardReset()` in both
   paths, success and failure, because leaving the ESP32 in download mode is
   exactly the black-screen-with-red-LED state a user reads as a brick. The same
@@ -656,14 +659,14 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **206,449 bytes** on 2026-11-03, the rebuild carrying two bundled sketches, the
+  **210,545 bytes** on 2026-11-04, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror, the three-step probe, the owner's logo as the icon, the mark
   centred on the top bar at 26dp as one PNG per density rather than above the
   drawer's wordmark, the gear and chevrons drawn as shapes, and the shelf that
   adds, edits, deletes and attaches a project and imports a file from its own
-  picker. That is 20,115 bytes above the previous 182,238, and the rebuild overwrote
-  that file, so the difference is not itemised here.
+  picker. That is 4,096 bytes above the 206,449 measured the day before, and the
+  rebuild overwrote that file, so the difference is not itemised here.
 - **The archive is byte-reproducible now, on one machine.** AGP stamps a
   *Dependency Info Block* into the APK Signing Block and fills it differently on
   every build — same sources, different bytes. On 2026-11-03 two builds of this
@@ -681,12 +684,12 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the tree.** Measured on 2026-11-03: `clean assembleRelease` exits 0 in 16 s, 44
   actionable tasks with 41 executed, including `lintVitalRelease`. The archive
   Gradle writes is unsigned, because the release type has no `signingConfig`, so
-  [`release.sh`](release.sh) aligns and signs it. The unsigned file is 193,862
-  bytes, 12,587 under the debug APK because `debug` writes the larger signing
-  block. The signed file is **206,447 bytes** (202 kB), 12,585 more again from a
-  4096-bit key's bigger signing block, and 2 bytes *under* the debug APK — the two
-  archives sit within a rounding error of each other, so the debug figure is no
-  guide to the release one. It is versionCode 1,
+  [`release.sh`](release.sh) aligns and signs it. Rebuilt on 2026-11-04: the unsigned file is 198,182
+  bytes, 12,363 under the debug APK because `debug` writes the larger signing
+  block. The signed file is **214,639 bytes** (210 kB), 16,457 more again from a
+  4096-bit key's bigger signing block, and 4,094 *over* the debug APK — the two
+  archives hold the same code, but the release block is the larger one, so the
+  debug figure is no guide to the release one. It is versionCode 1,
   minSdk 26, targetSdk 35, not debuggable, and it carries both sketches in its
   assets. The signer is read back out of the archive and refused if it comes back
   as the debug identity instead. The unsigned file is build output rather than a

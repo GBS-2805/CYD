@@ -84,6 +84,44 @@ def wrong_ink(dest):
     themed(dest, ink=INK[:4] + ["#ff00ff"] + INK[5:])
 
 
+RENDER = """import sys
+from pathlib import Path
+from PIL import Image
+out = Path(sys.argv[sys.argv.index("--out") + 1])
+out.mkdir(parents=True, exist_ok=True)
+Image.new("RGB", (4, 4), (0, 0, 0)).save(out / "demo.png")
+"""
+
+
+def deck_renderer(dest):
+    (dest / "artifacts").mkdir(parents=True, exist_ok=True)
+    (dest / "artifacts/decks").mkdir(parents=True, exist_ok=True)
+    (dest / "artifacts/deck_screens.py").write_text(RENDER)
+
+
+def stale_page(dest):
+    deck_renderer(dest)
+    from PIL import Image
+    Image.new("RGB", (4, 4), (255, 255, 255)).save(dest / "artifacts/decks/demo.png")
+
+
+def missing_page(dest):
+    deck_renderer(dest)
+    from PIL import Image
+    Image.new("RGB", (4, 4), (255, 255, 255)).save(dest / "artifacts/decks/other.png")
+
+
+def broken_renderer(dest):
+    (dest / "artifacts/decks").mkdir(parents=True, exist_ok=True)
+    (dest / "artifacts/deck_screens.py").write_text(
+        "import sys\nsys.stderr.write('boom\\n')\nsys.exit(1)\n")
+
+
+def empty_renderer(dest):
+    (dest / "artifacts/decks").mkdir(parents=True, exist_ok=True)
+    (dest / "artifacts/deck_screens.py").write_text("import sys\n")
+
+
 def drift(dest):
     (dest / ASSETS / WIDGET / (WIDGET + ".ino")).write_text(SKETCH + "// edited later\n")
 
@@ -182,6 +220,31 @@ CASES = [
         mutate=wrong_ink,
         want_code=1,
         want=["draws the ink ink as #ff00ff", "but Palette.DARK_TEXT is"],
+    ),
+    dict(
+        name="a deck page that is not today's drawing is refused",
+        mutate=stale_page,
+        want_code=1,
+        want=["artifacts/decks/demo.png is stale: md5", "drawn now", "on disk"],
+    ),
+    dict(
+        name="a deck page the renderer draws but the tree lacks is refused",
+        mutate=missing_page,
+        want_code=1,
+        want=["artifacts/decks/demo.png is missing",
+              "draw it with artifacts/deck_screens.py"],
+    ),
+    dict(
+        name="a renderer that fails is refused, not skipped",
+        mutate=broken_renderer,
+        want_code=1,
+        want=["failed, so no deck page could be checked", "boom"],
+    ),
+    dict(
+        name="a renderer that draws nothing is refused, not skipped",
+        mutate=empty_renderer,
+        want_code=1,
+        want=["artifacts/deck_screens.py drew nothing"],
     ),
 ]
 

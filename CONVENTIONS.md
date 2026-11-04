@@ -489,6 +489,15 @@ static uint8_t themeIndex = 1;   // which one is live; the app writes it
   `LIGHT_FIELD`/`LIGHT_TEXT`, or whose INK ground or ink is not `DARK_FIELD`/
   `DARK_TEXT`. `artifacts/deck_palette.py` draws both decks' tables at the panel's
   320x240 into `artifacts/decks/`; that is a palette proof, not a capture.
+  **A change to a deck page ends in a drawing of it.** `artifacts/deck_screens.py`
+  ports every page both sketches can show — the phone deck's home, messages, now
+  playing, detail, settings and calibration, and the Spotify deck's player, setup
+  and calibration — into a 320x240 page per theme from each sketch's own draw calls
+  and `THEMES` row. `check_widget_assets.py` draws them all again into a temp dir
+  and refuses a committed page that no longer matches, so editing a sketch without
+  redrawing is a red gate rather than a stale picture. Glyphs are a stand-in for
+  Adafruit's 5x7 and the content is sample data, so a page is a reconstruction, not
+  a capture.
 * **The theme is chosen at runtime, by the app.** A Phone Link deck carries a
   read-write palette characteristic (`6f2d0008-…`, one byte, `0` PAPER or `1`
   INK), applies it, stores it in the `settings` namespace and repaints; the app
