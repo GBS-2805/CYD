@@ -2075,8 +2075,8 @@ static void drawTypedLine() {
   const bool secret = setupStep == 1 || setupStep == 3 || setupStep == 4;
   for (size_t i = 0; i < shown; ++i) typed[i] = secret ? '*' : setupLine[i];
   typed[shown] = '\0';
-  tft.fillRect(20, 154, 280, 18, C_TILE);
-  drawTextAt(typed, 24, 159, 1, C_TEXT, C_TILE);
+  tft.fillRect(26, 154, 264, 18, C_TILE);
+  drawTextAt(typed, 28, 159, 1, C_TEXT, C_TILE);
 }
 
 // Whether the phone side ever arrived, and whether it ever asked for the page.
@@ -2097,32 +2097,26 @@ static void drawSetup() {
   drawTextRight("SETUP", SCREEN_W - 12, 13, 1, C_DIM, C_BG);
   tft.drawFastHLine(0, 31, SCREEN_W, C_EDGE);
 
-  // The phone is the intended way in, so it leads. The serial wizard below is
-  // the fallback, not the instruction.
   drawTextAt("on the phone, no laptop", 12, 40, 1, C_DIM, C_BG);
   drawTextAt("1  join WiFi \"Spotify Deck\"", 12, 56, 1, C_TEXT, C_BG);
   drawTextAt("2  open http://192.168.4.1", 12, 70, 1, C_TEXT, C_BG);
   drawTextAt("3  fill in the page", 12, 84, 1, C_TEXT, C_BG);
 
-  // The card is sized to what it holds. It ran 18 px past its last line, and the
-  // empty band read as a field that had failed to draw.
-  tft.fillRoundRect(8, 102, 304, 78, CORNER_CARD, C_TILE);
-  tft.drawRoundRect(8, 102, 304, 78, CORNER_CARD, C_EDGE);
+  // The card starts on the page margin like every other card: 12..308, text 10 in.
+  tft.fillRoundRect(12, 102, 296, 78, CORNER_CARD, C_TILE);
+  tft.drawRoundRect(12, 102, 296, 78, CORNER_CARD, C_EDGE);
 
   char step[28];
   snprintf(step, sizeof(step), "OR SERIAL  %u/%u",
            static_cast<unsigned>(setupStep + 1),
            static_cast<unsigned>(SETUP_STEPS));
-  drawTextAt(step, 18, 110, 1, C_DIM, C_TILE);
-  drawWrappedText(SETUP_SHORT[setupStep], 18, 126, 284, 1, C_TEXT, C_TILE, 2);
+  drawTextAt(step, 22, 110, 1, C_DIM, C_TILE);
+  drawWrappedText(SETUP_SHORT[setupStep], 22, 126, 272, 1, C_TEXT, C_TILE, 2);
 
-  // What has been typed so far, in the field it goes into rather than on a bare
-  // line near the card's edge.
-  tft.drawRoundRect(18, 152, 284, 22, 6, C_EDGE);
+  // What has been typed so far, in the field it goes into.
+  tft.drawRoundRect(22, 152, 272, 22, 6, C_EDGE);
   drawTypedLine();
 
-  // Both ways to reach the page: the access point's fixed address, and the home
-  // network address the phone needs after it switches back to its own WiFi.
   drawTextAt("192.168.4.1", 12, 190, 1, C_DIM, C_BG);
   if (WiFi.status() == WL_CONNECTED) {
     const String ip = WiFi.localIP().toString();
@@ -3334,13 +3328,13 @@ static void applyMirrorLine(const char *line) {
 
 // --------------------------------------------------------------- now page ---
 
-static const Rect PREV_BTN = {8, 152, 96, 52};
+static const Rect PREV_BTN = {12, 152, 96, 52};
 static const Rect PLAY_BTN = {112, 152, 96, 52};
-static const Rect NEXT_BTN = {216, 152, 96, 52};
+static const Rect NEXT_BTN = {212, 152, 96, 52};
 static const Rect WORDMARK = {0, 0, 220, 32};
 // Footer chip: hold it to open setup. 30 px tall and 112 wide, because a
 // resistive panel needs a target a finger cannot miss at the screen's edge.
-static const Rect SETUP_BTN = {200, 206, 112, 30};
+static const Rect SETUP_BTN = {196, 206, 112, 30};
 static bool setupChipLit = false;
 
 // Where a tap counts, as opposed to where the chip is drawn. A resistive panel
@@ -3405,20 +3399,19 @@ static void drawProgress(const NowPlaying &n) {
   if (dur > 0 && pos > dur) pos = dur;
   if (dur == 0) pos = 0;
 
-  tft.fillRect(18, 112, 284, 6, C_TILE);
-  tft.fillRoundRect(18, 112, 284, 6, 3, C_TILE_HI);
+  tft.fillRect(22, 112, 272, 6, C_TILE);
+  tft.fillRoundRect(22, 112, 272, 6, 3, C_TILE_HI);
   if (dur > 0) {
-    const int filled =
-        static_cast<int>((static_cast<uint64_t>(pos) * 284ULL) / dur);
-    if (filled > 0) tft.fillRoundRect(18, 112, filled, 6, 3, C_TEXT);
+    const int filled = static_cast<int>((static_cast<uint64_t>(pos) * 272ULL) / dur);
+    if (filled > 0) tft.fillRoundRect(22, 112, filled, 6, 3, C_TEXT);
   }
 
   char elapsed[10];
   char total[10];
   formatMs(pos, elapsed, sizeof(elapsed));
   formatMs(dur, total, sizeof(total));
-  drawTextAt(elapsed, 18, 121, 1, C_DIM, C_TILE);
-  drawTextRight(total, 302, 121, 1, C_DIM, C_TILE);
+  drawTextAt(elapsed, 22, 121, 1, C_DIM, C_TILE);
+  drawTextRight(total, 298, 121, 1, C_DIM, C_TILE);
 }
 
 static void drawNow() {
@@ -3430,27 +3423,23 @@ static void drawNow() {
   bool ready = false;
   readNowPlaying(n, ready);
 
-  tft.fillRoundRect(8, 40, 304, 104, CORNER_CARD, C_TILE);
-  tft.drawRoundRect(8, 40, 304, 104, CORNER_CARD, C_EDGE);
+  tft.fillRoundRect(12, 40, 296, 104, CORNER_CARD, C_TILE);
+  tft.drawRoundRect(12, 40, 296, 104, CORNER_CARD, C_EDGE);
 
   const char *title = n.title[0] ? n.title
                                  : (ready ? "NOTHING PLAYING" : "CONNECTING...");
-  drawWrappedText(title, 18, 50, 284, 2, C_TEXT, C_TILE, 2);
-  drawTextAt(n.artist[0] ? n.artist : "waiting for Spotify", 18, 94, 1, C_DIM,
+  drawWrappedText(title, 22, 50, 272, 2, C_TEXT, C_TILE, 2);
+  drawTextAt(n.artist[0] ? n.artist : "waiting for Spotify", 22, 94, 1, C_DIM,
              C_TILE);
   drawProgress(n);
 
-  // A chip asked of the phone stays lit until the next redraw, exactly as on the
-  // phone deck: the light is the round trip, not the outcome. PLAY is always filled
-  // because it is this page's one action on the WiFi path.
   const bool waiting = linkConnected && linkChipMs != 0 && millis() - linkChipMs < 4000;
   drawChip(PREV_BTN, "|<<", 2, waiting && linkChip == CMD_PREV);
   drawChip(PLAY_BTN, n.playing ? "PAUSE" : "PLAY", 2, true);
   drawChip(NEXT_BTN, ">>|", 2, waiting && linkChip == CMD_NEXT);
 
   tft.fillRect(0, 204, SCREEN_W, 36, C_BG);
-  drawTextAt(n.device[0] ? n.device : "no output device", 12, 210, 1, C_DIM,
-             C_BG);
+  drawTextAt(n.device[0] ? n.device : "no output device", 12, 210, 1, C_DIM, C_BG);
   if (n.status >= 400) {
     char err[20];
     snprintf(err, sizeof(err), "api %u", static_cast<unsigned>(n.status));

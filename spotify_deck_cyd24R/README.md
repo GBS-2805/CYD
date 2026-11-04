@@ -295,7 +295,7 @@ scheme**; see the measurement below for why that is enough.
 
 Both decks are ordinary Arduino sketches and both travel on the phone: the app
 bundles this one too (`check_widget_assets.py` prints `2 widgets bundled, every
-copy matches`, with this sketch at md5 `b2029325…`), so it can be pulled from the
+copy matches`, with this sketch at md5 `fb40e042…`), so it can be pulled from the
 same shelf as its sibling.
 
 From a computer, `toolchain.sh` has already compiled it:
@@ -410,7 +410,7 @@ The two figures are this tree's own build through `~/.arduino-cyd-3/env.sh` on
 `~/.arduino15` and prints **1,880,053 B** for the same sketch, 48 B under with the
 globals identical — the build-root sensitivity
 [`../CONVENTIONS.md`](../CONVENTIONS.md#build) records, not a different sketch, since
-both read md5 `b2029325…`. Quote the root you measured on rather than reconciling the
+both read md5 `fb40e042…`. Quote the root you measured on rather than reconciling the
 last two digits.
 
 Without Bluetooth the sketch was 1,125,781 bytes on the default scheme — the

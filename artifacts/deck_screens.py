@@ -46,6 +46,7 @@ W, H = 320, 240
 HEADER_H = 34
 MARGIN = 12
 CORNER_CARD = 10
+CARD_PAD = 10
 CORNER_BUTTON = 8
 
 # ------------------------------------------------------------------ content ---
@@ -214,21 +215,21 @@ def clock_text(seconds):
 # ------------------------------------------------------------------ phone -----
 PHONE_HEADER_BACK = (6, 3, 34, 28)
 PHONE_BACK_BTN = (6, 3, 34, 28)
-PHONE_GEAR = (284, 5, 32, 24)
-PHONE_LINK_PILL = (204, 6, 76, 22)
-PHONE_SET_LINK_PILL = (234, 6, 76, 22)
-PHONE_STATUS_CARD = (8, 40, 304, 76)
-PHONE_NOTIF_ROW = [(8, 134, 304, 32), (8, 168, 304, 32), (8, 202, 304, 32)]
+PHONE_GEAR = (276, 5, 32, 24)
+PHONE_LINK_PILL = (196, 6, 76, 22)
+PHONE_SET_LINK_PILL = (232, 6, 76, 22)
+PHONE_STATUS_CARD = (12, 40, 296, 76)
+PHONE_NOTIF_ROW = [(12, 134, 296, 32), (12, 168, 296, 32), (12, 202, 296, 32)]
 PHONE_HOME_TAB = [(12, 72, 296, 34), (12, 110, 296, 34), (12, 148, 296, 34)]
 PHONE_TABS = ["MESSAGES", "SETTINGS", "CALIBRATE"]
 PHONE_DETAIL_DISMISS = (12, 202, 148, 30)
 PHONE_DETAIL_BACK = (168, 202, 140, 30)
-PHONE_NOW_BACK = (8, 202, 304, 30)
-PHONE_SET_BRI_DOWN = (12, 64, 146, 28)
-PHONE_SET_BRI_UP = (162, 64, 146, 28)
-PHONE_SET_CLEAR = (232, 106, 72, 26)
-PHONE_SET_CAL = (8, 146, 304, 32)
-PHONE_SET_CLOSE = (8, 186, 304, 34)
+PHONE_NOW_BACK = (12, 202, 296, 30)
+PHONE_SET_BRI_DOWN = (22, 64, 134, 28)
+PHONE_SET_BRI_UP = (164, 64, 134, 28)
+PHONE_SET_CLEAR = (226, 106, 72, 26)
+PHONE_SET_CAL = (12, 146, 296, 32)
+PHONE_SET_CLOSE = (12, 186, 296, 34)
 PHONE_BRIGHTNESS = 70
 
 
@@ -273,19 +274,19 @@ def phone_status_card(p):
     r = PHONE_STATUS_CARD
     p.fill_round(r, CORNER_CARD, "tile")
     p.ring(r, CORNER_CARD, "edge")
-    p.text_at("$ sys.status --", r[0] + 12, r[1] + 7, 1, "dim", "tile")
+    p.text_at("$ sys.status --", r[0] + CARD_PAD, r[1] + 7, 1, "dim", "tile")
     state = "READY // ONLINE"
-    text_right = r[0] + r[2] - 12
+    text_right = r[0] + r[2] - CARD_PAD
     p.text_right(state, text_right, r[1] + 7, 1, "accent", "tile")
     p.fill_circle(text_right - p.width(state, 1) - 9, r[1] + 11, 3, "accent")
-    p.hline(r[0] + 12, r[1] + 20, r[2] - 24, "edge")
+    p.hline(r[0] + CARD_PAD, r[1] + 20, r[2] - 2 * CARD_PAD, "edge")
 
     hh, mm, ss = CLOCK
-    p.text_at("%02d:%02d" % (hh, mm), r[0] + 12, r[1] + 24, 4, "text", "tile")
-    p.text_at("%02d" % ss, r[0] + 134, r[1] + 36, 1, "accent", "tile")
-    p.text_at("TUE 4 NOV  //  phone time", r[0] + 12, r[1] + 60, 1, "dim", "tile")
+    p.text_at("%02d:%02d" % (hh, mm), r[0] + CARD_PAD, r[1] + 24, 4, "text", "tile")
+    p.text_at("%02d" % ss, r[0] + 118, r[1] + 36, 1, "accent", "tile")
+    p.text_at("TUE 4 NOV  //  phone time", r[0] + CARD_PAD, r[1] + 60, 1, "dim", "tile")
 
-    batt_x = r[0] + 236
+    batt_x = r[0] + r[2] - CARD_PAD - 58
     p.text_at("BATTERY", batt_x, r[1] + 26, 1, "dim", "tile")
     p.text_at("%d%%" % BATTERY, batt_x, r[1] + 36, 2, battery_slot(BATTERY, CHARGING), "tile")
     bar = (batt_x, r[1] + 56, 58, 6)
@@ -295,9 +296,9 @@ def phone_status_card(p):
 
 
 def phone_section_header(p):
-    p.fill_circle(12, 125, 3, "purple")
-    p.text_at("01 // NOTIFICATIONS", 20, 121, 1, "text", "bg")
-    p.text_right("%d NEW" % UNREAD if UNREAD else "DIRECT ACCESS", W - 8, 121, 1,
+    p.fill_circle(MARGIN, 125, 3, "purple")
+    p.text_at("01 // NOTIFICATIONS", MARGIN + 10, 121, 1, "text", "bg")
+    p.text_right("%d NEW" % UNREAD if UNREAD else "DIRECT ACCESS", W - MARGIN, 121, 1,
                  "yellow" if UNREAD else "dim", "bg")
 
 
@@ -314,19 +315,20 @@ def phone_notice_row(p, slot):
     n = NOTICES[slot]
     p.ring(r, CORNER_CARD, "accentDim" if n["unread"] else "edge")
 
-    icon = (r[0] + 8, r[1] + 6, 20, 20)
+    icon = (r[0] + CARD_PAD, r[1] + 6, 20, 20)
     p.fill_round(icon, 6, "tileHi")
     p.ring(icon, 6, "accentDim" if n["unread"] else "edge")
     p.text_centered(n["app"][0], icon, 2, "yellow" if n["unread"] else "dim", "tileHi")
 
-    p.text_at(n["app"], r[0] + 36, r[1] + 4, 1, "accent" if n["unread"] else "dim", "tile")
-    p.text_right(age_text(n["at"]), r[0] + r[2] - 8, r[1] + 4, 1, "dim", "tile")
+    text_x = r[0] + CARD_PAD + 28
+    p.text_at(n["app"], text_x, r[1] + 4, 1, "accent" if n["unread"] else "dim", "tile")
+    p.text_right(age_text(n["at"]), r[0] + r[2] - CARD_PAD, r[1] + 4, 1, "dim", "tile")
 
     ink = "text" if n["unread"] else "dim"
-    if p.width(n["title"], 2) <= r[2] - 46:
-        p.text_at(n["title"], r[0] + 36, r[1] + 14, 2, ink, "tile")
+    if p.width(n["title"], 2) <= r[2] - 2 * CARD_PAD - 28:
+        p.text_at(n["title"], text_x, r[1] + 14, 2, ink, "tile")
     else:
-        p.text_at(fit_text(n["title"], 20), r[0] + 36, r[1] + 16, 1, ink, "tile")
+        p.text_at(fit_text(n["title"], 20), text_x, r[1] + 16, 1, ink, "tile")
 
 
 def page_phone_home(p):
@@ -369,22 +371,22 @@ def page_phone_board(p):
 def page_phone_now(p):
     p.fill_screen("bg")
     phone_header(p)
-    card = (8, 40, 304, 96)
+    card = (12, 40, 296, 96)
     p.fill_round(card, CORNER_CARD, "tile")
     p.ring(card, CORNER_CARD, "edge")
-    p.text_at("02 // NOW PLAYING", 20, 46, 1, "dim", "tile")
-    p.wrapped(TRACK["title"], 20, 62, 280, 2, "text", "tile", 2)
-    p.text_at(TRACK["artist"], 20, 104, 1, "accent" if TRACK["playing"] else "dim", "tile")
-    p.text_at(TRACK["album"], 20, 118, 1, "dim", "tile")
+    p.text_at("02 // NOW PLAYING", 22, 46, 1, "dim", "tile")
+    p.wrapped(TRACK["title"], 22, 62, 272, 2, "text", "tile", 2)
+    p.text_at(TRACK["artist"], 22, 104, 1, "accent" if TRACK["playing"] else "dim", "tile")
+    p.text_at(TRACK["album"], 22, 118, 1, "dim", "tile")
 
-    bar = (8, 146, 304, 10)
+    bar = (12, 146, 296, 10)
     p.ring(bar, 5, "edge")
     fill = max(0, (bar[2] - 4) * TRACK["position"] // TRACK["duration"])
     if fill:
         p.fill_round((bar[0] + 2, bar[1] + 2, fill, bar[3] - 4), 3, "accent")
-    p.text_at(clock_text(TRACK["position"]), 10, 160, 1, "dim", "bg")
-    p.text_right(clock_text(TRACK["duration"]), W - 10, 160, 1, "dim", "bg")
-    p.text_at("PLAYING // MIRRORED FROM THE PHONE", 10, 178, 1, "accent", "bg")
+    p.text_at(clock_text(TRACK["position"]), 12, 160, 1, "dim", "bg")
+    p.text_right(clock_text(TRACK["duration"]), W - 12, 160, 1, "dim", "bg")
+    p.text_at("PLAYING // MIRRORED FROM THE PHONE", 12, 178, 1, "accent", "bg")
     phone_button(p, PHONE_NOW_BACK, "BACK", 2, False)
 
 
@@ -414,17 +416,17 @@ def page_phone_settings(p):
     p.text_at("SETTINGS", 48, 8, 2, "text", "bg")
     link_pill(p, PHONE_SET_LINK_PILL)
 
-    p.fill_round((8, 38, 304, 58), CORNER_CARD, "tile")
-    p.ring((8, 38, 304, 58), CORNER_CARD, "edge")
-    p.text_at("BRIGHTNESS", 18, 44, 1, "dim", "tile")
-    p.text_right("%d%%" % PHONE_BRIGHTNESS, 300, 46, 2, "accent", "tile")
+    p.fill_round((12, 38, 296, 58), CORNER_CARD, "tile")
+    p.ring((12, 38, 296, 58), CORNER_CARD, "edge")
+    p.text_at("BRIGHTNESS", 22, 44, 1, "dim", "tile")
+    p.text_right("%d%%" % PHONE_BRIGHTNESS, 298, 46, 2, "accent", "tile")
     phone_button(p, PHONE_SET_BRI_DOWN, "-", 3, False)
     phone_button(p, PHONE_SET_BRI_UP, "+", 3, False)
 
-    p.fill_round((8, 102, 304, 38), CORNER_CARD, "tile")
-    p.ring((8, 102, 304, 38), CORNER_CARD, "edge")
-    p.text_at("NOTIFICATIONS", 18, 108, 1, "dim", "tile")
-    p.text_at("%d waiting" % len(NOTICES), 18, 120, 1, "text", "tile")
+    p.fill_round((12, 102, 296, 38), CORNER_CARD, "tile")
+    p.ring((12, 102, 296, 38), CORNER_CARD, "edge")
+    p.text_at("NOTIFICATIONS", 22, 108, 1, "dim", "tile")
+    p.text_at("%d waiting" % len(NOTICES), 22, 120, 1, "text", "tile")
     phone_button(p, PHONE_SET_CLEAR, "CLEAR", 1, False)
 
     phone_button(p, PHONE_SET_CAL, "CALIBRATE TOUCH", 1, False)
@@ -472,10 +474,10 @@ PHONE_PAGES = [
 PHONE_THEMES = None
 
 # ---------------------------------------------------------------- spotify -----
-SPOTIFY_PREV = (8, 152, 96, 52)
+SPOTIFY_PREV = (12, 152, 96, 52)
 SPOTIFY_PLAY = (112, 152, 96, 52)
-SPOTIFY_NEXT = (216, 152, 96, 52)
-SPOTIFY_SETUP = (200, 206, 112, 30)
+SPOTIFY_NEXT = (212, 152, 96, 52)
+SPOTIFY_SETUP = (196, 206, 112, 30)
 SPOTIFY_SHORT = ["WiFi network name", "WiFi password", "Spotify client id",
                  "Client secret (may be blank)", "Spotify refresh token"]
 SPOTIFY_TRACK = dict(title="Midnight City", artist="M83", device="phone",
@@ -507,18 +509,18 @@ def page_spotify_now(p):
     p.fill_screen("bg")
     spotify_header(p)
 
-    card = (8, 40, 304, 104)
+    card = (12, 40, 296, 104)
     p.fill_round(card, CORNER_CARD, "tile")
     p.ring(card, CORNER_CARD, "edge")
-    p.wrapped(SPOTIFY_TRACK["title"], 18, 50, 284, 2, "text", "tile", 2)
-    p.text_at(SPOTIFY_TRACK["artist"], 18, 94, 1, "dim", "tile")
+    p.wrapped(SPOTIFY_TRACK["title"], 22, 50, 272, 2, "text", "tile", 2)
+    p.text_at(SPOTIFY_TRACK["artist"], 22, 94, 1, "dim", "tile")
 
-    p.fill_rect(18, 112, 284, 6, "tile")
-    p.fill_round((18, 112, 284, 6), 3, "tileHi")
-    filled = 284 * SPOTIFY_TRACK["position"] // SPOTIFY_TRACK["duration"]
-    p.fill_round((18, 112, filled, 6), 3, "text")
-    p.text_at(clock_text(SPOTIFY_TRACK["position"]), 18, 121, 1, "dim", "tile")
-    p.text_right(clock_text(SPOTIFY_TRACK["duration"]), 302, 121, 1, "dim", "tile")
+    p.fill_rect(22, 112, 272, 6, "tile")
+    p.fill_round((22, 112, 272, 6), 3, "tileHi")
+    filled = 272 * SPOTIFY_TRACK["position"] // SPOTIFY_TRACK["duration"]
+    p.fill_round((22, 112, filled, 6), 3, "text")
+    p.text_at(clock_text(SPOTIFY_TRACK["position"]), 22, 121, 1, "dim", "tile")
+    p.text_right(clock_text(SPOTIFY_TRACK["duration"]), 298, 121, 1, "dim", "tile")
 
     spotify_chip(p, SPOTIFY_PREV, "|<<", 2, False)
     spotify_chip(p, SPOTIFY_PLAY, "PAUSE" if SPOTIFY_TRACK["playing"] else "PLAY", 2, True)
@@ -540,12 +542,12 @@ def page_spotify_setup(p):
     p.text_at("2  open http://192.168.4.1", 12, 70, 1, "text", "bg")
     p.text_at("3  fill in the page", 12, 84, 1, "text", "bg")
 
-    p.fill_round((8, 102, 304, 78), CORNER_CARD, "tile")
-    p.ring((8, 102, 304, 78), CORNER_CARD, "edge")
-    p.text_at("OR SERIAL  1/5", 18, 110, 1, "dim", "tile")
-    p.wrapped(SPOTIFY_SHORT[0], 18, 126, 284, 1, "text", "tile", 2)
-    p.ring((18, 152, 284, 22), 6, "edge")
-    p.text_at("workshop", 24, 159, 1, "text", "tile")
+    p.fill_round((12, 102, 296, 78), CORNER_CARD, "tile")
+    p.ring((12, 102, 296, 78), CORNER_CARD, "edge")
+    p.text_at("OR SERIAL  1/5", 22, 110, 1, "dim", "tile")
+    p.wrapped(SPOTIFY_SHORT[0], 22, 126, 272, 1, "text", "tile", 2)
+    p.ring((22, 152, 272, 22), 6, "edge")
+    p.text_at("workshop", 28, 159, 1, "text", "tile")
 
     p.text_at("192.168.4.1", 12, 190, 1, "dim", "bg")
     p.text_right("192.168.1.24", W - 12, 190, 1, "dim", "bg")

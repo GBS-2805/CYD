@@ -1447,17 +1447,21 @@ static constexpr int HEADER_H = 34;
 // One margin for every page: the status line, the wordmark, the tabs and the
 // rules all start on this edge.
 static constexpr int MARGIN = 12;
+// Everything inside a card sits this far from its edge, and cards run from MARGIN
+// to SCREEN_W - MARGIN. Before this, cards started at 8 and text at 12, 18 or 20
+// depending on the page, so no two edges lined up.
+static constexpr int CARD_PAD = 10;
 
 // 24x24 was under a fingertip on a resistive panel; 34x28 plus slop clears it.
-static const Rect GEAR_BTN = {284, 5, 32, 24};
-static const Rect LINK_PILL = {204, 6, 76, 22};
+static const Rect GEAR_BTN = {276, 5, 32, 24};
+static const Rect LINK_PILL = {196, 6, 76, 22};
 // The same pill, right-aligned in a header that has no gear.
-static const Rect SET_LINK_PILL = {234, 6, 76, 22};
+static const Rect SET_LINK_PILL = {232, 6, 76, 22};
 static const Rect BACK_BTN = {6, 3, 34, 28};
 
-static const Rect STATUS_CARD = {8, 40, 304, 76};
-static const Rect NOTIF_ROW[3] = {{8, 134, 304, 32}, {8, 168, 304, 32},
-                                  {8, 202, 304, 32}};
+static const Rect STATUS_CARD = {12, 40, 296, 76};
+static const Rect NOTIF_ROW[3] = {{12, 134, 296, 32}, {12, 168, 296, 32},
+                                  {12, 202, 296, 32}};
 
 static const Rect DETAIL_DISMISS = {12, 202, 148, 30};
 static const Rect DETAIL_BACK = {168, 202, 140, 30};
@@ -1466,15 +1470,15 @@ static const Rect DETAIL_BACK = {168, 202, 140, 30};
 // leaves the now-playing page. The strip is 196 px wide because the phone's
 // battery block starts at 244.
 static const Rect NOW_STRIP = {20, 96, 196, 16};
-static const Rect NOW_BACK = {8, 202, 304, 30};
+static const Rect NOW_BACK = {12, 202, 296, 30};
 
 // Half the brightness card each. Two 54px chips were pushed to the card's outer
 // edges, where the panel's x mapping is least linear: "-" landed, "+" did not.
-static const Rect SET_BRI_DOWN = {12, 64, 146, 28};
-static const Rect SET_BRI_UP = {162, 64, 146, 28};
-static const Rect SET_CLEAR = {232, 106, 72, 26};
-static const Rect SET_CAL = {8, 146, 304, 32};
-static const Rect SET_CLOSE = {8, 186, 304, 34};
+static const Rect SET_BRI_DOWN = {22, 64, 134, 28};
+static const Rect SET_BRI_UP = {164, 64, 134, 28};
+static const Rect SET_CLEAR = {226, 106, 72, 26};
+static const Rect SET_CAL = {12, 146, 296, 32};
+static const Rect SET_CLOSE = {12, 186, 296, 34};
 
 // Front page: a status line, the wordmark, two pills, three numbered tabs. The
 // clock and battery moved up out of the bottom strip, so the page now ends in a
@@ -2517,14 +2521,13 @@ static void drawHeader() {
 }
 
 static void drawSectionHeader() {
-  tft.fillCircle(12, 125, 3, C_PURPLE);
-  drawTextAt("01 // NOTIFICATIONS", 20, 121, 1, C_TEXT, C_BG);
-
+  tft.fillCircle(MARGIN, 125, 3, C_PURPLE);
+  drawTextAt("01 // NOTIFICATIONS", MARGIN + 10, 121, 1, C_TEXT, C_BG);
   char right[16];
   const int unread = countUnread();
   if (unread > 0) snprintf(right, sizeof(right), "%d NEW", unread);
   else snprintf(right, sizeof(right), "DIRECT ACCESS");
-  drawTextRight(right, SCREEN_W - 8, 121, 1, unread > 0 ? C_YELLOW : C_DIM, C_BG);
+  drawTextRight(right, SCREEN_W - MARGIN, 121, 1, unread > 0 ? C_YELLOW : C_DIM, C_BG);
 }
 
 // Battery reads at a glance: blue while charging, pink under 30%, green at or
@@ -2541,7 +2544,7 @@ static void drawStatusCard() {
   tft.fillRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD, C_TILE);
   tft.drawRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD, C_EDGE);
 
-  drawTextAt("$ sys.status --", r.x + 12, r.y + 7, 1, C_DIM, C_TILE);
+  drawTextAt("$ sys.status --", r.x + CARD_PAD, r.y + 7, 1, C_DIM, C_TILE);
   const bool linked = phoneLinked();
   const char *state = linked ? "READY // ONLINE"
                              : (ownerKnown ? "STANDBY // OFFLINE"
@@ -2550,13 +2553,11 @@ static void drawStatusCard() {
   uint16_t bw = 0, bh = 0;
   tft.setFont(fontFor(1));
   tft.getTextBounds(state, 0, 0, &bx, &by, &bw, &bh);
-  const int textRight = r.x + r.w - 12;
-  drawTextAt(state, textRight - static_cast<int>(bw), r.y + 7, 1,
-             linked ? C_ACCENT : C_DIM, C_TILE);
+  const int textRight = r.x + r.w - CARD_PAD;
+  drawTextRight(state, textRight, r.y + 7, 1, linked ? C_ACCENT : C_DIM, C_TILE);
   tft.fillCircle(textRight - static_cast<int>(bw) - 9, r.y + 11, 3,
                  linked ? C_ACCENT : C_PINK);
-
-  tft.drawFastHLine(r.x + 12, r.y + 20, r.w - 24, C_EDGE);
+  tft.drawFastHLine(r.x + CARD_PAD, r.y + 20, r.w - 2 * CARD_PAD, C_EDGE);
 
   if (clockValid) {
     const time_t now = clockNow();
@@ -2570,19 +2571,18 @@ static void drawStatusCard() {
     snprintf(seconds, sizeof(seconds), "%02d", parts.tm_sec);
     snprintf(date, sizeof(date), "%s %d %s  //  %s", DAYS[parts.tm_wday],
              parts.tm_mday, MONTHS[parts.tm_mon], clockSourceLabel());
-    drawTextAt(hhmm, r.x + 12, r.y + 24, 4, C_TEXT, C_TILE);
-    drawTextAt(seconds, r.x + 134, r.y + 36, 1, C_ACCENT, C_TILE);
-    if (!nowTrack.valid) drawTextAt(date, r.x + 12, r.y + 60, 1, C_DIM, C_TILE);
+    // The clock face is 18 px a digit, so five characters end at +112: the
+    // seconds sit beside that, not at the old 6 px-per-character 134.
+    drawTextAt(hhmm, r.x + CARD_PAD, r.y + 24, 4, C_TEXT, C_TILE);
+    drawTextAt(seconds, r.x + 118, r.y + 36, 1, C_ACCENT, C_TILE);
+    if (!nowTrack.valid) drawTextAt(date, r.x + CARD_PAD, r.y + 60, 1, C_DIM, C_TILE);
   } else {
-    drawTextAt("--:--", r.x + 12, r.y + 24, 4, C_DIM, C_TILE);
+    drawTextAt("--:--", r.x + CARD_PAD, r.y + 24, 4, C_DIM, C_TILE);
     if (!nowTrack.valid) {
-      drawTextAt("no time yet  //  waiting", r.x + 12, r.y + 60, 1, C_DIM, C_TILE);
+      drawTextAt("no time yet  //  waiting", r.x + CARD_PAD, r.y + 60, 1, C_DIM, C_TILE);
     }
   }
 
-  // The card's last line is the one thing on the board that is not about the
-  // phone: what it is playing. It replaces the date while a track is live and
-  // opens the now-playing page on a tap.
   if (nowTrack.valid) {
     char elapsed[8], total[10], title[24], line[64];
     formatClock(nowPosition(), elapsed, sizeof(elapsed));
@@ -2591,10 +2591,12 @@ static void drawStatusCard() {
     fitText(title, sizeof(title), nowTrack.title[0] != '\0' ? nowTrack.title : "(untitled)", 18);
     snprintf(line, sizeof(line), "%s %s %s  %s", nowTrack.playing ? ">>" : "||",
              elapsed, total, title);
-    drawTextAt(line, r.x + 12, r.y + 60, 1, C_ACCENT, C_TILE);
+    drawTextAt(line, r.x + CARD_PAD, r.y + 60, 1, C_ACCENT, C_TILE);
   }
 
-  const int battX = r.x + 236;
+  // The battery block is measured from the card's right edge, so the bar ends on
+  // the same line the card does.
+  const int battX = r.x + r.w - CARD_PAD - 58;
   drawTextAt("BATTERY", battX, r.y + 26, 1, C_DIM, C_TILE);
   char percent[8];
   if (batteryLevel >= 0) snprintf(percent, sizeof(percent), "%d%%", batteryLevel);
@@ -2706,48 +2708,45 @@ static void formatAge(time_t at, char *out, size_t outLen) {
   }
 }
 
-static void drawNoticeRow(int slot) {
-  const Rect r = NOTIF_ROW[slot];
-  const bool has = slot < noticeCount;
-
-  tft.fillRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD, has ? C_TILE : C_BG);
+static void drawNoticeRow(int index) {
+  const Rect r = NOTIF_ROW[index];
+  const bool has = index < noticeCount;
   if (!has) {
-    // The fill above already cleared any stale row, so only the first empty
-    // slot earns an outline; the rest stay quiet background.
-    if (slot > 0) return;
-    tft.drawRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD, C_EDGE);
-    const char *empty = phoneLinked() ? "no notifications"
-                                      : "waiting for companion";
-    drawTextCentered(empty, r, 1, C_DIM, C_BG);
+    tft.fillRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD, C_BG);
+    if (index == 0) {
+      tft.drawRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD, C_EDGE);
+      drawTextCentered("no notifications", r, 1, C_DIM, C_BG);
+    }
     return;
   }
-
-  const Notice &n = notices[slot];
+  const Notice &n = notices[index];
+  tft.fillRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD, C_TILE);
   tft.drawRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD, n.unread ? C_ACCENT_DIM : C_EDGE);
 
-  // App tile with the first letter, like the module icons on the reference.
-  const Rect icon = {static_cast<int16_t>(r.x + 8), static_cast<int16_t>(r.y + 6), 20, 20};
+  const Rect icon = {static_cast<int16_t>(r.x + CARD_PAD),
+                     static_cast<int16_t>(r.y + 6), 20, 20};
   tft.fillRoundRect(icon.x, icon.y, icon.w, icon.h, 6, C_TILE_HI);
   tft.drawRoundRect(icon.x, icon.y, icon.w, icon.h, 6, n.unread ? C_ACCENT_DIM : C_EDGE);
-  const char initial[2] = {n.app[0], '\0'};
-  drawTextCentered(initial, icon, 2, n.unread ? C_YELLOW : C_DIM, C_TILE_HI);
+  char letter[2] = {n.app[0], '\0'};
+  drawTextCentered(letter, icon, 2, n.unread ? C_YELLOW : C_DIM, C_TILE_HI);
 
-  drawTextAt(n.app, r.x + 36, r.y + 4, 1, n.unread ? C_ACCENT : C_DIM, C_TILE);
+  const int textX = r.x + CARD_PAD + 28;
+  drawTextAt(n.app, textX, r.y + 4, 1, n.unread ? C_ACCENT : C_DIM, C_TILE);
+  char when[16];
+  formatAge(n.at, when, sizeof(when));
+  drawTextRight(when, r.x + r.w - CARD_PAD, r.y + 4, 1, C_DIM, C_TILE);
 
-  char age[8];
-  formatAge(n.at, age, sizeof(age));
-  drawTextRight(age, r.x + r.w - 8, r.y + 4, 1, C_DIM, C_TILE);
-
-  char title[28];
+  const uint16_t ink = n.unread ? C_TEXT : C_DIM;
   int16_t bx = 0, by = 0;
   uint16_t bw = 0, bh = 0;
   tft.setFont(fontFor(2));
   tft.getTextBounds(n.title, 0, 0, &bx, &by, &bw, &bh);
-  if (static_cast<int>(bw) <= r.w - 46) {
-    drawTextAt(n.title, r.x + 36, r.y + 14, 2, n.unread ? C_TEXT : C_DIM, C_TILE);
+  if (static_cast<int>(bw) <= r.w - 2 * CARD_PAD - 28) {
+    drawTextAt(n.title, textX, r.y + 14, 2, ink, C_TILE);
   } else {
+    char title[24];
     fitText(title, sizeof(title), n.title, 20);
-    drawTextAt(title, r.x + 36, r.y + 16, 1, n.unread ? C_TEXT : C_DIM, C_TILE);
+    drawTextAt(title, textX, r.y + 16, 1, ink, C_TILE);
   }
 }
 
@@ -2812,31 +2811,28 @@ static void drawNow() {
   tft.fillScreen(C_BG);
   drawHeader();
 
-  tft.fillRoundRect(8, 40, 304, 96, CORNER_CARD, C_TILE);
-  tft.drawRoundRect(8, 40, 304, 96, CORNER_CARD, C_EDGE);
-  drawTextAt("02 // NOW PLAYING", 20, 46, 1, C_DIM, C_TILE);
+  tft.fillRoundRect(12, 40, 296, 96, CORNER_CARD, C_TILE);
+  tft.drawRoundRect(12, 40, 296, 96, CORNER_CARD, C_EDGE);
+  drawTextAt("02 // NOW PLAYING", 22, 46, 1, C_DIM, C_TILE);
 
   if (!nowTrack.valid) {
-    drawTextAt("nothing playing", 20, 68, 2, C_DIM, C_TILE);
+    drawTextAt("nothing playing", 22, 68, 2, C_DIM, C_TILE);
     drawTextAt(phoneLinked() ? "start something on the phone"
                              : "link the phone to mirror it",
-               20, 96, 1, C_DIM, C_TILE);
+               22, 96, 1, C_DIM, C_TILE);
   } else {
     drawWrappedText(nowTrack.title[0] != '\0' ? nowTrack.title : "(untitled)",
-                    20, 62, 280, 2, C_TEXT, C_TILE, 2);
-    // Artist and album get a line each rather than sharing a baseline: an artist
-    // is 32 characters and an album 32 more, and the two would meet in the
-    // middle of the card.
+                    22, 62, 272, 2, C_TEXT, C_TILE, 2);
     drawTextAt(nowTrack.artist[0] != '\0' ? nowTrack.artist : "unknown artist",
-               20, 104, 1, nowTrack.playing ? C_ACCENT : C_DIM, C_TILE);
+               22, 104, 1, nowTrack.playing ? C_ACCENT : C_DIM, C_TILE);
     if (nowTrack.album[0] != '\0') {
       char album[48];
       fitText(album, sizeof(album), nowTrack.album, 44);
-      drawTextAt(album, 20, 118, 1, C_DIM, C_TILE);
+      drawTextAt(album, 22, 118, 1, C_DIM, C_TILE);
     }
   }
 
-  const Rect bar = {8, 146, 304, 10};
+  const Rect bar = {12, 146, 296, 10};
   tft.drawRoundRect(bar.x, bar.y, bar.w, bar.h, 5, C_EDGE);
   const uint32_t position = nowPosition();
   if (nowTrack.valid && nowTrack.duration > 0) {
@@ -2850,13 +2846,13 @@ static void drawNow() {
   formatClock(position, elapsed, sizeof(elapsed));
   if (nowTrack.valid && nowTrack.duration > 0) formatClock(nowTrack.duration, total, sizeof(total));
   else snprintf(total, sizeof(total), "--:--");
-  drawTextAt(elapsed, 10, 160, 1, C_DIM, C_BG);
-  drawTextRight(total, SCREEN_W - 10, 160, 1, C_DIM, C_BG);
+  drawTextAt(elapsed, 12, 160, 1, C_DIM, C_BG);
+  drawTextRight(total, SCREEN_W - 12, 160, 1, C_DIM, C_BG);
 
   drawTextAt(nowTrack.valid && nowTrack.playing
                  ? "PLAYING // MIRRORED FROM THE PHONE"
                  : "PAUSED // MIRRORED FROM THE PHONE",
-             10, 178, 1, nowTrack.valid && nowTrack.playing ? C_ACCENT : C_DIM, C_BG);
+             12, 178, 1, nowTrack.valid && nowTrack.playing ? C_ACCENT : C_DIM, C_BG);
 
   drawButton(NOW_BACK, "BACK", 2, false);
 }
@@ -2906,22 +2902,22 @@ static void drawSettings() {
   drawLinkPill(SET_LINK_PILL);
 
   // Brightness.
-  tft.fillRoundRect(8, 38, 304, 58, CORNER_CARD, C_TILE);
-  tft.drawRoundRect(8, 38, 304, 58, CORNER_CARD, C_EDGE);
-  drawTextAt("BRIGHTNESS", 18, 44, 1, C_DIM, C_TILE);
+  tft.fillRoundRect(12, 38, 296, 58, CORNER_CARD, C_TILE);
+  tft.drawRoundRect(12, 38, 296, 58, CORNER_CARD, C_EDGE);
+  drawTextAt("BRIGHTNESS", 22, 44, 1, C_DIM, C_TILE);
   char value[8];
   snprintf(value, sizeof(value), "%u%%", static_cast<unsigned>(brightness));
-  drawTextRight(value, 300, 46, 2, C_ACCENT, C_TILE);
+  drawTextRight(value, 298, 46, 2, C_ACCENT, C_TILE);
   drawButton(SET_BRI_DOWN, "-", 3, false);
   drawButton(SET_BRI_UP, "+", 3, false);
 
   // Notifications.
-  tft.fillRoundRect(8, 102, 304, 38, CORNER_CARD, C_TILE);
-  tft.drawRoundRect(8, 102, 304, 38, CORNER_CARD, C_EDGE);
+  tft.fillRoundRect(12, 102, 296, 38, CORNER_CARD, C_TILE);
+  tft.drawRoundRect(12, 102, 296, 38, CORNER_CARD, C_EDGE);
   char count[28];
   snprintf(count, sizeof(count), "%d waiting", noticeCount);
-  drawTextAt("NOTIFICATIONS", 18, 108, 1, C_DIM, C_TILE);
-  drawTextAt(count, 18, 120, 1, C_TEXT, C_TILE);
+  drawTextAt("NOTIFICATIONS", 22, 108, 1, C_DIM, C_TILE);
+  drawTextAt(count, 22, 120, 1, C_TEXT, C_TILE);
   drawButton(SET_CLEAR, "CLEAR", 1, false);
 
   drawButton(SET_CAL, "CALIBRATE TOUCH", 1, false);
