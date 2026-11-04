@@ -18,13 +18,14 @@ settings:
 Ask it anything about the deck's state and it answers from the link itself, not
 from guesswork: `linked 4m 12s · -62 dBm · 18 packets · 5 notices`.
 
-**Two themes, one app.** DARK is off-white ink on black; **SETTINGS → APPEARANCE
-→ LIGHT** turns the same screens into black ink on an off-white page. The choice is
-stored, survives a restart, and switching rebuilds the screen because every colour
-is read when a view is built. The same choice also goes down the link to the deck
-that is linked, and every deck keeps its own PAPER/INK pair on PAIRED. The top band
-stays light either way: it is the ground the mark was drawn on, so it needs no
-plate behind it.
+**Two palettes, two places.** The app's own is set in **SETTINGS → APPEARANCE**:
+**PAPER** is black ink on an off-white page, **INK** is the same page inverted. That
+choice is the app's alone — stored, kept across a restart, and applied by rebuilding
+the screen, because every colour is read when a view is built. A deck's palette is
+the deck's: each row on PAIRED carries the same two words and writes that board
+alone, so the phone and a CYD can sit on different pages without either switch
+knowing about the other. The top band stays light either way: it is the ground the
+mark was drawn on, so it needs no plate behind it.
 
 ## Monitoring your CYDs
 
@@ -36,6 +37,9 @@ plate behind it.
   CYD in range never steals the connection; the choice survives restarts.
 - Every deck that links is remembered under **SAVED DECKS** with its last-seen
   time, so a board that is switched off still shows up.
+  Its linked row carries **RENAME**, which writes a name of up to 16
+  characters to the board and stores it there, so the name follows the
+  deck rather than the phone.
 - **UNLINK** drops the link and forgets the row in one tap — on the linked deck's
   card, or on its SAVED DECKS row where it replaces the `LINKED` badge. The scan
   keeps running but stops linking by itself until you tap LINK, so the board you
@@ -209,16 +213,18 @@ ROM protocol: SLIP framing, sync, register reads, `FLASH_BEGIN`/`FLASH_DATA`/
 | Notification | `6f2d0004-…` | UTF-8 `App\|Title\|Text`, truncated to 120 bytes |
 | Identity | `6f2d0005-…` | **read** — the deck's one line of JSON, parsed by `DeckIdentity`; a network deck answers the same document at `GET /deck.json` |
 | Now playing | `6f2d0006-…` | UTF-8 `state\|position\|duration\|title\|artist\|album`, whole seconds, state `play`/`pause`/`stop`, written once a second while something plays |
-| Theme | `6f2d0008-…` | **read/write**, 1 byte: `0` PAPER, `1` INK. SETTINGS writes the linked deck too, so the phone and the board share one palette; each deck's own pair on PAIRED changes that board alone |
+| Theme | `6f2d0008-…` | **read/write**, 1 byte: `0` PAPER, `1` INK. Each deck's own pair on PAIRED writes it, so a board's palette is the board's; the app's appearance switch never touches one |
 
-The palette is the one setting that lives at both ends. Choosing DARK or LIGHT in
-SETTINGS stores the app's palette and writes the same one to the linked deck, so
-the phone and the board match; every deck row on PAIRED carries its own PAPER and
-INK pair, because each board keeps its palette in NVS and two decks can honestly
-differ. Only the linked row can be written — the link carries one deck at a time —
-and the chip that is filled is the palette the board answered with, not the last
-one tapped. A deck flashed before `6f2d0008-…` existed has no palette
-characteristic, and its pair stays dark rather than writing nowhere.
+The palette lives at both ends, and each end has its own switch. The app's is in
+SETTINGS → APPEARANCE and changes only the app. A deck's is on its row on PAIRED:
+PAPER or INK, written down the link to that board alone, and the chip that is
+filled is the palette the board answered with, not the last one tapped. Only the
+linked row can be written — the link carries one deck at a time — so an unlinked
+row says `link to set` instead of a chip that would write nowhere. A deck flashed
+before `6f2d0008-…` existed has no palette characteristic, and nothing is written
+rather than writing nowhere. The two choices stay independent because the two
+surfaces are: a board read from across a room need not be set the way the phone is
+held.
 
 Service UUID is `6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10`; full UUIDs are in
 [`DeckService.java`](app/src/main/java/dev/phonedesk/companion/DeckService.java).

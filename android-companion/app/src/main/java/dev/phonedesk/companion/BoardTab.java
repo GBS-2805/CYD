@@ -1517,8 +1517,18 @@ final class BoardTab extends ScrollView {
         TextView name = Ui.text(activity, entry.name, 15, Ui.TEXT);
         card.addView(name);
 
-        TextView size = Ui.text(activity, Ui.size(entry.size) + "  ·  "
-                + (entry.textual() ? "text" : "binary"), 12, Ui.DIM);
+        // The bytes on this card are the bytes COPY pastes, so the card names
+        // them: a sketch copied out of an older install has a different size and
+        // digest, and Arduino's own "Sketch uses" line has to match this one.
+        String detail = Ui.size(entry.size) + "  ·  " + (entry.textual() ? "text" : "binary");
+        if (entry.textual()) {
+            byte[] bytes = FlashLibrary.readBytes(activity, entry);
+            detail += "  ·  " + SketchStamp.of(bytes);
+            String build = SketchVersion.label(SketchVersion.of(
+                    bytes == null ? null : new String(bytes, java.nio.charset.StandardCharsets.UTF_8)));
+            if (!build.isEmpty()) detail += "  ·  " + build;
+        }
+        TextView size = Ui.text(activity, detail, 12, Ui.DIM);
         size.setPadding(0, Ui.dp(activity, 2), 0, 0);
         card.addView(size);
 

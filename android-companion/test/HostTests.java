@@ -58,6 +58,8 @@ public final class HostTests {
     private static final VirtualClock CLOCK = new VirtualClock();
 
     public static void main(String[] args) throws Exception {
+        sketchStamp();
+        deckVersion();
         EspRom.useClock(CLOCK);
         UsbSerialCh340.clock = CLOCK;
         framingRoundTrip();
@@ -1024,6 +1026,53 @@ public final class HostTests {
         check("theme: the chips are named the way the deck's table spells them",
                 DeckTheme.name(DeckTheme.PAPER).equals("PAPER")
                         && DeckTheme.name(DeckTheme.INK).equals("INK"));
+    }
+
+    /**
+     * The stamp on the flash shelf is what stops a stale COPY being flashed as if
+     * it were today's sketch: the shelf names the bytes, Arduino names the size it
+     * compiled, and this tree quotes the md5. These are the formatting rules the
+     * card promises, so a change to them has to be a deliberate one.
+     */
+    private static void sketchStamp() {
+        byte[] abc = "abc".getBytes(StandardCharsets.UTF_8);
+        check("stamp: a sketch reads as its size and the first eight md5 digits",
+                SketchStamp.of(abc).equals("3 B  ·  90015098"));
+        check("stamp: the digest is the md5 this tree quotes, to eight digits",
+                SketchStamp.digest(abc).equals("90015098")
+                        && SketchStamp.digest("".getBytes(StandardCharsets.UTF_8))
+                                .equals("d41d8cd9"));
+        check("stamp: thousands are separated the way the docs write them",
+                SketchStamp.of(new byte[150544]).startsWith("150,544 B  ·  "));
+        check("stamp: nothing to read says so instead of looking like a build",
+                SketchStamp.of(null).equals("unreadable")
+                        && SketchStamp.of(new byte[0]).equals("empty"));
+    }
+
+    /**
+     * One constant per sketch names the build, and both readers have to agree with
+     * it: the identity document carries it so a linked deck says what it runs, and
+     * the shelf reads the same declaration out of the bundled text.
+     */
+    private static void deckVersion() {
+        DeckIdentity named = DeckIdentity.parse("{\"id\":\"phone_deck_cyd24R-A1B2C3\","
+                + "\"widget\":\"phone_deck_cyd24R\",\"v\":\"1.0.0\",\"link\":\"ble\"}");
+        check("version: a deck's own build is read from the document",
+                named.version.equals("1.0.0") && named.usable());
+        DeckIdentity older = DeckIdentity.parse("{\"id\":\"phone_deck_cyd24R-A1B2C3\","
+                + "\"widget\":\"phone_deck_cyd24R\",\"link\":\"ble\"}");
+        check("version: a deck flashed before the key reads empty, not a guess",
+                older.version.isEmpty() && older.usable() && older.bluetooth());
+        check("version: a sketch names its build in one declaration",
+                SketchVersion.of("static const char DECK_VERSION[] = \"1.0.0\";").equals("1.0.0")
+                        && SketchVersion.of("static constexpr char DECK_VERSION[] = \"2.3.1\";")
+                                .equals("2.3.1"));
+        check("version: a sketch that declares none reads empty",
+                SketchVersion.of("/* nothing here */").isEmpty()
+                        && SketchVersion.of(null).isEmpty());
+        check("version: a card writes it the way a person reads it",
+                SketchVersion.label("1.0.0").equals("v1.0.0")
+                        && SketchVersion.label("").isEmpty());
     }
 
     private static void check(String name, boolean ok) {

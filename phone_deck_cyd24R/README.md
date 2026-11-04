@@ -88,7 +88,10 @@ name is a label, not a control: the switch lives in the companion app (see
   anything on its own. It is the Spotify deck's now page as far as this board can
   honestly carry it, and it says `nothing playing` when the phone is not.
 * **03 SETTINGS** is brightness (two buttons, one half of the card each) and
-  calibration. The notifications card it used to carry is gone: a count with no
+  calibration, and it says whether a touch fit is stored: `TOUCH FIT SAVED` after
+  a run, `TOUCH FIT ASSUMED` before one. That is read from the stored record each
+  time the page is drawn, not kept in a flag. The notifications card it used to
+  carry is gone: a count with no
   action behind it held a row a control could use, and clearing the inbox is
   waiting on a home of its own. The unread count still sits in the front page's
   footer.
@@ -251,10 +254,11 @@ board's MAC, so it differs per board.
 Service `6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10`: four write characteristics, one
 read-write and one read.
 
-The Spotify deck speaks the same service with the same six UUIDs and adds a
-seventh for its transport chips, so a scan run from the app now sees **both**
-decks when both are powered on; the shelf tells them apart by name and tag, not
-by service.
+The Spotify deck speaks the same service with the same core UUIDs — time,
+battery, notice, now playing, theme — and adds one for its transport chips; the
+label is this deck's own. A scan run from the app therefore sees **both** decks
+when both are powered on; the shelf tells them apart by name and tag, not by
+service.
 
 | Characteristic | UUID | Payload |
 | --- | --- | --- |
@@ -264,6 +268,7 @@ by service.
 | Identity | `6f2d0005-9a3c-4b57-9d21-6a1e0c4f8b10` | **read** |
 | Now playing | `6f2d0006-9a3c-4b57-9d21-6a1e0c4f8b10` | UTF-8 `state\|position\|duration\|title\|artist\|album`, whole seconds, state `play`/`pause`/`stop` |
 | Theme | `6f2d0008-9a3c-4b57-9d21-6a1e0c4f8b10` | **read/write**, 1 byte: `0` PAPER, `1` INK — applied, stored in NVS and repainted |
+| Label | `6f2d0009-9a3c-4b57-9d21-6a1e0c4f8b10` | **read/write**, up to 16 printable ASCII bytes: the owner's name for this board |
 
 The palette is a setting now. `0` is PAPER and `1` is INK, the same two entries
 `THEMES[]` has always had, and a write applies it, stores it in the `settings`
@@ -296,15 +301,40 @@ is a second row.
 
 ```json
 {"id":"phone_deck_cyd24R-A1B2C3","widget":"phone_deck_cyd24R",
- "tag":"A1B2C3","name":"Phone Deck","role":"phone",
- "board":"2432S024R","link":"ble"}
+ "tag":"A1B2C3","name":"Phone Deck","label":"","role":"phone",
+ "v":"1.0.0","link":"ble"}
 ```
 
+`id` names the hardware and does not move: it is the key the app files a row under,
+so changing it would split one board into two rows and lose the history of both. What
+an owner can change is `label` — up to 16 printable ASCII bytes, stored in the
+`identity` namespace, blank until set — written to the label characteristic below and
+quoted here, so the app shows `Kitchen` rather than `Phone Deck`, and a second board
+of this widget stays its own row. Renaming is one write:
+
+```python
+await client.write_gatt_char("6f2d0009-9a3c-4b57-9d21-6a1e0c4f8b10", b"Kitchen")
+```
+
+A blank write clears it. A board that has not published a document at all is filed
+under its address, and the app shows the address's last four hex digits so two
+identical un-named boards never read as two identical rows.
+
 The three a board with no network has none of — `ip`, `setup`, `signed` — are
-simply absent. The document is about 150 bytes, longer than the 20 a default ATT
-MTU carries, so a reader asks for a larger MTU first (the app asks for 185) and a
-read that comes back cut short names no widget, which leaves the app on the
+simply absent. The document is written from a 192-byte buffer, longer than the 20
+a default ATT MTU carries, so a reader asks for a larger MTU first: the app asks
+for 247, which carries the whole buffer, and a deck that caps its own MTU lower
+(the Spotify deck asks 185, leaving 182 for payload) still answers because Android
+takes the smaller of the two. The sketch prints `identity is <n> bytes, over one
+185-MTU read` if the document ever grows past what the smallest reader can take,
+because a read that comes back cut short names no widget and leaves the app on the
 address fallback rather than inventing an id.
+
+On connect the deck asks for a 7.5–15 ms interval with no slave latency and a 4 s
+supervision timeout (`updateConnParams(…, 6, 12, 0, 400)`), the same request the
+Spotify deck makes. Without it the link sits at whatever interval the phone chose:
+a tap waits for the next one, and a phone that walks away takes longer to read as
+gone. The phone may grant more; this is a request, not a setting.
 
 Writes are normal GATT write-with-response; no subscription is needed and no
 pairing is required. Time is local wall-clock time, so the deck needs no timezone
@@ -391,6 +421,14 @@ list of distinct devices rather than a row of identical entries.
 * **Do not re-add HID for Android.** Advertising a HID keyboard made iOS list the
   deck, but on Android the phone tried to use it as a keyboard, failed, left a
   stale bond and then refused to reconnect.
+* **A bond the phone deleted is deleted here too.** The deck used to keep its half
+  of a bond the phone had forgotten, so every retry failed with an authentication
+  error and the only way back was the 1.2 s gear hold. `onDisconnect` now reads the
+  HCI reason (`0x05` authentication failure, `0x06` PIN or key missing, `0x3E` link
+  never established), and `onAuthenticationComplete` reads the pairing result;
+  either one calls `esp_ble_remove_bond_device()` for the phone's address, clears
+  the owner record and advertises again — at most once every five seconds, so a
+  failing attempt cannot stop a pairing from finishing. **Unverified on hardware.**
 * **Touch is sampled, not read once.** `readRawTouch()` takes four conversions,
   drops any that convert zero pressure, medians each axis and rejects the tap if
   the spread exceeds 300 raw units. The pressure floor is deliberately not a
@@ -407,6 +445,12 @@ list of distinct devices rather than a row of identical entries.
   the link carries no encryption until a phone does.
 * **The RGB LED is active-low**: three discrete LEDs between GPIO 4/16/17 and
   3.3 V. There is no WS2812 on this board — `neopixelWrite` was wrong and is gone.
+* **Letters came out as blocks.** The three bitmap faces were pasted in
+  row-padded, and `drawChar()` reads a glyph as one unbroken bitstream, so
+  every character on glass was a shifted block while the frames stayed
+  perfect. Fixed 2026-11-04 by repacking both sketches and the renderer; a
+  deck flashed before that date needs this build to show text. The whole
+  story is in [the typeface section](../CONVENTIONS.md#typefaces-one-bitstream-per-glyph).
 
 ## Verified, and not
 
@@ -447,19 +491,19 @@ flash and 3.7 kB of RAM more, depending on the path.
 
 ### Headroom
 
-Measured here on 2026-11-01 with [`../check_headroom.py`](../check_headroom.py),
+Measured here on 2026-11-04 with [`../check_headroom.py`](../check_headroom.py),
 core **3.3.12**, default partition scheme:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,177,862 | **141,602** | 1,310,720 (89 % used) |
-| DRAM | 45,284 globals | **282,396** | 327,680 |
+| flash | 1,179,402 | **131,318** | 1,310,720 (89 % used) |
+| DRAM | 45,332 globals | **282,348** | 327,680 |
 
 The root behind those figures is `~/.arduino-cyd/env.sh`, the one whose `env.sh`
-pins its own data and library dirs: `check_docs.py --refresh` re-read 1,177,862 B
-and 45,284 B from it on 2026-11-03. While that script set only `PATH` the same
+pins its own data and library dirs: `check_docs.py --refresh` re-read 1,179,402 B
+and 45,332 B from it on 2026-11-04. While that script set only `PATH` the same
 build went through `~/.arduino15` and printed 1,168,282 B — 32 B under with the
-globals identical — another worktree's root prints the same 1,177,862 B, and
+globals identical — another worktree's root prints the same size, and
 `/tmp/arduino-cyd-3` was read at 1,168,170 B, 144 B under. Quote the root with the
 number (see
 [the build note](../CONVENTIONS.md#build)).
@@ -490,13 +534,13 @@ from the repo root, after sourcing a toolchain.
     [`old_core.json`](../old_core.json) — size, globals and md5 together, measured
     2026-11-04 through `~/.arduino-cyd-2` — because a 2.0.17 figure quoted here
     would be checked against the 3.3.12 build and refused.
-* Core **3.3.12** links it at 1,177,862 bytes (89 % of 1,310,720) with 45,284 bytes of RAM
+* Core **3.3.12** links it at 1,179,402 bytes (89 % of 1,310,720) with 45,332 bytes of RAM
   (13 % of 327,680), `EXIT=0` under `--warnings all`, re-measured on 2026-11-04 with the new typeface. An earlier 3.3.12 build on a shorter path reported 1,163,930 / 45,004,
   so 3.x is path-sensitive too — 1,137–1,141 kB, not a fixed count.
 * The bundled copy matches byte for byte after `:app:syncWidgets`;
   `check_widget_assets.py` prints `2 widgets bundled, every copy matches`
-  (this sketch md5 `5be1ba2a…`, the Spotify one `fb40e042…`).
-* Core 3.x costs this sketch ~0.8 kB of flash and ~3.6 kB of RAM over 2.0.17 —
+  (this sketch md5 `6a2609cc…`, the Spotify one `0a2147b9…`).
+* Core 3.x costs this sketch ~1.1 kB of flash and ~3.6 kB of RAM over 2.0.17 —
   nothing like the Spotify deck's 155 kB gap, which is that sketch's network
   stack rather than the core (see the build note in
   [CONVENTIONS](../CONVENTIONS.md#build)).
@@ -521,7 +565,7 @@ The first flash of a new board is the test of those, not a formality.
 | --- | --- | --- |
 | nothing in a Bluetooth scan | setup failed before `startBluetooth()`, or a phone holds the link | check the boot log for the advertising line; disconnect that phone |
 | a second phone changes nothing | that is the binding: `[ble] refused: this deck is bound to another phone` | hold the gear 1.2 s (`[id] binding cleared`), then connect the phone you want |
-| will not reconnect after one success | a stale HID bond from an old build | forget `ESP32 Phone_Widget` in Bluetooth settings, power-cycle the deck |
+| will not reconnect after one success | a phone that is not scanning, or a bond one end kept after the other deleted it | the deck now drops its own half on an authentication failure; if it still refuses, forget the deck in Bluetooth settings and power-cycle the board |
 | white or blank screen | backlight at minimum, or the pin is not driven | SET has − and +; the backlight is GPIO 27 |
 | status LED still glows | a channel wired differently on this revision | adjust `PIN_LED_*` |
 
@@ -536,5 +580,5 @@ The first flash of a new board is the test of those, not a formality.
 ## Measured
 
 `check_headroom.py` built this sketch on 2026-11-04 with core 3.3.12 and read
-`Sketch uses 1,177,862 bytes` and `45,284 bytes` of globals; this folder's sketch
-md5 is `5be1ba2a…`.
+`Sketch uses 1,179,402 bytes` and `45,332 bytes` of globals; this folder's sketch
+md5 is `6a2609cc…`.

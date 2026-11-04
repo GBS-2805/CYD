@@ -50,6 +50,12 @@ reason to add a resource pipeline.
 - The service records every scan result that looks like a deck (Phone Link UUID or
   a name containing "phone deck"), keeps 12 with a 30 s TTL, and exposes them
   through `DeckService.snapshot()`.
+- **The scan asks for decks only**: filters on the chosen address, on the Phone
+  Link service UUID and on every widget service the catalog knows (five at most,
+  the controller's table is small), so other advertisers never wake the service
+  while NEARBY still sees a second board. Two empty scans drop the filters — a
+  legacy flash advertises no UUID — and the retry delay doubles to a 20 s ceiling
+  in `LOW_POWER`. A link resets both.
 - **One link at a time.** A second GATT link to another CYD was deliberately not
   built: the firmware accepts one phone, and juggling several links with Android's
   single-operation GATT API is not worth the complexity.
@@ -107,6 +113,25 @@ reason to add a resource pipeline.
 - COPY puts the entire sketch on the clipboard for ArduinoDroid's editor. That is
   the path that works regardless of Android version.
 
+### The shelf names its bytes
+
+Every sketch card on the flash shelf now carries the sketch's own fingerprint
+beside COPY — `150,544 B  ·  6a2609cc`, its length and the first eight digits of
+its md5. The bytes on that card are the bytes COPY pastes, and Arduino answers
+with the size it compiled (`Sketch uses 1,179,402 bytes`), so a sketch pasted out
+of an older install is visible before it is flashed rather than after: the two
+numbers disagree. `SketchStamp` does the formatting and four host checks hold it,
+including the md5 of `abc` and the thousands separator the docs use.
+
+The trap it closes: this shelf copies the sketch bundled into the APK, so an
+install that predates a fix keeps handing out the old text however many times it
+is flashed. The stamp makes the version on the card something you can read.
+
+Each sketch also declares `DECK_VERSION` (`1.0.0`), which the card prints as
+`v1.0.0` and the deck quotes in its identity as `"v"`. So the shelf says which
+build a COPY would flash and the deck's own row says which build is linked —
+the same string, read from the same declaration on the board.
+
 ## Project notebook
 
 - `ProjectStore` holds one record per project: id, name, tagline, body, libraries,
@@ -137,7 +162,8 @@ reason to add a resource pipeline.
 - **Add, edit, delete and attach are built.** `ADD A PROJECT` and the `EDIT` chip
   open the same form card — name, tagline, status, notes — and `DELETE` is offered
   only for records this app made (`user:` ids), because a widget's card belongs to
-  its descriptor and would be seeded back on the next read. `ATTACH A FILE` opens
+  its descriptor and a catalogue card's words belong to `FirmwareCatalog`, and both
+  are rewritten on the next read, so a save there would be undone. `ATTACH A FILE` opens
   the picker as a card in its place, listing what FILES holds and offering
   `IMPORT A FILE` for what it does not: a `.ino` becomes
   `COPY SOURCE` (the text ArduinoDroid compiles) and a `.bin` becomes `FLASH`,
@@ -146,7 +172,17 @@ reason to add a resource pipeline.
   is still the app's own uploader, which has never synced, so a card can reach the
   flasher but cannot make it work — that gap is unchanged. The catalogue is the
   seeded cards, plus whatever this app added, plus whatever is imported into
-  FILES.
+  FILES. **A catalogue card carries no file at all**: Bruce is a browser flasher,
+  so its record is marked `catalog`, a read heals one that was given a file (kind
+  back to `IMAGE`, name cleared), and the card draws no `FILE` badge, no
+  `ATTACH A FILE` and no `NEEDS` line — that field holds "Prebuilt image." on
+  these seeds, which read like a library nobody had installed. **No field of a
+  record starts null.** `seed()` builds the first-run records in memory and the
+  shelf draws them before any JSON round trip could fill the gaps; the log line
+  called `build.isEmpty()` on that null, so a fresh install drew `SHELF FAILED TO
+  DRAW` until the app was restarted. `theOpenCardsComeBackWithTheRebuild` found it
+  while it was being written for the theme switch; every string field starts empty
+  now.
 
 ## Third-party firmware: catalogue, do not bundle
 
@@ -336,8 +372,10 @@ URL and a flashing note. Decisions behind it:
   `ets Jul 29 2019 12:21:46` because the boot-mode line sat past the 32nd byte;
   the ROM's date and `boot:0x13` versus `boot:0x3` are what identify the chip and
   whether IO0 took effect.
-- **Theme**: two themes and nothing else — **DARK** is off-white ink on black,
-  **LIGHT** is black ink on the off-white page. The band is a shade of that same
+- **Palette**: two palettes and nothing else — **INK** is off-white ink on black,
+  **PAPER** is black ink on the off-white page. The app's is its own switch in
+  SETTINGS; a deck's is its own pair on PAIRED, so the two ends move separately.
+  The band is a shade of that same
   off-white in both, because the owner's mark is drawn in black on a light ground:
   it keeps black ink and the artwork needs no plate behind it. Every other ink is
   the page's opposite at an alpha — `GOOD` .78, `DIM` .70, `VIOLET` .66, the
@@ -356,7 +394,7 @@ URL and a flashing note. Decisions behind it:
   4.5:1, hints and status words to 3:1, and a hairline to 1.5:1 as a line rather
   than a word, then checks the ramp still runs quietest to loudest. It also refuses
   a quarter-strength ink, so a theme cannot pass by making every value the same.
-  **181 checks**, up from 164 when the second theme and the decks' palettes
+  **185 checks**, up from 164 when the second theme and the decks' palettes
   arrived and from 171 before `labels()` measured each label against its own fill.
   The decks' copies of those two pages are held to the app's by
   `check_widget_assets.py` (its two extra selftest branches break one page on
@@ -486,13 +524,41 @@ Identical to the sketch, checked against its `onWrite` handlers:
 - Identity `6f2d0005-…` — read only: the one-line JSON `DeckIdentity` parses
 - Now playing `6f2d0006-…` — `state|position|duration|title|artist|album`, whole
   seconds, written once a second from `NowPacket`; `stop` clears the card
+- Label `6f2d0009-…` — read/write on **both** decks: the owner's name for the
+  board, up to 16 printable ASCII bytes, stored in `identity` NVS and quoted in
+  the document as `label`, so a Spotify deck renames the same way
 
 ## Design decisions
 
-- **Unfiltered scan, match afterwards**: the deck advertises the UUID, but the scan
-  response can be dropped, so name matching is kept as a fallback.
+- **Filtered scan, matched afterwards**: filters on the chosen address, the
+  Phone Link UUID and every catalogued widget service (five at most, the
+  controller's table is small) keep the radio quiet; `looksLikeDeck` still
+  checks the name, so a deck whose scan response was dropped is not lost,
+  and two empty scans drop the filters entirely.
 - **One write in flight**, `ArrayDeque` plus a 1.5 s watchdog that unsticks the
-  queue when a callback never arrives.
+  queue when a callback never arrives. The 1 Hz mirror is the one write sent
+  without a response (`WRITE_TYPE_NO_RESPONSE`): it needs no acknowledgement, and
+  its watchdog is 300 ms, so a stack that never calls back cannot hold the queue
+  for a second and a half.
+- **Time on the minute**: the tick waits for the phone's next minute boundary
+  instead of keeping a 30 s phase of its own, so the deck's HH:MM flips when the
+  phone's does. Battery rides on the same pass.
+- **The stack re-arms, not the scanner**: after a first link, a drop tries
+  `connectGatt(…, autoConnect = true, …)` for the board that was just lost, with a
+  12 s watchdog that falls back to a scan. A cold start still scans, which is the
+  quicker route to a first connection.
+- **The id is fixed, the label is the owner's.** `id` (`<widget>-<TAG>`) is the
+  store key, so renaming it is not offered: it would split one board into two rows.
+  `label` renames the board; an unnamed one falls back to `Phone Deck ·<last four
+  hex of its address>`, so two of one widget never read as the same row. RENAME on
+  the linked row opens one field, 16 characters, and writes it; the write triggers
+  an identity re-read, so the row and the linked card show the new name without a
+  re-link, and a deck flashed before the characteristic says it cannot be renamed
+  instead of writing into nothing.
+- **MTU 247**, because the identity document is written from a 192-byte buffer; a
+  deck that caps the MTU lower still answers. The connection is asked for
+  `CONNECTION_PRIORITY_HIGH` on connect: the deck requests 7.5–15 ms, but the
+  central decides.
 - **Two write paths**: `writeCharacteristic(ch, value, type)` on Android 13+,
   `setValue` + `writeCharacteristic(ch)` below.
 - **Foreground service**, type `connectedDevice`, so scanning survives the screen
@@ -525,7 +591,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   deadline and every pause reads the clock, `test.sh` installs a virtual one and
   the stub port advances it, so the two checks that ran the real probe against a
   silent board — 57 s each — still try all five wirings and both windows. Measured
-  on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 181 now. `./check.sh`
+  on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 185 now. `./check.sh`
   runs the fast set, `./check.sh --full` the release set.
 - **The checkers' refusals are tested too, without a compiler.** Ten
   `selftest_*.py` files build a throwaway repo — a stand-in `arduino-cli`, a
@@ -541,15 +607,27 @@ Identical to the sketch, checked against its `onWrite` handlers:
   `./check.sh --selftest`, and the pre-commit hook runs it when a
   `check_*.py` or `selftest_*.py` is staged. That is the gap it closes: the three
   newest docs refusals were found by a reader, because nothing had ever run them.
-- **The app has two themes, and both are measured, not eyeballed.** SETTINGS
-  carries an APPEARANCE card whose DARK and LIGHT are one segmented switch; the
+- **The app has two palettes, and both are measured, not eyeballed.** SETTINGS
+  carries an APPEARANCE card whose PAPER and INK are one segmented switch, and the
+  card says the choice is the app's alone — a deck's palette is its own pair on
+  PAIRED; the
   choice is stored in its own `appearance` preferences file and applied before the
   first view exists, and switching recreates the activity because every colour in
-  this app is read when a view is constructed. The band keeps its value in both
+  this app is read when a view is constructed. **The screen you were on comes back
+  with it**: `onSaveInstanceState` carries the section and `onCreate` reopens it
+  after the UI is built, so the switch in SETTINGS leaves you in SETTINGS — the
+  rebuild used to land on the drawer, which read as the app restarting.
+  `CaptureTest.sectionSurvivesTheRebuild` reproduces it through the platform's own
+  save and restore, so a future rebuild cannot quietly lose it again. **The scroll
+  offset and the unfolded cards come back as well**: every screen has a stable id,
+  which is what lets `ScrollView` restore its own offset from the saved view state,
+  and `ProjectsTab` puts the open card ids in the activity's bundle, because a fold
+  has no view property behind it. `theScrollComesBackWithTheRebuild` and
+  `theOpenCardsComeBackWithTheRebuild` fail if either half regresses. The band keeps its value in both
   themes on purpose — it is the ground the owner's mark was drawn on, so a band
   that turned over would put a plate behind artwork that has none — which is why a
   primary action fills with the page's ink and carries the page itself as its
-  label. Both themes are held to the same floors: 181 host checks, ten of them
+  label. Both themes are held to the same floors: 185 host checks, ten of them
   label-on-fill pairs and each theme's inks against field, fill and hairline.
 - **The committed tree builds on its own.** Measured on 2026-11-02: `git archive
   HEAD` into an empty directory plus a fresh `git init` — no built assets, no
@@ -607,7 +685,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   sketches they name are inside the APK, `assets/widgets/phone_deck_cyd24R/` and
   `assets/widgets/spotify_deck_cyd24R/`, and `check_widget_assets.py` in the repo
   root compares those copies with `../<folder>/<sketch>.ino` byte for byte (phone
-  deck md5 `5be1ba2a…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
+  deck md5 `6a2609cc…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
   header rewrite, and `00bb1560…`, `eca02e93…`, `49f29bcb…` before the Bluetooth
   link, the callback change and the one-line answer — both in sync on 2026-11-02).
   The rewrite makes the phone-over-Bluetooth source the deck's first one and
@@ -615,8 +693,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
   folded in on 2026-11-03, and the APK in `dist/` was rebuilt against it. That sketch also
   **compiles here**, measured on 2026-11-04 once `~/.arduino-cyd/env.sh` was
   sourced — `check_docs.py`'s gate built it on the `huge_app` partition and read
-  1,890,609 B with 69,124 B of globals, beside the phone deck's unchanged
-  1,177,862 B / 45,284 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
+  1,891,501 B with 69,164 B of globals, beside the phone deck's
+  1,179,402 B / 45,332 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
   `PATH`, so that build goes through `~/.arduino15` and reads 1,880,053 B — 48 B
   under with the globals identical, the build-root sensitivity the docs record.
   The root that first printed that figure reads 1,878,661 B, 16 B over. Neither board has run it.
@@ -659,14 +737,14 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **226,929 bytes** on 2026-11-04, the rebuild carrying two bundled sketches, the
+  **231,025 bytes** on 2026-11-04, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror, the three-step probe, the owner's logo as the icon, the mark
   centred on the top bar at 26dp as one PNG per density rather than above the
   drawer's wordmark, the gear and chevrons drawn as shapes, and the shelf that
   adds, edits, deletes and attaches a project and imports a file from its own
-  picker. The typeface change then rebuilt it the same day at **226,929 bytes**
-  (222 kB): the two sketches now carry their own bitmap faces, and the step from
+  picker. The typeface change then rebuilt it the same day at **231,025 bytes**
+  (226 kB): the two sketches now carry their own bitmap faces, and the step from
   the 210,545-byte archive is mostly that data plus the redrawn pages.
 - **The archive is byte-reproducible now, on one machine.** AGP stamps a
   *Dependency Info Block* into the APK Signing Block and fills it differently on
@@ -685,12 +763,13 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the tree.** Measured on 2026-11-03: `clean assembleRelease` exits 0 in 16 s, 44
   actionable tasks with 41 executed, including `lintVitalRelease`. The archive
   Gradle writes is unsigned, because the release type has no `signingConfig`, so
-  [`release.sh`](release.sh) aligns and signs it. Rebuilt on 2026-11-04 after the typeface change: the unsigned file is 215,842
-  bytes, 11,091 under the debug APK because `debug` writes the larger signing
-  block. The signed file is **231,023 bytes** (226 kB), 15,445 more again from a
-  4096-bit key's bigger signing block, and 4,094 *over* the debug APK — the two
-  archives hold the same code, but the release block is the larger one, so the
-  debug figure is no guide to the release one. It is versionCode 1,
+  [`release.sh`](release.sh) aligns and signs it. Rebuilt on 2026-11-04 after the label, once for the phone deck and again for
+  the Spotify one twice more, for the bond self-heal: the unsigned file is
+  226,206 bytes, `release.sh` signs it with a 4096-bit key and writes
+  **239,215 bytes** (235 kB), and the debug APK in `dist/` is
+  239,217 bytes. The three hold the
+  same code and differ only in their signing blocks, so no one figure is a guide
+  to the others. It is versionCode 1,
   minSdk 26, targetSdk 35, not debuggable, and it carries both sketches in its
   assets. The signer is read back out of the archive and refused if it comes back
   as the debug identity instead. The unsigned file is build output rather than a
@@ -948,6 +1027,20 @@ padding still shows.
   refused with insufficient authentication now calls `createBond()` once per
   connection and lets the 1 Hz mirror re-send what it dropped. **Unverified on a
   phone.**
+- **Auto-reconnect, scan filter and backoff**: the `autoConnect` re-arm, the
+  address/UUID filters, the 20 s ceiling and the 300 ms unacked watchdog have never
+  run on a phone. What to look for: `Connecting to <name>` within a second of
+  walking back into range with no `Scanning for decks` in between.
+- **Deck label**: a rename is written to `6f2d0009-…`, stored in NVS, quoted in the
+  identity document and shown by the app; a blank write clears it. Both sketches
+  expose it, so the write is the same on either deck. **Unverified on
+  hardware** — the sanitiser is exercised only by compiling it.
+- **Deck-side bond drop**: both sketches remove their half of a bond on HCI
+  `0x05`, `0x06` or `0x3E`, so the next connect pairs afresh. The serial line is
+  `[ble] bond dropped (keys gone) <addr>` on the phone deck and
+  `[link] bond dropped (keys gone)` on the Spotify deck. **Unverified on
+  hardware** — step 6 under [Proving it on hardware](#proving-it-on-hardware)
+  is the test that decides it.
 - **Battery optimisation** can kill the foreground service. SETTINGS now asks for
   this app's own exemption (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, with the
   permission in the manifest) and falls back to the list, then to system settings.
@@ -988,10 +1081,30 @@ message is also a finding.
    `Stale pairing could not be removed` means the reflective `removeBond` is
    refused on this Android build — note the version and forget the entry in
    Settings by hand.
-6. **Insufficient authentication.** A write that lands before a bond shows
+6. **Both ends forget a bond**, once per deck. Link the deck, then in the
+   phone's Bluetooth settings forget it — the phone deck under its advertised
+   name, the Spotify deck under `Spotify Deck <tag>` — and press LINK again in
+   the app. On the deck's serial at 115200 expect the deck's own line first:
+   `[ble] bond dropped (keys gone) <addr>` on the phone deck,
+   `[link] bond dropped (keys gone)` on the Spotify deck, each followed by
+   `<prefix> pairing ok` and `<prefix> phone connected`, with the app back on a
+   link and the name it had before. The app's half can announce itself
+   too (`Stale pairing forgotten, retrying`); a link that comes up with no
+   bond-dropped line on either side is still a pass — the phone re-paired on its
+   own — but say which of the two happened, because only the first proves the
+   deck's branch ran. Do not forget twice inside five seconds: the deck ignores
+   the second on purpose, and that is the rate limit, not a failure. Last, hold
+   PLAY 3 s on the Spotify deck (or type `unpair`) and confirm the manual escape
+   still removes the bond and advertises again.
+7. **Walk away and back.** Carry the phone out of range until the deck reads
+   OFFLINE, then return. Expect `Connecting to <name>` without a `Scanning for
+   decks` line in between, and a link within a few seconds. `Disconnected, scanning`
+   instead means the autoConnect arm was refused and the scan took over; either way
+   note which one, because the two have different battery costs.
+8. **Insufficient authentication.** A write that lands before a bond shows
    `Pairing to write` and one system pairing prompt. If writes are still refused
    afterwards, the `pair` branch was right and the bond is not completing.
-7. **Battery.** SETTINGS, then BATTERY SETTINGS, should raise the system exemption
+9. **Battery.** SETTINGS, then BATTERY SETTINGS, should raise the system exemption
    dialog for Off-site rather than a list to search. Grant it, leave the bridge
    running overnight, and read the card's packet age in the morning: a stopped
    service shows as a link that died hours ago.

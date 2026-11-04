@@ -11,7 +11,7 @@ active.
 
 This deck needs `PartitionScheme=huge_app`. Bluetooth does not fit beside WiFi,
 mbedTLS and the setup server in the default 1,310,720-byte app slot: the linked
-image is 1,890,609 bytes, 144 % of the 1,310,720-byte slot and 60 % of 3,145,728.
+image is 1,891,501 bytes, 144 % of the 1,310,720-byte slot and 60 % of 3,145,728.
 phone deck afterwards with the default scheme re-partitions the board back, so
 each upload has to carry the scheme its own sketch was built for.
 
@@ -77,11 +77,18 @@ between lines, and shows `PHONE` in the header instead of `WIFI`.
 | `6f2d0003-…` battery | phone → deck | stored; a low battery is the app's own business, not drawn yet |
 | `6f2d0004-…` notice | phone → deck | accepted and dropped: there is no notice card here |
 | `6f2d0005-…` identity | deck → phone | the same document `/deck.json` answers, with `"link":"ble"` |
+| `6f2d0009-…` label | phone ↔ deck | read/write: the owner's name for this board, the same characteristic the phone deck exposes |
 | `6f2d0006-…` now playing | phone → deck | the mirror line, `state\|position\|duration\|title\|artist\|album` |
 | `6f2d0007-…` command | deck → phone | **notify**: `<serial>\|prev`, `<serial>\|toggle`, `<serial>\|next` |
 
 The first three exist because the app will not hold a link to a service that is
-missing them, not because this page draws them. The last two are the useful pair.
+missing them, not because this page draws them. The mirror and the command are
+the pair the page uses, and the label is what RENAME writes.
+
+The link heals its own bond. When the phone deletes its half — a forgotten pairing,
+a reinstall — this deck removes its own on the next disconnected link and logs
+`[link] bond dropped (keys gone)`, so the way back is a reconnect rather than the
+PLAY hold; a pairing that fails is cleaned up the same way.
 
 **A chip is a request, never a change of state.** The deck has no player of its
 own, so a tap raises a notify and lights the chip; the phone runs the key against
@@ -295,7 +302,7 @@ scheme**; see the measurement below for why that is enough.
 
 Both decks are ordinary Arduino sketches and both travel on the phone: the app
 bundles this one too (`check_widget_assets.py` prints `2 widgets bundled, every
-copy matches`, with this sketch at md5 `fb40e042…`), so it can be pulled from the
+copy matches`, with this sketch at md5 `0a2147b9…`), so it can be pulled from the
 same shelf as its sibling.
 
 From a computer, `toolchain.sh` has already compiled it:
@@ -401,8 +408,8 @@ compiler:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,890,609 | **1,255,119** | 3,145,728 (60 % used) |
-| DRAM | 69,124 globals | **258,556** | 327,680 |
+| flash | 1,891,501 | **1,254,227** | 3,145,728 (60 % used) |
+| DRAM | 69,164 globals | **258,516** | 327,680 |
 
 The two figures are this tree's own build through `~/.arduino-cyd-3/env.sh` on
 2026-11-02, the root whose `env.sh` pins its own data and library dirs. Sourcing
@@ -410,7 +417,7 @@ The two figures are this tree's own build through `~/.arduino-cyd-3/env.sh` on
 `~/.arduino15` and prints **1,880,053 B** for the same sketch, 48 B under with the
 globals identical — the build-root sensitivity
 [`../CONVENTIONS.md`](../CONVENTIONS.md#build) records, not a different sketch, since
-both read md5 `fb40e042…`. Quote the root you measured on rather than reconciling the
+both read md5 `0a2147b9…`. Quote the root you measured on rather than reconciling the
 last two digits.
 
 Without Bluetooth the sketch was 1,125,781 bytes on the default scheme — the
@@ -466,9 +473,9 @@ sourcing a toolchain.
 * **It needs `huge_app` now, and that is the scheme `toolchain.sh` pins.**
   Without Bluetooth the 3.3.12 build was 1,125,781 bytes, 85 % of 1,310,720:
   measured from the pre-link sketch (`00bb1560`), not a flag on today's file.
-  With the link it is 1,890,609 bytes: **144 %** of 1,310,720, **60 %** of 3,145,728.
+  With the link it is 1,891,501 bytes: **144 %** of 1,310,720, **60 %** of 3,145,728.
   An earlier pair of runs differed by 48 B; the pre-commit hook and a direct
-  compile both print 1,890,609 now, so the single figure is the measured one.
+  compile both print 1,891,501 now, so the single figure is the measured one.
   `default.csv`
   sizes `app0` and `app1` at 1,310,720 each, so on the default scheme this deck no
   longer links at all — not a tighter fit, a refusal. Uploading it re-partitions
@@ -604,6 +611,10 @@ So when the deck says `SPOTIFY UNREACHABLE`, run `--check` first: if it reports 
 stale pin, Spotify changed authority, the sketch needs a reflash; if it says the
 pins are in sync, the fault is the clock, the network or the token, and the
 trouble table below applies. It needs `openssl` and nothing else.
+* **Letters came out as blocks.** Same fault as the phone deck: the faces
+  were row-padded and `drawChar()` reads one bitstream per glyph. Both
+  sketches were repacked on 2026-11-04 and `check_fonts.py` holds it; see
+  [the typeface section](../CONVENTIONS.md#typefaces-one-bitstream-per-glyph).
 
 ## Limits worth knowing
 

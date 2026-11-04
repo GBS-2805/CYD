@@ -118,9 +118,9 @@ final class TopBar {
     void showSection(int index) {
         boolean drawer = index == MainActivity.HOME;
         back.setVisibility(drawer ? View.GONE : View.VISIBLE);
-        crumbText.setTextColor(drawer ? Ui.BAND_DIM : Ui.INK);
-        Ui.tint(back, drawer ? Ui.BAND_DIM : Ui.INK);
-        Ui.tint(gear, index == MainActivity.SECTION_SETTINGS ? Ui.INK : Ui.BAND_DIM);
+        crumbText.setTextColor(drawer ? Ui.BAND_DIM : Ui.BAND_INK);
+        Ui.tint(back, drawer ? Ui.BAND_DIM : Ui.BAND_INK);
+        Ui.tint(gear, index == MainActivity.SECTION_SETTINGS ? Ui.BAND_INK : Ui.BAND_DIM);
     }
 
     /** The pill reports the link, and says IDLE when the bridge is not running. */
@@ -131,10 +131,10 @@ final class TopBar {
         if (snapshot.linked) {
             pill.setText("LINKED");
             pill.setTextColor(Ui.BAND);
-            pill.setBackground(Ui.rounded(where, Ui.INK, Ui.INK, 9));
+            pill.setBackground(Ui.rounded(where, Ui.BAND_INK, Ui.BAND_INK, 9));
         } else if (running) {
             pill.setText("SCANNING");
-            pill.setTextColor(Ui.INK);
+            pill.setTextColor(Ui.BAND_INK);
             pill.setBackground(Ui.rounded(where, 0, Ui.BAND_RULE, 9));
         } else {
             pill.setText("IDLE");

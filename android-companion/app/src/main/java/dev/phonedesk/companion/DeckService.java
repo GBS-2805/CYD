@@ -17,6 +17,7 @@ import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanRecord;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
@@ -82,20 +83,34 @@ public class DeckService extends Service {
      * that writes nowhere.
      */
     static final UUID THEME_UUID = UUID.fromString("6f2d0008-9a3c-4b57-9d21-6a1e0c4f8b10");
+    /**
+     * The owner's name for a board, read/write, at most 16 printable ASCII bytes.
+     * Optional: a deck flashed before the label existed has no such characteristic,
+     * and renaming it is refused with a message rather than a write into nothing.
+     */
+    static final UUID LABEL_UUID = UUID.fromString("6f2d0009-9a3c-4b57-9d21-6a1e0c4f8b10");
     /** The client-characteristic-configuration descriptor every notify carries. */
     private static final UUID CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
 
     /**
-     * The deck's identity document is ~150 bytes, so the default 23-byte ATT MTU
-     * would return it truncated. 185 is the smallest size both ends are required
-     * to support above the default.
+     * The deck's identity document is written from a 192-byte buffer, so the
+     * default 23-byte ATT MTU would return it truncated and the deck would be
+     * filed under its address. 247 is the ceiling iOS grants and carries the
+     * whole document; a deck that caps the MTU lower (the Spotify deck asks 185)
+     * still answers, because Android takes the smaller of the two.
      */
-    private static final int MTU_BYTES = 185;
+    private static final int MTU_BYTES = 247;
 
     private static final String CHANNEL_ID = "deck_link";
     private static final int FOREGROUND_ID = 7;
 
-    private static final long TICK_MS = 30_000L;
+    /** Time and battery go out on the phone's minute, not on a phase of their own. */
+    private static final long MINUTE_MS = 60_000L;
+    private static final long TICK_SLACK_MS = 250L;
+    /** The controller keeps a small filter table; five is the safe ceiling. */
+    private static final int SCAN_FILTER_LIMIT = 5;
+    /** autoConnect waits for an advertisement for ever; a scan is the way back. */
+    private static final long AUTO_CONNECT_MS = 12_000L;
     private static final long SCAN_TIMEOUT_MS = 15_000L;
     private static final long RSSI_POLL_MS = 10_000L;
     private static final long NEARBY_TTL_MS = 30_000L;
@@ -130,6 +145,8 @@ public class DeckService extends Service {
         /** {@code phone_deck_cyd24R-A1B2C3}, or "" until the deck names itself. */
         public String deviceId = "";
         public String deviceTag = "";
+        /** The build the deck says it runs, its identity's {@code v}, or "". */
+        public String deviceVersion = "";
         /** The palette the deck says it is on, or {@link DeckTheme#UNKNOWN}. */
         public int theme = DeckTheme.UNKNOWN;
         public int rssi;
@@ -165,22 +182,21 @@ public class DeckService extends Service {
     }
 
     /**
-     * The palette chosen in SETTINGS, for the phone and the deck it is linked
-     * to: one theme over both ends, because the board is the half a person looks
-     * at from across the room. A deck that wants the other palette gets it from
-     * its own pair on PAIRED, which changes that board alone.
+     * One deck's own palette, from that deck's row on PAIRED. The app's appearance
+     * switch is a separate choice and never writes here, so a phone on one palette
+     * and a board on the other is a decision, not a drift.
      */
-    static void pushTheme(int uiTheme) {
-        final DeckService svc = instance;
-        if (svc != null) svc.writeTheme(uiTheme == Ui.LIGHT ? DeckTheme.PAPER : DeckTheme.INK);
-    }
-
-    /** One deck's own palette from its row on PAIRED. Ignored unless it is the linked board. */
     static void setDeckTheme(String mac, int deckTheme) {
         final DeckService svc = instance;
         if (svc != null && mac != null && mac.equalsIgnoreCase(svc.linkedMac)) {
             svc.writeTheme(deckTheme);
         }
+    }
+
+    /** Renames the linked deck: one write, then the identity read that quotes it. */
+    static void rename(String label) {
+        final DeckService svc = instance;
+        if (svc != null) svc.writeLabel(label);
     }
 
     /** User picked a deck in the monitor; remember it and link to it now. */
@@ -247,12 +263,15 @@ public class DeckService extends Service {
         final BluetoothGattCharacteristic characteristic;
         final BluetoothGattDescriptor descriptor;
         final byte[] data;
+        /** False for the 1 Hz mirror, which does not need an acknowledged round trip. */
+        final boolean acked;
 
         Write(BluetoothGattCharacteristic characteristic, BluetoothGattDescriptor descriptor,
-              byte[] data) {
+              byte[] data, boolean acked) {
             this.characteristic = characteristic;
             this.descriptor = descriptor;
             this.data = data;
+            this.acked = acked;
         }
     }
 
@@ -270,10 +289,20 @@ public class DeckService extends Service {
     private BluetoothGattCharacteristic nowChar;
     private BluetoothGattCharacteristic commandChar;
     private BluetoothGattCharacteristic themeChar;
+    private BluetoothGattCharacteristic labelChar;
 
     private boolean scanning;
     private boolean connecting;
     private boolean writing;
+
+    /** Set once a deck has answered: from then on a drop re-arms in the stack. */
+    private boolean everLinked;
+    /** The board the last link was with, so a reconnect needs no scan. */
+    private BluetoothDevice lastDevice;
+    /** Scans in a row that found nothing; the delay grows until a link resets it. */
+    private int scanMisses;
+    /** Set after two misses, so a legacy flash advertising no UUID is still seen. */
+    private boolean unfilteredScan;
 
     /**
      * Set by UNLINK: keep the scan (so NEARBY stays honest) but never link on my
@@ -287,6 +316,7 @@ public class DeckService extends Service {
     private volatile String linkedName = "";
     private volatile String linkedId = "";
     private volatile String linkedTag = "";
+ String linkedVersion = "";
     private volatile int linkedRssi;
     private volatile long connectedAtMs;
     private volatile long lastWriteMs;
@@ -306,8 +336,22 @@ public class DeckService extends Service {
 
     private final Runnable scanTimeout = () -> {
         stopScan();
+        ++scanMisses;
+        // A filtered scan cannot see a flash that advertises no service UUID.
+        // Two misses and the next pass looks at everything nearby instead.
+        if (scanMisses >= 2) unfilteredScan = true;
         setStatus("Deck not found, retrying");
-        scheduleScan(3000);
+        scheduleScan(nextScanDelay());
+    };
+
+    /** Keeps autoConnect from waiting for ever on a board that is switched off. */
+    private final Runnable autoConnectTimeout = () -> {
+        if (gatt != null && timeChar == null) {
+            connecting = false;
+            releaseGatt();
+            ++scanMisses;
+            scheduleScan(nextScanDelay());
+        }
     };
 
     private final Runnable tick = new Runnable() {
@@ -315,7 +359,10 @@ public class DeckService extends Service {
         public void run() {
             pushTime();
             pushBattery();
-            handler.postDelayed(this, TICK_MS);
+            // Wait for the phone's next minute rather than keep a 30 s phase of
+            // our own: a clock that flips 29 s late is worse than one on time.
+            long untilMinute = MINUTE_MS - (System.currentTimeMillis() % MINUTE_MS);
+            handler.postDelayed(this, untilMinute + TICK_SLACK_MS);
         }
     };
 
@@ -375,8 +422,16 @@ public class DeckService extends Service {
                     // Ask for the larger MTU before the services are up: at the
                     // default the identity read comes back cut short and names no
                     // widget, so the deck would be filed under its MAC.
+                    handler.removeCallbacks(autoConnectTimeout);
                     g.requestMtu(MTU_BYTES);
                     g.discoverServices();
+                    try {
+                        // The deck asks for 7.5-15 ms, but the central decides, so
+                        // ask here too or the interval stays at Android's default.
+                        g.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH);
+                    } catch (Exception ignored) {
+                        // Optional: the deck's own request is the other half.
+                    }
                 } catch (SecurityException e) {
                     setStatus("Bluetooth permission needed");
                     releaseGatt();
@@ -397,8 +452,13 @@ public class DeckService extends Service {
                     scheduleScan(3000);
                     return;
                 }
+                // The stack can wait for the board's advertisement with no scan at
+                // all, which is how a phone that walked out of the room comes back.
+                // A cold start still scans: that is faster to a first link.
+                if (everLinked && lastDevice != null && reconnectAuto()) return;
                 setStatus("Disconnected, scanning");
-                scheduleScan(2000);
+                ++scanMisses;
+                scheduleScan(nextScanDelay());
             }
         }
 
@@ -427,12 +487,17 @@ public class DeckService extends Service {
             // Optional: a deck flashed before the palette moved to the app has
             // no theme characteristic, and the switch then says so.
             themeChar = service.getCharacteristic(THEME_UUID);
+            labelChar = service.getCharacteristic(LABEL_UUID);
             if (timeChar == null || batteryChar == null || noticeChar == null) {
                 setStatus("Deck characteristics missing");
                 releaseGatt();
                 scheduleScan(4000);
                 return;
             }
+            everLinked = true;
+            lastDevice = g.getDevice();
+            scanMisses = 0;
+            unfilteredScan = false;
             linkedMac = g.getDevice().getAddress();
             linkedName = safeName(g.getDevice());
             linkedId = "";
@@ -480,6 +545,11 @@ public class DeckService extends Service {
                 askForBond(g.getDevice());
             }
             handler.removeCallbacks(writeTimeout);
+            // A rename only reaches the row once the deck's document quotes it, so
+            // ask again as soon as the write lands.
+            if (LABEL_UUID.equals(ch.getUuid()) && statusCode == BluetoothGatt.GATT_SUCCESS) {
+                readIdentity();
+            }
             if (statusCode == BluetoothGatt.GATT_SUCCESS) {
                 ++writesSent;
                 lastWriteMs = System.currentTimeMillis();
@@ -588,6 +658,7 @@ public class DeckService extends Service {
         snapshot.deviceMac = linkedMac;
         snapshot.deviceId = linkedId;
         snapshot.deviceTag = linkedTag;
+        snapshot.deviceVersion = linkedVersion;
         snapshot.rssi = linkedRssi;
         snapshot.writes = writesSent;
         snapshot.notices = noticesForwarded;
@@ -665,12 +736,15 @@ public class DeckService extends Service {
             return;
         }
 
+        // Low latency while a deck is known to be about; the cheapest mode once a
+        // scan has come back empty, because that is the state that lasts for hours.
         ScanSettings settings = new ScanSettings.Builder()
-                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .setScanMode(scanMisses == 0 ? ScanSettings.SCAN_MODE_LOW_LATENCY
+                                             : ScanSettings.SCAN_MODE_LOW_POWER)
                 .build();
 
         try {
-            scanner.startScan(null, settings, scanCallback);
+            scanner.startScan(scanFilters(), settings, scanCallback);
             scanning = true;
             setStatus("Scanning for decks");
             handler.removeCallbacks(scanTimeout);
@@ -678,6 +752,63 @@ public class DeckService extends Service {
         } catch (SecurityException e) {
             setStatus("Bluetooth permission needed");
         }
+    }
+
+    /**
+     * Narrows the radio to decks: the address already chosen, the Phone Link
+     * service, and every widget service the catalog knows, so a second board is
+     * still seen in NEARBY. Empty once two scans have found nothing, because a
+     * deck that advertises none of them would stay invisible for ever, and a deck
+     * found slowly is better than one never found.
+     */
+    private List<ScanFilter> scanFilters() {
+        if (unfilteredScan) return null;
+        List<ScanFilter> filters = new ArrayList<>();
+        String wanted = preferredMac == null ? "" : preferredMac;
+        if (!wanted.isEmpty()) {
+            // The chosen board as its own filter, so a flash that advertises no
+            // service UUID is still found without giving up the quiet radio.
+            filters.add(new ScanFilter.Builder().setDeviceAddress(wanted).build());
+        }
+        filters.add(new ScanFilter.Builder().setServiceUuid(new ParcelUuid(SERVICE_UUID)).build());
+        for (UUID uuid : WidgetCatalog.services(this)) {
+            // The controller's filter table is small, so the list stays short.
+            if (filters.size() >= SCAN_FILTER_LIMIT) break;
+            if (SERVICE_UUID.equals(uuid)) continue;
+            filters.add(new ScanFilter.Builder().setServiceUuid(new ParcelUuid(uuid)).build());
+        }
+        return filters;
+    }
+
+    /** 2 s after a drop, doubling to 20 s while the board stays away. */
+    private long nextScanDelay() {
+        int steps = Math.min(scanMisses, 4);
+        return Math.min(2000L << steps, 20_000L);
+    }
+
+    /**
+     * Re-arms the link in the stack itself, so a board that comes back into range
+     * reconnects with no scan and no radio bill. Only after a first link: a cold
+     * start scans, which is the quicker route to a first connection.
+     */
+    private boolean reconnectAuto() {
+        if (lastDevice == null) return false;
+        connecting = true;
+        setStatus("Connecting to " + safeName(lastDevice));
+        try {
+            gatt = lastDevice.connectGatt(this, true, gattCallback, BluetoothDevice.TRANSPORT_LE);
+        } catch (SecurityException e) {
+            connecting = false;
+            gatt = null;
+            return false;
+        }
+        if (gatt == null) {
+            connecting = false;
+            return false;
+        }
+        handler.removeCallbacks(autoConnectTimeout);
+        handler.postDelayed(autoConnectTimeout, AUTO_CONNECT_MS);
+        return true;
     }
 
     private void stopScan() {
@@ -733,7 +864,7 @@ public class DeckService extends Service {
             for (DeckStore.Known known : DeckStore.all(this)) {
                 if (known.mac.equalsIgnoreCase(result.getDevice().getAddress())) return known.name;
             }
-            name = "Phone Deck";
+            name = DeckStore.withMacSuffix("Phone Deck", result.getDevice().getAddress());
         }
         return name;
     }
@@ -806,6 +937,9 @@ public class DeckService extends Service {
         if (mac == null || mac.isEmpty() || !mac.equalsIgnoreCase(linkedMac)) return;
         paused = true;
         preferredMac = "";
+        // Asked to stay away: do not re-arm in the stack behind the user's back.
+        everLinked = false;
+        lastDevice = null;
         DeckStore.setPreferred(this, "");
         stopScan();
         releaseGatt();
@@ -857,6 +991,7 @@ public class DeckService extends Service {
             return;
         }
         connecting = true;
+        lastDevice = device;
         setStatus("Connecting to " + safeName(device));
         try {
             gatt = device.connectGatt(this, false, gattCallback, BluetoothDevice.TRANSPORT_LE);
@@ -899,6 +1034,7 @@ public class DeckService extends Service {
         if (linkedMac.isEmpty()) return;
         linkedId = identity == null ? "" : identity.id;
         linkedTag = identity == null ? "" : identity.tag;
+        linkedVersion = identity == null ? "" : identity.version;
         DeckStore.remember(this, identity, linkedMac, linkedName);
         if (identity != null && identity.usable()) {
             final String label = identity.label.isEmpty() ? linkedName : identity.label;
@@ -908,6 +1044,7 @@ public class DeckService extends Service {
 
     private void releaseGatt() {
         handler.removeCallbacks(writeTimeout);
+        handler.removeCallbacks(autoConnectTimeout);
         BluetoothGatt old = gatt;
         gatt = null;
         timeChar = null;
@@ -917,6 +1054,7 @@ public class DeckService extends Service {
         nowChar = null;
         commandChar = null;
         themeChar = null;
+        labelChar = null;
         linkedTheme = DeckTheme.UNKNOWN;
         // A rebooted deck starts its counter again at 1, so a new link forgets the
         // last one it ran rather than judging the first tap a repeat.
@@ -1005,7 +1143,7 @@ public class DeckService extends Service {
         lastNow = packet;
         // NowPacket keeps the line inside one write already; the clamp is the
         // belt to that braces, because a broken line is worse than a short one.
-        enqueue(nowChar, clamp(packet.getBytes(StandardCharsets.UTF_8), 150));
+        enqueue(nowChar, clamp(packet.getBytes(StandardCharsets.UTF_8), 150), false);
     }
 
     private static String clean(String value) {
@@ -1027,9 +1165,14 @@ public class DeckService extends Service {
     // -------------------------------------------------------------- writes ---
 
     private boolean enqueue(BluetoothGattCharacteristic characteristic, byte[] data) {
+        return enqueue(characteristic, data, true);
+    }
+
+    private boolean enqueue(BluetoothGattCharacteristic characteristic, byte[] data,
+                            boolean acked) {
         if (characteristic == null || gatt == null) return false;
         if (writes.size() > 8) writes.clear();
-        writes.add(new Write(characteristic, null, data));
+        writes.add(new Write(characteristic, null, data, acked));
         writeNext();
         return true;
     }
@@ -1037,7 +1180,7 @@ public class DeckService extends Service {
     private boolean enqueue(BluetoothGattDescriptor descriptor, byte[] data) {
         if (descriptor == null || gatt == null) return false;
         if (writes.size() > 8) writes.clear();
-        writes.add(new Write(null, descriptor, data));
+        writes.add(new Write(null, descriptor, data, true));
         writeNext();
         return true;
     }
@@ -1049,7 +1192,9 @@ public class DeckService extends Service {
 
         writing = true;
         handler.removeCallbacks(writeTimeout);
-        handler.postDelayed(writeTimeout, 1500);
+        // A write without a response does not callback on every stack, so it is
+        // unstuck quickly instead of holding the queue for a second and a half.
+        handler.postDelayed(writeTimeout, next.acked ? 1500 : 300);
 
         try {
             if (next.descriptor != null) {
@@ -1064,10 +1209,9 @@ public class DeckService extends Service {
                     }
                 }
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                gatt.writeCharacteristic(next.characteristic, next.data,
-                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                gatt.writeCharacteristic(next.characteristic, next.data, writeTypeOf(next));
             } else {
-                next.characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                next.characteristic.setWriteType(writeTypeOf(next));
                 next.characteristic.setValue(next.data);
                 if (!gatt.writeCharacteristic(next.characteristic)) {
                     handler.removeCallbacks(writeTimeout);
@@ -1079,6 +1223,12 @@ public class DeckService extends Service {
             handler.removeCallbacks(writeTimeout);
             writing = false;
         }
+    }
+
+    /** The 1 Hz mirror needs no acknowledgement; a settings write must land. */
+    private static int writeTypeOf(Write write) {
+        return write.acked ? BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                           : BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE;
     }
 
     // --------------------------------------------------------------- tapes ---
@@ -1146,6 +1296,40 @@ public class DeckService extends Service {
      * read-back, so a tap answers at once; the next read corrects it if the
      * board disagreed.
      */
+    /**
+     * The board's own rules, applied here too: printable ASCII, no quote or
+     * backslash, 16 bytes, trimmed. A blank string clears the name. The board
+     * sanitises the same way, so a value that survives this one is not rejected
+     * there - the two cannot disagree about what a label is.
+     */
+    static String sanitizeLabel(String label) {
+        if (label == null) return "";
+        final StringBuilder out = new StringBuilder();
+        for (int i = 0; i < label.length() && out.length() < 16; ++i) {
+            final char c = label.charAt(i);
+            if (c < 0x20 || c > 0x7e || c == '"' || c == '\\') continue;
+            out.append(c);
+        }
+        return out.toString().trim();
+    }
+
+    /**
+     * Writes the name to the label characteristic. A deck flashed before the
+     * characteristic existed is told so, because a silent failure would look like a
+     * rename that the next refresh undid.
+     */
+    private void writeLabel(String label) {
+        if (gatt == null) return;
+        if (labelChar == null) {
+            setStatus("This deck cannot be renamed (older flash)");
+            return;
+        }
+        final String clean = sanitizeLabel(label);
+        if (enqueue(labelChar, clean.getBytes(StandardCharsets.UTF_8))) {
+            setStatus(clean.isEmpty() ? "Label cleared" : "Named " + clean);
+        }
+    }
+
     private void writeTheme(int deckTheme) {
         if (themeChar == null || gatt == null) return;
         if (!DeckTheme.known(deckTheme)) return;

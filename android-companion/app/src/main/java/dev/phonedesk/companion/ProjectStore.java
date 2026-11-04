@@ -54,20 +54,29 @@ final class ProjectStore {
     private static final String KEY_VERSION = "version";
 
     static final class Project {
-        String id;
-        String name;
-        String tagline;
-        String body;
-        String libraries;
-        String sourceUrl;
-        String installerUrl;
-        String notes;
-        String build;
-        String fileName;
+        // Every string starts empty. `seed()` builds a record in memory and the
+        // shelf reads it straight back on the first launch, before any JSON round
+        // trip can fill the gaps: the log line called `build.isEmpty()` on the null
+        // that left and a fresh install drew SHELF FAILED TO DRAW.
+        String id = "";
+        String name = "";
+        String tagline = "";
+        String body = "";
+        String libraries = "";
+        String sourceUrl = "";
+        String installerUrl = "";
+        String notes = "";
+        String build = "";
+        String fileName = "";
         int kind;
         int status;
         int touch;
         long updatedMs;
+        /**
+         * True for a card the catalogue seeded — a link to someone else's installer.
+         * It has no bytes here, so the shelf must not offer it a file.
+         */
+        boolean catalog;
 
         Project() {
         }
@@ -87,6 +96,7 @@ final class ProjectStore {
             status = other.status;
             touch = other.touch;
             updatedMs = other.updatedMs;
+            catalog = other.catalog;
         }
 
         boolean inside() {
@@ -142,6 +152,18 @@ final class ProjectStore {
                 project.id = WIDGET_PREFIX + "phone_deck_cyd24R";
                 changed = true;
             }
+            if (isCatalogId(project.id)) {
+                // A catalogue card is a link, not a file. An install that attached
+                // one to Bruce keeps saying SKETCH and FILE until a read corrects
+                // it, and a card that offers a file Bruce cannot have is a lie.
+                if (!project.catalog || project.kind != KIND_IMAGE
+                        || (project.fileName != null && !project.fileName.isEmpty())) {
+                    project.catalog = true;
+                    project.kind = KIND_IMAGE;
+                    project.fileName = "";
+                    changed = true;
+                }
+            }
         }
         for (WidgetCatalog.Widget widget : WidgetCatalog.all(context)) {
             String id = WIDGET_PREFIX + widget.id;
@@ -182,6 +204,20 @@ final class ProjectStore {
         project.libraries = libraries;
         project.kind = KIND_INSIDE;
         return true;
+    }
+
+    /** Is this the id a catalogue entry is seeded under? Those ids are the catalogue's. */
+    static boolean isCatalogId(String id) {
+        for (FirmwareCatalog.Item item : FirmwareCatalog.all()) {
+            if (catalogId(item.name).equals(id)) return true;
+        }
+        return false;
+    }
+
+    /** `ESP32 Marauder` keeps the tag docs use; the others spell their own name out. */
+    private static String catalogId(String name) {
+        return name.equals("ESP32 Marauder") ? "marauder"
+                : name.toLowerCase(java.util.Locale.US).replace(' ', '-');
     }
 
     static Project byId(Context context, String id) {
@@ -263,8 +299,8 @@ final class ProjectStore {
         int index = 0;
         for (FirmwareCatalog.Item item : FirmwareCatalog.all()) {
             Project project = new Project();
-            project.id = item.name.equals("ESP32 Marauder") ? "marauder"
-                    : item.name.toLowerCase(java.util.Locale.US).replace(' ', '-');
+            project.id = catalogId(item.name);
+            project.catalog = true;
             project.name = item.name;
             project.tagline = item.tagline;
             project.body = item.body;
@@ -335,6 +371,7 @@ final class ProjectStore {
             json.put("status", project.status);
             json.put("touch", project.touch);
             json.put("updated", project.updatedMs);
+            json.put("catalog", project.catalog);
         } catch (JSONException ignored) {
             // Every value here is a string or a number; this cannot fail.
         }
@@ -352,12 +389,14 @@ final class ProjectStore {
         project.installerUrl = json.optString("installer", "");
         project.notes = json.optString("notes", "");
         project.build = json.optString("build", "");
-        project.fileName = json.optString("file", "");
+        String file = json.optString("file", "");
+        project.fileName = file == null ? "" : file;
         project.kind = clamp(json.optInt("kind", KIND_IMAGE), 0, KIND_INSIDE);
         project.status = clamp(json.optInt("status", STATUS_WANT), 0, STATUS_PARKED);
         project.touch = clamp(json.optInt("touch", FirmwareNotes.TOUCH_UNTESTED), 0,
                 FirmwareNotes.TOUCH_LABELS.length - 1);
         project.updatedMs = json.optLong("updated", 0);
+        project.catalog = json.optBoolean("catalog", false);
         return project;
     }
 

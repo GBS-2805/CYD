@@ -79,7 +79,7 @@ final class DeckStore {
         if (mac == null || mac.isEmpty()) return;
         final String id = identity != null && identity.usable() ? identity.id : "";
         final String key = id.isEmpty() ? mac : id;
-        final String label = name(identity, fallbackName);
+        final String label = name(identity, fallbackName, mac);
 
         final SharedPreferences.Editor edit = prefs(context).edit();
         for (Known other : all(context)) {
@@ -94,9 +94,22 @@ final class DeckStore {
         edit.apply();
     }
 
-    private static String name(DeckIdentity identity, String fallbackName) {
+    private static String name(DeckIdentity identity, String fallbackName, String mac) {
         if (identity != null && !identity.label.isEmpty()) return identity.label;
-        return fallbackName == null || fallbackName.isEmpty() ? "Phone Deck" : fallbackName;
+        return withMacSuffix(fallbackName, mac);
+    }
+
+    /**
+     * Two boards of one widget are both "Phone Deck" until they are named, so an
+     * unnamed one carries the tail of its address instead: two rows a person can
+     * tell apart without opening either.
+     */
+    static String withMacSuffix(String name, String mac) {
+        final String base = name == null || name.isEmpty() ? "Phone Deck" : name;
+        if (mac == null) return base;
+        final String tail = mac.replace(":", "");
+        if (tail.length() < 4) return base;
+        return base + " \u00b7" + tail.substring(tail.length() - 4);
     }
 
     static List<Known> all(Context context) {
@@ -115,7 +128,8 @@ final class DeckStore {
                 } else if (key.startsWith("m:")) {
                     // A row written before decks had ids: name, seen.
                     out.add(new Known("", "", "",
-                            parts.length > 0 && !parts[0].isEmpty() ? parts[0] : "Phone Deck",
+                            withMacSuffix(parts.length > 0 ? parts[0] : "",
+                                    key.substring(2)),
                             key.substring(2), parseLong(parts.length > 1 ? parts[1] : "")));
                 }
             }

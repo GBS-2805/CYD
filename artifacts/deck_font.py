@@ -34,17 +34,31 @@ FACES = {
 
 
 def _bits(mask, box):
-    """Rows padded to whole bytes, most significant bit first, as GFXfont wants."""
+    """The glyph as one bitstream, most significant bit first, as GFXfont wants.
+
+    Adafruit_GFX's drawChar() pulls a fresh byte every eighth pixel and never
+    pads to a row boundary, so bits run straight on from the end of one row into
+    the next. Packing each row to a whole byte instead put two dead bits at the
+    end of every row of a five- or six-pixel glyph, which shifted every later
+    row right and, on the wide faces, spilled one glyph's rows into the next
+    character: on glass the letters were blocks, while the renderer here — which
+    unpacked with the same padding — drew perfect text over them.
+    """
     x0, y0, x1, y1 = box
     out = bytearray()
+    byte = 0
+    filled = 0
     for y in range(y0, y1):
-        for x0b in range(x0, x1, 8):
-            byte = 0
-            for i in range(8):
-                x = x0b + i
-                if x < x1 and mask.getpixel((x, y)) > 127:
-                    byte |= 0x80 >> i
-            out.append(byte)
+        for x in range(x0, x1):
+            if mask.getpixel((x, y)) > 127:
+                byte |= 0x80 >> filled
+            filled += 1
+            if filled == 8:
+                out.append(byte)
+                byte = 0
+                filled = 0
+    if filled:
+        out.append(byte)
     return bytes(out)
 
 

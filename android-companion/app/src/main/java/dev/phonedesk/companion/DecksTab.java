@@ -1,9 +1,13 @@
 package dev.phonedesk.companion;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.graphics.Typeface;
+import android.text.InputFilter;
+import android.text.InputType;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -67,7 +71,11 @@ final class DecksTab extends ScrollView {
             sb.append(nearby.mac).append(':').append(nearby.rssi / 5).append(';');
         }
         sb.append('#');
-        for (DeckStore.Known deck : known) sb.append(deck.key()).append(';');
+        // The name is in here on purpose: a rename writes to the board, comes back
+        // in the identity document and moves nothing else, so without it the row
+        // would keep the old label until something unrelated changed.
+        for (DeckStore.Known deck : known) sb.append(deck.key()).append(':')
+                .append(deck.name).append(';');
         return sb.toString();
     }
 
@@ -107,7 +115,11 @@ final class DecksTab extends ScrollView {
 
         if (snapshot.linked) {
             LinearLayout deck = Ui.card(activity);
-            deck.addView(Ui.text(activity, snapshot.deviceName, 18, Ui.TEXT));
+            // The board's own name when it gave one, so a rename shows here without
+            // waiting for a re-link.
+            final DeckStore.Known named = DeckStore.byMac(activity, snapshot.deviceMac);
+            deck.addView(Ui.text(activity,
+                    named == null ? snapshot.deviceName : named.name, 18, Ui.TEXT));
             // Tag first: it is the half of the id that cannot move, and the MAC
             // below it is only the address this connection happened over.
             final String where = snapshot.deviceTag.isEmpty()
@@ -207,24 +219,38 @@ final class DecksTab extends ScrollView {
         // One row per board, keyed by widget and tag: the tag is the half of the id
         // that cannot move. The address is in the card above, where the link is.
         final String where = deck.tag.isEmpty() ? deck.mac : deck.tag;
+        final boolean linked = deck.mac.equalsIgnoreCase(snapshot.deviceMac);
+        // The build only comes from a live read, so a deck that is not linked right
+        // now shows no version rather than the last one it happened to report.
+        final String build = linked ? SketchVersion.label(snapshot.deviceVersion) : "";
         TextView detail = Ui.text(activity,
                 where + " \u00B7 linked "
-                        + Ui.ago(deck.seenMs, System.currentTimeMillis()),
+                        + Ui.ago(deck.seenMs, System.currentTimeMillis())
+                        // Its own line: the row is too narrow to end a dot mid-sentence.
+                        + (build.isEmpty() ? "" : "\n" + build),
                 12, Ui.DIM);
         detail.setPadding(0, Ui.dp(activity, 2), 0, 0);
         labels.addView(detail);
-        final boolean linked = deck.mac.equalsIgnoreCase(snapshot.deviceMac);
         labels.addView(themePair(deck, snapshot, linked));
 
         card.addView(labels, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
         if (linked) {
-            // The card above already says LINKED; here the useful control is the way
-            // out, which drops the link and forgets the row in one tap.
+            // Naming needs the link: the label is a write to the board, and one deck
+            // is linked at a time. Then the way out, which drops the link and
+            // forgets the row in one tap.
+            Button rename = Ui.action(activity, "RENAME", false);
+            rename.setOnClickListener(v -> rename(deck));
+            card.addView(rename);
+
             Button unlink = Ui.action(activity, "UNLINK", false);
             unlink.setOnClickListener(v -> unlink(deck, true));
-            card.addView(unlink);
+            LinearLayout.LayoutParams spare =
+                    new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT);
+            spare.leftMargin = Ui.dp(activity, 8);
+            card.addView(unlink, spare);
         } else {
             Button link = Ui.action(activity, "LINK", false);
             link.setOnClickListener(v -> DeckService.connectTo(deck.mac));
@@ -243,10 +269,11 @@ final class DecksTab extends ScrollView {
     }
 
     /**
-     * The palette pair for one deck. Every row carries it, because every board
-     * keeps its own palette in NVS; only the linked one can be written, since the
-     * link carries one deck at a time, so an unlinked row says what it needs first
-     * instead of a chip that would write nowhere.
+     * The palette pair for one deck, and the only place a deck's palette is set.
+     * Every row carries it, because every board keeps its own palette in NVS; only
+     * the linked one can be written, since the link carries one deck at a time, so
+     * an unlinked row says what it needs first instead of a chip that would write
+     * nowhere.
      */
     private LinearLayout themePair(DeckStore.Known deck, DeckService.Snapshot snapshot,
                                    boolean linked) {
@@ -263,7 +290,7 @@ final class DecksTab extends ScrollView {
         return row;
     }
 
-    /** One palette chip: filled when the deck is on it, dead when the deck is not linked. */
+    /** One palette chip: filled when the deck is on it, dead when it is not linked. */
     private Button chip(int theme, int live, DeckStore.Known deck, boolean linked) {
         Button chip = Ui.action(activity, DeckTheme.name(theme), live == theme);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
@@ -278,6 +305,31 @@ final class DecksTab extends ScrollView {
             chip.setEnabled(false);
         }
         return chip;
+    }
+
+    /**
+     * The dialog behind RENAME. Sixteen characters is the board's field width, so
+     * the input cannot promise more than the write can keep; an empty field clears
+     * the name and the row falls back to the tag.
+     */
+    private void rename(DeckStore.Known deck) {
+        final EditText field = new EditText(activity);
+        field.setHint("Name this deck");
+        field.setSingleLine(true);
+        field.setText(deck.name);
+        field.setSelection(field.getText().length());
+        field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        field.setFilters(new InputFilter[] { new InputFilter.LengthFilter(16) });
+        field.setTextColor(Ui.TEXT);
+        field.setHintTextColor(Ui.DIM);
+        new AlertDialog.Builder(activity)
+                .setTitle("Name this deck")
+                .setMessage("Up to 16 characters, kept on the board.")
+                .setView(field)
+                .setPositiveButton("SAVE", (dialog, which) ->
+                        DeckService.rename(field.getText().toString()))
+                .setNegativeButton("CANCEL", null)
+                .show();
     }
 
     /**

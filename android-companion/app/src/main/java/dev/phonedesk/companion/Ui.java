@@ -43,25 +43,29 @@ final class Ui {
     static int PINK = Palette.DARK_ALOUD;
     static int GOOD = Palette.DARK_OK;
     static int BAND = Palette.BAND;
-    static int INK = Palette.INK;
+    static int BAND_INK = Palette.INK;
     static int BAND_DIM = Palette.BAND_DIM;
     static int BAND_RULE = Palette.BAND_RULE;
     /** Text on a filled primary action: the page's own ink, so it is always the
      * opposite of the fill — black on the off-white button, off-white on the black. */
     static int ON_FILL = Palette.DARK_FIELD;
 
-    /** The two palettes, by the name the switch uses. */
-    static final int DARK = 0;
-    static final int LIGHT = 1;
+    /** The app's two palettes, by the name its switch uses — the same two words a
+     * deck's row uses, so one vocabulary covers both ends. */
+    static final int INK = 0;
+    static final int PAPER = 1;
 
     /**
      * Swap every ink for the chosen palette. Called before the first view is built,
      * and again after the switch stores its answer — which is why the switch
      * recreates the activity: a colour here is read when a view is constructed, so a
      * screen already on show keeps the palette it was built in.
+     *
+     * This is the <b>app's</b> palette and nothing else. A deck keeps its own in
+     * NVS and is set from its row on PAIRED, so the two ends never share a value.
      */
-    static void applyTheme(int theme) {
-        final boolean light = theme == LIGHT;
+    static void applyTheme(int palette) {
+        final boolean light = palette == PAPER;
         BG = light ? Palette.LIGHT_FIELD : Palette.DARK_FIELD;
         CARD = BG;
         CARD_HI = light ? Palette.LIGHT_WASH : Palette.DARK_WASH;
@@ -74,7 +78,7 @@ final class Ui {
         PINK = light ? Palette.LIGHT_ALOUD : Palette.DARK_ALOUD;
         GOOD = light ? Palette.LIGHT_OK : Palette.DARK_OK;
         BAND = Palette.BAND;
-        INK = Palette.INK;
+        BAND_INK = Palette.INK;
         BAND_DIM = Palette.BAND_DIM;
         BAND_RULE = Palette.BAND_RULE;
         ON_FILL = light ? Palette.LIGHT_FIELD : Palette.DARK_FIELD;

@@ -28,6 +28,22 @@ import android.widget.LinearLayout;
 public class MainActivity extends Activity {
 
     private static final int REQ_PERMISSIONS = 2;
+    /** Where the section was, across the rebuild the theme switch causes. */
+    private static final String KEY_SECTION = "section";
+    /** The cards that were unfolded, which no view property can carry. */
+    private static final String KEY_EXPANDED = "expanded";
+    /**
+     * A stable id per screen. A view saves its own state only when it has
+     * an id, and {@code ScrollView} keeps its offset there: on restore it writes the
+     * stored value straight into {@code mScrollY}, before any layout could clamp it
+     * against a height the screen does not have yet. So the scroll comes back
+     * without this class reading or writing a single offset.
+     */
+    static final int ID_HOME = 0x0f000001;
+    static final int ID_DECKS = 0x0f000002;
+    static final int ID_PROJECTS = 0x0f000003;
+    static final int ID_SERIAL = 0x0f000004;
+    static final int ID_SETTINGS = 0x0f000005;
 
     /** The drawer itself; sections are numbered in the order the drawer lists them. */
     static final int HOME = -1;
@@ -84,6 +100,15 @@ public class MainActivity extends Activity {
         // The bars are the system's, not ours, so they need telling.
         Ui.applySystemBars(this);
         setContentView(buildUi());
+        // buildUi opens the drawer, and recreate() builds a whole new activity: the
+        // theme switch used to drop the user back on the front page from wherever
+        // they were, because nothing carried the section across the rebuild.
+        if (savedInstanceState != null) {
+            // Before the first refresh, so an unfolded card is built open rather
+            // than folded and then flipped a frame later.
+            projectsTab.restoreExpanded(savedInstanceState.getStringArray(KEY_EXPANDED));
+            showSection(savedInstanceState.getInt(KEY_SECTION, HOME));
+        }
         requestBluetoothPermissions();
     }
 
@@ -115,6 +140,19 @@ public class MainActivity extends Activity {
             return;
         }
         super.onBackPressed();
+    }
+
+    /**
+     * The section survives a rebuild, which today means the theme switch: a colour
+     * is read when a view is constructed, so {@code recreate()} is how the app
+     * repaints itself, and returning to the drawer would throw away the screen the
+     * user was reading. A rotation keeps it for the same reason.
+     */
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt(KEY_SECTION, activeSection);
+        outState.putStringArray(KEY_EXPANDED, projectsTab.expandedIds());
     }
 
     @Override
@@ -160,6 +198,11 @@ public class MainActivity extends Activity {
             showSection(SECTION_SERIAL);
         });
         setupTab = new SetupTab(this);
+        home.setId(ID_HOME);
+        decksTab.setId(ID_DECKS);
+        projectsTab.setId(ID_PROJECTS);
+        boardTab.setId(ID_SERIAL);
+        setupTab.setId(ID_SETTINGS);
         content.addView(home, frameParams());
         content.addView(decksTab, frameParams());
         content.addView(projectsTab, frameParams());
@@ -211,6 +254,11 @@ public class MainActivity extends Activity {
     private FrameLayout.LayoutParams frameParams() {
         return new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+    }
+
+    /** The section on screen, which is what a rebuild has to restore. */
+    int section() {
+        return activeSection;
     }
 
     /** Shows one screen: {@link #HOME} for the drawer, otherwise a section. */

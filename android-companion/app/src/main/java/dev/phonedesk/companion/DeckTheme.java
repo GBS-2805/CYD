@@ -4,9 +4,10 @@ package dev.phonedesk.companion;
  * The one byte a deck's palette is set with, and the name the app draws for it.
  *
  * The board's own table has two entries — 0 PAPER, black ink on an off-white
- * page, and 1 INK, the same page inverted — and the app's two themes are the same
- * choice seen from the other end. Keeping the mapping in one place is what stops a
- * switch that says DARK from lighting the paper page, and it is plain Java so
+ * page, and 1 INK, the same page inverted — the two palettes the app's own switch
+ * the same two words the app's own switch uses, though the two choices are
+ * independent. Keeping the encoding in one place is what stops a chip that says
+ * PAPER from lighting the ink page, and it is plain Java so
  * {@code test.sh} can hold the encoding the board actually reads.
  */
 final class DeckTheme {

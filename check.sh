@@ -136,6 +136,11 @@ step "tracked"    'index'             tracked_step
 # it needs no compiler: a deck it names, one row per deck, an md5 for a sketch a
 # clone would have. A build on that core is the slower question, in --full.
 step "old record" 'consistently'      python3 check_old_core.py --record
+# The deck's three faces are bitmap data pasted into a sketch, and Adafruit_GFX
+# reads a glyph as one bitstream with no row padding. Padding rows to bytes is
+# what turned every letter on glass into blocks on the first flash, and the
+# frames missed it because the renderer padded too. This holds both round trips.
+step "fonts"      'glyphs packed'      python3 check_fonts.py
 # A number of screens is a claim like a size, and the one that drifted: seven files
 # said seven for a week after the app drew nine. This reads the tracked prose against
 # the frames git holds, so the count has one home instead of eight.

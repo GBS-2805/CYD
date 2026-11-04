@@ -171,7 +171,7 @@ final class SetupTab extends ScrollView {
 
         LinearLayout themeCard = Ui.card(activity);
         themeCard.addView(Ui.text(activity,
-                "Two themes over the same screens: black ink on an off-white page, and the "
+                "The app's own palette: black ink on an off-white page, or the "
                         + "same page inverted. The band stays light either way, because it is "
                         + "the ground the mark was drawn on.",
                 13, Ui.DIM));
@@ -189,18 +189,25 @@ final class SetupTab extends ScrollView {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        Button dark = Ui.segment(activity, "DARK", live == Ui.DARK);
-        dark.setOnClickListener(v -> pickTheme(Ui.DARK));
-        themeSwitch.addView(dark, new LinearLayout.LayoutParams(
+        Button paper = Ui.segment(activity, "PAPER", live == Ui.PAPER);
+        paper.setOnClickListener(v -> pickTheme(Ui.PAPER));
+        themeSwitch.addView(paper, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        Button light = Ui.segment(activity, "LIGHT", live == Ui.LIGHT);
-        light.setOnClickListener(v -> pickTheme(Ui.LIGHT));
-        themeSwitch.addView(light, new LinearLayout.LayoutParams(
+        Button ink = Ui.segment(activity, "INK", live == Ui.INK);
+        ink.setOnClickListener(v -> pickTheme(Ui.INK));
+        themeSwitch.addView(ink, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
         Ui.space(activity, themeSwitch, 10);
         themeCard.addView(themeSwitch);
+
+        // The one place the two vocabularies could be confused, so it says which
+        // end this switch owns.
+        TextView paletteNote = Ui.text(activity,
+                "The app only. A deck's palette is its own, on PAIRED.", 11, Ui.DIM);
+        paletteNote.setPadding(0, Ui.dp(activity, 8), 0, 0);
+        themeCard.addView(paletteNote);
         Ui.space(activity, themeCard, 10);
         body.addView(themeCard);
 
@@ -232,15 +239,13 @@ final class SetupTab extends ScrollView {
     }
 
     /**
-     * Store the choice, tell the linked deck and rebuild, so every screen is drawn
-     * in the palette picked. One theme over both ends is the point: the board is
-     * the half a person looks at from across the room. A deck that should stay on
-     * the other palette gets it from its own pair on PAIRED.
+     * Store the app's choice and rebuild, so every screen is drawn in the palette
+     * picked. It stops at the app on purpose: the deck is a different surface and
+     * each board keeps its own palette, set from its row on PAIRED.
      */
-    private void pickTheme(int theme) {
-        if (theme == Appearance.get(activity)) return;
-        Appearance.set(activity, theme);
-        DeckService.pushTheme(theme);
+    private void pickTheme(int palette) {
+        if (palette == Appearance.get(activity)) return;
+        Appearance.set(activity, palette);
         activity.recreate();
     }
 

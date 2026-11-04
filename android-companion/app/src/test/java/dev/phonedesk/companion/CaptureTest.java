@@ -6,8 +6,11 @@ import android.graphics.Canvas;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -57,6 +60,8 @@ public final class CaptureTest {
     private static final String DECK_MAC = "A4:CF:12:8B:3D:6E";
     private static final String DECK_TAG = "8B3D6E";
     private static final String DECK_ID = "phone_deck_cyd24R-" + DECK_TAG;
+    /** The one card of the user's own, which is the only kind a file may be filed on. */
+    private static final String OWN_CARD = "Imported sketch";
 
     private Activity host;
     private long now;
@@ -84,14 +89,83 @@ public final class CaptureTest {
         capture("projects-edit", MainActivity.SECTION_PROJECTS, new ProjectsTab(host),
                 "ADD A PROJECT");
         captureTaps("projects-file", MainActivity.SECTION_PROJECTS, new ProjectsTab(host),
-                firstUnfiled(), "ATTACH A FILE");
+                OWN_CARD, "CHANGE");
         capture("serial", MainActivity.SECTION_SERIAL, new BoardTab(host), null);
         // SETTINGS is drawn in the paper palette on purpose: it is the screen the
         // switch lives on, so one frame shows the control and what it does, and the
         // light theme is in the gate instead of only in a description of it.
-        Ui.applyTheme(Ui.LIGHT);
+        Ui.applyTheme(Ui.PAPER);
         capture("settings", MainActivity.SECTION_SETTINGS, new SetupTab(host), null);
-        Ui.applyTheme(Ui.DARK);
+        Ui.applyTheme(Ui.INK);
+    }
+
+    /**
+     * The theme switch rebuilds the activity — a colour is read when a view is
+     * built, so {@code recreate()} is how the app repaints itself. That rebuild
+     * used to land on the drawer however deep the user was, because nothing
+     * carried the section across. This drives the platform's own save and restore,
+     * the same pair {@code recreate()} calls, rather than a copy of the logic.
+     */
+    @Test
+    public void sectionSurvivesTheRebuild() {
+        org.robolectric.android.controller.ActivityController<MainActivity> controller =
+                Robolectric.buildActivity(MainActivity.class).setup();
+        controller.get().showSection(MainActivity.SECTION_SETTINGS);
+        controller.recreate();
+        assertEquals(MainActivity.SECTION_SETTINGS, controller.get().section());
+    }
+
+    /**
+     * The scroll offset is the platform's to keep: every screen carries a stable
+     * id, so {@code ScrollView} writes its offset into the saved view state and
+     * reads it back on the rebuild. This lays the app out, scrolls SETTINGS,
+     * rebuilds, and asks the new screen where it is.
+     */
+    @Test
+    public void theScrollComesBackWithTheRebuild() {
+        org.robolectric.android.controller.ActivityController<MainActivity> controller =
+                Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        activity.showSection(MainActivity.SECTION_SETTINGS);
+
+        View root = activity.getWindow().getDecorView();
+        root.measure(View.MeasureSpec.makeMeasureSpec(WIDTH, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(852, View.MeasureSpec.EXACTLY));
+        root.layout(0, 0, WIDTH, 852);
+
+        ScrollView settings = activity.findViewById(MainActivity.ID_SETTINGS);
+        assertNotNull("SETTINGS is a screen with a scroll offset", settings);
+        settings.scrollTo(0, 120);
+        assertEquals("the screen has to scroll before the restore means anything",
+                120, settings.getScrollY());
+
+        controller.recreate();
+
+        ScrollView again = controller.get().findViewById(MainActivity.ID_SETTINGS);
+        assertNotNull(again);
+        assertEquals(120, again.getScrollY());
+    }
+
+    /**
+     * A fold is not a view property, so the shelf carries the open ids in the
+     * activity's saved state. This checks both halves: put a card back open and its
+     * body is drawn, clear them and the body is gone.
+     */
+    @Test
+    public void theOpenCardsComeBackWithTheRebuild() {
+        host = Robolectric.buildActivity(Activity.class).setup().get();
+
+        ProjectsTab open = new ProjectsTab(host);
+        open.restoreExpanded(new String[] { "bruce" });
+        open.refresh();
+        assertTrue("the shelf drew: " + texts(open), texts(open).contains("Bruce"));
+        assertTrue("folded ids " + java.util.Arrays.toString(open.expandedIds()),
+                find(open, "INSTALLER") != null);
+
+        ProjectsTab folded = new ProjectsTab(host);
+        folded.restoreExpanded(new String[0]);
+        folded.refresh();
+        assertTrue("a folded shelf draws no card body", find(folded, "INSTALLER") == null);
     }
 
     /**
@@ -125,6 +199,8 @@ public final class CaptureTest {
         snapshot.deviceMac = DECK_MAC;
         snapshot.deviceId = DECK_ID;
         snapshot.deviceTag = DECK_TAG;
+        // The row prints the linked deck's build; the frame should show one.
+        snapshot.deviceVersion = "1.0.0";
         // The palette the board answers with, so the PAIRED rows draw a lit chip
         // rather than a pair that says nothing about this deck.
         snapshot.theme = DeckTheme.INK;
@@ -158,40 +234,29 @@ public final class CaptureTest {
     }
 
     /**
-     * One card with a file, stored the way the shelf would store one. No seed has a
-     * file, so without this the FILE badge and the FILE block would be in no frame
-     * at all: a render cannot show what the app never held.
+     * One card with a file, stored the way the shelf would store one. It has to be a
+     * card of the user's own: a widget ships its sketch inside the app and a
+     * catalogue card is an installer link, so neither can hold a file. Without this
+     * the FILE badge and the file block would be in no frame at all — a render
+     * cannot show what the app never held.
      */
     private void pinFile() {
         List<FlashLibrary.Entry> entries = FlashLibrary.list(host);
         if (entries.isEmpty()) return;
         FlashLibrary.Entry entry = entries.get(0);
         List<ProjectStore.Project> projects = new ArrayList<>(ProjectStore.all(host));
-        projects.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
-        for (ProjectStore.Project project : projects) {
-            if (project.kind == ProjectStore.KIND_INSIDE) continue;
-            project.fileName = entry.name;
-            project.kind = entry.textual()
-                    ? ProjectStore.KIND_SKETCH : ProjectStore.KIND_IMAGE;
-            ProjectStore.save(host, projects);
-            return;
-        }
-    }
-
-    /**
-     * The first card the shelf would draw with an ATTACH on it, in the order it
-     * draws them. A widget's card has none because its sketch ships inside the app,
-     * and the card {@link #pinFile} already filed has `CHANGE` instead.
-     */
-    private String firstUnfiled() {
-        List<ProjectStore.Project> projects = new ArrayList<>(ProjectStore.all(host));
-        projects.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
-        for (ProjectStore.Project project : projects) {
-            if (project.kind != ProjectStore.KIND_INSIDE && project.fileName.isEmpty()) {
-                return project.name;
-            }
-        }
-        throw new IllegalStateException("no unfiled card to attach to");
+        ProjectStore.Project mine = new ProjectStore.Project();
+        mine.id = "user:imported";
+        mine.name = OWN_CARD;
+        mine.tagline = "A sketch off this phone";
+        mine.fileName = entry.name;
+        mine.kind = entry.textual()
+                ? ProjectStore.KIND_SKETCH : ProjectStore.KIND_IMAGE;
+        mine.status = ProjectStore.STATUS_FLASHED;
+        mine.touch = FirmwareNotes.TOUCH_UNTESTED;
+        mine.updatedMs = now - 3_600_000L;
+        projects.add(mine);
+        ProjectStore.save(host, projects);
     }
 
     /**
@@ -285,6 +350,17 @@ public final class CaptureTest {
             }
         }
         return null;
+    }
+
+    /** Every label on a screen, for a failure message that says what was drawn. */
+    private static String texts(View view) {
+        StringBuilder out = new StringBuilder();
+        if (view instanceof TextView) out.append(((TextView) view).getText()).append(" | ");
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) out.append(texts(group.getChildAt(i)));
+        }
+        return out.toString();
     }
 
     /** The screens build themselves on refresh, the same call the phone makes. */

@@ -355,7 +355,7 @@ final class ProjectsTab extends ScrollView {
 
     private void addChip(LinearLayout row, String label, int filter) {
         final boolean on = activeFilter == filter;
-        TextView chip = Ui.text(activity, label, 10, on ? Ui.INK : Ui.DIM);
+        TextView chip = Ui.text(activity, label, 10, on ? Ui.BAND_INK : Ui.DIM);
         chip.setLetterSpacing(0.1f);
         chip.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         chip.setBackground(Ui.rounded(activity, on ? Ui.ACCENT : Ui.CARD_HI,
@@ -404,7 +404,7 @@ final class ProjectsTab extends ScrollView {
 
         // A filed card says so while folded: whether it can run a file is the
         // difference between a note and something to copy or flash.
-        if (!project.fileName.isEmpty()) {
+        if (!project.fileName.isEmpty() && !project.catalog) {
             TextView file = Ui.text(activity, "FILE", 10, Ui.ACCENT);
             file.setLetterSpacing(0.12f);
             file.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
@@ -449,7 +449,9 @@ final class ProjectsTab extends ScrollView {
             card.addView(description);
         }
 
-        if (!project.libraries.isEmpty()) {
+        // A prebuilt image's card says "Prebuilt image." in that field, which as a
+        // NEEDS line reads like a library nobody has installed.
+        if (!project.libraries.isEmpty() && project.kind != ProjectStore.KIND_IMAGE) {
             TextView libs = Ui.text(activity, "NEEDS  " + project.libraries, 11, Ui.ACCENT);
             libs.setPadding(0, Ui.dp(activity, 6), 0, 0);
             libs.setLineSpacing(Ui.dp(activity, 2), 1f);
@@ -462,8 +464,9 @@ final class ProjectsTab extends ScrollView {
         card.addView(logView(project));
 
         // Only a card the app may change can be given a file: a widget's card is
-        // the descriptor's, and it already knows which sketch it ships with.
-        if (!project.inside()) card.addView(fileBlock(project));
+        // the descriptor's and already knows which sketch it ships with, and a
+        // catalogue card is an installer link with no bytes here to attach.
+        if (!project.inside() && !project.catalog) card.addView(fileBlock(project));
 
         LinearLayout primary = Ui.row(activity);
         primary.setPadding(0, Ui.dp(activity, 10), 0, 0);
@@ -509,7 +512,10 @@ final class ProjectsTab extends ScrollView {
         state.setOnClickListener(v -> pickStatus(project));
         secondary.addView(state, spaced(8));
 
-        if (!project.inside()) {
+        // Only a record this app made can be edited: a widget's card belongs to its
+        // descriptor and a catalogue card's name, tagline and body are the
+        // catalogue's; both are rewritten on read, so a save there would forget.
+        if (!project.inside() && !project.catalog) {
             Button edit = Ui.action(activity, "EDIT", false);
             edit.setOnClickListener(v -> startEdit(project));
             secondary.addView(edit, spaced(8));
@@ -869,6 +875,25 @@ final class ProjectsTab extends ScrollView {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    /** The cards that are unfolded, for the rebuild the theme switch causes. */
+    String[] expandedIds() {
+        return expanded.toArray(new String[0]);
+    }
+
+    /**
+     * Puts the folds back. Called before the first build, so the shelf draws the
+     * cards open instead of opening them a frame later, and it resets the
+     * signature because the folds are part of what a rebuild compares.
+     */
+    void restoreExpanded(String[] ids) {
+        if (ids == null) return;
+        expanded.clear();
+        for (String id : ids) {
+            if (id != null && !id.isEmpty()) expanded.add(id);
+        }
+        signature = "";
     }
 
     private void toggle(String id) {

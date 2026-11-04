@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 
 /**
  * Which palette the app draws in, stored so a restart and a rebuild keep it.
+ * The app's alone: a deck's palette is written down the link from that deck's row.
  *
  * The choice lives here rather than in {@link Ui} because {@code test.sh} compiles
  * the palette without any Android class, and a preference needs a Context. One
@@ -19,11 +20,11 @@ final class Appearance {
     private Appearance() {
     }
 
-    /** {@link Ui#DARK} on a fresh install, and after anything unreadable. */
+    /** {@link Ui#INK} on a fresh install, and after anything unreadable. */
     static int get(Context context) {
-        if (context == null) return Ui.DARK;
+        if (context == null) return Ui.INK;
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        return prefs.getInt(KEY, Ui.DARK) == Ui.LIGHT ? Ui.LIGHT : Ui.DARK;
+        return prefs.getInt(KEY, Ui.INK) == Ui.PAPER ? Ui.PAPER : Ui.INK;
     }
 
     static void set(Context context, int theme) {

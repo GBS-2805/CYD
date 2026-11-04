@@ -90,7 +90,7 @@ sketch and the descriptor `id`, which always move together:
   still proves nothing, because `esp32:esp32:esp32` defaults to `PSRAM=disabled`.
   Read the marking, never a product listing.
 * **Budget for 4 MB of flash and no PSRAM.** The default partition scheme gives
-  the app 1,310,720 bytes and the deck takes 1,177,862 of them (89 % as reported
+  the app 1,310,720 bytes and the deck takes 1,179,402 of them (89 % as reported
   by the compiler, after the mirror). DRAM is 327,680 bytes with ~300 kB of heap
   free at boot once the display and touch drivers are up; a 320x240 RGB565
   framebuffer is 153,600, so there is room for one, not two. Treat "it fits" as a
@@ -119,7 +119,7 @@ with the date and the command that printed it, because a number without a run be
 it is the drift this file exists to stop.
 
 1. **The phone deck, on the default partition.** BLE only, so no partition switch
-   and no network, at 1,177,862 B, 89 % of its 1,310,720 B slot.
+   and no network, at 1,179,402 B, 89 % of its 1,310,720 B slot.
    Compile it in ArduinoDroid with Adafruit GFX, Adafruit ILI9341 and
    XPT2046_Touchscreen, and record the `Sketch uses …` line and the `md5sum` of the
    file the phone compiled — the size belongs to the compiler, the md5 to the bytes.
@@ -134,7 +134,7 @@ it is the drift this file exists to stop.
    on this board: run the calibration and record whether taps land at all, then the
    fit it computed. A control that ignores taps is usually this, not the control.
 5. **The Bluetooth link.** Point the app at the board and record the advertised name
-   and its tag, whether the identity document reads whole at MTU 185, that time,
+   and its tag, whether the identity document reads whole at MTU 247, that time,
    battery and notice all answer (the app refuses a link missing any of them), and
    the `PAIRED` row's `tag · linked <age>`.
 6. **Two phones.** Which one binds, and what the second is told — the claim has never
@@ -144,7 +144,7 @@ it is the drift this file exists to stop.
    the expensive deck.
 8. **The Spotify deck, on `huge_app` — Bluetooth half done on 2026-11-03.** The
    first sketch here whose partition scheme has to be flashed with it:
-   1,890,609 B, 60 % of its 3,145,728 B slot. Flashed, it linked to the companion app,
+   1,891,501 B, 60 % of its 3,145,728 B slot. Flashed, it linked to the companion app,
    drew the phone's line and started playback from a chip, so the scheme, the
    advertise, the identity read, the mirror and the command notify all answered at
    once; the corner chips were hard to hit, which is why `10bb4b7` enlarged their
@@ -183,8 +183,8 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   globals, Spotify 1,122,281 B, 85 % of 1,310,720, / 53,572 B globals. Those are
   48 B and 32 B above the same sketches built straight through `arduino-cli` from
   another path — the build-root sensitivity above, not a different toolchain. The
-  mirror has since moved the phone deck to 1,177,862 B, 89 % of 1,310,720, /
-  45,284 B globals and the Spotify sketch to 1,125,781 B, 85 % of 1,310,720, /
+  mirror has since moved the phone deck to 1,179,402 B, 89 % of 1,310,720, /
+  45,332 B globals and the Spotify sketch to 1,125,781 B, 85 % of 1,310,720, /
   53,636 B globals, as [`check_headroom.py`](check_headroom.py) read both of them
   on 2026-11-01 — that Spotify file is the one before the Bluetooth link
   (`00bb1560`), not a flag on today's.
@@ -222,8 +222,8 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   end ever observed, and the next build printed 1,878,661 twice.
 * **A size names the root that printed it, and here that root is
   `~/.arduino-cyd-3`.** The current 3.3.12 figures in these docs — phone deck
-  1,177,862 B / 45,284 B of globals, the linked Spotify deck 1,890,609 B /
-  69,124 B on `huge_app`, the unlinked Spotify deck 1,125,781 B — are that
+  1,179,402 B / 45,332 B of globals, the linked Spotify deck 1,891,501 B /
+  69,164 B on `huge_app`, the unlinked Spotify deck 1,125,781 B — are that
   root's, read through `arduino-cli` 1.5.2-rc.1 on 2026-11-02. It is the root
   worth naming because its `env.sh` pins its own data, download and user dirs;
   `~/.arduino-cyd/env.sh` sets only `PATH`, so sourcing it builds through
@@ -250,7 +250,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   installs a virtual clock and the stub port advances it, so a check that runs the
   real probe against a silent board still tries all five wirings and both windows
   without waiting for them. Measured on 2026-11-02: 179 s before the seam, 1.45 s
-  after, the same 126 checks then, 181 now. The seam exists because the alternative — a shorter
+  after, the same 126 checks then, 185 now. The seam exists because the alternative — a shorter
   window in the test — would test a different probe.
 * **That check runs on commit.** [`.githooks/pre-commit`](.githooks/pre-commit)
   runs the whole fast gate — [`check.sh`](check.sh) — on every commit, so no
@@ -339,7 +339,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   silently build the wrong core and report 73 % where the release reads 85 %.
   Both together took **18 s** here, on core 3.3.12 with the build cache warm; on
   2026-11-01, after the mirror, `check_headroom.py` over both decks read
-  1,177,862 B (142,406 B free) and 1,125,781 B (184,939 B free), exit 0. A second
+  1,177,962 B (142,406 B free) and 1,125,781 B (184,939 B free), exit 0. A second
   install root read 1,168,170 B (142,550 B free) and 1,125,669 B (185,051 B free)
   for the same two sketches — 144 B and 112 B lower with the globals identical,
   which is the build-root sensitivity above rather than drift in the sketches.
@@ -529,6 +529,31 @@ static uint8_t themeIndex = 1;   // which one is live; the app writes it
   change goes through that one function, because a half-applied palette is a
   screen drawn in two greys.
 
+## Typefaces: one bitstream per glyph
+
+Both decks draw text with three faces cut from DejaVu Sans Mono by
+[`artifacts/deck_font.py`](artifacts/deck_font.py) — 11 px body, 20 px display,
+30 px clock — pasted into each sketch as PROGMEM and blitted into the frames by
+[`artifacts/deck_screens.py`](artifacts/deck_screens.py). Adafruit_GFX's
+`drawChar()` pulls a fresh byte every eighth pixel and never pads to a row
+boundary, so a glyph is exactly `ceil(width × height / 8)` bytes and the next
+glyph starts immediately after it.
+
+Padding each row to a whole byte is the trap. It leaves dead bits at the end of
+every row, so every row after the first shifts right and a wide face runs on into
+the next character. The first flash of the phone deck showed it as blocks where
+the letters should be — and the frames could not show it, because the renderer
+was unpacking with the same padding and so drew perfect text over a broken glass.
+Neither deck draws text through `setFont()` and `print()` any more: `blitText()`
+reads the tables itself, clears each glyph cell to the background colour the
+caller asked for (the library refuses that for custom fonts, so a repainted
+label kept the old glyphs under the new ones), and writes horizontal runs.
+[`check_fonts.py`](check_fonts.py) holds the packing: offsets that add up to
+`ceil(w × h / 8)`, a bitmap exactly as long as the last glyph needs, both decks
+carrying the same faces, and a renderer that unpacks continuously.
+[`selftest_fonts.py`](selftest_fonts.py) mutates each of those faults back in and
+expects a refusal.
+
 ## NVS
 
 * One Preferences namespace per concern: `settings` for user-visible settings,
@@ -546,11 +571,11 @@ static uint8_t themeIndex = 1;   // which one is live; the app writes it
 * Keep every name the widget has ever advertised in the app's `nameMatch`, or
   boards flashed before a rename stop being found.
 * Service and characteristic UUIDs are per deck, never reused across decks, with
-  one deliberate exception: the **Phone Link** service (`6f2d0001-…` and its six
+  one deliberate exception: the **Phone Link** service (`6f2d0001-…` and its seven
   characteristics) is spoken by every deck that talks to the companion app,
   because the app has one scan and one implementation of it. That is what lets one
   phone drive whichever BLE deck is flashed. What stays per deck is the identity
-  document — widget, name, role, board — and the advertised name, which is what
+  document — widget, name, role, v — and the advertised name, which is what
   `nameMatch` reads.
 * A deck that speaks the service must expose **all** of time, battery and notice,
   not just the ones it draws: the app refuses a link to a server missing any of
@@ -558,6 +583,20 @@ static uint8_t themeIndex = 1;   // which one is live; the app writes it
 * Nothing here pairs in the phone's Bluetooth settings: these are GATT
   peripherals, not keyboards. A design that makes Android treat the board as an
   input device gets the link dropped.
+
+## One build name per sketch
+
+Each sketch declares `DECK_VERSION` — `1.0.0` today — and that one constant is
+quoted in its identity document as `"v"`, so a linked deck says which firmware it
+is running and the app prints it on the deck's row. The flash shelf reads the same
+declaration out of the bundled sketch and prints it there too, which is the answer
+to "is this the build I think it is?" without a serial cable.
+
+Bump it whenever the sketch changes in a way a reader could notice — a screen, a
+key, a serial line, a fix that alters behaviour — and in the same change. The
+identity document has a hard ceiling of 182 bytes (one read at MTU 185), so the key
+is one letter: the longest document either deck can build is 164 bytes on the phone
+deck and 172 on the Spotify deck, both with a sixteen-character label.
 
 ## Deck identity
 
@@ -596,10 +635,12 @@ static uint8_t themeIndex = 1;   // which one is live; the app writes it
   the record as the address, never as the key. A board that has not published a
   document (an older flash, a read that failed) is filed under its MAC and
   upgraded the first time it answers, so the list migrates itself.
-* **An identity document is longer than a default ATT MTU.** It is ~150 bytes
-  against the 20 usable at MTU 23, so the app asks for 185 before discovering
-  services and asks again after `onMtuChanged`; a truncated read names no widget
-  and falls back to the address rather than inventing a half id.
+* **An identity document is longer than a default ATT MTU.** It is written from a
+  192-byte buffer against the 20 usable at MTU 23, so the app asks for 247 before
+  discovering services and asks again after `onMtuChanged`; a deck that caps its
+  own MTU lower (the Spotify deck asks 185) still answers, because Android takes
+  the smaller of the two. A truncated read names no widget and falls back to the
+  address rather than inventing a half id.
 
 ## One chat, one tree
 
@@ -614,7 +655,7 @@ deleted. What is left is the part that was never about the count.
   `git cherry-pick <sha>` needs nothing pushed — a push is a publish, not a hand-off.
   A copy silently drops whichever version was written second; a merge shows both
   sides of the disagreement. Re-measure what a merge brings, because a figure
-  belongs to the root that printed it: the 1,890,609 B above is a branch's
+  belongs to the root that printed it: the 1,891,501 B above is a branch's
   1,879,489 B read again through this root, not a number copied across.
 * **A rule has one home.** Anything true of the whole board or of the app lives in
   this file; anything true of one widget lives in that widget's `README.md`;
@@ -744,15 +785,28 @@ the names behind them did not move — `DecksTab`, `ProjectsTab`, `SECTION_DECKS
 the screens are — so a grep for the old words finds code, not copy.
 `SETTINGS` is deliberately not a fourth: it is configuration rather
 than navigation, so it hangs off the gear at the outer end of the top bar, past
-the link pill. The one appearance choice — **DARK** or **LIGHT** — lives there in
-its own card: `Ui` holds the live inks as mutable statics, `Ui.applyTheme` swaps
+the link pill. The app's own appearance choice — **PAPER** or **INK** — lives there
+in its own card, and it is the app's alone: a deck's palette is set per board on
+PAIRED, so each end has a switch. `Ui` holds the live inks as mutable statics, `Ui.applyTheme` swaps
 them, and the switch stores the answer with `Appearance` and recreates the
 activity, because a colour is read when a view is built and a screen already on
-show would otherwise keep the theme it was drawn in. DARK is off-white ink on
-black, LIGHT is black ink on the off-white page; the band is a shade of that same
+show would otherwise keep the theme it was drawn in. **The section survives that
+rebuild.** `MainActivity` saves it in `onSaveInstanceState` and reopens it after
+`buildUi()`, so switching themes in SETTINGS leaves you in SETTINGS; until
+2026-11-04 the rebuild landed on the drawer from wherever the user was, which is
+a bug rather than a repaint. `CaptureTest.sectionSurvivesTheRebuild` drives the
+platform's own save and restore — the pair `recreate()` calls — instead of a copy
+of the rule. **The scroll offset and the unfolded cards come back too.** Each
+screen carries a stable id, so the platform's view-state restore puts the
+`ScrollView` offset back itself — `ScrollView` writes the stored value straight
+into `mScrollY`, before a layout could clamp it — and the shelf saves the ids of
+its open cards with the activity, because a fold is not a view property.
+`theScrollComesBackWithTheRebuild` and `theOpenCardsComeBackWithTheRebuild` hold
+both halves. INK is off-white ink on
+black, PAPER is black ink on the off-white page; the band is a shade of that same
 off-white in both, because it is the ground the mark was drawn on and a band that
 turned with the theme would put a plate behind artwork that has none. The same
-choice is written to the linked deck, and each deck keeps its own pair on PAIRED. The bottom tab bar is gone on purpose, because a drawer that *is*
+choice is the app's own, and each deck keeps its own PAPER/INK pair on PAIRED, so a phone on one page and a board on the other is a decision rather than drift. The bottom tab bar is gone on purpose, because a drawer that *is*
 the front page needs no second navigation.
 
 * **The top bar carries the owner's mark, centred on the band.** `TopBar` puts
@@ -812,12 +866,14 @@ the front page needs no second navigation.
   and the `EDIT` chip open the same editor with the record's four fields — name,
   tagline, status, notes. A dialog would be a second window the capture cannot
   draw, so the render gate would have nothing to compare; a card is also what the
-  shelf already is. A card that ships inside the app has no `EDIT`: its name,
-  tagline, body and libraries belong to `widget.json` and the store refreshes
-  them on every read, so a field there would forget what it was told. `DELETE`
-  exists only for records this app made (`user:` ids) for the same reason, and
-  a record added here is `SKETCH` kind, which is why `INSTALLER` and `SOURCE`
-  appear only when a link is set and `RECIPE` only on an `IMAGE`.
+  shelf already is. A card that ships inside the app has no `EDIT`, and neither
+  does one the catalogue seeded: a widget's name, tagline, body and libraries
+  belong to `widget.json`, a catalogue card's belong to `FirmwareCatalog`, and
+  the store rewrites both on every read, so a field there would forget what it
+  was told. `EDIT` and `DELETE` exist only for records this app made (`user:`
+  ids) for the same reason, and a record added here is `SKETCH` kind, which is
+  why `INSTALLER` and `SOURCE` appear only when a link is set and `RECIPE` only
+  on an `IMAGE`.
 * **A card can name a file, and the kind follows the file.** `ATTACH A FILE` opens
   the picker as a card in place of the project's own — the same reason the editor
   is a card — listing what FILES already holds, because a second picker window is
@@ -832,6 +888,13 @@ the front page needs no second navigation.
   rebuilt in place so the next tap is the new file rather than ATTACH again. A
   folded card carries a `FILE` badge when it names one, so the shelf answers
   "which of these can run something" before anything is opened.
+* **A catalogue card has no file slot.** `marauder`, `bruce` and `launcher` are
+  links to someone else's installer, so their records are marked `catalog` and a
+  read heals one that was given a file: kind back to `IMAGE`, name cleared. Bruce
+  is a browser flasher — there is no `.ino` and no `.bin` here to attach — and a
+  card that offered one was offering a file that cannot exist. Those cards also
+  draw no `NEEDS` line, because the field behind it holds "Prebuilt image." on
+  these seeds and read like a library nobody had installed.
 * **Libraries are one disclaimer at the top of the shelf**, read from the widget
   descriptors and never retyped in Java. Each library is a button that copies the
   exact name ArduinoDroid's library list searches for, and the ArduinoBLE warning

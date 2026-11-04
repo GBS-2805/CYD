@@ -150,12 +150,12 @@ class Panel:
                 continue
             gx, gy = x + pen + xoff, y + yoff
             self.draw.rectangle([gx, gy, gx + w - 1, gy + h - 1], fill=self.c[bg])
-            stride = (w + 7) // 8
+            bit = 0                      # continuous, exactly as drawChar() reads
             for row in range(h):
-                base = row * stride
                 for col in range(w):
-                    if data[base + (col >> 3)] & (0x80 >> (col & 7)):
+                    if data[bit >> 3] & (0x80 >> (bit & 7)):
                         self.image.putpixel((gx + col, gy + row), fg_col)
+                    bit += 1
 
     def text_at(self, string, x, y, size, fg, bg):
         self.text(string, x, y, size, fg, bg)
@@ -420,6 +420,7 @@ def page_phone_settings(p):
 
     phone_button(p, PHONE_SET_CAL, "CALIBRATE TOUCH", 1, False)
     phone_button(p, PHONE_SET_CLOSE, "CLOSE", 2, True)
+    p.text_at("TOUCH FIT SAVED", MARGIN, 196, 1, "accent", "bg")
     p.text_at("Galaxy S23", 12, 226, 1, "purple", "bg")
     p.text_right("hold gear = forget", W - 12, 226, 1, "dim", "bg")
 

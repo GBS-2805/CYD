@@ -104,6 +104,8 @@ HISTORICAL = {
     1168282: "~/.arduino-cyd/env.sh's phone build while that script set only "
              "PATH, so ~/.arduino15's dirs",
     1163930: "an earlier 3.3.12 phone build on a shorter path",
+    1177962: "the phone sketch before the link improvements, quoted in a "
+             "dated 2026-11-01 run",
     1165174: "the phone sketch through one arduino-cli root",
     1165222: "the same phone sketch through toolchain.sh's root",
     1400000: "the const table quoted as the test that overflows the slot",
