@@ -32,7 +32,7 @@
  *   - Hold a notification to dismiss it on the phone.
  *   - Tap the gear (top right) for brightness and calibration.
  *   - Hold the gear for 1.2 s to forget the phone this board is bound to.
- *   - Hold the title for 1.5 s, or touch the screen at boot, to calibrate.
+ *   - Hold the title for 1.5 s to calibrate. Booting never opens it.
  *
  * Every board is its own widget: the advertised name carries a tag read from
  * the chip's efuse MAC, and the first phone to connect claims the board. Other
@@ -263,7 +263,7 @@ Preferences calPrefs;
 
 // Bumped whenever a stored touch fit should stop being trusted. A mismatch
 // makes loadMapping() fall back to the factory default and re-opens the
-// calibration screen on boot, which is what a fresh flash needs.
+// calibration screen, which a panel whose taps land wrong needs.
 static constexpr uint8_t CAL_MAP_VERSION = 2;
 bool mappingStored = false;
 
@@ -3311,14 +3311,13 @@ void setup() {
   initIdentity();
   startBluetooth();
 
-  // Holding the panel while the board boots always opens calibration, even if
-  // the stored mapping is wrong. A fresh flash calibrates before the deck
-  // appears, because a wrong mapping turns every key into a guess.
-  if (!mappingStored || touch.touched()) {
-    startCalibration();
-  } else {
-    drawHome();
-  }
+  // A boot lands on the front page, always — a fresh flash included. Calibration
+  // used to open here whenever the panel was held or no fit had been stored, so a
+  // deck that had never been touched booted into a three-dot target instead of its
+  // own front page. It is still one tap away in settings and one hold away on the
+  // title, and the assumed mapping (raw axes rotated 90 degrees) is what a fresh
+  // flash draws with until somebody runs it.
+  drawHome();
 }
 
 void loop() {

@@ -93,8 +93,8 @@ name is a label, not a control: the switch lives in the companion app (see
   waiting on a home of its own. The unread count still sits in the front page's
   footer.
 
-Calibration is reached from settings, by holding the title for 1.5 s, or by
-touching the screen at boot, so it no longer needs a row of its own here.
+Calibration is reached from settings, or by holding the title for 1.5 s, so it
+no longer needs a row of its own here.
 
 The THEME page is gone. It was a contact sheet that could only say "set
 `THEME_INDEX`, then reflash", and the app now writes the palette down the link
@@ -207,8 +207,11 @@ bundled copy.
 
 ## First run and testing the link
 
-1. Flash and let the deck boot. The first boot opens touch calibration: tap the
-   three dots — top-left, top-right, bottom-left — and the fit saves itself.
+1. Flash and let the deck boot. It lands on the front page: a fresh flash draws
+   with the assumed mapping (raw axes rotated 90 degrees) instead of stopping for
+   calibration. When taps land wrong, open calibration from settings or by holding
+   the title for 1.5 s: tap the three dots — top-left, top-right, bottom-left —
+   and the fit saves itself.
    Each tap is the median of four panel reads and is dismissed if the samples
    disagree by more than 300 raw units, so one noisy conversion cannot misplace a
    corner; three taps fix the affine map exactly. Hold anywhere for 2 s to
@@ -342,7 +345,6 @@ asyncio.run(main())
 | Tap `DISMISS` in the detail view | Remove it from the deck |
 | Tap the gear (top right) | Brightness and calibrate touch |
 | Hold the title for 1.5 s | Touch calibration |
-| Touch the screen at boot | Touch calibration |
 
 ## Advertising
 
@@ -450,14 +452,14 @@ core **3.3.12**, default partition scheme:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,177,926 | **141,602** | 1,310,720 (89 % used) |
+| flash | 1,177,862 | **141,602** | 1,310,720 (89 % used) |
 | DRAM | 45,284 globals | **282,396** | 327,680 |
 
 The root behind those figures is `~/.arduino-cyd/env.sh`, the one whose `env.sh`
-pins its own data and library dirs: `check_docs.py --refresh` re-read 1,177,926 B
+pins its own data and library dirs: `check_docs.py --refresh` re-read 1,177,862 B
 and 45,284 B from it on 2026-11-03. While that script set only `PATH` the same
 build went through `~/.arduino15` and printed 1,168,282 B — 32 B under with the
-globals identical — another worktree's root prints the same 1,177,926 B, and
+globals identical — another worktree's root prints the same 1,177,862 B, and
 `/tmp/arduino-cyd-3` was read at 1,168,170 B, 144 B under. Quote the root with the
 number (see
 [the build note](../CONVENTIONS.md#build)).
@@ -488,12 +490,12 @@ from the repo root, after sourcing a toolchain.
     [`old_core.json`](../old_core.json) — size, globals and md5 together, measured
     2026-11-04 through `~/.arduino-cyd-2` — because a 2.0.17 figure quoted here
     would be checked against the 3.3.12 build and refused.
-* Core **3.3.12** links it at 1,177,926 bytes (89 % of 1,310,720) with 45,284 bytes of RAM
+* Core **3.3.12** links it at 1,177,862 bytes (89 % of 1,310,720) with 45,284 bytes of RAM
   (13 % of 327,680), `EXIT=0` under `--warnings all`, re-measured on 2026-11-04 with the new typeface. An earlier 3.3.12 build on a shorter path reported 1,163,930 / 45,004,
   so 3.x is path-sensitive too — 1,137–1,141 kB, not a fixed count.
 * The bundled copy matches byte for byte after `:app:syncWidgets`;
   `check_widget_assets.py` prints `2 widgets bundled, every copy matches`
-  (this sketch md5 `7d3d5676…`, the Spotify one `fb40e042…`).
+  (this sketch md5 `5be1ba2a…`, the Spotify one `fb40e042…`).
 * Core 3.x costs this sketch ~0.8 kB of flash and ~3.6 kB of RAM over 2.0.17 —
   nothing like the Spotify deck's 155 kB gap, which is that sketch's network
   stack rather than the core (see the build note in
@@ -534,5 +536,5 @@ The first flash of a new board is the test of those, not a formality.
 ## Measured
 
 `check_headroom.py` built this sketch on 2026-11-04 with core 3.3.12 and read
-`Sketch uses 1,177,926 bytes` and `45,284 bytes` of globals; this folder's sketch
-md5 is `7d3d5676…`.
+`Sketch uses 1,177,862 bytes` and `45,284 bytes` of globals; this folder's sketch
+md5 is `5be1ba2a…`.
