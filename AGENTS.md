@@ -15,5 +15,9 @@ Non-negotiables if you read nothing else:
   `HOWTO.md` and `HANDOFF.md` — `CONVENTIONS.md` says why.
 * Build with the widget's `toolchain.sh`, and report only what actually ran. Never
   claim a compile, a flash or a measurement that did not happen.
+* A UI change ends with renders in the chat: capture them, publish them, and post
+  one labelled public link per screen touched **before** committing, pushing or
+  deploying. The render is the gate, not a receipt — `CONVENTIONS.md` has the
+  mechanics and the shape a link has to have.
 * Do not commit, push or deploy unless asked, and do not touch another widget's
   folder.

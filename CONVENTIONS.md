@@ -245,7 +245,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   installs a virtual clock and the stub port advances it, so a check that runs the
   real probe against a silent board still tries all five wirings and both windows
   without waiting for them. Measured on 2026-11-02: 179 s before the seam, 1.45 s
-  after, the same 126 checks then, 152 now. The seam exists because the alternative — a shorter
+  after, the same 126 checks then, 153 now. The seam exists because the alternative — a shorter
   window in the test — would test a different probe.
 * **That check runs on commit.** [`.githooks/pre-commit`](.githooks/pre-commit)
   runs the whole fast gate — [`check.sh`](check.sh) — on every commit, so no
@@ -604,7 +604,9 @@ deleted. What is left is the part that was never about the count.
   brings is re-measured here. Read a branch's paths before merging: an older one can
   *look* like work and be a downgrade, which is what `app/phone-deck-build` was at 87
   commits back, 21 paths under `cyd_phone_deck/`, a folder this tree renamed away.
-* Nothing is pushed or deployed without being asked. The repo stays private.
+* Nothing is pushed or deployed without being asked, except the render bundle a UI
+  change is shown through: that publish is part of the gate above, not a separate
+  request. The repo stays private.
 * **One kB is 1,024 bytes, and it is written down once, here.** Every size in
   these docs is binary: 202,353 B is "198 kB", 343,307 B is "335 kB", rounded to
   the nearest kB with the exact bytes beside it in a table or in `HANDOFF.md`.
@@ -644,7 +646,7 @@ One command per stage, and each one is checked rather than assumed:
 | --- | --- | --- |
 | Capture, install, rebuild the tall sheet and the site bundle | `android-companion/capture.sh` | 12 s warm (21 s cold) |
 | Verify the committed frames still match the app | inside `./check.sh --full` | 9.7 s |
-| Put them online | deploy `artifacts/site/manifest.json` | seconds, and asked for |
+| Put them online | deploy `artifacts/site/manifest.json` | seconds; the gate, not a separate ask |
 
 * **The capture runs the app, not a drawing.** `CaptureTest` builds `TopBar` and each
   screen, measures at 393 dp, lays them out and draws with Android's renderer; a state
@@ -786,21 +788,30 @@ the front page needs no second navigation.
   address the deck printed. `SIGN IN` fetches the deck's own authorize URL and
   opens it, so the custom scheme still returns into this app; a deck that is
   signed in and out of setup says so instead of asking a page it does not serve.
-* **Every UI change ships a render, and the render is linked before anything
-  ships.** Draw the screens it touches with `android-companion/capture.sh`, which runs the
-  app's own views through Android's renderer, and keep the PNGs in
-  `artifacts/renders/`. Then *show* them: put each PNG somewhere that serves the
-  bytes over public `https` and post it as a labelled link —
+* **A render is a gate before a UI change ships, never a receipt after it.** The
+  order is fixed: draw the screens with `android-companion/capture.sh`, publish
+  them, post one labelled link per screen touched — and only then commit, push or
+  deploy. A turn that changes a pixel ends with those links whether or not anyone
+  asked for one, because the owner reads this chat on a phone and cannot open the
+  worktree: a change with no link is a change he has not seen, however green the
+  gate is. If a frame looks wrong, the change waits; a capture that disagrees with
+  the code is the gate working, not a formality to route around. `check_renders.py`
+  holds the half a machine can hold — the committed frames must be what the app
+  draws — and the link is the half only he can check. The PNGs live in
+  `artifacts/renders/`; *show* them by putting each one somewhere that serves the
+  bytes over public `https` and posting a labelled link —
   `[Home, the drawer](https://host/abc.png)` — for every screen the change
   touched, and only those. **Shape matters as much as the file.** The owner reads
   this chat on a phone, and that client renders neither Markdown images nor bare
   URLs: `![home](…)` and a naked `https://…` on its own line both arrive as
   letters on a screen, and a workspace path is worse still, because it opens
   nothing anywhere but here. What arrives is a *label* wrapped around a public
-  URL, and the host has to still be serving it when he taps. **The link is a
-  gate, not a courtesy: nothing is pushed or published
-  until the owner has a link to a viewable render of what changed.** And that link
-  is a real `https` address: a chat client cannot open
+  URL, and the host has to still be serving it when he taps. **A link is not a
+  gate at all unless it opens.** The first links this repo posted 404'd because the
+  hostname had one character too many, so open every address before sending it —
+  `curl -s -o /dev/null -w '%{http_code}' <url>` printing `200` is the proof; a
+  file sitting in `artifacts/site/public/` proves nothing about the internet. And
+  the address must be a real `https` one: a chat client cannot open
   `artifacts/renders/home.png`, so [`artifacts/publish_renders.py`](artifacts/publish_renders.py)
   copies the committed frames into `artifacts/site/public/` with a gallery page, and
   that bundle is deployed as the static site below. So the step after a capture is
