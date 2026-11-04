@@ -344,8 +344,10 @@ URL and a flashing note. Decisions behind it:
   hairline .23 — with `PINK` the one step above the text (pure white on black,
   black on paper), so a status separates by luminance. A card is a **hairline cell
   on the page** (`Ui.CARD` is the page); surfaces that need a fill of their own —
-  a secondary action, a chip off, the search field, the drawer's board row — use
-  `Ui.CARD_HI`, a 12 % wash in the opposite ink. The live pill is the one filled
+  a secondary action, a chip off, the drawer's board row — use `Ui.CARD_HI`, a 12 %
+  wash in the opposite ink; a text field takes `Ui.INPUT`, one step higher at 18 %,
+  so the box reads as a box and its placeholder is not the faintest ink on the
+  page. The live pill is the one filled
   shape on the band: black fill, band-paper text. Monospace did not move: the deck
   is a terminal, so the font stayed.
 - **The floors are measured, not assumed.** `Palette` holds both themes (so the
@@ -354,8 +356,12 @@ URL and a flashing note. Decisions behind it:
   4.5:1, hints and status words to 3:1, and a hairline to 1.5:1 as a line rather
   than a word, then checks the ramp still runs quietest to loudest. It also refuses
   a quarter-strength ink, so a theme cannot pass by making every value the same.
-  **171 checks**, up from 164 when the second theme and the decks' palettes
-  arrived.
+  **181 checks**, up from 164 when the second theme and the decks' palettes
+  arrived and from 171 before `labels()` measured each label against its own fill.
+  The decks' copies of those two pages are held to the app's by
+  `check_widget_assets.py` (its two extra selftest branches break one page on
+  purpose), and `artifacts/deck_palette.py` draws each deck's table at 320x240 into
+  `artifacts/decks/` — a palette proof, not a capture of the glass.
 - **Probe always restores the board.** `probeUsb()` calls `hardReset()` in both
   paths, success and failure, because leaving the ESP32 in download mode is
   exactly the black-screen-with-red-LED state a user reads as a brick. The same
@@ -516,7 +522,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   deadline and every pause reads the clock, `test.sh` installs a virtual one and
   the stub port advances it, so the two checks that ran the real probe against a
   silent board — 57 s each — still try all five wirings and both windows. Measured
-  on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 171 now. `./check.sh`
+  on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 181 now. `./check.sh`
   runs the fast set, `./check.sh --full` the release set.
 - **The checkers' refusals are tested too, without a compiler.** Ten
   `selftest_*.py` files build a throwaway repo — a stand-in `arduino-cli`, a
@@ -532,16 +538,16 @@ Identical to the sketch, checked against its `onWrite` handlers:
   `./check.sh --selftest`, and the pre-commit hook runs it when a
   `check_*.py` or `selftest_*.py` is staged. That is the gap it closes: the three
   newest docs refusals were found by a reader, because nothing had ever run them.
-- **The app has two palettes, and the light one is measured, not eyeballed.**
-  SETTINGS carries an APPEARANCE card with DARK and LIGHT; the choice is stored in
-  its own `appearance` preferences file and applied before the first view exists, and
-  switching recreates the activity because every colour in this app is read when a
-  view is constructed. The band keeps its value in both palettes on purpose — it is
-  the ground the owner's mark was drawn on, so a dark band would put a white plate
-  behind artwork that has none — which is why `ACCENT` turns from a light fill into
-  the darkest ink and a primary action carries band grey for its label. The paper
-  inks are held to the same floors as the blue ones: 171 host checks, eleven of them
-  the light palette against field, fill and hairline.
+- **The app has two themes, and both are measured, not eyeballed.** SETTINGS
+  carries an APPEARANCE card whose DARK and LIGHT are one segmented switch; the
+  choice is stored in its own `appearance` preferences file and applied before the
+  first view exists, and switching recreates the activity because every colour in
+  this app is read when a view is constructed. The band keeps its value in both
+  themes on purpose — it is the ground the owner's mark was drawn on, so a band
+  that turned over would put a plate behind artwork that has none — which is why a
+  primary action fills with the page's ink and carries the page itself as its
+  label. Both themes are held to the same floors: 181 host checks, ten of them
+  label-on-fill pairs and each theme's inks against field, fill and hairline.
 - **The committed tree builds on its own.** Measured on 2026-11-02: `git archive
   HEAD` into an empty directory plus a fresh `git init` — no built assets, no
   `.build_figures.json`, nothing in `dist/` the commit does not hold — passed the
@@ -598,7 +604,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   sketches they name are inside the APK, `assets/widgets/phone_deck_cyd24R/` and
   `assets/widgets/spotify_deck_cyd24R/`, and `check_widget_assets.py` in the repo
   root compares those copies with `../<folder>/<sketch>.ino` byte for byte (phone
-  deck md5 `7047e587…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
+  deck md5 `f5b49522…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
   header rewrite, and `00bb1560…`, `eca02e93…`, `49f29bcb…` before the Bluetooth
   link, the callback change and the one-line answer — both in sync on 2026-11-02).
   The rewrite makes the phone-over-Bluetooth source the deck's first one and

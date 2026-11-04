@@ -245,7 +245,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   installs a virtual clock and the stub port advances it, so a check that runs the
   real probe against a silent board still tries all five wirings and both windows
   without waiting for them. Measured on 2026-11-02: 179 s before the seam, 1.45 s
-  after, the same 126 checks then, 171 now. The seam exists because the alternative — a shorter
+  after, the same 126 checks then, 181 now. The seam exists because the alternative — a shorter
   window in the test — would test a different probe.
 * **That check runs on commit.** [`.githooks/pre-commit`](.githooks/pre-commit)
   runs the whole fast gate — [`check.sh`](check.sh) — on every commit, so no
@@ -471,10 +471,24 @@ static uint8_t themeIndex = 1;   // which one is live; the app writes it
 * Status rules must keep the last three distinguishable in every theme, by
   luminance rather than hue: charging strongest against the ground, the warning
   state next, the healthy state quietest.
+* **A control's label is measured against the fill under it, not the page.**
+  `HostTests.labels()` holds every pair at 4.5:1 — a secondary action's ink on its
+  wash, a field's text and its placeholder on the field fill, the live segment's
+  label on the page ink, the primary action's label on its fill — with a
+  placeholder allowed 3:1 as a hint. Lifting a fill one step can quiet the word on
+  it while every check that measures ink against the page still passes, which is
+  how a button becomes a caption without anyone editing its colour.
 * **Ship monochrome.** Two themes: 0 PAPER (black ink on an off-white page) and
   1 INK (the same page inverted), the last six roles stepping that one ink, so a
   new widget needs no colour decisions to be readable. A widget that genuinely needs colour adds a theme to
   its own table and says why in its README.
+* **A deck's two pages are the app's two pages.** The sketch is pasted on its own
+  into ArduinoDroid, so it cannot import the palette — its table is a second copy
+  of four values. `check_widget_assets.py` reads each sketch's `THEMES[]` comments
+  and `Palette.java`, and refuses a deck whose PAPER ground or ink is not
+  `LIGHT_FIELD`/`LIGHT_TEXT`, or whose INK ground or ink is not `DARK_FIELD`/
+  `DARK_TEXT`. `artifacts/deck_palette.py` draws both decks' tables at the panel's
+  320x240 into `artifacts/decks/`; that is a palette proof, not a capture.
 * **The theme is chosen at runtime, by the app.** A Phone Link deck carries a
   read-write palette characteristic (`6f2d0008-…`, one byte, `0` PAPER or `1`
   INK), applies it, stores it in the `settings` namespace and repaints; the app

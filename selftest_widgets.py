@@ -29,12 +29,21 @@ HEADROOM = ROOT / "check_headroom.py"
 WIDGET = "demo_deck_cyd24R"
 SKETCH = "/* stand-in widget */\nvoid setup() {}\nvoid loop() {}\n"
 ASSETS = "android-companion/app/src/main/assets/widgets"
+PALETTE = ROOT / "android-companion/app/src/main/java/dev/phonedesk/companion/Palette.java"
+PAPER = ["#f1f0eb", "#e8e7e2", "#dddcd7", "#b3b1ac", "#000000", "#5b5a56",
+         "#000000", "#a9a8a3", "#1a1a18", "#7a7974", "#000000", "#4e4d49"]
+INK = ["#000000", "#101010", "#1c1c1a", "#3a3a37", "#f1f0eb", "#a8a7a2",
+       "#f1f0eb", "#6a6a66", "#ffffff", "#8c8b86", "#f1f0eb", "#b6b5b0"]
 
 
 def tree(dest):
     dest.mkdir(parents=True, exist_ok=True)
     shutil.copy2(CHECK, dest / "check_widget_assets.py")
     shutil.copy2(HEADROOM, dest / "check_headroom.py")
+    if PALETTE.is_file():
+        target = dest / "android-companion/app/src/main/java/dev/phonedesk/companion/Palette.java"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(PALETTE, target)
     folder = dest / WIDGET
     folder.mkdir()
     descriptor = folder / "widget.json"
@@ -51,6 +60,28 @@ def tree(dest):
 
 def descriptor(dest, meta):
     (dest / WIDGET / "widget.json").write_text(json.dumps(meta))
+
+
+def themed(dest, paper=None, ink=None):
+    """A sketch whose THEMES table says the app's two pages, or not."""
+    paper = list(paper or PAPER)
+    ink = list(ink or INK)
+    rows = []
+    for name, slots in (("0 PAPER", paper), ("1 INK", ink)):
+        rows.append("  // %s\n  { %s }," % (name, ", ".join("0x0000 /* %s */" % h for h in slots)))
+    text = ("struct Palette { uint16_t a, b; };\nstatic constexpr Palette THEMES[] = {\n"
+            + "\n".join(rows) + "\n};\n")
+    sketch = dest / WIDGET / (WIDGET + ".ino")
+    sketch.write_text(text)
+    (dest / ASSETS / WIDGET / (WIDGET + ".ino")).write_bytes(sketch.read_bytes())
+
+
+def wrong_paper(dest):
+    themed(dest, paper=["#ff00ff"] + PAPER[1:])
+
+
+def wrong_ink(dest):
+    themed(dest, ink=INK[:4] + ["#ff00ff"] + INK[5:])
 
 
 def drift(dest):
@@ -139,6 +170,18 @@ CASES = [
         mutate=no_widgets,
         want_code=1,
         want=["no widget.json found"],
+    ),
+    dict(
+        name="a deck whose paper page disagrees with the app is refused",
+        mutate=wrong_paper,
+        want_code=1,
+        want=["draws the paper page as #ff00ff", "but Palette.LIGHT_FIELD is"],
+    ),
+    dict(
+        name="a deck whose ink disagrees with the app is refused",
+        mutate=wrong_ink,
+        want_code=1,
+        want=["draws the ink ink as #ff00ff", "but Palette.DARK_TEXT is"],
     ),
 ]
 

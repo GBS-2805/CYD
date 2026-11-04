@@ -400,6 +400,27 @@ list of distinct devices rather than a row of identical entries.
 
 ## Verified, and not
 
+### Proving the theme toggle
+
+The palette is written by the phone, so this is the one test that needs both ends.
+It has not been run on a board yet; write each result here, with its date, when it
+is.
+
+1. Flash this sketch from ArduinoDroid — default partition, core 3.3.12, Adafruit
+   GFX, Adafruit ILI9341, XPT2046_Touchscreen — and record the `Sketch uses …`
+   line and the md5 ArduinoDroid reports.
+2. In the app: PAIRED, scan, LINK the board. The card shows the tag, the MAC and
+   `PAPER` or `INK`. That word is the byte the board reads back, so `theme
+   unknown` there means the characteristic did not answer.
+3. Tap `INK` on the saved row: the glass repaints inverted within a second and the
+   card keeps saying `INK`. Tap `PAPER`: the same, the other way.
+4. Flip SETTINGS → APPEARANCE on the phone. The phone and the linked deck should
+   end on the same page, because the app writes its choice down the link.
+5. Power-cycle the board with the backlight switch off and on: it must come back on
+   the page it was left on, without a rescan. That is NVS, not the phone.
+6. Unlink and re-link: the chips light from the board's answer, not from what the
+   phone last sent. An unlink that re-lights the other chip was the app's guess.
+
 A compile in this repo, on 2026-10-30 and before the mirror, with `arduino-cli`
 1.5.2-rc.1:
 **core 2.0.17** 1,162,797–1,162,813 B, **88 %** of 1,310,720, and
@@ -465,7 +486,7 @@ from the repo root, after sourcing a toolchain.
   so 3.x is path-sensitive too — 1,137–1,141 kB, not a fixed count.
 * The bundled copy matches byte for byte after `:app:syncWidgets`;
   `check_widget_assets.py` prints `2 widgets bundled, every copy matches`
-  (this sketch md5 `7047e587…`, the Spotify one `c446f31a…`).
+  (this sketch md5 `f5b49522…`, the Spotify one `50c4422d…`).
 * Core 3.x costs this sketch ~2.3 kB of flash and ~3.7 kB of RAM over 2.0.17 —
   nothing like the Spotify deck's 155 kB gap, which is that sketch's network
   stack rather than the core (see the build note in
@@ -507,4 +528,4 @@ The first flash of a new board is the test of those, not a formality.
 
 `check_headroom.py` built this sketch on 2026-11-02 with core 3.3.12 and read
 `Sketch uses 1,169,118 bytes` and `45,284 bytes` of globals; this folder's sketch
-md5 is `7047e587…`.
+md5 is `f5b49522…`.

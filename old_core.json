@@ -4,13 +4,13 @@
   "decks": {
     "phone_deck_cyd24R": {
       "globals": 41716,
-      "md5": "7047e587ab864d6de9462239401c631f",
+      "md5": "f5b495223130e85b25fd899d096667cb",
       "slot": 1310720,
       "used": 1168305
     },
     "spotify_deck_cyd24R": {
       "globals": 63276,
-      "md5": "c446f31a27a95207ea3800c1376c60bd",
+      "md5": "50c4422d11cdc19e9c51d126f3b0c7d1",
       "slot": 3145728,
       "used": 1750145
     }

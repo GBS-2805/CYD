@@ -127,7 +127,7 @@ struct Palette {
 
 static constexpr Palette THEMES[] = {
   // 0 PAPER - black ink on an off-white page
-  { 0xF79D /* #f1f0eb */, 0xEF3C /* #e8e7e2 */, 0xDEFA /* #dddcd7 */, 0xCE38 /* #c8c7c2 */,
+  { 0xF79D /* #f1f0eb */, 0xEF3C /* #e8e7e2 */, 0xDEFA /* #dddcd7 */, 0xB595 /* #b3b1ac */,
     0x0000 /* #000000 */, 0x5ACA /* #5b5a56 */, 0x0000 /* #000000 */, 0xAD54 /* #a9a8a3 */,
     0x18C3 /* #1a1a18 */, 0x7BCE /* #7a7974 */, 0x0000 /* #000000 */, 0x4A69 /* #4e4d49 */ },
   // 1 INK - the same page inverted: off-white ink on black
@@ -1718,7 +1718,9 @@ static void drawHomeTab(int index, bool lit) {
   if (lit) tft.fillRoundRect(r.x, r.y, r.w, r.h, 6, C_TEXT);
   char number[4];
   snprintf(number, sizeof(number), "%02d", index + 1);
-  drawTextAt(number, r.x + 4, r.y + 11, 1, lit ? C_BG : C_ACCENT_DIM, bg);
+  // An unread number is a word, so it takes the hint ink; accent-in-shadow is a
+  // hairline slot and read at 1.9:1 in the paper theme, which is a smudge.
+  drawTextAt(number, r.x + 4, r.y + 11, 1, lit ? C_BG : C_DIM, bg);
   drawTextAt(TAB_LABELS[index], r.x + 26, r.y + 8, 2, lit ? C_BG : C_TEXT, bg);
 }
 

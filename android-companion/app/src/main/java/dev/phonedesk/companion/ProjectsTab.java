@@ -72,7 +72,7 @@ final class ProjectsTab extends ScrollView {
         search.setTextSize(13);
         search.setTextColor(Ui.TEXT);
         search.setHintTextColor(Ui.DIM);
-        search.setBackground(Ui.rounded(activity, Ui.CARD_HI, Ui.EDGE, 8));
+        search.setBackground(Ui.rounded(activity, Ui.INPUT, Ui.EDGE, 8));
         search.setPadding(Ui.dp(activity, 12), Ui.dp(activity, 8),
                 Ui.dp(activity, 12), Ui.dp(activity, 8));
         search.addTextChangedListener(new TextWatcher() {
@@ -632,7 +632,7 @@ final class ProjectsTab extends ScrollView {
         field.setTypeface(Typeface.MONOSPACE);
         field.setTextColor(Ui.TEXT);
         field.setHintTextColor(Ui.DIM);
-        field.setBackground(Ui.rounded(activity, Ui.CARD_HI, Ui.EDGE, 8));
+        field.setBackground(Ui.rounded(activity, Ui.INPUT, Ui.EDGE, 8));
         field.setPadding(Ui.dp(activity, 10), Ui.dp(activity, 6),
                 Ui.dp(activity, 10), Ui.dp(activity, 6));
         return field;
@@ -968,8 +968,8 @@ final class ProjectsTab extends ScrollView {
         } else {
             StringBuilder text = new StringBuilder();
             text.append("TOUCH: ").append(FirmwareNotes.touchLabel(project.touch).toUpperCase());
-            if (!project.build.isEmpty()) text.append("   ·   BUILD: ").append(project.build);
-            text.append("   ·   ").append(Ui.ago(project.updatedMs, System.currentTimeMillis()));
+            if (!project.build.isEmpty()) text.append("  \u00B7  BUILD: ").append(project.build);
+            text.append("  \u00B7  ").append(Ui.ago(project.updatedMs, System.currentTimeMillis()));
             if (!project.notes.isEmpty()) text.append('\n').append(project.notes);
             view = Ui.text(activity, text.toString(), 11,
                     project.touch == FirmwareNotes.TOUCH_BROKEN ? Ui.PINK : Ui.GOOD);

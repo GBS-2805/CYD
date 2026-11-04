@@ -175,26 +175,32 @@ final class SetupTab extends ScrollView {
                         + "same page inverted. The band stays light either way, because it is "
                         + "the ground the mark was drawn on.",
                 13, Ui.DIM));
-        LinearLayout themeActions = Ui.row(activity);
-        themeActions.setPadding(0, Ui.dp(activity, 10), 0, 0);
-
-        // The live palette is the filled button, so the row says which one is on
-        // without a second label. Switching rebuilds the activity: a colour here is
-        // read when a view is constructed, and screens already built keep theirs.
+        // One track, two equal halves, the live one filled: a switch shows which of
+        // two states is on, where a filled button beside an outlined one read as a
+        // primary and a secondary action. Switching rebuilds the activity, because a
+        // colour here is read when a view is constructed.
         final int live = Appearance.get(activity);
-        Button dark = Ui.action(activity, "DARK", live == Ui.DARK);
+        LinearLayout themeSwitch = Ui.row(activity);
+        themeSwitch.setBackground(Ui.rounded(activity, android.graphics.Color.TRANSPARENT,
+                Ui.EDGE, 10));
+        final int inset = Ui.dp(activity, 4);
+        themeSwitch.setPadding(inset, inset, inset, inset);
+        themeSwitch.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        Button dark = Ui.segment(activity, "DARK", live == Ui.DARK);
         dark.setOnClickListener(v -> pickTheme(Ui.DARK));
-        themeActions.addView(dark, new LinearLayout.LayoutParams(
+        themeSwitch.addView(dark, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        Button light = Ui.action(activity, "LIGHT", live == Ui.LIGHT);
+        Button light = Ui.segment(activity, "LIGHT", live == Ui.LIGHT);
         light.setOnClickListener(v -> pickTheme(Ui.LIGHT));
-        LinearLayout.LayoutParams lightParams = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        lightParams.leftMargin = Ui.dp(activity, 8);
-        themeActions.addView(light, lightParams);
+        themeSwitch.addView(light, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        themeCard.addView(themeActions);
+        Ui.space(activity, themeSwitch, 10);
+        themeCard.addView(themeSwitch);
         Ui.space(activity, themeCard, 10);
         body.addView(themeCard);
 
@@ -320,17 +326,23 @@ final class SetupTab extends ScrollView {
             android.widget.Toast.makeText(activity, "Trace copied",
                     android.widget.Toast.LENGTH_SHORT).show();
         });
-        Ui.space(activity, copy, 10);
-        crashCard.addView(copy);
-
         Button clear = Ui.action(activity, "CLEAR", false);
         clear.setOnClickListener(v -> {
             CrashLog.clear(activity);
             crashShown = null;
             refreshCrashCard();
         });
-        Ui.space(activity, clear, 8);
-        crashCard.addView(clear);
+        // One row: they are a pair of clipboard actions, and two full-width bars
+        // one above the other read as two panels rather than the buttons they are.
+        LinearLayout traceActions = Ui.row(activity);
+        Ui.space(activity, traceActions, 10);
+        traceActions.addView(copy);
+        LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        clearParams.leftMargin = Ui.dp(activity, 8);
+        traceActions.addView(clear, clearParams);
+        crashCard.addView(traceActions);
     }
 
     /**

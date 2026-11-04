@@ -14,6 +14,7 @@ CONVENTIONS.md names and this file exists to close.
   ./check_widget_assets.py    exit 0 when every bundled copy matches, 1 otherwise
 """
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -27,6 +28,53 @@ NOT_A_WIDGET = {"android-companion"}
 
 # One hash for every checker; see check_headroom.md5.
 md5 = headroom.md5
+
+# The app's own palette, so a deck cannot describe a page the phone does not.
+PALETTE = ROOT / "android-companion/app/src/main/java/dev/phonedesk/companion/Palette.java"
+# The twelve slots in the order both sketches declare them.
+SLOTS = ["bg", "tile", "tileHi", "edge", "text", "dim",
+         "accent", "accentDim", "pink", "purple", "yellow", "green"]
+
+
+def argb(source, name):
+    """`Palette.X = 0xFFF1F0EB` as `#f1f0eb`, or None when it is not there."""
+    found = re.search(r"\b%s\s*=\s*0x([0-9A-Fa-f]{8})\b" % name, source)
+    return "#" + found.group(1)[2:].lower() if found else None
+
+
+def palette_problems(folders):
+    """Both decks draw the same two pages the app draws, or say which disagrees.
+
+    A sketch is pasted on its own into ArduinoDroid, so its palette cannot be
+    imported from the app — it is a second copy of the same four values. This is
+    the check that the copy still says what `Palette.java` says.
+    """
+    problems = []
+    if not PALETTE.is_file():
+        return problems
+    source = PALETTE.read_text(encoding="utf-8")
+    pages = {"paper": ("LIGHT_FIELD", "LIGHT_TEXT"), "ink": ("DARK_FIELD", "DARK_TEXT")}
+    for folder in folders:
+        sketch = folder / (folder.name + ".ino")
+        if not sketch.is_file():
+            continue
+        text = sketch.read_text(encoding="utf-8", errors="replace")
+        start = text.find("THEMES[]")
+        if start < 0:
+            continue                      # a widget with no palette table
+        block = text[start:text.find("};", start)]
+        found = re.findall(r"0x[0-9A-Fa-f]{4}\s*/\*\s*(#[0-9a-fA-F]{6})\s*\*/", block)
+        if len(found) < 2 * len(SLOTS):
+            continue                      # not a twelve-slot table; check_docs has it
+        rows = {"paper": found[:len(SLOTS)], "ink": found[len(SLOTS):2 * len(SLOTS)]}
+        for name, (ground_const, ink_const) in pages.items():
+            for slot, constant, word in ((0, ground_const, "page"), (4, ink_const, "ink")):
+                want = argb(source, constant)
+                got = rows[name][slot]
+                if want and got.lower() != want.lower():
+                    problems.append("%s draws the %s %s as %s, but Palette.%s is %s"
+                                    % (shown(sketch), name, word, got, constant, want))
+    return problems
 
 
 def shown(path):
@@ -93,6 +141,9 @@ def main():
                      "in sync" if not stale else "OUT OF SYNC"))
         problems.extend(stale)
 
+    palette = palette_problems(list(widget_folders()))
+    problems.extend(palette)
+
     if not rows:
         print("no widget.json found under %s" % shown(ROOT))
         return 1
@@ -105,7 +156,8 @@ def main():
         print("  - %s exists but no descriptor claims id %r"
               % (shown(ASSETS / name), name))
 
-    broken = sum(1 for row in rows if row[3] != "in sync") + len(on_disk - expected)
+    broken = (sum(1 for row in rows if row[3] != "in sync")
+              + len(on_disk - expected) + len(palette))
     if broken:
         print("\n%d problem%s. The app build re-syncs from the widget folder, so "
               "run one, or copy the named file(s) over."

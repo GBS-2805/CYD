@@ -135,7 +135,7 @@ struct Palette {
 
 static constexpr Palette THEMES[] = {
   // 0 PAPER - black ink on an off-white page
-  { 0xF79D /* #f1f0eb */, 0xEF3C /* #e8e7e2 */, 0xDEFA /* #dddcd7 */, 0xCE38 /* #c8c7c2 */,
+  { 0xF79D /* #f1f0eb */, 0xEF3C /* #e8e7e2 */, 0xDEFA /* #dddcd7 */, 0xB595 /* #b3b1ac */,
     0x0000 /* #000000 */, 0x5ACA /* #5b5a56 */, 0x0000 /* #000000 */, 0xAD54 /* #a9a8a3 */,
     0x18C3 /* #1a1a18 */, 0x7BCE /* #7a7974 */, 0x0000 /* #000000 */, 0x4A69 /* #4e4d49 */ },
   // 1 INK - the same page inverted: off-white ink on black

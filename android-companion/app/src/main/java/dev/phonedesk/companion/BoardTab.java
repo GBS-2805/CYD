@@ -202,7 +202,7 @@ final class BoardTab extends ScrollView {
         monitorInput.setTextColor(Ui.TEXT);
         monitorInput.setHintTextColor(Ui.DIM);
         monitorInput.setTypeface(Typeface.MONOSPACE);
-        monitorInput.setBackground(Ui.rounded(activity, Ui.CARD_HI, Ui.EDGE, 8));
+        monitorInput.setBackground(Ui.rounded(activity, Ui.INPUT, Ui.EDGE, 8));
         monitorInput.setPadding(Ui.dp(activity, 10), Ui.dp(activity, 8),
                 Ui.dp(activity, 10), Ui.dp(activity, 8));
     }
@@ -442,14 +442,22 @@ final class BoardTab extends ScrollView {
         Button start = Ui.action(activity, monitorOpen ? "STOP MONITOR" : "START MONITOR",
                 !monitorOpen);
         start.setOnClickListener(v -> toggleMonitor());
-        Ui.space(activity, start, 10);
-        card.addView(start);
 
         Button restart = Ui.action(activity, "RESTART + WATCH", false);
         restart.setEnabled(monitorOpen);
         restart.setOnClickListener(v -> requestMonitorReset());
-        Ui.space(activity, restart, 8);
-        card.addView(restart);
+
+        // One row of equal halves: stretched one above the other they read as two
+        // panels, and the pair is one choice — open the port, or reboot and watch.
+        LinearLayout monitorActions = Ui.row(activity);
+        Ui.space(activity, monitorActions, 10);
+        monitorActions.addView(start, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams restartParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        restartParams.leftMargin = Ui.dp(activity, 8);
+        monitorActions.addView(restart, restartParams);
+        card.addView(monitorActions);
 
         card.addView(Ui.section(activity, "OUTPUT"));
 

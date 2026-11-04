@@ -113,18 +113,29 @@ final class DecksTab extends ScrollView {
             final String where = snapshot.deviceTag.isEmpty()
                     ? snapshot.deviceMac
                     : snapshot.deviceTag + " \u00B7 " + snapshot.deviceMac;
-            final String palette = snapshot.theme == DeckTheme.UNKNOWN
-                    ? "" : " \u00B7 " + DeckTheme.name(snapshot.theme);
-            TextView mac = Ui.text(activity, where + palette + " \u00B7 packet "
-                    + Ui.ago(snapshot.lastWriteMs, System.currentTimeMillis()), 12, Ui.DIM);
+            // Two lines on purpose: the address already fills one, and a line that
+            // wraps in the middle of a fact reads as two facts. Where the deck is on
+            // the first, what it is showing and when it last answered on the second.
+            TextView mac = Ui.text(activity, where, 12, Ui.DIM);
             mac.setPadding(0, Ui.dp(activity, 4), 0, 0);
             deck.addView(mac);
+            final String palette = snapshot.theme == DeckTheme.UNKNOWN
+                    ? "theme unknown" : DeckTheme.name(snapshot.theme);
+            TextView wrote = Ui.text(activity, palette + " \u00B7 wrote "
+                    + Ui.ago(snapshot.lastWriteMs, System.currentTimeMillis()), 12, Ui.DIM);
+            wrote.setPadding(0, Ui.dp(activity, 2), 0, 0);
+            deck.addView(wrote);
             // The way out of a link from the card that shows it, so an unlink never
             // depends on finding the row for this board further down the page.
+            // Compact and at the end, the way the row's own UNLINK is: stretched
+            // across the card it read as a panel with a word in it.
+            LinearLayout unlinkRow = Ui.row(activity);
+            unlinkRow.setGravity(android.view.Gravity.END);
             Button unlink = Ui.action(activity, "UNLINK", false);
             unlink.setOnClickListener(v -> unlinkLinked(snapshot));
-            Ui.space(activity, unlink, 10);
-            deck.addView(unlink);
+            unlinkRow.addView(unlink);
+            Ui.space(activity, unlinkRow, 10);
+            deck.addView(unlinkRow);
             Ui.space(activity, deck, 10);
             body.addView(deck);
         }

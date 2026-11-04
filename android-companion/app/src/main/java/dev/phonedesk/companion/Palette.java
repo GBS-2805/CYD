@@ -18,8 +18,10 @@ final class Palette {
 
     /** The page, dark: black. */
     static final int DARK_FIELD = 0xFF000000;
-    /** A wash over black: a lifted row, a secondary action, a search field. */
+    /** A wash over black: a lifted row, a secondary action, a chip that is off. */
     static final int DARK_WASH = 0x1FFFFFFF;
+    /** A wash one step above {@link #DARK_WASH}: a text field's own fill. */
+    static final int DARK_INPUT = 0x2EFFFFFF;
     /** A hairline on black. A line is not a word; it is not asked for 3:1. */
     static final int DARK_EDGE = 0x3AF1F0EB;
     /** Body ink on black: the off-white. */
@@ -39,6 +41,8 @@ final class Palette {
     static final int LIGHT_FIELD = 0xFFF1F0EB;
     /** A wash over the off-white. */
     static final int LIGHT_WASH = 0x14000000;
+    /** A wash one step above {@link #LIGHT_WASH}: a text field's own fill. */
+    static final int LIGHT_INPUT = 0x1C000000;
     /** A hairline on the off-white. */
     static final int LIGHT_EDGE = 0x38000000;
     /** Body ink on the off-white: black. */

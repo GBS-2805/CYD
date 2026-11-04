@@ -33,6 +33,8 @@ final class Ui {
     static int BG = Palette.DARK_FIELD;
     static int CARD = Palette.DARK_FIELD;
     static int CARD_HI = Palette.DARK_WASH;
+    /** A text field's fill: one step above CARD_HI, so the box reads as a box. */
+    static int INPUT = Palette.DARK_INPUT;
     static int EDGE = Palette.DARK_EDGE;
     static int TEXT = Palette.DARK_TEXT;
     static int DIM = Palette.DARK_DIM;
@@ -63,6 +65,7 @@ final class Ui {
         BG = light ? Palette.LIGHT_FIELD : Palette.DARK_FIELD;
         CARD = BG;
         CARD_HI = light ? Palette.LIGHT_WASH : Palette.DARK_WASH;
+        INPUT = light ? Palette.LIGHT_INPUT : Palette.DARK_INPUT;
         EDGE = light ? Palette.LIGHT_EDGE : Palette.DARK_EDGE;
         TEXT = light ? Palette.LIGHT_TEXT : Palette.DARK_TEXT;
         DIM = light ? Palette.LIGHT_DIM : Palette.DARK_DIM;
@@ -234,6 +237,31 @@ final class Ui {
         button.setMinWidth(0);
         button.setMinimumWidth(0);
         button.setPadding(dp(context, 14), dp(context, 8), dp(context, 14), dp(context, 8));
+        return button;
+    }
+
+    /**
+     * One half of a two-state switch.
+     *
+     * Both halves are the same box with the same border, and the live one is filled
+     * with the page's own ink. That is the difference from {@link #action}: a
+     * primary and a secondary button read as two offers, while two equal boxes with
+     * one filled read as one control showing which of two states is on.
+     */
+    static Button segment(Context context, String label, boolean on) {
+        Button button = new Button(context);
+        button.setText(label);
+        button.setAllCaps(false);
+        button.setTypeface(Typeface.MONOSPACE);
+        button.setTextSize(13);
+        button.setTextColor(on ? ON_FILL : TEXT);
+        button.setBackground(rounded(context, on ? TEXT : Color.TRANSPARENT, on ? TEXT : EDGE, 8));
+        pressable(context, button, 8);
+        button.setMinHeight(dp(context, 40));
+        button.setMinimumHeight(dp(context, 40));
+        button.setMinWidth(0);
+        button.setMinimumWidth(0);
+        button.setPadding(dp(context, 12), dp(context, 8), dp(context, 12), dp(context, 8));
         return button;
     }
 

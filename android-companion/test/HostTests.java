@@ -64,6 +64,7 @@ public final class HostTests {
         bondAdvice();
         noticeText();
         contrast();
+        labels();
         syncChecksum();
         handshakeIntoDownloadMode();
         quietSyncUsesNoControlLines();
@@ -953,6 +954,43 @@ public final class HostTests {
         }
         check("contrast: the " + name + " ramp stays in order, quietest first ("
                         + ramp.toString().trim() + ")", ordered);
+    }
+
+    /**
+     * Every control fills its own background and then draws its own label on it, and
+     * the pair is what has to clear the floor: a fill can be lifted a step at a time
+     * until the word on it is as quiet as the page around it, while every check that
+     * measures an ink against the page still passes. That is how a button went from
+     * reading as a panel to reading as a caption, and no paragraph caught it.
+     */
+    private static void labels() {
+        label("dark", Palette.DARK_FIELD, Palette.DARK_WASH, Palette.DARK_INPUT,
+                Palette.DARK_TEXT, Palette.DARK_DIM, Palette.DARK_PRIMARY, 0xFF000000);
+        label("light", Palette.LIGHT_FIELD, Palette.LIGHT_WASH, Palette.LIGHT_INPUT,
+                Palette.LIGHT_TEXT, Palette.LIGHT_DIM, Palette.LIGHT_PRIMARY, 0xFFF1F0EB);
+    }
+
+    private static void label(String name, int page, int wash, int input, int text, int dim,
+                              int filled, int onFilled) {
+        // The wash and the field fill are translucent, so each is laid over the page
+        // first: a ratio taken against a half-transparent colour measures nothing.
+        final int washOnPage = Contrast.over(wash, page);
+        final int inputOnPage = Contrast.over(input, page);
+        check("contrast: " + name + " a secondary action's label on its own wash clears "
+                        + "4.5:1 (" + tenths(Contrast.ratio(text, washOnPage)) + ")",
+                Contrast.ratio(text, washOnPage) >= Contrast.BODY);
+        check("contrast: " + name + " a field's text on its own fill clears 4.5:1 ("
+                        + tenths(Contrast.ratio(text, inputOnPage)) + ")",
+                Contrast.ratio(text, inputOnPage) >= Contrast.BODY);
+        check("contrast: " + name + " a field's placeholder on that fill clears 3:1 ("
+                        + tenths(Contrast.ratio(dim, inputOnPage)) + ")",
+                Contrast.ratio(dim, inputOnPage) >= Contrast.QUIET);
+        check("contrast: " + name + " the live segment's label on the page ink clears 4.5:1 ("
+                        + tenths(Contrast.ratio(onFilled, text)) + ")",
+                Contrast.ratio(onFilled, text) >= Contrast.BODY);
+        check("contrast: " + name + " the primary action's label on its fill clears 4.5:1 ("
+                        + tenths(Contrast.ratio(onFilled, filled)) + ")",
+                Contrast.ratio(onFilled, filled) >= Contrast.BODY);
     }
 
     /** {@code 0xA8D9D9D9} reads as "66 %", which is how the palette is described. */
