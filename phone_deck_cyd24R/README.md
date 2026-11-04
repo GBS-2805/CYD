@@ -485,7 +485,7 @@ from the repo root, after sourcing a toolchain.
   so 3.x is path-sensitive too — 1,137–1,141 kB, not a fixed count.
 * The bundled copy matches byte for byte after `:app:syncWidgets`;
   `check_widget_assets.py` prints `2 widgets bundled, every copy matches`
-  (this sketch md5 `90f057a5…`, the Spotify one `fb40e042…`).
+  (this sketch md5 `ebb57c81…`, the Spotify one `fb40e042…`).
 * Core 3.x costs this sketch ~0.8 kB of flash and ~3.6 kB of RAM over 2.0.17 —
   nothing like the Spotify deck's 155 kB gap, which is that sketch's network
   stack rather than the core (see the build note in
@@ -527,4 +527,4 @@ The first flash of a new board is the test of those, not a formality.
 
 `check_headroom.py` built this sketch on 2026-11-04 with core 3.3.12 and read
 `Sketch uses 1,178,450 bytes` and `45,284 bytes` of globals; this folder's sketch
-md5 is `90f057a5…`.
+md5 is `ebb57c81…`.

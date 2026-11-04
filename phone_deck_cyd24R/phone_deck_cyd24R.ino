@@ -1469,7 +1469,7 @@ static const Rect DETAIL_BACK = {168, 202, 140, 30};
 // The date line inside the status card while a track is live, and the button that
 // leaves the now-playing page. The strip is 196 px wide because the phone's
 // battery block starts at 244.
-static const Rect NOW_STRIP = {20, 96, 196, 16};
+static const Rect NOW_STRIP = {22, 96, 196, 16};
 static const Rect NOW_BACK = {12, 202, 296, 30};
 
 // Half the brightness card each. Two 54px chips were pushed to the card's outer

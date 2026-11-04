@@ -27,7 +27,14 @@ ROOT = Path(__file__).resolve().parent
 CHECK = ROOT / "check_widget_assets.py"
 HEADROOM = ROOT / "check_headroom.py"
 WIDGET = "demo_deck_cyd24R"
-SKETCH = "/* stand-in widget */\nvoid setup() {}\nvoid loop() {}\n"
+SKETCH = """/* stand-in deck */
+static constexpr int SCREEN_W = 320;
+static constexpr int MARGIN = 12;
+static constexpr int CARD_PAD = 10;
+static const Rect CARD = {12, 40, 296, 76};
+void setup() {}
+void loop() {}
+"""
 ASSETS = "android-companion/app/src/main/assets/widgets"
 PALETTE = ROOT / "android-companion/app/src/main/java/dev/phonedesk/companion/Palette.java"
 PAPER = ["#f1f0eb", "#e8e7e2", "#dddcd7", "#b3b1ac", "#000000", "#5b5a56",
@@ -82,6 +89,44 @@ def wrong_paper(dest):
 
 def wrong_ink(dest):
     themed(dest, ink=INK[:4] + ["#ff00ff"] + INK[5:])
+
+
+def grid_sketch(dest, line, margin=12, pad=10):
+    """A sketch with the deck's grid and one rect where the case puts it."""
+    text = ("/* stand-in deck */\nstatic constexpr int SCREEN_W = 320;\n"
+            "static constexpr int MARGIN = %d;\nstatic constexpr int CARD_PAD = %d;\n"
+            "%s\nvoid setup() {}\nvoid loop() {}\n" % (margin, pad, line))
+    sketch = dest / WIDGET / (WIDGET + ".ino")
+    sketch.write_text(text)
+    (dest / ASSETS / WIDGET / (WIDGET + ".ino")).write_bytes(sketch.read_bytes())
+
+
+def card_past_margin(dest):
+    grid_sketch(dest, "static const Rect CARD = {8, 40, 296, 76};")
+
+
+def card_starting_in_inset(dest):
+    grid_sketch(dest, "static const Rect CARD = {18, 40, 280, 76};")
+
+
+def card_ending_in_inset(dest):
+    grid_sketch(dest, "static const Rect CARD = {12, 40, 290, 76};")
+
+
+def card_stopping_short(dest):
+    grid_sketch(dest, "static const Rect CARD = {12, 40, 260, 76};")
+
+
+def no_width(dest):
+    text = ("/* stand-in deck */\nstatic constexpr int MARGIN = 12;\n"
+            "static const Rect CARD = {12, 40, 296, 76};\nvoid setup() {}\nvoid loop() {}\n")
+    sketch = dest / WIDGET / (WIDGET + ".ino")
+    sketch.write_text(text)
+    (dest / ASSETS / WIDGET / (WIDGET + ".ino")).write_bytes(sketch.read_bytes())
+
+
+def margin_off_grid(dest):
+    grid_sketch(dest, "static const Rect CARD = {8, 40, 304, 76};", margin=8)
 
 
 RENDER = """import sys
@@ -245,6 +290,42 @@ CASES = [
         mutate=empty_renderer,
         want_code=1,
         want=["artifacts/deck_screens.py drew nothing"],
+    ),
+    dict(
+        name="a card that starts left of the page margin is refused",
+        mutate=card_past_margin,
+        want_code=1,
+        want=["CARD spans 8..304, past the page margin 12..308"],
+    ),
+    dict(
+        name="a rect starting between the margin and the card inset is refused",
+        mutate=card_starting_in_inset,
+        want_code=1,
+        want=["CARD starts at 18, between the margin 12 and the card inset 22"],
+    ),
+    dict(
+        name="a rect ending between the card inset and the margin is refused",
+        mutate=card_ending_in_inset,
+        want_code=1,
+        want=["CARD ends at 302, between the card inset 298 and the margin 308"],
+    ),
+    dict(
+        name="a card that starts on the margin but stops short of it is refused",
+        mutate=card_stopping_short,
+        want_code=1,
+        want=["CARD is a card from 12 to 272, so it does not reach the margin at 308"],
+    ),
+    dict(
+        name="a sketch that declares no screen width is refused, not skipped",
+        mutate=no_width,
+        want_code=1,
+        want=["is not on the page grid: it declares no SCREEN_W"],
+    ),
+    dict(
+        name="a deck whose margin is not the grid's is refused",
+        mutate=margin_off_grid,
+        want_code=1,
+        want=["sets MARGIN 8 and CARD_PAD 10; the deck grid is 12 and 10"],
     ),
 ]
 

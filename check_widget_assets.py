@@ -116,6 +116,124 @@ def palette_problems(folders):
     return problems
 
 
+# The deck grid. Both sketches declare it and artifacts/deck_screens.py copies it,
+# so these two numbers are written down four times; this is what keeps them equal.
+# A card runs MARGIN to SCREEN_W - MARGIN, and everything inside one starts CARD_PAD
+# in from that edge.
+GRID_MARGIN = 12
+GRID_PAD = 10
+# The band above the content, where the wordmark, the link pill and the back button
+# sit. They are not cards, so the margin does not apply to them, and a deck that
+# declares its own HEADER_H says where its band ends.
+GRID_BAND = 34
+
+
+def deck_grid(text):
+    """A sketch's SCREEN_W, margin and inset, the last two defaulted to the grid.
+
+    SCREEN_W has to be there, because it is what the right margin is measured from.
+    A sketch that names MARGIN and CARD_PAD is read at its word -- and refused when
+    the word is not the deck grid's -- while one that draws the same edges from
+    literals is measured against the grid rather than told to declare it.
+    """
+    grid = {"MARGIN": GRID_MARGIN, "CARD_PAD": GRID_PAD}
+    for name in ("SCREEN_W", "MARGIN", "CARD_PAD"):
+        found = re.search(r"\b%s\s*=\s*(-?\d+)\s*;" % name, text)
+        if found:
+            grid[name] = int(found.group(1))
+        elif name == "SCREEN_W":
+            return name, None
+    return None, grid
+
+
+def rect_constants(text):
+    """Every `static const Rect NAME = {...}`, and each row of a `Rect NAME[3]`."""
+    for found in re.finditer(r"static\s+const\s+Rect\s+(\w+)\s*(\[[^\]]*\])?\s*=\s*\{", text):
+        name = found.group(1)
+        start = found.end() - 1
+        depth = 0
+        body = None
+        for index in range(start, len(text)):
+            if text[index] == "{":
+                depth += 1
+            elif text[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    body = text[start:index + 1]
+                    break
+        if body is None:
+            continue
+        rows = re.findall(r"\{([^{}]*)\}", body) if found.group(2) else [body[1:-1]]
+        for row in rows:
+            numbers = [int(number) for number in re.findall(r"-?\d+", row)]
+            if len(numbers) == 4:
+                yield name, numbers
+
+
+def grid_problems_for(sketch):
+    """Every rect in one deck sits on the page grid, or says which edge left it.
+
+    The grid pass settled the deck pages on one margin and one card inset; a rule
+    that only lives in the prose is broken again by the next page. This reads the
+    layout constants out of the sketch rather than trusting a comment: the margin
+    and inset have to be the grid's own numbers, no rect may cross either margin,
+    no rect may invent an inset between the two grid lines, and a rect that starts
+    on the margin and is wider than half the column has to reach the other side.
+    Touch boxes (`_HIT`) and the band are exempt because they are slop and chrome,
+    not cards, and a sketch holding no Rect at all is not a page.
+    """
+    text = sketch.read_text(encoding="utf-8", errors="replace")
+    rects = list(rect_constants(text))
+    if not rects:
+        return []
+    missing, grid = deck_grid(text)
+    if missing:
+        return ["%s is not on the page grid: it declares no %s"
+                % (shown(sketch), missing)]
+
+    problems = []
+    if grid["MARGIN"] != GRID_MARGIN or grid["CARD_PAD"] != GRID_PAD:
+        problems.append("%s sets MARGIN %d and CARD_PAD %d; the deck grid is %d and %d"
+                        % (shown(sketch), grid["MARGIN"], grid["CARD_PAD"],
+                           GRID_MARGIN, GRID_PAD))
+
+    band = GRID_BAND
+    band_line = re.search(r"\bHEADER_H\s*=\s*(-?\d+)\s*;", text)
+    if band_line:
+        band = int(band_line.group(1))
+    left = grid["MARGIN"]
+    right = grid["SCREEN_W"] - grid["MARGIN"]
+    inset_left = left + grid["CARD_PAD"]
+    inset_right = right - grid["CARD_PAD"]
+
+    for name, (x, y, w, h) in rects:
+        if name.endswith("_HIT") or y + h <= band:
+            continue                     # touch slop and the band, not cards
+        if x < left or x + w > right:
+            problems.append("%s: %s spans %d..%d, past the page margin %d..%d"
+                            % (shown(sketch), name, x, x + w, left, right))
+        elif left < x < inset_left:
+            problems.append("%s: %s starts at %d, between the margin %d and the card inset %d"
+                            % (shown(sketch), name, x, left, inset_left))
+        elif inset_right < x + w < right:
+            problems.append("%s: %s ends at %d, between the card inset %d and the margin %d"
+                            % (shown(sketch), name, x + w, inset_right, right))
+        elif x == left and w * 2 > right - left and x + w != right:
+            problems.append("%s: %s is a card from %d to %d, so it does not reach the "
+                            "margin at %d" % (shown(sketch), name, left, x + w, right))
+    return problems
+
+
+def grid_problems(folders):
+    """Every deck sketch on the grid, deck by deck."""
+    problems = []
+    for folder in folders:
+        sketch = folder / (folder.name + ".ino")
+        if sketch.is_file():
+            problems.extend(grid_problems_for(sketch))
+    return problems
+
+
 def shown(path):
     try:
         return path.relative_to(ROOT).as_posix()
@@ -180,9 +298,12 @@ def main():
                      "in sync" if not stale else "OUT OF SYNC"))
         problems.extend(stale)
 
-    palette = palette_problems(list(widget_folders()))
+    folders = list(widget_folders())
+    palette = palette_problems(folders)
+    grid = grid_problems(folders)
     pages = deck_page_problems()
     problems.extend(palette)
+    problems.extend(grid)
     problems.extend(pages)
 
     if not rows:
@@ -198,7 +319,7 @@ def main():
               % (shown(ASSETS / name), name))
 
     broken = (sum(1 for row in rows if row[3] != "in sync")
-              + len(on_disk - expected) + len(palette) + len(pages))
+              + len(on_disk - expected) + len(palette) + len(grid) + len(pages))
     if broken:
         print("\n%d problem%s. The app build re-syncs from the widget folder, so "
               "run one, or copy the named file(s) over."

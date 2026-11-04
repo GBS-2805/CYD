@@ -276,7 +276,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   and the last three docs refusals were found by a reader, not by the check. Each
   `selftest_*.py` builds a throwaway repo in a temp directory — a stand-in
   `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
-  checker refuses: 43 docs branches, 9 asset branches, 10 margin branches, 23 old-core  ones, 9 render ones (a moved pixel, a wrong size, a corrupt PNG, a capture that failed), 11 screen ones
+  checker refuses: 43 docs branches, 21 asset branches, 10 margin branches, 23 old-core  ones, 9 render ones (a moved pixel, a wrong size, a corrupt PNG, a capture that failed), 11 screen ones
   (a stale count written in words, in digits and with a hyphen, a right count in
   the wrong paragraph, and frames that do not match the prose), 4 repro ones (two
   archives of different bytes, of different sizes, a build that fails and a build
@@ -498,6 +498,18 @@ static uint8_t themeIndex = 1;   // which one is live; the app writes it
   redrawing is a red gate rather than a stale picture. Glyphs are a stand-in for
   Adafruit's 5x7 and the content is sample data, so a page is a reconstruction, not
   a capture.
+  **Both decks sit on one grid.** A page runs `MARGIN = 12` to `SCREEN_W - MARGIN`,
+  and everything inside a card starts `CARD_PAD = 10` in from that edge.
+  `check_widget_assets.py` holds every `static const Rect` in a sketch to those two
+  numbers: nothing may cross either page margin, no rect may invent an inset — the
+  8, 18 and 20 px edges the grid pass removed were exactly that — or stop short of
+  one, and a rect that begins on the margin and is wider than half the column has
+  to reach the other side. The sketch's own `MARGIN`/`CARD_PAD` are read where it
+  declares them and refused when they are not the grid's; a sketch drawing the same
+  edges from literals is measured against the grid. Two exemptions are named in the
+  rule rather than guessed: the band above the content, where the wordmark, the
+  link pill and the back button live, and the `_HIT` boxes, which are touch slop
+  and draw nothing.
 * **The theme is chosen at runtime, by the app.** A Phone Link deck carries a
   read-write palette characteristic (`6f2d0008-…`, one byte, `0` PAPER or `1`
   INK), applies it, stores it in the `settings` namespace and repaints; the app
