@@ -396,8 +396,7 @@ URL and a flashing note. Decisions behind it:
   on phones without OTG still work; the card then reports that USB host is absent.
 - **Partially verified on hardware.** Two probes ran on a real phone (Android
   17, CH340 `1a86:7523`). The first saw `0 B` at all five rates and could not say
-  whether the board was silent or the bytes never left. The second, with counters,
-  showed **552 B out per round** (46 B × 12 syncs — the send path is proven) with
+  whether the board was silent or the bytes never left. The second, with counters,   showed **552 B out per round** (46 B × 12 syncs, so the bridge accepted every packet) with
   **0 B in**, plus **234 B of non-ASCII at 74880** after a plain reset. Bytes at
   the wrong rate that are not text mean the chip runs when released but says
   nothing at 115200 during the sync rounds, which is the signature of a polarity
@@ -517,7 +516,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   deadline and every pause reads the clock, `test.sh` installs a virtual one and
   the stub port advances it, so the two checks that ran the real probe against a
   silent board — 57 s each — still try all five wirings and both windows. Measured
-  on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 152 now green then, 135 now. `./check.sh`
+  on 2026-11-02: 179 s before, 1.45 s after, the same 126 checks then, 153 now. `./check.sh`
   runs the fast set, `./check.sh --full` the release set.
 - **The checkers' refusals are tested too, without a compiler.** Ten
   `selftest_*.py` files build a throwaway repo — a stand-in `arduino-cli`, a

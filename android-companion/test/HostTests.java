@@ -194,6 +194,32 @@ public final class HostTests {
                 port.commands.size() == 1 && port.commands.get(0)[0] == OP_SYNC);
         check("the ping counts as no reset at all",
                 joined(trace).contains("control lines untouched"));
+
+        // The bytes as they leave the port, not as this app's own decoder reads
+        // them: the stub's decoded lists assume the header layout sendCommand
+        // writes, so only a literal pin can catch that layout being wrong. These
+        // are esptool's sync frame — 0xC0, direction 0x00, opcode 0x08, size 36,
+        // checksum 0xDD, the 0x20120707 request and 32 0x55s, 0xC0 — and 46 bytes
+        // is what made "552 B out" twelve attempts on the phone's log.
+        final byte[] expected = new byte[46];
+        int at = 0;
+        expected[at++] = (byte) 0xC0;
+        expected[at++] = 0x00;
+        expected[at++] = (byte) OP_SYNC;
+        expected[at++] = 36;
+        expected[at++] = 0x00;
+        expected[at++] = (byte) 0xDD;
+        expected[at++] = 0x00;
+        expected[at++] = 0x00;
+        expected[at++] = 0x00;
+        expected[at++] = 0x07;
+        expected[at++] = 0x07;
+        expected[at++] = 0x12;
+        expected[at++] = 0x20;
+        for (int i = 0; i < 32; ++i) expected[at++] = 0x55;
+        expected[at] = (byte) 0xC0;
+        check("the sync frame on the wire is esptool's 46 bytes",
+                Arrays.equals(expected, port.wire.toByteArray()));
     }
 
     /**

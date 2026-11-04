@@ -36,6 +36,12 @@ final class UsbSerialCh340 {
 
     private final ByteArrayOutputStream inbound = new ByteArrayOutputStream();
     private final ByteArrayOutputStream commandBytes = new ByteArrayOutputStream();
+    /**
+     * Every byte handed to the port, untouched — SLIP framing and all. The decoded
+     * lists above share the header layout the protocol writes, so a mistake in that
+     * layout would look correct to them; this is the copy an independent pin reads.
+     */
+    final ByteArrayOutputStream wire = new ByteArrayOutputStream();
     private boolean inFrame;
     private Responder responder;
 
@@ -78,6 +84,7 @@ final class UsbSerialCh340 {
      */
     void write(byte[] data) throws IOException {
         if (failWrites) throw new IOException("USB write failed");
+        wire.write(data, 0, data.length);
         for (byte value : data) {
             final int current = value & 0xFF;
             if (current == 0xC0) {
