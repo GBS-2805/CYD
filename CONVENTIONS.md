@@ -15,7 +15,12 @@ controller or bridge gets its own section here first.
   either breaks the phone workflow and the app's build. The name carries the
   board it runs on — see [Naming](#naming-topic_deck_board) below.
 * One sketch, one tab, **no extra headers**. A pasted `.ino` cannot see a header
-  beside it.
+  beside it. **And one copy of it.** A `.ino` lives in its widget folder, plus the
+  bundle Gradle writes under `app/src/main/assets/`; `check_widget_assets.py`
+  refuses any other `.ino` in the tree, because a hand-made second copy is the one
+  a reader opens by mistake. `android-companion/dist/` held the phone sketch three
+  layout generations old — a pre-grid margin, the removed CLEAR chip, the CALIBRATE
+  row — with nothing compiling or reading it.
 * Each **widget** folder has one `README.md`: what it is, how to flash it, the
   traps, and what is verified. No `HOWTO.md`, no `HANDOFF.md` beside it — a task
   that needs steps gets them in that README. The app folder is the one exception,
@@ -276,7 +281,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   and the last three docs refusals were found by a reader, not by the check. Each
   `selftest_*.py` builds a throwaway repo in a temp directory — a stand-in
   `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
-  checker refuses: 43 docs branches, 21 asset branches, 10 margin branches, 23 old-core  ones, 9 render ones (a moved pixel, a wrong size, a corrupt PNG, a capture that failed), 11 screen ones
+  checker refuses: 43 docs branches, 23 asset branches, 10 margin branches, 23 old-core  ones, 9 render ones (a moved pixel, a wrong size, a corrupt PNG, a capture that failed), 11 screen ones
   (a stale count written in words, in digits and with a hyphen, a right count in
   the wrong paragraph, and frames that do not match the prose), 4 repro ones (two
   archives of different bytes, of different sizes, a build that fails and a build

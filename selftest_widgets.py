@@ -199,6 +199,17 @@ def no_widgets(dest):
     shutil.rmtree(dest / WIDGET)
 
 
+def stray_copy(dest):
+    """The sketch copied somewhere else, the way dist/ held one."""
+    (dest / "dist").mkdir()
+    shutil.copy2(dest / WIDGET / (WIDGET + ".ino"), dest / "dist" / (WIDGET + ".ino"))
+
+
+def stray_elsewhere(dest):
+    (dest / "notes").mkdir()
+    (dest / "notes/scratch.ino").write_text("void setup() {}\n")
+
+
 CASES = [
     dict(
         name="a widget whose copy matches passes",
@@ -326,6 +337,19 @@ CASES = [
         mutate=margin_off_grid,
         want_code=1,
         want=["sets MARGIN 8 and CARD_PAD 10; the deck grid is 12 and 10"],
+    ),
+    dict(
+        name="a second copy of a sketch outside its widget folder is refused",
+        mutate=stray_copy,
+        want_code=1,
+        want=["dist/demo_deck_cyd24R.ino is a second copy of",
+              "a sketch lives only in its widget folder"],
+    ),
+    dict(
+        name="a .ino belonging to no widget folder is refused",
+        mutate=stray_elsewhere,
+        want_code=1,
+        want=["notes/scratch.ino is a .ino outside any widget folder"],
     ),
 ]
 

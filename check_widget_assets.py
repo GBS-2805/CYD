@@ -234,6 +234,40 @@ def grid_problems(folders):
     return problems
 
 
+# Where a `.ino` may live: in the widget folder that owns it, and nowhere else.
+# The copy under app/src/main/assets is the one exception, because Gradle writes it
+# from those folders and the comparison above holds it byte for byte. A third copy
+# is a sketch nobody compiles and everybody might open — `dist/` carried one three
+# layout generations old until 2026-11-04.
+BUILD_DIRS = {"build", ".git", ".scratch", ".gradle", "node_modules"}
+
+
+def stray_sketch_problems(folders):
+    """Every .ino in the tree is some widget's own sketch, and there is one of each."""
+    problems = []
+    allowed = []
+    for folder in folders:
+        try:
+            meta = json.loads((folder / "widget.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            meta = {}
+        name = str(meta.get("sketch") or (folder.name + ".ino")).strip()
+        allowed.append((folder / name, folder))
+    for sketch in sorted(ROOT.rglob("*.ino")):
+        if BUILD_DIRS & set(sketch.relative_to(ROOT).parts) or ASSETS in sketch.parents:
+            continue
+        if any(sketch == home for home, _ in allowed):
+            continue
+        twin = next((home for home, _ in allowed if home.name == sketch.name), None)
+        if twin is not None:
+            problems.append("%s is a second copy of %s; a sketch lives only in its widget folder"
+                            % (shown(sketch), shown(twin)))
+        else:
+            problems.append("%s is a .ino outside any widget folder, so nothing compiles or ships it"
+                            % shown(sketch))
+    return problems
+
+
 def shown(path):
     try:
         return path.relative_to(ROOT).as_posix()
@@ -302,9 +336,11 @@ def main():
     palette = palette_problems(folders)
     grid = grid_problems(folders)
     pages = deck_page_problems()
+    stray = stray_sketch_problems(folders)
     problems.extend(palette)
     problems.extend(grid)
     problems.extend(pages)
+    problems.extend(stray)
 
     if not rows:
         print("no widget.json found under %s" % shown(ROOT))
@@ -319,7 +355,8 @@ def main():
               % (shown(ASSETS / name), name))
 
     broken = (sum(1 for row in rows if row[3] != "in sync")
-              + len(on_disk - expected) + len(palette) + len(grid) + len(pages))
+              + len(on_disk - expected) + len(palette) + len(grid) + len(pages)
+              + len(stray))
     if broken:
         print("\n%d problem%s. The app build re-syncs from the widget folder, so "
               "run one, or copy the named file(s) over."
