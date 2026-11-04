@@ -164,6 +164,17 @@ def main():
     if logo.is_file():
         shutil.copyfile(logo, PUBLIC / logo.name)
 
+    # The download has to be the APK this tree built. It used to be copied by hand
+    # after every build, which is a step that gets skipped exactly when the build
+    # changed something: the bundle would then serve the previous app under a
+    # gallery of the new one.
+    apk = HERE.parent / "android-companion" / "dist" / "PhoneDeckBridge-debug.apk"
+    if apk.is_file():
+        shutil.copyfile(apk, PUBLIC / apk.name)
+    else:
+        print("note: %s is not built, so the bundle carries no APK"
+              % apk.relative_to(HERE.parent))
+
     (PUBLIC / "index.html").write_text(PAGE.format(figures="\n".join(figures)))
 
     files = sorted(p.name for p in PUBLIC.iterdir())

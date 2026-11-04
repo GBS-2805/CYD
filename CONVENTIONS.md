@@ -695,18 +695,22 @@ deleted. What is left is the part that was never about the count.
 * One widget per change. A change touching two widget folders is two changes.
 * **Run the gates from one command.** [`check.sh`](check.sh) is the fast set a
   commit must pass — docs (figures, links, prose), widget assets, the 2.0.17
-  record's shape (no compiler needed), the host tests — and `./check.sh --full`
+  record's shape (no compiler needed), the archive in `dist/` (its size ceiling
+  and the sketches bundled in it), the host tests — and `./check.sh --full`
   adds deck headroom on 3.3.12, the 2.0.17 decks compared with `old_core.json`,
   the nine render captures, the APK build, two more builds of that APK that must
   match it byte for byte, and every deck compiled twice with its clock pinned,
-  whose images must match too — and `./check.sh --selftest` runs the ten
+  whose images must match too, the decks compiling concurrently — and `./check.sh --selftest` runs the eleven
   `selftest_*.py` files in about ten seconds. It also refuses a source file that is in the worktree but not in the
   index: every commit here stages tracked files, which cannot pick up a new one,
   and `LinkCommand.java` was referenced by two tracked classes for a day while a
   clone of the branch would not have compiled. The individual
   checkers keep their names because the pre-commit hook calls two of them with
   staged paths; nothing else needs six remembered invocations, and a round that
-  runs one command cannot skip a step by forgetting it.
+  runs one command cannot skip a step by forgetting it. `./check.sh --full <folder>`
+  proves the decks you name — their headroom, their old-core build and their
+  two-build repro — and leaves the other decks alone; the APK and the frames are
+  app-wide, so they still run. The release gate is the run with no names on it.
 * **Work reaches a branch by merge, never by copy**, so
   [the section above](#one-chat-one-tree) is the whole of it: a branch is mergeable
   on its own terms, nothing here needs anyone's permission, and a number a merge

@@ -4,6 +4,10 @@
 #
 #   ./check.sh          what a commit must pass            (~3 s)
 #   ./check.sh --full   what a release must pass           (~7 min: the decks on
+#   ./check.sh --full <folder> ...   the same for the decks you name: their
+#                       headroom, their old-core build and their two-build repro,
+#                       with the other decks left alone. The APK and the frames are
+#                       app-wide, so they still run.
 #                       both cores, the old ones compared with old_core.json, and
 #                       each deck built twice, so it needs all three toolchains — source
 #                       ~/.arduino-cyd/env.sh, ~/.arduino-cyd-2/env.sh or ~/.arduino15/env.sh for the old
@@ -11,11 +15,12 @@
 #   ./check.sh --selftest  the checkers' own refusals       (~10 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
-# nobody exercises: --selftest runs the ten selftest_*.py files, which hand each
+# nobody exercises: --selftest runs the eleven selftest_*.py files, which hand each
 # checker a throwaway repo and a stand-in (compiler, capture script, git repo) and
 # make it refuse.
 #
-# Fast:  docs (figures, links, prose, the recorded APK bytes), widget assets, the
+# Fast:  docs (figures, links, prose, the recorded APK bytes and its ceiling),
+#        widget assets, the
 #        index (no source file left outside it), the 2.0.17 record's shape (no
 #        compiler needed), the screen counts, the host tests, and the nine render
 #        captures whenever a staged file could move a pixel.
@@ -34,8 +39,32 @@ cd "$ROOT" || exit 1
 mkdir -p .scratch
 
 full=0
-[ "${1:-}" = "--full" ] && full=1
+selftest=0
+decks=()
 failures=0
+
+# Flags first, then deck names. A name that is not a deck is refused here rather
+# than down in a checker, where an unknown folder yields no sketches and a step
+# that measured nothing reads as a pass.
+for arg in "$@"; do
+  case "$arg" in
+    --full)     full=1 ;;
+    --selftest) selftest=1 ;;
+    -h|--help)
+      awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
+      exit 0 ;;
+    -*)
+      printf 'error: unknown flag %s (try --help)\n' "$arg" >&2
+      exit 2 ;;
+    *)
+      if [ ! -f "$arg/$arg.ino" ]; then
+        printf 'error: %s is not a deck: this tree has no %s/%s.ino\n' \
+               "$arg" "$arg" "$arg" >&2
+        exit 2
+      fi
+      decks+=("$arg") ;;
+  esac
+done
 
 step () {
   local name="$1" filter="$2"; shift 2
@@ -86,7 +115,7 @@ fi
 cli_args=()
 [ -n "$cli" ] && cli_args=(--arduino-cli "$cli")
 
-if [ "${1:-}" = "--selftest" ]; then
+if [ "$selftest" -eq 1 ]; then
   step "docs selftest"   'branches of check_docs'           python3 selftest_docs.py
   step "assets selftest" 'branches of check_widget_assets'  python3 selftest_widgets.py
   step "margin selftest" 'branches of check_headroom'       python3 selftest_headroom.py
@@ -96,6 +125,7 @@ if [ "${1:-}" = "--selftest" ]; then
   step "repro selftest" 'branches of check_repro'          python3 selftest_repro.py
   step "sketch selftest" 'branches of check_sketch_repro'   python3 selftest_sketch_repro.py
   step "gate selftest"   'branches of check.sh'            python3 selftest_gate.py
+  step "apk selftest"    'branches of check_apk'           python3 selftest_apk.py
   step "map selftest"    'branches of check_map'           python3 selftest_map.py
   echo
   if [ "$failures" -gt 0 ]; then
@@ -136,6 +166,10 @@ step "tracked"    'index'             tracked_step
 # it needs no compiler: a deck it names, one row per deck, an md5 for a sketch a
 # clone would have. A build on that core is the slower question, in --full.
 step "old record" 'consistently'      python3 check_old_core.py --record
+# The archive in dist/ is what the site serves and what HANDOFF quotes, and the
+# step that builds it is --full's. This is the cheap question a commit can answer
+# without building: is it still this tree's own build, and inside its ceiling?
+step "apk bytes"  'ceiling'           python3 check_apk.py
 # The deck's three faces are bitmap data pasted into a sketch, and Adafruit_GFX
 # reads a glyph as one bitstream with no row padding. Padding rows to bytes is
 # what turned every letter on glass into blocks on the first flash, and the
@@ -171,6 +205,7 @@ step   "map"      'has a selftest'     python3 check_map.py
 ui_staged () {
   git diff --cached --name-only --diff-filter=ACMR \
     -- 'android-companion/app/src/main/java' 'android-companion/app/src/main/res' \
+       'android-companion/app/src/main/assets' '*/widget.json' \
        'android-companion/capture.sh' | grep -q .
 }
 if [ "$full" -eq 1 ]; then
@@ -186,7 +221,7 @@ else
 fi
 
 if [ "$full" -eq 1 ]; then
-  step "headroom" 'deck\(s\) fit'       python3 check_headroom.py "${cli_args[@]}"
+  step "headroom" 'deck\(s\) fit'       python3 check_headroom.py "${cli_args[@]}" ${decks[@]+"${decks[@]}"}
   # The old core is a separate question, not a second opinion: a deck that fits on
   # 3.3.12 can still overflow on 2.0.17, and that root carries its own data dir and
   # its own Python path, so it is built in a shell that sourced its env.sh. The
@@ -197,7 +232,11 @@ if [ "$full" -eq 1 ]; then
     if [ -f "$candidate" ]; then abroot="$candidate"; break; fi
   done
   if [ -n "$abroot" ]; then
-    step "old core" 'old_core.json' bash -c '. "$0" && exec python3 check_old_core.py' "$abroot"
+    # $0 is the script name bash -c was given, so the env.sh is $1 and the deck
+    # names follow it: sourcing then shifting leaves exactly those names.
+    step "old core" 'old_core.json' bash -c \
+      '. "$1"; shift; exec python3 check_old_core.py "$@"' \
+      - "$abroot" ${decks[@]+"${decks[@]}"}
   else
     say "old core" "no A/B root in ~/.arduino-cyd-2 or ~/.arduino15, so the old core was NOT built"
   fi
@@ -209,7 +248,8 @@ if [ "$full" -eq 1 ]; then
   step "repro"    'same bytes'          python3 check_repro.py
   # The sketches are flashed, so their bytes matter the same way the APK's do:
   # each deck is compiled twice and the images must match.
-  step "sketch repro" 'same bytes'      python3 check_sketch_repro.py "${cli_args[@]}"
+  # The decks compile together, so a new deck costs a compile, not a run.
+  step "sketch repro" 'same bytes'      python3 check_sketch_repro.py "${cli_args[@]}" ${decks[@]+"${decks[@]}"}
 fi
 
 echo
