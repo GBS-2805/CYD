@@ -8,7 +8,8 @@ Non-negotiables if you read nothing else:
 
 * One widget per folder, one `.ino` named after the folder, no extra headers.
 * Libraries: Adafruit GFX, Adafruit ILI9341, XPT2046_Touchscreen — and never
-  ArduinoBLE, whose `BLEDevice.h` shadows the ESP32 core's BLE headers.
+  ArduinoBLE, whose `BLEDevice.h` shadows the ESP32 core's BLE headers — nor
+  NimBLE-Arduino, which is an API these sketches are not written against.
 * Every **widget** folder keeps one `README.md`. A finding true of the whole board
   goes into `CONVENTIONS.md`; one true of a single widget goes into that widget's
   README. The app folder is the standing exception and keeps `README.md`,

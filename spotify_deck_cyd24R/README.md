@@ -11,7 +11,7 @@ active.
 
 This deck needs `PartitionScheme=huge_app`. Bluetooth does not fit beside WiFi,
 mbedTLS and the setup server in the default 1,310,720-byte app slot: the linked
-image is 1,891,501 bytes, 144 % of the 1,310,720-byte slot and 60 % of 3,145,728.
+image is 1,891,309 bytes, 144 % of the 1,310,720-byte slot and 60 % of 3,145,728.
 phone deck afterwards with the default scheme re-partitions the board back, so
 each upload has to carry the scheme its own sketch was built for.
 
@@ -408,7 +408,7 @@ compiler:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,891,501 | **1,254,227** | 3,145,728 (60 % used) |
+| flash | 1,891,309 | **1,254,419** | 3,145,728 (60 % used) |
 | DRAM | 69,164 globals | **258,516** | 327,680 |
 
 The two figures are this tree's own build through `~/.arduino-cyd-3/env.sh` on
@@ -473,9 +473,9 @@ sourcing a toolchain.
 * **It needs `huge_app` now, and that is the scheme `toolchain.sh` pins.**
   Without Bluetooth the 3.3.12 build was 1,125,781 bytes, 85 % of 1,310,720:
   measured from the pre-link sketch (`00bb1560`), not a flag on today's file.
-  With the link it is 1,891,501 bytes: **144 %** of 1,310,720, **60 %** of 3,145,728.
+  With the link it is 1,891,309 bytes: **144 %** of 1,310,720, **60 %** of 3,145,728.
   An earlier pair of runs differed by 48 B; the pre-commit hook and a direct
-  compile both print 1,891,501 now, so the single figure is the measured one.
+  compile both print 1,891,309 now, so the single figure is the measured one.
   `default.csv`
   sizes `app0` and `app1` at 1,310,720 each, so on the default scheme this deck no
   longer links at all — not a tighter fit, a refusal. Uploading it re-partitions

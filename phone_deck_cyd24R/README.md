@@ -125,7 +125,9 @@ what the screen actually draws.
   sketch uses the core's own Bluedroid library (`BLEDevice`, `BLEServer`).
 * Libraries: **Adafruit GFX Library**, **Adafruit ILI9341**,
   **XPT2046_Touchscreen**.
-* Do **not** install **ArduinoBLE** — its `BLEDevice.h` shadows the core header.
+* Do **not** install **ArduinoBLE** — its `BLEDevice.h` shadows the core header. Nor
+  **NimBLE-Arduino**: this sketch is written against the core's Bluedroid stack, so
+  another BLE library is a rewrite of the link, not an install.
 * One file only: `phone_deck_cyd24R.ino`, no extra headers.
 
 ```bash
@@ -170,7 +172,7 @@ upload that will not sync, not a step.
    `fatal error: deck_types.h: No such file or directory`, because only the
    `.ino` is compiled.
 3. Board **ESP32 Dev Module**; install only Adafruit GFX, Adafruit ILI9341 and
-   XPT2046_Touchscreen. **ArduinoBLE must not be installed.**
+   XPT2046_Touchscreen. **ArduinoBLE and NimBLE-Arduino must not be installed.**
 4. **Upload from ArduinoDroid**, with an OTG adapter and a USB **data** cable.
    That is measured, not assumed: on 2026-10-31 the same phone, adapter, cable and
    board flashed successfully from ArduinoDroid, so the CH340, the cable and the
@@ -289,7 +291,10 @@ the card; a `play` line starts the deck's progress bar moving on its own between
 writes. The track shows on the status card's last line (`>> 1:12 3:45  Title`) and
 the whole page opens with a tap on it. That page has no transport buttons on
 purpose: the deck has no way to ask Spotify anything, so a pause here would be a
-promise it cannot keep. The text fields are capped at 47, 31 and 31 UTF-8 bytes,
+promise it cannot keep. It leaves by its own `BACK` button or the header's `<`
+chip, and a tap on the card does nothing: until 2026-11-04 any tap anywhere on
+that page went to the messages board, so the card could only be left by accident
+and the one thing that looked like a control did not behave like one. The text fields are capped at 47, 31 and 31 UTF-8 bytes,
 and the app replaces any `|` in a title with `/` before sending, because this
 characteristic splits on it.
 
@@ -302,7 +307,7 @@ is a second row.
 ```json
 {"id":"phone_deck_cyd24R-A1B2C3","widget":"phone_deck_cyd24R",
  "tag":"A1B2C3","name":"Phone Deck","label":"","role":"phone",
- "v":"1.0.0","link":"ble"}
+ "v":"1.0.1","link":"ble"}
 ```
 
 `id` names the hardware and does not move: it is the key the app files a row under,
@@ -374,6 +379,7 @@ asyncio.run(main())
 | Hold a notification (0.7 s) | Remove it from the deck |
 | Tap `DISMISS` in the detail view | Remove it from the deck |
 | Tap the gear (top right) | Brightness and calibrate touch |
+| Tap `BACK` on the now-playing page | Back to the front page |
 | Hold the title for 1.5 s | Touch calibration |
 
 ## Advertising
@@ -460,7 +466,8 @@ The palette is written by the phone, so this is the one test that needs both end
 It has not been run on a board yet; write each result here, with its date, when it
 is.
 
-1. Flash this sketch from ArduinoDroid — default partition, core 3.3.12, Adafruit
+1. Flash this sketch from ArduinoDroid — `PartitionScheme=huge_app` (the 3 MB app
+   slot, and what `toolchain.sh` pins), core 3.3.12, Adafruit
    GFX, Adafruit ILI9341, XPT2046_Touchscreen — and record the `Sketch uses …`
    line and the md5 ArduinoDroid reports.
 2. In the app: PAIRED, scan, LINK the board. The card shows the tag, the MAC and
@@ -492,15 +499,15 @@ flash and 3.7 kB of RAM more, depending on the path.
 ### Headroom
 
 Measured here on 2026-11-04 with [`../check_headroom.py`](../check_headroom.py),
-core **3.3.12**, default partition scheme:
+core **3.3.12**, `PartitionScheme=huge_app`:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,179,402 | **131,318** | 1,310,720 (89 % used) |
+| flash | 1,179,334 | **1,966,394** | 3,145,728 (37 % used) |
 | DRAM | 45,332 globals | **282,348** | 327,680 |
 
 The root behind those figures is `~/.arduino-cyd/env.sh`, the one whose `env.sh`
-pins its own data and library dirs: `check_docs.py --refresh` re-read 1,179,402 B
+pins its own data and library dirs: `check_docs.py --refresh` re-read 1,179,334 B
 and 45,332 B from it on 2026-11-04. While that script set only `PATH` the same
 build went through `~/.arduino15` and printed 1,168,282 B — 32 B under with the
 globals identical — another worktree's root prints the same size, and
@@ -510,11 +517,12 @@ number (see
 
 The check refuses a deck that overflows, that drops under **64 KiB** of free flash
 or that leaves under **160 KiB** of DRAM — the last floor is just over the
-153,600 B a full 320x240 RGB565 framebuffer needs. So this deck has one
-framebuffer's worth of slack and 126 kB besides, and a single addition larger
-than about **139 KiB** overflows the slot: a 1,400,000-byte const table measured
-1,668,748 B (127 % of 1,310,720), which is the overflow the refusal names rather than a bare
-`compile failed`. Re-measure with `python3 ../check_headroom.py phone_deck_cyd24R`
+153,600 B a full 320x240 RGB565 framebuffer needs. So this deck has almost two megabytes of flash to grow into, and one
+framebuffer's worth of DRAM slack. It takes a **1,966,394-byte** addition to
+overflow the slot now. On the default scheme it took far less: a
+1,400,000-byte const table measured 1,668,748 B and overflowed the
+1,310,720-byte slot it was built for, which is the refusal that named the need
+for `huge_app` rather than a bare `compile failed`. Re-measure with `python3 ../check_headroom.py phone_deck_cyd24R`
 from the repo root, after sourcing a toolchain.
 
 ### At a glance
@@ -534,12 +542,12 @@ from the repo root, after sourcing a toolchain.
     [`old_core.json`](../old_core.json) — size, globals and md5 together, measured
     2026-11-04 through `~/.arduino-cyd-2` — because a 2.0.17 figure quoted here
     would be checked against the 3.3.12 build and refused.
-* Core **3.3.12** links it at 1,179,402 bytes (89 % of 1,310,720) with 45,332 bytes of RAM
+* Core **3.3.12** links it at 1,179,334 bytes (37 % of 3,145,728) with 45,332 bytes of RAM
   (13 % of 327,680), `EXIT=0` under `--warnings all`, re-measured on 2026-11-04 with the new typeface. An earlier 3.3.12 build on a shorter path reported 1,163,930 / 45,004,
   so 3.x is path-sensitive too — 1,137–1,141 kB, not a fixed count.
 * The bundled copy matches byte for byte after `:app:syncWidgets`;
   `check_widget_assets.py` prints `2 widgets bundled, every copy matches`
-  (this sketch md5 `6a2609cc…`, the Spotify one `0a2147b9…`).
+  (this sketch md5 `abef49da…`, the Spotify one `0a2147b9…`).
 * Core 3.x costs this sketch ~1.1 kB of flash and ~3.6 kB of RAM over 2.0.17 —
   nothing like the Spotify deck's 155 kB gap, which is that sketch's network
   stack rather than the core (see the build note in
@@ -580,5 +588,5 @@ The first flash of a new board is the test of those, not a formality.
 ## Measured
 
 `check_headroom.py` built this sketch on 2026-11-04 with core 3.3.12 and read
-`Sketch uses 1,179,402 bytes` and `45,332 bytes` of globals; this folder's sketch
-md5 is `6a2609cc…`.
+`Sketch uses 1,179,334 bytes` and `45,332 bytes` of globals; this folder's sketch
+md5 is `abef49da…`.

@@ -273,10 +273,22 @@ final class ProjectsTab extends ScrollView {
         card.addView(hint);
 
         if (!never.isEmpty()) {
-            TextView warning = Ui.text(activity,
-                    "Never install " + String.join(" or ", never)
-                            + ": it shadows the ESP32 core's BLE headers and every build fails.",
-                    11, Ui.PINK);
+            // Two different refusals, so one line each: ArduinoBLE shadows the core's
+            // own headers, and another BLE library is not a compile problem at all —
+            // it is a rewrite of every call this sketch makes, which is why it is
+            // named here rather than left to be discovered after installing it.
+            StringBuilder banned = new StringBuilder();
+            for (String name : never) {
+                if (banned.length() > 0) banned.append('\n');
+                banned.append("Never install ").append(name).append(": ");
+                if (name.toLowerCase(Locale.US).contains("arduinoble")) {
+                    banned.append("it shadows the ESP32 core's BLE headers and every build fails.");
+                } else {
+                    banned.append("the deck is built on the core's own stack, so another "
+                            + "BLE library is a rewrite of the link, not an install.");
+                }
+            }
+            TextView warning = Ui.text(activity, banned.toString(), 11, Ui.PINK);
             warning.setPadding(0, Ui.dp(activity, 8), 0, 0);
             warning.setLineSpacing(Ui.dp(activity, 2), 1f);
             card.addView(warning);

@@ -216,12 +216,14 @@ final class WidgetCatalog {
                 + "set like a woodblock print in two monochrome themes: black ink on an "
                 + "off-white page, or the same page inverted.";
         widget.notes = "Bundled with the app: copy it into ArduinoDroid and compile, there is "
-                + "nothing to download.";
+                + "nothing to download. Compile it on PartitionScheme=huge_app, the 3 MB "
+                + "APP slot.";
         widget.assetPath = "widgets/phone_deck_cyd24R/phone_deck_cyd24R.ino";
         widget.libraries.add("Adafruit GFX Library");
         widget.libraries.add("Adafruit ILI9341");
         widget.libraries.add("XPT2046_Touchscreen");
         widget.never.add("ArduinoBLE");
+        widget.never.add("NimBLE-Arduino");
         widget.nameMatch.add("phone_widget");
         widget.nameMatch.add("phone deck");
         widget.service = UUID.fromString("6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10");

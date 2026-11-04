@@ -761,7 +761,7 @@ static void initIdentity() {
 // The build's name. It is quoted in the identity document, so the app can say
 // which firmware a deck is running; bump it whenever the sketch changes in a way
 // a reader could notice.
-static const char DECK_VERSION[] = "1.0.0";
+static const char DECK_VERSION[] = "1.0.1";
 
 static void buildDeckIdentity(char *out, size_t outLen) {
   snprintf(out, outLen,
@@ -3472,11 +3472,16 @@ void loop() {
       nowDrawnSecond = second;
       drawNow();
     }
+    // Only the two controls that say BACK leave this page: the chip in the header
+    // and the button across the bottom. Until 2026-11-04 any press anywhere went
+    // to the board, so the page could only be left by accident — tapping the
+    // phone's own track card opened the messages page. Both ways out land on the
+    // front page, because the front page's tab is where this page is opened from.
     if (down && !wasTouched) {
       touchStartMs = now;
       if (now - lastActionMs > 150) {
         lastActionMs = now;
-        drawBoard();
+        if (insideHeaderBack(x, y) || inside(x, y, NOW_BACK)) drawHome();
       }
     }
     wasTouched = down;

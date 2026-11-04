@@ -76,6 +76,14 @@ folder — `phone_deck_cyd24R.ino` or `spotify_deck_cyd24R.ino`. Each sketch is
 deliberately one file; splitting one fails with
 `deck_types.h: No such file or directory`.
 
+**Partition scheme: `huge_app`, the 3 MB APP slot.** Both sketches are built for it
+and neither fits the default 1,310,720-byte slot any more — the phone deck's radio
+alone measured 816,643 B — so pick that scheme in ArduinoDroid's board menu before
+compiling. The scheme is written at flash time: a board carrying the default
+partition keeps it until an upload built for this one lands. `1,179,334 B` of
+`3,145,728` for the phone deck, `1,891,309 B` for the Spotify deck, both measured
+on core 3.3.12.
+
 ## Install Marauder, Bruce or Launcher on the CYD
 
 Other firmwares are not flashed by this app. **BOARDS** opens the
@@ -106,8 +114,8 @@ needs exactly the same three libraries:
 
 | Sketch | Libraries | Never install |
 | --- | --- | --- |
-| Phone Deck (`phone_deck_cyd24R.ino`) | Adafruit GFX Library, Adafruit ILI9341, XPT2046_Touchscreen | ArduinoBLE |
-| Spotify Deck (`spotify_deck_cyd24R.ino`) | the same three | ArduinoBLE |
+| Phone Deck (`phone_deck_cyd24R.ino`) | Adafruit GFX Library, Adafruit ILI9341, XPT2046_Touchscreen | ArduinoBLE, NimBLE-Arduino |
+| Spotify Deck (`spotify_deck_cyd24R.ino`) | the same three | ArduinoBLE, NimBLE-Arduino |
 | Marauder / Bruce / Launcher | none — flash the prebuilt image | — |
 
 ### Install them without retyping the names

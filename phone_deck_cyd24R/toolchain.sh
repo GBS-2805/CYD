@@ -29,7 +29,10 @@ ROOT="${ARDUINO_HOME:-$HOME/.arduino-cyd}"
 # candidate, so a pinned 1.5.2 URL 404s and silently falls back anyway.
 CLI_VERSION="${ARDUINO_CLI_VERSION:-latest}"
 CORE="${ARDUINO_CORE:-esp32:esp32@3.3.12}"
-FQBN="${ARDUINO_FQBN:-esp32:esp32:esp32}"
+# huge_app, not the default scheme: this sketch's radio stack alone measured
+# 816,643 B on 2026-11-04, so the default 1,310,720-byte app slot left it 128 kB
+# - under the gate's own 64 KiB floor plus one framebuffer. huge_app gives 3 MB.
+FQBN="${ARDUINO_FQBN:-esp32:esp32:esp32:PartitionScheme=huge_app}"
 LIBS=("Adafruit GFX Library" "Adafruit ILI9341" "XPT2046_Touchscreen")
 
 SETUP_ONLY=0

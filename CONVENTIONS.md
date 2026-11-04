@@ -89,9 +89,12 @@ sketch and the descriptor `id`, which always move together:
   `N4XX` is 4 MB of flash and no PSRAM. On a board that does have it, `none found`
   still proves nothing, because `esp32:esp32:esp32` defaults to `PSRAM=disabled`.
   Read the marking, never a product listing.
-* **Budget for 4 MB of flash and no PSRAM.** The default partition scheme gives
-  the app 1,310,720 bytes and the deck takes 1,179,402 of them (89 % as reported
-  by the compiler, after the mirror). DRAM is 327,680 bytes with ~300 kB of heap
+* **Budget for 4 MB of flash and no PSRAM.** Both decks are built and flashed on
+  `PartitionScheme=huge_app`, which gives the app 3,145,728 bytes. The phone deck
+  takes 1,179,334 of them, 37 % of its 3,145,728-byte slot, and the Spotify deck
+  1,891,309, 60 % of the same 3,145,728-byte slot. They moved on 2026-11-04 because the phone
+  deck's radio alone measured 816,643 B, which left it 128 kB of the default
+  1,310,720-byte slot — under the gate's own floor plus one framebuffer. DRAM is 327,680 bytes with ~300 kB of heap
   free at boot once the display and touch drivers are up; a 320x240 RGB565
   framebuffer is 153,600, so there is room for one, not two. Treat "it fits" as a
   measurement from `Sketch uses ...`, never an assumption.
@@ -118,8 +121,9 @@ depends on. Write every result into that widget's `README.md` under *Verified*
 with the date and the command that printed it, because a number without a run behind
 it is the drift this file exists to stop.
 
-1. **The phone deck, on the default partition.** BLE only, so no partition switch
-   and no network, at 1,179,402 B, 89 % of its 1,310,720 B slot.
+1. **The phone deck, on `huge_app`.** BLE only, so no network and no TLS, at
+   1,179,334 B, 37 % of its 3,145,728 B slot — the scheme `toolchain.sh` pins,
+   so an ArduinoDroid upload has to carry it too.
    Compile it in ArduinoDroid with Adafruit GFX, Adafruit ILI9341 and
    XPT2046_Touchscreen, and record the `Sketch uses …` line and the `md5sum` of the
    file the phone compiled — the size belongs to the compiler, the md5 to the bytes.
@@ -144,7 +148,7 @@ it is the drift this file exists to stop.
    the expensive deck.
 8. **The Spotify deck, on `huge_app` — Bluetooth half done on 2026-11-03.** The
    first sketch here whose partition scheme has to be flashed with it:
-   1,891,501 B, 60 % of its 3,145,728 B slot. Flashed, it linked to the companion app,
+   1,891,309 B, 60 % of its 3,145,728 B slot. Flashed, it linked to the companion app,
    drew the phone's line and started playback from a chip, so the scheme, the
    advertise, the identity read, the mirror and the command notify all answered at
    once; the corner chips were hard to hit, which is why `10bb4b7` enlarged their
@@ -169,8 +173,15 @@ sketch for it.
 
 ## Build
 
+Every widget here is built and flashed on `PartitionScheme=huge_app`, the 3 MB app
+slot. The default scheme's 1,310,720 bytes is less than anything with a radio needs
+— the phone deck's BLE stack alone measured 816,643 B on 2026-11-04 — so the
+scheme is the default everywhere it could be forgotten: in
+[`check_headroom.py`](check_headroom.py), in each widget's `toolchain.sh`, and in
+the copy of the sketch the app hands out.
+
 ```bash
-arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
+arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app my_widget
 ```
 
 * Board package `esp32:esp32`. Both decks default to core **3.3.12** and compile
@@ -183,8 +194,8 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   globals, Spotify 1,122,281 B, 85 % of 1,310,720, / 53,572 B globals. Those are
   48 B and 32 B above the same sketches built straight through `arduino-cli` from
   another path — the build-root sensitivity above, not a different toolchain. The
-  mirror has since moved the phone deck to 1,179,402 B, 89 % of 1,310,720, /
-  45,332 B globals and the Spotify sketch to 1,125,781 B, 85 % of 1,310,720, /
+  mirror has since moved the phone deck, 1,179,334 B on `huge_app` today with
+  45,332 B of globals, and the Spotify sketch to 1,125,781 B, 85 % of 1,310,720,
   53,636 B globals, as [`check_headroom.py`](check_headroom.py) read both of them
   on 2026-11-01 — that Spotify file is the one before the Bluetooth link
   (`00bb1560`), not a flag on today's.
@@ -222,7 +233,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   end ever observed, and the next build printed 1,878,661 twice.
 * **A size names the root that printed it, and here that root is
   `~/.arduino-cyd-3`.** The current 3.3.12 figures in these docs — phone deck
-  1,179,402 B / 45,332 B of globals, the linked Spotify deck 1,891,501 B /
+  1,179,334 B / 45,332 B of globals, the linked Spotify deck 1,891,309 B /
   69,164 B on `huge_app`, the unlinked Spotify deck 1,125,781 B — are that
   root's, read through `arduino-cli` 1.5.2-rc.1 on 2026-11-02. It is the root
   worth naming because its `env.sh` pins its own data, download and user dirs;
@@ -433,7 +444,12 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   Library`, `Adafruit ILI9341`, `XPT2046_Touchscreen`.
 * **Never install ArduinoBLE.** Its `BLEDevice.h` shadows the core's header and
   the build dies in a wall of errors. BLE comes from the core (Bluedroid) —
-  `BLEDevice`, `BLEServer`, `BLEClient`.
+  `BLEDevice`, `BLEServer`, `BLEClient`. **`NimBLE-Arduino` is refused for a
+  different reason**: it would compile, but every call the sketch makes is written
+  against Bluedroid, so swapping the stack is a rewrite of the link rather than a
+  library install — and it saves nothing a 3 MB slot needs. Both names live in the
+  descriptors' `never` list, which is what the app's library box prints, and each
+  carries its own reason there: one shadows a header, the other is the wrong API.
 * Use the widget's [`toolchain.sh`](phone_deck_cyd24R/toolchain.sh) rather than
   assembling a toolchain per session; it is idempotent and keeps everything under one
   `ARDUINO_HOME`.
@@ -586,7 +602,8 @@ expects a refusal.
 
 ## One build name per sketch
 
-Each sketch declares `DECK_VERSION` — `1.0.0` today — and that one constant is
+Each sketch declares `DECK_VERSION` — the phone deck `1.0.1`, the Spotify
+deck `1.0.0` today — and that one constant is
 quoted in its identity document as `"v"`, so a linked deck says which firmware it
 is running and the app prints it on the deck's row. The flash shelf reads the same
 declaration out of the bundled sketch and prints it there too, which is the answer
@@ -655,7 +672,7 @@ deleted. What is left is the part that was never about the count.
   `git cherry-pick <sha>` needs nothing pushed — a push is a publish, not a hand-off.
   A copy silently drops whichever version was written second; a merge shows both
   sides of the disagreement. Re-measure what a merge brings, because a figure
-  belongs to the root that printed it: the 1,891,501 B above is a branch's
+  belongs to the root that printed it: the 1,891,309 B above is a branch's
   1,879,489 B read again through this root, not a number copied across.
 * **A rule has one home.** Anything true of the whole board or of the app lives in
   this file; anything true of one widget lives in that widget's `README.md`;

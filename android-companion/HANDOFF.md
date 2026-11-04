@@ -116,9 +116,9 @@ reason to add a resource pipeline.
 ### The shelf names its bytes
 
 Every sketch card on the flash shelf now carries the sketch's own fingerprint
-beside COPY — `150,544 B  ·  6a2609cc`, its length and the first eight digits of
+beside COPY — `151,242 B  ·  abef49da`, its length and the first eight digits of
 its md5. The bytes on that card are the bytes COPY pastes, and Arduino answers
-with the size it compiled (`Sketch uses 1,179,402 bytes`), so a sketch pasted out
+with the size it compiled (`Sketch uses 1,179,334 bytes`), so a sketch pasted out
 of an older install is visible before it is flashed rather than after: the two
 numbers disagree. `SketchStamp` does the formatting and four host checks hold it,
 including the md5 of `abc` and the thousands separator the docs use.
@@ -127,8 +127,9 @@ The trap it closes: this shelf copies the sketch bundled into the APK, so an
 install that predates a fix keeps handing out the old text however many times it
 is flashed. The stamp makes the version on the card something you can read.
 
-Each sketch also declares `DECK_VERSION` (`1.0.0`), which the card prints as
-`v1.0.0` and the deck quotes in its identity as `"v"`. So the shelf says which
+Each sketch also declares `DECK_VERSION` (`1.0.1` on the phone deck, `1.0.0` on
+the Spotify deck), which the card prints as
+`v1.0.1` and the deck quotes in its identity as `"v"`. So the shelf says which
 build a COPY would flash and the deck's own row says which build is linked —
 the same string, read from the same declaration on the board.
 
@@ -215,12 +216,14 @@ URL and a flashing note. Decisions behind it:
   would also bring GPL source-distribution obligations into the APK.
 - **Library requirements are per option, not generic.** Only the deck sketch is
   an ArduinoDroid build (Adafruit GFX, Adafruit ILI9341, XPT2046_Touchscreen; never
-  ArduinoBLE). The other three are prebuilt PlatformIO images — Bruce alone pins
+  ArduinoBLE or NimBLE-Arduino). The other three are prebuilt PlatformIO images — Bruce alone pins
   roughly 40 libraries — so their cards say "None" and point at the installer
   rather than pretending they can be compiled in ArduinoDroid.
 - **One-tap library setup, driven by the descriptor.** The LIBRARIES card under an
   INSIDE project reads `widget.libraries` and warns about anything in
-  `widget.never` ("Never install ArduinoBLE: …"). Each row has **INSTALL**
+  `widget.never`, one line per name because the reasons differ: ArduinoBLE shadows
+  a core header and will not build, while NimBLE-Arduino would build but is the
+  wrong API for a sketch written against Bluedroid. Each row has **INSTALL**
   (`installLibrary()`), which copies the name and then opens ArduinoDroid's library
   screen, plus **COPY NAME**. **INSTALL ALL** does the same with every name on the
   clipboard; **COPY ALL** only copies; **OPEN ARDUINODROID** opens the editor.
@@ -685,7 +688,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   sketches they name are inside the APK, `assets/widgets/phone_deck_cyd24R/` and
   `assets/widgets/spotify_deck_cyd24R/`, and `check_widget_assets.py` in the repo
   root compares those copies with `../<folder>/<sketch>.ino` byte for byte (phone
-  deck md5 `6a2609cc…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
+  deck md5 `abef49da…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
   header rewrite, and `00bb1560…`, `eca02e93…`, `49f29bcb…` before the Bluetooth
   link, the callback change and the one-line answer — both in sync on 2026-11-02).
   The rewrite makes the phone-over-Bluetooth source the deck's first one and
@@ -693,8 +696,8 @@ Identical to the sketch, checked against its `onWrite` handlers:
   folded in on 2026-11-03, and the APK in `dist/` was rebuilt against it. That sketch also
   **compiles here**, measured on 2026-11-04 once `~/.arduino-cyd/env.sh` was
   sourced — `check_docs.py`'s gate built it on the `huge_app` partition and read
-  1,891,501 B with 69,164 B of globals, beside the phone deck's
-  1,179,402 B / 45,332 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
+  1,891,309 B with 69,164 B of globals, beside the phone deck's
+  1,179,334 B / 45,332 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
   `PATH`, so that build goes through `~/.arduino15` and reads 1,880,053 B — 48 B
   under with the globals identical, the build-root sensitivity the docs record.
   The root that first printed that figure reads 1,878,661 B, 16 B over. Neither board has run it.
@@ -764,8 +767,11 @@ Identical to the sketch, checked against its `onWrite` handlers:
   actionable tasks with 41 executed, including `lintVitalRelease`. The archive
   Gradle writes is unsigned, because the release type has no `signingConfig`, so
   [`release.sh`](release.sh) aligns and signs it. Rebuilt on 2026-11-04 after the label, once for the phone deck and again for
-  the Spotify one twice more, for the bond self-heal: the unsigned file is
-  226,206 bytes, `release.sh` signs it with a 4096-bit key and writes
+  the Spotify one twice more, for the bond self-heal, again after the now page's
+  taps were mapped to its own BACK controls, and again when both cards began
+  naming the 3 MB partition, and again when the library box began refusing
+  NimBLE-Arduino: the unsigned file is
+  226,638 bytes, `release.sh` signs it with a 4096-bit key and writes
   **239,215 bytes** (235 kB), and the debug APK in `dist/` is
   239,217 bytes. The three hold the
   same code and differ only in their signing blocks, so no one figure is a guide

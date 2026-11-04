@@ -89,6 +89,10 @@ SKIP_DIRS = {".git", ".gradle", "build", "node_modules"}
 # binary by a few bytes. Each one names why, so a new stale figure cannot hide in
 # here by accident.
 HISTORICAL = {
+    1310720: "the default scheme's app slot, which both decks were built "
+             "against before they moved to huge_app on 2026-11-04 - default.csv "
+             "sizes app0 and app1 at 1,310,720 each, so a past build's share of "
+             "it is still arithmetic rather than a guess",
     1122249: "the Spotify sketch on 2.0.17 on its own path, before the 3.x jump",
     1122281: "the Spotify sketch on 2.0.17 through toolchain.sh's root",
     1114485: "an earlier note's Spotify figure, which did not reproduce",
@@ -748,7 +752,10 @@ def main():
         )
 
     sizes = allowed_sizes(built)
-    ceilings = {deck["slot"] for deck in built} | {DRAM_CEILING}
+    # The default scheme's slot stays a legitimate ceiling: a figure measured
+    # before 2026-11-04 was a share of it, and the arithmetic is what keeps the
+    # prose honest.
+    ceilings = {deck["slot"] for deck in built} | {DRAM_CEILING, 1310720}
     hashes = {deck["md5"][:8] for deck in built}
     full_hashes = {deck["md5"] for deck in built}
     problems = []

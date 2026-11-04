@@ -29,24 +29,27 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-FQBN = "esp32:esp32:esp32"
+# The 3 MB app slot is this repo's standard, not a per-deck exception: the
+# default scheme gives the app 1,310,720 bytes, and the phone deck's BLE stack
+# alone measured 816,643 B on 2026-11-04. A builder that names no scheme gets
+# huge_app, so no widget can be quietly checked against a slot it will not use.
+FQBN = "esp32:esp32:esp32:PartitionScheme=huge_app"
 
 # The two floors, in KiB. They live here so `--help` and the environment agree,
 # and check_old_core.py applies the same words to an old-core build.
 DEFAULT_MIN_FREE_KB = 64
 DEFAULT_MIN_RAM_KB = 160
 
-# A deck that has outgrown the default scheme says so here, and the ceiling still
-# comes from the compiler rather than this table: with huge_app it prints
-# 3,145,728, so the same floors are applied to a bigger slot. Only the Spotify
-# deck is listed, because Bluetooth does not fit beside WiFi, TLS and its setup
-# server in 1,310,720 bytes.
-PARTITION = {"spotify_deck_cyd24R": "PartitionScheme=huge_app"}
+# The ceiling still comes from the compiler rather than this file: huge_app prints
+# 3,145,728, so the same floors apply to the bigger slot, and a deck that is moved
+# to another scheme is measured against whatever that scheme reports.
+# Overrides, for a widget that ever needs a different scheme. Empty on purpose:
+# everything here is huge_app, so the table says nothing rather than repeating it.
+PARTITION = {}
 
 
 def fqbn_for(folder):
-    extra = PARTITION.get(folder.name)
-    return f"{FQBN}:{extra}" if extra else FQBN
+    return PARTITION.get(folder.name, FQBN)
 
 FLASH_RE = re.compile(
     r"Sketch uses (\d+) bytes \((\d+)%\) of program storage space\. "
