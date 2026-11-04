@@ -135,6 +135,7 @@ final class DrawerHome extends ScrollView {
         row.addView(aside);
 
         row.setOnClickListener(v -> tap.run());
+        Ui.pressable(activity, row, 14);
         Ui.space(activity, row, 10);
         return row;
     }
@@ -155,6 +156,7 @@ final class DrawerHome extends ScrollView {
             signature = "";
             refresh();
         });
+        Ui.pressable(activity, row, 14);
         Ui.space(activity, row, 10);
         return row;
     }
@@ -204,6 +206,7 @@ final class DrawerHome extends ScrollView {
         row.addView(Ui.icon(activity, R.drawable.ic_chevron_forward, 14, Ui.DIM));
 
         row.setOnClickListener(v -> nav.openSection(MainActivity.SECTION_PROJECTS));
+        Ui.pressable(activity, row, 8);
         // Two boards need the gap the project rows had: the fill is only 6% above
         // the ground, so the edge alone does not separate them.
         Ui.space(activity, row, 6);

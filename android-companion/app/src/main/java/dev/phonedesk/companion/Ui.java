@@ -1,9 +1,13 @@
 package dev.phonedesk.companion;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
@@ -25,8 +29,7 @@ final class Ui {
     // GOOD success, VIOLET the quietest status.
     static final int BG = Palette.FIELD;
     static final int CARD = Palette.FIELD;
-    static final int CARD_HI = Palette.WASH;
-    static final int EDGE = Palette.EDGE;
+    static final int CARD_HI = Palette.WASH;    static final int EDGE = Palette.EDGE;
     static final int TEXT = Palette.TEXT;
     static final int DIM = Palette.DIM;
     static final int ACCENT = Palette.ACCENT;
@@ -117,8 +120,42 @@ final class Ui {
         view.setColorFilter(color, PorterDuff.Mode.SRC_IN);
     }
 
-    static Button action(Context context, String label, boolean primary) {
-        Button button = new Button(context);
+    /**
+     * Press feedback for anything with a tap listener.
+     *
+     * Every surface here is a GradientDrawable, and a GradientDrawable has no
+     * pressed state: nothing on screen moved between the tap and the next screen
+     * arriving, so a tap read as ignored until it worked. This keeps the view's
+     * own background as the ripple's content and its shape as the mask, so the
+     * ripple is clipped to the card's radius instead of washing a square over it.
+     */
+    static void pressable(Context context, View view, int radiusDp) {
+        final Drawable content = view.getBackground();
+        GradientDrawable mask = new GradientDrawable();
+        mask.setShape(GradientDrawable.RECTANGLE);
+        mask.setCornerRadius(dp(context, radiusDp));
+        mask.setColor(Color.BLACK);
+        view.setBackground(new RippleDrawable(
+                ColorStateList.valueOf(pressTone(content)), content, mask));
+    }
+
+    /**
+     * The ripple's own colour, taken from the fill it sits on: dark ink on a light
+     * surface, light ink on a dark one. A single fixed shade disappeared on half
+     * the buttons — which is the same bug as no ripple, one colour at a time.
+     */
+    private static int pressTone(Drawable fill) {
+        int surface = Color.TRANSPARENT;
+        if (fill instanceof GradientDrawable) {
+            final ColorStateList tint = ((GradientDrawable) fill).getColor();
+            if (tint != null) surface = tint.getDefaultColor();
+        }
+        final int luminance = (int) (0.299 * Color.red(surface)
+                + 0.587 * Color.green(surface) + 0.114 * Color.blue(surface));
+        return (0x40 << 24) | (luminance > 0x80 ? 0x000000 : 0xFFFFFF);
+    }
+
+    static Button action(Context context, String label, boolean primary) {        Button button = new Button(context);
         button.setText(label);
         button.setAllCaps(false);
         button.setTypeface(Typeface.MONOSPACE);
@@ -126,8 +163,12 @@ final class Ui {
         button.setTextColor(primary ? Ui.INK : Ui.TEXT);
         button.setBackground(rounded(context, primary ? ACCENT : CARD_HI,
                 primary ? ACCENT : EDGE, 10));
-        button.setMinHeight(0);
-        button.setMinimumHeight(0);
+        pressable(context, button, 10);
+        // 48dp is the shortest a finger hits reliably. Thirteen-sp monospace text
+        // with 8dp of padding above and below came to about 33dp, which is short
+        // enough that a tap aimed at the button lands on the card behind it.
+        button.setMinHeight(dp(context, 48));
+        button.setMinimumHeight(dp(context, 48));
         button.setMinWidth(0);
         button.setMinimumWidth(0);
         button.setPadding(dp(context, 14), dp(context, 8), dp(context, 14), dp(context, 8));

@@ -429,6 +429,10 @@ final class ProjectsTab extends ScrollView {
         card.addView(name);
 
         View.OnClickListener flip = v -> toggle(project.id);
+        // The header is the target for the whole accordion; without a ripple it was
+        // a row that either opened the card or did not, with nothing in between.
+        header.setBackground(Ui.rounded(activity, 0, 0, 10));
+        Ui.pressable(activity, header, 10);
         header.setOnClickListener(flip);
         name.setOnClickListener(flip);
         fold.setOnClickListener(flip);
