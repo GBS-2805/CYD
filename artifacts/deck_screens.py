@@ -4,14 +4,15 @@
 `artifacts/deck_palette.py` proves each sketch's palette table. This draws the
 screens themselves: the draw functions from `phone_deck_cyd24R.ino` and
 `spotify_deck_cyd24R.ino`, ported call for call — the same rects, the same strings,
-the same 6*size x 8*size character grid, the colours from that sketch's own
-`THEMES` row.
+the same line pitches, the colours from that sketch's own `THEMES` row.
 
-Three things are stand-ins, and all three are visible if you know the glass:
+The letters are the deck's own. `artifacts/deck_font.py` cuts the faces both
+sketches paste in, and this blits the same one-bit bitmaps at the same offsets, so
+a heading here is the pixels the panel sets rather than a lookalike in a desktop
+font.
 
-  * the glyphs. Adafruit's 5x7 is a bitmap inside the library; this draws DejaVu
-    Sans Mono on the same cell, so every string lands where the panel puts it and
-    takes its width, but the letterforms are not Adafruit's.
+Two things are stand-ins:
+
   * the seam of a rounded corner and the 1px ring of `drawRoundRect`, which PIL
     draws by a slightly different rule.
   * the *content*: a frame needs a notification, a track and a battery, so the
@@ -21,12 +22,11 @@ It is a reconstruction, not a capture. Nothing here has run on a board.
 
     python3 artifacts/deck_screens.py     # writes artifacts/decks/<deck>-<page>-<theme>.png
 """
-import os
 import re
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -36,11 +36,15 @@ if "--out" in sys.argv:                       # check_widget_assets.py draws int
 DECKS = {"phone": ROOT / "phone_deck_cyd24R/phone_deck_cyd24R.ino",
          "spotify": ROOT / "spotify_deck_cyd24R/spotify_deck_cyd24R.ino"}
 
+sys.path.insert(0, str(HERE))
+import deck_font                              # noqa: E402  (lives beside this script)
+
 SLOTS = ["bg", "tile", "tileHi", "edge", "text", "dim",
          "accent", "accentDim", "pink", "purple", "yellow", "green"]
 
 W, H = 320, 240
 HEADER_H = 34
+MARGIN = 12
 CORNER_CARD = 10
 CORNER_BUTTON = 8
 
@@ -57,6 +61,12 @@ NOTICES = [
 ]
 TRACK = dict(valid=True, playing=True, position=97, duration=244,
              title="Midnight City", artist="M83", album="Hurry Up, We're Dreaming")
+BODY = ("Sam is stuck on the northbound line and asks whether we can push the "
+        "standup to ten. No objection from the workshop side; the bench is "
+        "still open until lunch.")
+
+FACES = deck_font.faces()
+FACE_FOR = {1: "body", 2: "display", 3: "display", 4: "clock"}
 
 
 # -------------------------------------------------------------------- panel ---
@@ -103,45 +113,67 @@ class Panel:
     def line(self, x0, y0, x1, y1, slot):
         self.draw.line([x0, y0, x1, y1], fill=self.c[slot])
 
-    # --- text: getTextBounds() of the built-in font, 6*size per character ------
+    # --- text: setFont(), where getTextBounds() reports the ink box ------------
     @staticmethod
-    def bounds(text, size):
-        return 6 * size * len(text) - size, 8 * size
+    def glyphs(string, size):
+        face = FACES[FACE_FOR[size]]
+        pen = 0
+        for ch in string:
+            w, h, advance, xoff, yoff, data = face["glyphs"].get(
+                ord(ch), face["glyphs"][ord("?")])
+            yield pen, w, h, advance, xoff, yoff, data
+            pen += advance
 
-    @staticmethod
-    def font(size):
-        import matplotlib
-        root = os.path.join(os.path.dirname(matplotlib.__file__), "mpl-data", "fonts", "ttf")
-        return ImageFont.truetype(os.path.join(root, "DejaVuSansMono.ttf"), max(6, 7 * size))
+    def ink(self, string, size):
+        """The box getTextBounds() answers: x0, x1, y0, y1 relative to the cursor."""
+        x0 = x1 = y0 = y1 = None
+        for pen, w, h, _advance, xoff, yoff, _data in self.glyphs(string, size):
+            if not (w and h):
+                continue
+            x0 = pen + xoff if x0 is None else min(x0, pen + xoff)
+            x1 = pen + xoff + w if x1 is None else max(x1, pen + xoff + w)
+            y0 = yoff if y0 is None else min(y0, yoff)
+            y1 = yoff + h if y1 is None else max(y1, yoff + h)
+        if x0 is None:
+            return 0, 0, 0, 0
+        return x0, x1, y0, y1
+
+    def width(self, string, size):
+        x0, x1, _y0, _y1 = self.ink(string, size)
+        return x1 - x0
 
     def text(self, string, x, y, size, fg, bg):
-        font = self.font(size)
-        step = 6 * size
-        for i, ch in enumerate(string):
-            cx = x + i * step
-            self.draw.rectangle([cx, y, cx + step - 1, y + 8 * size - 1],
-                                fill=self.c[bg])
-            if ch != " ":
-                self.draw.text((cx, y + 7 * size), ch, font=font, fill=self.c[fg],
-                               anchor="ls")
+        fg_col = self.c[fg]
+        for pen, w, h, _advance, xoff, yoff, data in self.glyphs(string, size):
+            if not (w and h):
+                continue
+            gx, gy = x + pen + xoff, y + yoff
+            self.draw.rectangle([gx, gy, gx + w - 1, gy + h - 1], fill=self.c[bg])
+            stride = (w + 7) // 8
+            for row in range(h):
+                base = row * stride
+                for col in range(w):
+                    if data[base + (col >> 3)] & (0x80 >> (col & 7)):
+                        self.image.putpixel((gx + col, gy + row), fg_col)
 
     def text_at(self, string, x, y, size, fg, bg):
         self.text(string, x, y, size, fg, bg)
 
     def text_centered(self, string, r, size, fg, bg):
-        bw, bh = self.bounds(string, size)
-        self.text(string, r[0] + (r[2] - bw) // 2, r[1] + (r[3] - bh) // 2, size, fg, bg)
+        x0, x1, y0, y1 = self.ink(string, size)
+        self.text(string, r[0] + (r[2] - (x1 - x0)) // 2 - x0,
+                  r[1] + (r[3] - (y1 - y0)) // 2 - y0, size, fg, bg)
 
     def text_right(self, string, right, y, size, fg, bg):
-        bw, _ = self.bounds(string, size)
-        self.text(string, right - bw, y, size, fg, bg)
+        x0, x1, _y0, _y1 = self.ink(string, size)
+        self.text(string, right - x1, y, size, fg, bg)
 
     def wrapped(self, string, x, y, width, size, fg, bg, max_lines):
-        line_height = 8 * size + 3
+        line_height = 13 if size == 1 else 26
         line, used, lines = "", 0, 0
         for word in string.split():
             candidate = (line + " " + word) if used else word
-            if self.bounds(candidate, size)[0] > width and used:
+            if self.width(candidate, size) > width and used:
                 self.text(line, x, y + lines * line_height, size, fg, bg)
                 lines += 1
                 if lines >= max_lines:
@@ -187,9 +219,7 @@ PHONE_LINK_PILL = (204, 6, 76, 22)
 PHONE_SET_LINK_PILL = (234, 6, 76, 22)
 PHONE_STATUS_CARD = (8, 40, 304, 76)
 PHONE_NOTIF_ROW = [(8, 134, 304, 32), (8, 168, 304, 32), (8, 202, 304, 32)]
-PHONE_HOME_TAB = [(10, 84, 300, 30), (10, 118, 300, 30), (10, 152, 300, 30)]
-PHONE_HOME_PILL_A = (10, 52, 96, 18)
-PHONE_HOME_PILL_B = (114, 52, 96, 18)
+PHONE_HOME_TAB = [(12, 72, 296, 34), (12, 110, 296, 34), (12, 148, 296, 34)]
 PHONE_TABS = ["MESSAGES", "SETTINGS", "CALIBRATE"]
 PHONE_DETAIL_DISMISS = (12, 202, 148, 30)
 PHONE_DETAIL_BACK = (168, 202, 140, 30)
@@ -245,10 +275,9 @@ def phone_status_card(p):
     p.ring(r, CORNER_CARD, "edge")
     p.text_at("$ sys.status --", r[0] + 12, r[1] + 7, 1, "dim", "tile")
     state = "READY // ONLINE"
-    bw, _ = p.bounds(state, 1)
     text_right = r[0] + r[2] - 12
-    p.text_at(state, text_right - bw, r[1] + 7, 1, "accent", "tile")
-    p.fill_circle(text_right - bw - 9, r[1] + 11, 3, "accent")
+    p.text_right(state, text_right, r[1] + 7, 1, "accent", "tile")
+    p.fill_circle(text_right - p.width(state, 1) - 9, r[1] + 11, 3, "accent")
     p.hline(r[0] + 12, r[1] + 20, r[2] - 24, "edge")
 
     hh, mm, ss = CLOCK
@@ -294,7 +323,7 @@ def phone_notice_row(p, slot):
     p.text_right(age_text(n["at"]), r[0] + r[2] - 8, r[1] + 4, 1, "dim", "tile")
 
     ink = "text" if n["unread"] else "dim"
-    if p.bounds(n["title"], 2)[0] <= r[2] - 46:
+    if p.width(n["title"], 2) <= r[2] - 46:
         p.text_at(n["title"], r[0] + 36, r[1] + 14, 2, ink, "tile")
     else:
         p.text_at(fit_text(n["title"], 20), r[0] + 36, r[1] + 16, 1, ink, "tile")
@@ -302,37 +331,30 @@ def phone_notice_row(p, slot):
 
 def page_phone_home(p):
     p.fill_screen("bg")
-    p.text_at("SYNC %02d:%02d // PHONE TIME" % CLOCK[:2], 10, 6, 1, "dim", "bg")
-    p.text_right("BATTERY %d%%" % BATTERY, PHONE_GEAR[0] - 6, 6, 1,
+    p.text_at("SYNC %02d:%02d // PHONE TIME" % CLOCK[:2], MARGIN, 8, 1, "dim", "bg")
+    p.text_right("BAT %d%%" % BATTERY, PHONE_GEAR[0] - 8, 8, 1,
                  battery_slot(BATTERY, CHARGING), "bg")
     p.fill_round(PHONE_GEAR, 6, "tile")
     p.ring(PHONE_GEAR, 6, "edge")
     gear(p, PHONE_GEAR[0] + PHONE_GEAR[2] // 2, PHONE_GEAR[1] + PHONE_GEAR[3] // 2, "text")
-    p.text_at("PHONE DECK", 10, 20, 3, "text", "bg")
+    p.hline(MARGIN, 30, W - 2 * MARGIN, "edge")
 
-    badge_right = W - 10
-    badge_w = 6 * len("LINKED") - 1
-    p.fill_circle(badge_right - badge_w - 12, 36, 4, "accent")
-    p.text_right("LINKED", badge_right, 32, 1, "accent", "bg")
+    p.text_at("PHONE DECK", MARGIN, 40, 2, "text", "bg")
+    badge_right = W - MARGIN
+    p.text_right("LINKED", badge_right, 46, 1, "accent", "bg")
+    p.fill_circle(badge_right - 7 * len("LINKED") - 10, 50, 3, "accent")
 
-    p.fill_round(PHONE_HOME_PILL_A, 9, "bg")
-    p.ring(PHONE_HOME_PILL_A, 9, "edge")
-    p.fill_circle(PHONE_HOME_PILL_A[0] + 11, PHONE_HOME_PILL_A[1] + 9, 2,
-                 "yellow" if UNREAD else "accent")
-    p.text_at("%d NEW" % UNREAD if UNREAD else "INBOX CLEAR", PHONE_HOME_PILL_A[0] + 20,
-              PHONE_HOME_PILL_A[1] + 5, 1, "text", "bg")
+    p.hline(MARGIN, 64, W - 2 * MARGIN, "edge")
+    for i, r in enumerate(PHONE_HOME_TAB):
+        p.text_at("%02d" % (i + 1), r[0] + 12, r[1] + 13, 1, "dim", "bg")
+        p.text_at(PHONE_TABS[i], r[0] + 40, r[1] + 9, 2, "text", "bg")
+        p.text_right(">", r[0] + r[2] - 12, r[1] + 9, 2, "dim", "bg")
+    p.hline(MARGIN, 192, W - 2 * MARGIN, "edge")
 
-    p.fill_round(PHONE_HOME_PILL_B, 9, "text")
-    p.text_centered("THEME %02d" % (0 if p.slots is PHONE_THEMES["PAPER"] else 1),
-                    PHONE_HOME_PILL_B, 1, "bg", "text")
-
-    p.hline(10, 78, W - 20, "edge")
-    for i in range(3):
-        p.text_at("%02d" % (i + 1), PHONE_HOME_TAB[i][0] + 4, PHONE_HOME_TAB[i][1] + 11,
-                  1, "dim", "bg")
-        p.text_at(PHONE_TABS[i], PHONE_HOME_TAB[i][0] + 26, PHONE_HOME_TAB[i][1] + 8,
-                  2, "text", "bg")
-    p.hline(10, 224, W - 20, "edge")
+    p.text_at("%d NEW" % UNREAD if UNREAD else "INBOX CLEAR", MARGIN, 204, 1,
+              "yellow" if UNREAD else "accent", "bg")
+    p.text_right("THEME 00 %s" % ("PAPER" if p.slots is PHONE_THEMES["PAPER"] else "INK"),
+                 W - MARGIN, 204, 1, "dim", "bg")
 
 
 def page_phone_board(p):
@@ -376,11 +398,9 @@ def page_phone_detail(p):
     p.text_at(n["app"], 48, 8, 2, "text", "bg")
     p.text_right(age_text(n["at"]), W - 12, 13, 1, "dim", "bg")
     p.wrapped(n["title"], 12, 44, W - 24, 2, "text", "bg", 2)
-    p.hline(12, 88, W - 24, "edge")
-    body = ("Sam is stuck on the northbound line and asks whether we can push the "
-            "standup to ten. No objection from the workshop side; the bench is "
-            "still open until lunch.")
-    p.wrapped(body, 12, 98, W - 24, 1, "dim", "bg", 9)
+    p.hline(12, 92, W - 24, "edge")
+    p.wrapped(BODY, 12, 100, W - 24, 1, "dim", "bg", 7)
+    p.hline(12, 194, W - 24, "edge")
     phone_button(p, PHONE_DETAIL_DISMISS, "DISMISS", 2, True)
     phone_button(p, PHONE_DETAIL_BACK, "BACK", 2, False)
 
@@ -413,38 +433,43 @@ def page_phone_settings(p):
     p.text_right("hold gear = forget", W - 12, 226, 1, "dim", "bg")
 
 
+def phone_calibration(p):
+    p.fill_screen("bg")
+    tx, ty = 26, 26
+    p.hline(tx - 11, ty, 23, "text")
+    p.vline(tx, ty - 11, 23, "text")
+    p.circle(tx, ty, 7, "accent")
+    p.fill_circle(tx, ty, 1, "accent")
+
+    right = tx < W // 2
+    lower = ty < H // 2
+    y = 150 if lower else 10
+    edge = W - 12
+    if right:
+        p.text_right("CALIBRATE 1/3", edge, y, 2, "accent", "bg")
+        p.text_right("tap the dot in this corner", edge, y + 22, 1, "text", "bg")
+        p.text_right("hold 2s anywhere = cancel", edge, y + 36, 1, "dim", "bg")
+    else:
+        p.text_at("CALIBRATE 1/3", 12, y, 2, "accent", "bg")
+        p.text_at("tap the dot in this corner", 12, y + 22, 1, "text", "bg")
+        p.text_at("hold 2s anywhere = cancel", 12, y + 36, 1, "dim", "bg")
+    for i in range(3):
+        cx = (W - 17 - i * 18) if right else (17 + i * 18)
+        if i <= 0:
+            p.fill_circle(cx, y + 54, 5, "accent")
+        else:
+            p.circle(cx, y + 54, 5, "edge")
+
+
 PHONE_PAGES = [
     ("home", page_phone_home),
     ("board", page_phone_board),
     ("now", page_phone_now),
     ("detail", page_phone_detail),
     ("settings", page_phone_settings),
-    ("calibration", None),      # filled in below, declared after the crosshair
+    ("calibration", phone_calibration),
 ]
 PHONE_THEMES = None
-
-
-def phone_calibration(p):
-    p.fill_screen("bg")
-    x, y = 26, 26
-    p.hline(x - 11, y, 23, "text")
-    p.vline(x, y - 11, 23, "text")
-    p.circle(x, y, 7, "accent")
-    p.fill_circle(x, y, 1, "accent")
-    p.text_at("CALIBRATE 1/3", 10, 10, 2, "accent", "bg")
-    p.text_at("Tap the dot in this corner", 10, 36, 1, "text", "bg")
-    p.text_at("order: TL TR BL, then done", 10, 48, 1, "dim", "bg")
-    p.text_at("raw", 10, 212, 1, "dim", "bg")
-    p.text_at("hold 2s anywhere = cancel", 10, 226, 1, "dim", "bg")
-    for i in range(3):
-        cx = 250 + i * 18
-        if i < 1:
-            p.fill_circle(cx, 22, 5, "accent")
-        else:
-            p.circle(cx, 22, 5, "edge")
-
-
-PHONE_PAGES[5] = ("calibration", phone_calibration)
 
 # ---------------------------------------------------------------- spotify -----
 SPOTIFY_PREV = (8, 152, 96, 52)
@@ -515,28 +540,37 @@ def page_spotify_setup(p):
     p.text_at("2  open http://192.168.4.1", 12, 70, 1, "text", "bg")
     p.text_at("3  fill in the page", 12, 84, 1, "text", "bg")
 
-    p.fill_round((8, 102, 304, 96), CORNER_CARD, "tile")
-    p.ring((8, 102, 304, 96), CORNER_CARD, "edge")
+    p.fill_round((8, 102, 304, 78), CORNER_CARD, "tile")
+    p.ring((8, 102, 304, 78), CORNER_CARD, "edge")
     p.text_at("OR SERIAL  1/5", 18, 110, 1, "dim", "tile")
-    p.wrapped(SPOTIFY_SHORT[0], 18, 128, 284, 1, "text", "tile", 2)
-    p.fill_rect(18, 184, 284, 10, "tile")
-    p.text_at("workshop", 18, 184, 1, "text", "tile")
+    p.wrapped(SPOTIFY_SHORT[0], 18, 126, 284, 1, "text", "tile", 2)
+    p.ring((18, 152, 284, 22), 6, "edge")
+    p.text_at("workshop", 24, 159, 1, "text", "tile")
 
-    p.text_at("192.168.4.1", 12, 214, 1, "dim", "bg")
-    p.text_right("192.168.1.24", W - 12, 214, 1, "dim", "bg")
+    p.text_at("192.168.4.1", 12, 190, 1, "dim", "bg")
+    p.text_right("192.168.1.24", W - 12, 190, 1, "dim", "bg")
     p.fill_rect(0, 224, W, 16, "bg")
     p.text_at("no phone joined yet", 12, 228, 1, "dim", "bg")
 
 
 def page_spotify_calibration(p):
     p.fill_screen("bg")
-    p.text_at("CALIBRATE", 12, 10, 2, "text", "bg")
-    p.text_right("TOUCH", W - 12, 13, 1, "dim", "bg")
-    p.hline(0, 31, W, "edge")
-    p.text_at("tap the dot", 12, 40, 1, "dim", "bg")
-    p.text_at("hold 2 s to cancel", 12, 54, 1, "dim", "bg")
-    spotify_crosshair(p, 26, 26)
-    p.text_at("1 / 3", 12, 214, 1, "dim", "bg")
+    tx, ty = 26, 26
+    spotify_crosshair(p, tx, ty)
+    right = tx < W // 2
+    lower = ty < H // 2
+    y = 168 if lower else 10
+    edge = W - 12
+    if right:
+        p.text_right("CALIBRATE", edge, y, 2, "text", "bg")
+        p.text_right("tap the dot", edge, y + 22, 1, "dim", "bg")
+        p.text_right("1 / 3", edge, y + 36, 1, "accent", "bg")
+        p.text_right("hold 2 s to cancel", edge, y + 50, 1, "dim", "bg")
+    else:
+        p.text_at("CALIBRATE", 12, y, 2, "text", "bg")
+        p.text_at("tap the dot", 12, y + 22, 1, "dim", "bg")
+        p.text_at("1 / 3", 12, y + 36, 1, "accent", "bg")
+        p.text_at("hold 2 s to cancel", 12, y + 50, 1, "dim", "bg")
 
 
 SPOTIFY_PAGES = [

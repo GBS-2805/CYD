@@ -11,7 +11,7 @@ active.
 
 This deck needs `PartitionScheme=huge_app`. Bluetooth does not fit beside WiFi,
 mbedTLS and the setup server in the default 1,310,720-byte app slot: the linked
-image is 1,881,093 bytes, 143 % of the 1,310,720-byte slot and 59 % of 3,145,728.
+image is 1,890,609 bytes, 144 % of the 1,310,720-byte slot and 60 % of 3,145,728.
 phone deck afterwards with the default scheme re-partitions the board back, so
 each upload has to carry the scheme its own sketch was built for.
 
@@ -295,7 +295,7 @@ scheme**; see the measurement below for why that is enough.
 
 Both decks are ordinary Arduino sketches and both travel on the phone: the app
 bundles this one too (`check_widget_assets.py` prints `2 widgets bundled, every
-copy matches`, with this sketch at md5 `50c4422d…`), so it can be pulled from the
+copy matches`, with this sketch at md5 `b2029325…`), so it can be pulled from the
 same shelf as its sibling.
 
 From a computer, `toolchain.sh` has already compiled it:
@@ -394,14 +394,14 @@ sketch from a desktop on 2026-10-31.
 
 ### Headroom
 
-Measured here on 2026-11-02 with [`../check_docs.py`](../check_docs.py) `--refresh`,
+Measured here on 2026-11-04 with [`../check_docs.py`](../check_docs.py) `--refresh`,
 core **3.3.12**, `PartitionScheme=huge_app` — the scheme this deck now needs, and
 which `check_headroom.py` knows about per deck so the ceiling still comes from the
 compiler:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,881,093 | **1,264,635** | 3,145,728 (59 % used) |
+| flash | 1,890,609 | **1,255,119** | 3,145,728 (60 % used) |
 | DRAM | 69,124 globals | **258,556** | 327,680 |
 
 The two figures are this tree's own build through `~/.arduino-cyd-3/env.sh` on
@@ -410,7 +410,7 @@ The two figures are this tree's own build through `~/.arduino-cyd-3/env.sh` on
 `~/.arduino15` and prints **1,880,053 B** for the same sketch, 48 B under with the
 globals identical — the build-root sensitivity
 [`../CONVENTIONS.md`](../CONVENTIONS.md#build) records, not a different sketch, since
-both read md5 `50c4422d…`. Quote the root you measured on rather than reconciling the
+both read md5 `b2029325…`. Quote the root you measured on rather than reconciling the
 last two digits.
 
 Without Bluetooth the sketch was 1,125,781 bytes on the default scheme — the
@@ -466,9 +466,9 @@ sourcing a toolchain.
 * **It needs `huge_app` now, and that is the scheme `toolchain.sh` pins.**
   Without Bluetooth the 3.3.12 build was 1,125,781 bytes, 85 % of 1,310,720:
   measured from the pre-link sketch (`00bb1560`), not a flag on today's file.
-  With the link it is 1,881,093 bytes: **143 %** of 1,310,720, **59 %** of 3,145,728.
+  With the link it is 1,890,609 bytes: **144 %** of 1,310,720, **60 %** of 3,145,728.
   An earlier pair of runs differed by 48 B; the pre-commit hook and a direct
-  compile both print 1,881,093 now, so the single figure is the measured one.
+  compile both print 1,890,609 now, so the single figure is the measured one.
   `default.csv`
   sizes `app0` and `app1` at 1,310,720 each, so on the default scheme this deck no
   longer links at all — not a tighter fit, a refusal. Uploading it re-partitions

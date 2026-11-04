@@ -607,16 +607,16 @@ Identical to the sketch, checked against its `onWrite` handlers:
   sketches they name are inside the APK, `assets/widgets/phone_deck_cyd24R/` and
   `assets/widgets/spotify_deck_cyd24R/`, and `check_widget_assets.py` in the repo
   root compares those copies with `../<folder>/<sketch>.ino` byte for byte (phone
-  deck md5 `f5b49522…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
+  deck md5 `a6fb98b5…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
   header rewrite, and `00bb1560…`, `eca02e93…`, `49f29bcb…` before the Bluetooth
   link, the callback change and the one-line answer — both in sync on 2026-11-02).
   The rewrite makes the phone-over-Bluetooth source the deck's first one and
   Spotify's own Web API the optional half; it arrived by merging a branch that was
   folded in on 2026-11-03, and the APK in `dist/` was rebuilt against it. That sketch also
-  **compiles here**, measured on 2026-11-03 once `~/.arduino-cyd/env.sh` was
+  **compiles here**, measured on 2026-11-04 once `~/.arduino-cyd/env.sh` was
   sourced — `check_docs.py`'s gate built it on the `huge_app` partition and read
-  1,881,093 B with 69,124 B of globals, beside the phone deck's unchanged
-  1,169,118 B / 45,284 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
+  1,890,609 B with 69,124 B of globals, beside the phone deck's unchanged
+  1,178,466 B / 45,284 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
   `PATH`, so that build goes through `~/.arduino15` and reads 1,880,053 B — 48 B
   under with the globals identical, the build-root sensitivity the docs record.
   The root that first printed that figure reads 1,878,661 B, 16 B over. Neither board has run it.
@@ -659,14 +659,15 @@ Identical to the sketch, checked against its `onWrite` handlers:
   changes **99,757 bytes**, the widget-descriptor change **102,590 bytes**, and the
   merged firmware plus the probe work **101,029 bytes**, and the icon, allowlist
   and edge-to-edge work **112,473 bytes**; the artifact in `dist/` now measures
-  **210,545 bytes** on 2026-11-04, the rebuild carrying two bundled sketches, the
+  **226,929 bytes** on 2026-11-04, the rebuild carrying two bundled sketches, the
   drawer that names boards rather than projects, the sign-in that finishes in the
   app, the mirror, the three-step probe, the owner's logo as the icon, the mark
   centred on the top bar at 26dp as one PNG per density rather than above the
   drawer's wordmark, the gear and chevrons drawn as shapes, and the shelf that
   adds, edits, deletes and attaches a project and imports a file from its own
-  picker. That is 4,096 bytes above the 206,449 measured the day before, and the
-  rebuild overwrote that file, so the difference is not itemised here.
+  picker. The typeface change then rebuilt it the same day at **226,929 bytes**
+  (222 kB): the two sketches now carry their own bitmap faces, and the step from
+  the 210,545-byte archive is mostly that data plus the redrawn pages.
 - **The archive is byte-reproducible now, on one machine.** AGP stamps a
   *Dependency Info Block* into the APK Signing Block and fills it differently on
   every build — same sources, different bytes. On 2026-11-03 two builds of this
@@ -679,14 +680,14 @@ Identical to the sketch, checked against its `onWrite` handlers:
   4,367 of them the bigger signing
   block that re-signing writes. A different keystore signs different bytes, so
   reproducible means this toolchain and this key; `OFFSITE_KEYSTORE` overrides
-  both halves. Quote the size to the nearest kB (202 kB), never as a checksum.
+  both halves. Quote the size to the nearest kB (222 kB), never as a checksum.
 - **The release build type runs, and its archive is signed by a key that is not in
   the tree.** Measured on 2026-11-03: `clean assembleRelease` exits 0 in 16 s, 44
   actionable tasks with 41 executed, including `lintVitalRelease`. The archive
   Gradle writes is unsigned, because the release type has no `signingConfig`, so
-  [`release.sh`](release.sh) aligns and signs it. Rebuilt on 2026-11-04: the unsigned file is 198,182
-  bytes, 12,363 under the debug APK because `debug` writes the larger signing
-  block. The signed file is **214,639 bytes** (210 kB), 16,457 more again from a
+  [`release.sh`](release.sh) aligns and signs it. Rebuilt on 2026-11-04 after the typeface change: the unsigned file is 215,838
+  bytes, 11,091 under the debug APK because `debug` writes the larger signing
+  block. The signed file is **231,023 bytes** (226 kB), 15,185 more again from a
   4096-bit key's bigger signing block, and 4,094 *over* the debug APK — the two
   archives hold the same code, but the release block is the larger one, so the
   debug figure is no guide to the release one. It is versionCode 1,

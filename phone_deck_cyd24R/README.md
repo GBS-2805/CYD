@@ -442,14 +442,14 @@ core **3.3.12**, default partition scheme:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,169,118 | **141,602** | 1,310,720 (89 % used) |
+| flash | 1,178,466 | **141,602** | 1,310,720 (89 % used) |
 | DRAM | 45,284 globals | **282,396** | 327,680 |
 
 The root behind those figures is `~/.arduino-cyd/env.sh`, the one whose `env.sh`
-pins its own data and library dirs: `check_docs.py --refresh` re-read 1,169,118 B
+pins its own data and library dirs: `check_docs.py --refresh` re-read 1,178,466 B
 and 45,284 B from it on 2026-11-03. While that script set only `PATH` the same
 build went through `~/.arduino15` and printed 1,168,282 B — 32 B under with the
-globals identical — another worktree's root prints the same 1,169,118 B, and
+globals identical — another worktree's root prints the same 1,178,466 B, and
 `/tmp/arduino-cyd-3` was read at 1,168,170 B, 144 B under. Quote the root with the
 number (see
 [the build note](../CONVENTIONS.md#build)).
@@ -480,14 +480,13 @@ from the repo root, after sourcing a toolchain.
     [`old_core.json`](../old_core.json) — size, globals and md5 together, measured
     2026-11-04 through `~/.arduino-cyd-2` — because a 2.0.17 figure quoted here
     would be checked against the 3.3.12 build and refused.
-* Core **3.3.12** links it at 1,169,118 bytes (89 % of 1,310,720) with 45,284 bytes of RAM
-  (13 %), `EXIT=0` under `--warnings all`, re-measured on 2026-11-01 after the
-  mirror. An earlier 3.3.12 build on a shorter path reported 1,163,930 / 45,004,
+* Core **3.3.12** links it at 1,178,466 bytes (89 % of 1,310,720) with 45,284 bytes of RAM
+  (13 % of 327,680), `EXIT=0` under `--warnings all`, re-measured on 2026-11-04 with the new typeface. An earlier 3.3.12 build on a shorter path reported 1,163,930 / 45,004,
   so 3.x is path-sensitive too — 1,137–1,141 kB, not a fixed count.
 * The bundled copy matches byte for byte after `:app:syncWidgets`;
   `check_widget_assets.py` prints `2 widgets bundled, every copy matches`
-  (this sketch md5 `f5b49522…`, the Spotify one `50c4422d…`).
-* Core 3.x costs this sketch ~2.3 kB of flash and ~3.7 kB of RAM over 2.0.17 —
+  (this sketch md5 `a6fb98b5…`, the Spotify one `b2029325…`).
+* Core 3.x costs this sketch ~0.8 kB of flash and ~3.6 kB of RAM over 2.0.17 —
   nothing like the Spotify deck's 155 kB gap, which is that sketch's network
   stack rather than the core (see the build note in
   [CONVENTIONS](../CONVENTIONS.md#build)).
@@ -526,6 +525,6 @@ The first flash of a new board is the test of those, not a formality.
 
 ## Measured
 
-`check_headroom.py` built this sketch on 2026-11-02 with core 3.3.12 and read
-`Sketch uses 1,169,118 bytes` and `45,284 bytes` of globals; this folder's sketch
-md5 is `f5b49522…`.
+`check_headroom.py` built this sketch on 2026-11-04 with core 3.3.12 and read
+`Sketch uses 1,178,466 bytes` and `45,284 bytes` of globals; this folder's sketch
+md5 is `a6fb98b5…`.
