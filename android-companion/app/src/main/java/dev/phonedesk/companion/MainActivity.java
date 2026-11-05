@@ -58,6 +58,9 @@ public class MainActivity extends Activity {
     static final int ID_SERIAL = 0x0f000004;
     static final int ID_SETTINGS = 0x0f000005;
     static final int ID_PULL = 0x0f000006;
+    /** The band and the page column, so a test can read the insets they were given. */
+    static final int ID_BAR = 0x0f000007;
+    static final int ID_CONTENT = 0x0f000008;
 
     /** Sections, in the order the pull-down and the panel list them. PAIRED is first. */
     static final int SECTION_DECKS = 0;
@@ -257,6 +260,7 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         content = new FrameLayout(this);
+        content.setId(ID_CONTENT);
         decksTab = new DecksTab(this);
         projectsTab = new ProjectsTab(this);
         boardTab = new BoardTab(this);
@@ -311,21 +315,32 @@ public class MainActivity extends Activity {
 
     /**
      * Android 15 draws every window edge to edge for apps targeting 35, so the bar
-     * would sit under the clock and the last row under the gesture handle. Pad the
-     * two ends and leave the middle alone. Below 15 the window still fits the bars
-     * itself, and adding this padding there would push the bar down for no reason.
+     * would sit under the clock and the last row under the gesture handle. Below 15
+     * the window still fits the bars itself, and adding this padding there would
+     * push the bar down for no reason.
+     *
+     * A camera hole is the second thing in that strip. {@code displayCutout()} joins
+     * {@code systemBars()} in one union, so the taller of the clock and the hole wins
+     * on each edge: a Flip's punch-hole sits in the top centre, where the mark does,
+     * and the band's own fill stays behind it while every word and control moves
+     * clear. Reading the sides as well is what covers landscape, where the same hole
+     * is on a long edge, and the two overlay panels take the same numbers because
+     * they are the window's edges too — the side panel's close button is exactly
+     * where the clock is.
      */
     private void applySystemBarInsets(LinearLayout page) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return;
-        final int side = Ui.dp(this, 14);
-        final int top = Ui.dp(this, 12);
-        final int under = Ui.dp(this, 8);
 
         page.setOnApplyWindowInsetsListener((view, insets) -> {
             android.graphics.Insets bars = insets.getInsets(
                     WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-            topBar.bar.setPadding(side, top + bars.top, side, under);
-            content.setPadding(0, 0, 0, bars.bottom);
+            // The band paints its colour from the very top, so the inset goes inside
+            // it: the fill stays put, the content moves.
+            topBar.inset(bars.left, bars.top, bars.right);
+            content.setPadding(bars.left, 0, bars.right, bars.bottom);
+            pullDown.inset(bars.left, bars.right);
+            sheet.inset(bars.left, bars.right, bars.bottom);
+            sidePanel.inset(bars.left, bars.top, bars.right, bars.bottom);
             return insets;
         });
         page.requestApplyInsets();

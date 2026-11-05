@@ -311,19 +311,26 @@ final class Ui {
      * The window chrome is part of the palette too. Below Android 15 the system
      * paints the status and navigation bars itself, so a paper page sat under a
      * black strip; and even edge to edge it picks the bar icons' own colour, so a
-     * light icon on the paper field disappeared. Both bars take the field, and the
-     * icons turn over with its luminance. Called once, before the first view.
+     * light icon on the paper field disappeared.
+     *
+     * On 15 and above the two bars sit on different colours: the window is edge to
+     * edge, the clock is over the band, and the navigation bar is over the page. So
+     * the status icons are chosen against {@link #BAND} there and against the page
+     * below, which is what stopped dark icons disappearing on moss's dark band.
+     * Called once, before the first view.
      */
     static void applySystemBars(Activity activity) {
         final Window window = activity.getWindow();
         window.setStatusBarColor(BG);
         window.setNavigationBarColor(BG);
-        final boolean paper = luminance(BG) > 0x80;
+        final boolean topIsLight = Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM
+                ? luminance(BAND) > 0x80 : luminance(BG) > 0x80;
+        final boolean bottomIsLight = luminance(BG) > 0x80;
         int flags = window.getDecorView().getSystemUiVisibility();
-        flags = paper ? flags | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        flags = topIsLight ? flags | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
                 : flags & ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            flags = paper ? flags | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+            flags = bottomIsLight ? flags | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
                     : flags & ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
         }
         window.getDecorView().setSystemUiVisibility(flags);

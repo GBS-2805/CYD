@@ -45,14 +45,20 @@ final class TopBar {
     final ImageView logo;
     private final ImageView chevron;
 
+    /** The band's own padding. The window's insets are added to these. */
+    private static final int SIDE_DP = 14;
+    private static final int TOP_DP = 12;
+    private static final int BOTTOM_DP = 12;
+
     /** The page names, in {@link MainActivity}'s section order. */
     private static final String[] TITLES = {"PAIRED", "BOARDS", "SERIAL", "SETTINGS"};
 
     TopBar(Context context) {
         bar = Ui.row(context);
+        bar.setId(MainActivity.ID_BAR);
         bar.setBackgroundColor(Ui.BAND);
-        bar.setPadding(Ui.dp(context, 14), Ui.dp(context, 12), Ui.dp(context, 14),
-                Ui.dp(context, 12));
+        bar.setPadding(Ui.dp(context, SIDE_DP), Ui.dp(context, TOP_DP),
+                Ui.dp(context, SIDE_DP), Ui.dp(context, BOTTOM_DP));
 
         // The pull-down: the site's chevron-double-down in a 40dp tap target, pulled
         // back so the glyph lines up with the page gutter. One chevron here, drawn
@@ -110,6 +116,19 @@ final class TopBar {
         outer.addView(menu, gearParams);
         bar.addView(outer, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+    }
+
+    /**
+     * Move the band's content clear of the clock, a camera hole and a cutout on the
+     * long edge, without moving its fill: the padding is inside the view, so the
+     * band's colour still reaches the screen's own edge, behind the hole included.
+     * The bottom keeps the tighter air the edge-to-edge build uses; the page below
+     * already pads for the navigation bar, so this view does not.
+     */
+    void inset(int left, int top, int right) {
+        Context where = bar.getContext();
+        bar.setPadding(Ui.dp(where, SIDE_DP) + left, Ui.dp(where, TOP_DP) + top,
+                Ui.dp(where, SIDE_DP) + right, Ui.dp(where, 8));
     }
 
     /** The name of the screen on show. */

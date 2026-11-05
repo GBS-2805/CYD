@@ -82,6 +82,17 @@ final class Sheet extends FrameLayout {
         addView(panel, panelParams);
     }
 
+    /**
+     * A sheet rises from the foot of the screen, so its last row is under the
+     * gesture handle or a navigation bar unless the panel is told otherwise; its
+     * sides are the window's edges too when a cutout sits on the long edge. The
+     * scrim still covers the whole screen and the panel's fill still reaches its
+     * own edge — only the content moves in.
+     */
+    void inset(int left, int right, int bottom) {
+        panel.setPadding(left, 0, right, bottom);
+    }
+
     /** Show {@code view} under {@code title}; the panel is closed when null. */
     void open(String title, View view) {
         label.setText(title.toUpperCase(Locale.US));

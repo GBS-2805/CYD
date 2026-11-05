@@ -302,16 +302,21 @@ Android Studio still works: open the `android-companion` folder (Ladybug or
 newer), let it sync, and run the `app` configuration.
 
 `minSdk` is 26, `targetSdk` is 35 — what a new store listing requires. Targeting
-35 puts the app edge to edge on Android 15, so `MainActivity` pads the top bar and
-insets the content by the system bar height there, and leaves older releases
-alone: below
-15 the window still fits the bars itself and that padding would double it. The
+35 puts the app edge to edge on Android 15, so `MainActivity` adds the window's
+insets to the band, the page and both overlays there, and leaves older releases
+alone: below 15 the window still fits the bars itself and that padding would double
+it. The inset is the union of `systemBars()` and `displayCutout()`, so a camera
+punch-hole — a Flip's sits in the top centre — moves the band's words down while
+its colour stays behind the hole, and the sides are read too so the band, the
+pull-down and the side panel clear a cutout that lands on the long edge when the
+phone is turned. The status bar's icons follow the band on 15 and above, because
+that is the colour the clock is actually drawn on. The
 sketch is only bundled when the build goes
 through Gradle; a raw `javac` build produces an APK-less class check and the
 BOARDS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
-[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (266 kB,
+[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (270 kB,
 package `dev.phonedesk.companion`, debug-signed). Install it with
 `adb install -r dist/PhoneDeckBridge-debug.apk`, or copy it to the phone and open
 it with "install unknown apps" allowed.

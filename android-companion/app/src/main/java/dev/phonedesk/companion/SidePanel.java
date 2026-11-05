@@ -38,6 +38,10 @@ final class SidePanel extends FrameLayout {
 
     private final Activity activity;
     private final LinearLayout panel;
+
+    /** The panel's own padding. The window's insets are added to these. */
+    private static final int SIDE_DP = 20;
+    private static final int UNDER_DP = 18;
     private final TextView status;
     private boolean open;
 
@@ -54,7 +58,8 @@ final class SidePanel extends FrameLayout {
         panel = Ui.column(activity);
         panel.setBackgroundColor(Ui.BG);
         panel.setClickable(true);
-        panel.setPadding(Ui.dp(activity, 20), 0, Ui.dp(activity, 20), Ui.dp(activity, 18));
+        panel.setPadding(Ui.dp(activity, SIDE_DP), 0, Ui.dp(activity, SIDE_DP),
+                Ui.dp(activity, UNDER_DP));
 
         LinearLayout head = Ui.row(activity);
         head.setMinimumHeight(Ui.dp(activity, 56));
@@ -124,6 +129,16 @@ final class SidePanel extends FrameLayout {
                         activity.getResources().getDisplayMetrics().widthPixels * 0.86f)),
                 ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END);
         addView(panel, panelParams);
+    }
+
+    /**
+     * The panel runs the window's full height against its right edge, so its head
+     * is where the clock and a punch-hole are, and its foot is where the gesture
+     * handle is. The fill keeps the edge; the words and the close circle move in.
+     */
+    void inset(int left, int top, int right, int bottom) {
+        panel.setPadding(Ui.dp(activity, SIDE_DP) + left, top,
+                Ui.dp(activity, SIDE_DP) + right, Ui.dp(activity, UNDER_DP) + bottom);
     }
 
     /** One row: its name, its hint, and a hairline under it. */

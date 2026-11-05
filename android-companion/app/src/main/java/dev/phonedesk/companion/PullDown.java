@@ -26,18 +26,32 @@ final class PullDown extends LinearLayout {
 
     private final Activity activity;
 
+    /** The pull-down's own padding. The window's side insets are added to these. */
+    private static final int SIDE_DP = 18;
+    private static final int TOP_DP = 2;
+    private static final int UNDER_DP = 10;
+
     PullDown(Activity activity, Nav nav) {
         super(activity);
         this.activity = activity;
         setOrientation(VERTICAL);
         setBackgroundColor(Ui.BG);
-        setPadding(Ui.dp(activity, 18), Ui.dp(activity, 2), Ui.dp(activity, 18),
-                Ui.dp(activity, 10));
+        setPadding(Ui.dp(activity, SIDE_DP), Ui.dp(activity, TOP_DP),
+                Ui.dp(activity, SIDE_DP), Ui.dp(activity, UNDER_DP));
 
         addView(Ui.rule(activity));
         addRow("PAIRED", "live link", () -> nav.openSection(MainActivity.SECTION_DECKS));
         addRow("BOARDS", "the shelf", () -> nav.openSection(MainActivity.SECTION_PROJECTS));
         addRow("SERIAL", "usb · flash", () -> nav.openSection(MainActivity.SECTION_SERIAL));
+    }
+
+    /**
+     * The pull-down is in flow under the band, so a cutout on the long edge has to
+     * move its rows as well as the band's: it is the same strip of screen.
+     */
+    void inset(int left, int right) {
+        setPadding(Ui.dp(activity, SIDE_DP) + left, Ui.dp(activity, TOP_DP),
+                Ui.dp(activity, SIDE_DP) + right, Ui.dp(activity, UNDER_DP));
     }
 
     private void addRow(String name, String hint, Runnable tap) {

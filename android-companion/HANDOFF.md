@@ -789,11 +789,15 @@ Identical to the sketch, checked against its `onWrite` handlers:
   again when a new project could start from an imported sketch: the unsigned file
   is 227,458 bytes, `release.sh` signs it with a 4096-bit key and writes
   **243,311 bytes** (238 kB), and the debug APK in `dist/` was 239,217 bytes then.
-  Rebuilt on 2026-11-05 after the restyle and the three Poppins faces, the same
-  debug APK is **272,209 bytes** (266 kB), sha256 beginning `15ca87b1` — 32,992 bytes
-  for the fonts and the new views, and still 55 kB under the ceiling. The code is the same in both archives — `classes.dex` is 249,492
-  bytes and `resources.arsc` 1,980 bytes either way — so the 4,094-byte difference
-  is packaging, alignment and the signing block rather than a different build, and
+  Rebuilt on 2026-11-05 after the restyle and the three Poppins faces, the debug
+  APK was 272,209 bytes (266 kB), sha256 beginning `15ca87b1` — 32,992 bytes for
+  the fonts and the new views. The cutout insets rebuilt it again the same day to
+  **276,305 bytes** (270 kB), sha256 beginning `9cae9c60`: 4,096 bytes over the
+  earlier archive, with `classes.dex` up 664 bytes (272,444 to 273,108) and the
+  rest packaging, and 51,375 bytes under the 327,680-byte ceiling. The code was
+  the same in the release pair — `classes.dex` 249,492 bytes and
+  `resources.arsc` 1,980 bytes either way — so its 4,094-byte difference is
+  packaging, alignment and the signing block rather than a different build, and
   no one figure is a guide to the others. It is versionCode 1,
   minSdk 26, targetSdk 35, not debuggable, and it carries both sketches in its
   assets. The signer is read back out of the archive and refused if it comes back
@@ -869,9 +873,17 @@ Identical to the sketch, checked against its `onWrite` handlers:
   second image over the first. Flash progress is mirrored in statics and the
   finished sentence is handed to whichever tab renders next.
 - `targetSdk 35` makes Android 15 draw every window edge to edge, so
-  `MainActivity.applySystemBarInsets` pads the header and tab bar by the system
-  bar insets **on 35 and above only**; below that the window still fits the bars
-  and the padding would be doubled.
+  `MainActivity.applySystemBarInsets` adds the window insets to the band, the page
+  and both overlays **on 35 and above only**; below that the window still fits the
+  bars and the padding would be doubled. The inset is the union of `systemBars()`
+  and `displayCutout()`, so a top-centre punch-hole (a Galaxy Flip's camera) moves
+  the band's words clear while its fill stays behind the hole, and the sides are
+  read too for a cutout that lands on the long edge in landscape. The side panel is
+  the case that needed it most: its close circle sits where the clock is, and its
+  foot where the gesture handle is. The status bar icons follow the band on 15+,
+  which is the colour behind them there. Not measured on a device with a cutout;
+  the geometry is the platform's insets, and `CaptureTest` dispatches a 44 dp top
+  hole and a 30 dp side hole through the activity to hold it.
 
 ## Probe order: the loader, then BOOT + RESET, then the wirings
 
@@ -983,7 +995,7 @@ every run, so it is never a picture of an earlier capture.
 | --- | --- |
 | Gallery (a scroll, one screen under the next) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/ |
 | One screen | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/paired.png — likewise `pull-down`, `side-panel`, `bridge-sheet`, `appearance-sheet`, `projects`, `projects-open`, `serial`, `settings` |
-| The strip (one row of the nine, for a single message) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/chat-sheet.jpg |
+| The strip (one row of the nine, for a desktop message — not a phone view) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/chat-sheet.jpg |
 | Preview copy | https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/ — the same bundle, deployed first and kept for a second look |
 | Bundle source | [`artifacts/site/`](../artifacts/site/) (`worker.js`, `manifest.json`), built by [`artifacts/publish_renders.py`](../artifacts/publish_renders.py) into the gitignored `artifacts/site/public/` |
 | Site | Freebuff Sites `3f6c1a9e-8b47-4d2c-9f11-5a7e2c4d8b60` — **production published**, preview published beside it |
@@ -993,7 +1005,9 @@ no secret on it, and the bundle is a copy of pixels git already holds, so the si
 show a screen the app no longer draws. `public/` is ignored by git — the frames beside it
 are the source. Nothing in the app reads this host. `capture.sh` rebuilds the bundle every
 time it installs frames, so the files the site serves cannot lag a capture; deploying them
-is a separate step, and publishing still needs asking.
+is a separate step, and publishing still needs asking. The phone view is the labelled
+per-screen links above, not the gallery and not the strip: the strip is a single row
+nine frames wide, so a phone shrinks each frame to a thumbnail.
 
 ### What a capture costs
 

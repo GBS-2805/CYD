@@ -3,8 +3,10 @@ package dev.phonedesk.companion;
 import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Insets;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -118,6 +120,44 @@ public final class CaptureTest {
         Ui.applyTheme(Palette.MOSS, true);
         capture("settings", MainActivity.SECTION_SETTINGS, new SetupTab(host), null, null);
         Ui.applyTheme(Appearance.palette(host), Appearance.light(host));
+    }
+
+    /**
+     * The band clears a camera hole, and the page clears the bars.
+     *
+     * Android 15 draws the window edge to edge, so the top strip is shared by the
+     * clock and whatever camera the phone carries. A Flip's punch-hole is in the top
+     * centre, where the mark sits; in landscape the same hole is on a long edge. One
+     * dispatch covers both: the display cutout joins the system bars, the band's
+     * content moves down and in while its fill stays, and the page takes the sides
+     * and the foot. The numbers are the platform's own, so the test uses the
+     * platform's insets rather than a copy of the app's arithmetic.
+     */
+    @Test
+    public void theBandClearsTheCameraHole() {
+        org.robolectric.android.controller.ActivityController<MainActivity> controller =
+                Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        View root = activity.getWindow().getDecorView();
+
+        WindowInsets insets = new WindowInsets.Builder()
+                .setInsets(WindowInsets.Type.systemBars(), Insets.of(0, 24, 0, 48))
+                // A hole taller than this phone's clock, and on the left edge the
+                // way a cutout lands when the phone is turned.
+                .setInsets(WindowInsets.Type.displayCutout(), Insets.of(30, 44, 0, 0))
+                .build();
+        root.dispatchApplyWindowInsets(insets);
+
+        View bar = activity.findViewById(MainActivity.ID_BAR);
+        assertNotNull(bar);
+        assertEquals(14 + 30, bar.getPaddingLeft());
+        assertEquals(12 + 44, bar.getPaddingTop());
+        assertEquals(8, bar.getPaddingBottom());
+
+        View content = activity.findViewById(MainActivity.ID_CONTENT);
+        assertNotNull(content);
+        assertEquals(30, content.getPaddingLeft());
+        assertEquals(48, content.getPaddingBottom());
     }
 
     /**

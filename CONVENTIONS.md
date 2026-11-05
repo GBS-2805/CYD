@@ -984,7 +984,14 @@ the front page needs no second navigation.
   URLs: `![home](…)` and a naked `https://…` on its own line both arrive as
   letters on a screen, and a workspace path is worse still, because it opens
   nothing anywhere but here. What arrives is a *label* wrapped around a public
-  URL, and the host has to still be serving it when he taps. **A link is not a
+  URL, and the host has to still be serving it when he taps. **Send the screens,
+  not a strip.** A phone message is a short list of labelled links, one per
+  screen — `[Paired](https://…/paired.png)` — because the label is the only part
+  the client makes tappable. The gallery is an optional second link;
+  `chat-sheet.jpg` is a desktop extra and never the way a phone is asked to read
+  the screens: it is one row nine frames wide, so every frame lands as a
+  thumbnail. A message whose only link is the gallery or the strip has not sent
+  the renders. **A link is not a
   gate at all unless it opens.** The first links this repo posted 404'd because the
   hostname had one character too many, so open every address before sending it —
   `curl -s -o /dev/null -w '%{http_code}' <url>` printing `200` is the proof; a

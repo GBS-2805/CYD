@@ -12,9 +12,11 @@ width, separated by a hairline and one line of caption, so opening it and draggi
 walks the app from its first page to settings. A strip of thumbnails shows the
 shape of the app and nothing readable; this shows what the phone shows.
 
-The strip is the one exception, because a single chat message wants one picture. It is
-drawn here from the same frames the page uses, so it cannot be a strip an earlier
-capture left in `renders/` while the app grew more screens.
+The strip is the one exception, because a desktop message can take one wide picture.
+It is not a phone view — nine frames across shrink to thumbnails — so a phone message
+carries one labelled link per screen instead, as `CONVENTIONS.md` asks. It is drawn
+here from the same frames the page uses, so it cannot be a strip an earlier capture
+left in `renders/` while the app grew more screens.
 
     python3 artifacts/publish_renders.py          # rebuild the bundle
     # then deploy artifacts/site/manifest.json with the sites tooling
