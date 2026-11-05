@@ -18,7 +18,9 @@
 #   ./check.sh --full --cached      the same steps without re-proving what this
 #                       tree already proved: each expensive step hashes its inputs
 #                       first, and one whose bytes match .gate_evidence.json is not
-#                       compiled again. For working on the tree, never for a release.
+#                       compiled again. Evidence about a deck or a file this tree
+#                       no longer holds is dropped before the run. For working on
+#                       the tree, never for a release.
 #   ./check.sh --selftest  the checkers' own refusals       (~10 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
@@ -138,7 +140,7 @@ step_evidenced () {
   rc=$?
   if [ "$rc" -eq 0 ] && [ -n "${STEP_LINE:-}" ]; then
     python3 check_evidence.py record --name "$name" --of "$key" \
-      --summary "$STEP_LINE" >/dev/null 2>&1
+      --watch ${watch[@]+"${watch[@]}"} --summary "$STEP_LINE" >/dev/null 2>&1
   fi
   return "$rc"
 }
@@ -281,6 +283,13 @@ else
 fi
 
 if [ "$full" -eq 1 ]; then
+  # Evidence about a deck or a file this tree no longer holds can never be reused,
+  # and it should not sit in the store looking current. Quiet when there is
+  # nothing to drop; a store that cannot be read is refused rather than rewritten.
+  if [ -f .gate_evidence.json ]; then
+    pruned=$(python3 check_evidence.py prune 2>&1) || true
+    [ -n "$pruned" ] && say "cache" "$(printf '%s' "$pruned" | tr '\n' ' ' | sed 's/ *$//')"
+  fi
   # What a key covers: the decks this run proves (the ones named, or every deck
   # the tree holds), so a run scoped to one deck can never answer for two.
   watched=()

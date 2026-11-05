@@ -21,13 +21,24 @@ gate rebuilds everything and this only answers "has anything moved since the las
 real run?". The store is `.gate_evidence.json` at the root, gitignored: it is
 evidence about this worktree, not part of the tree, and a clone starts with none.
 
+A store also outlives the tree it describes: a deck gets renamed, a step's sources
+move, and the entry that measured them stays behind. Such an entry can never hit
+again, because a key needs its files to exist, but it makes the store claim things
+about a tree that is not this one - so `prune` drops every entry that names an
+input this tree does not hold, and `list` marks one before that happens. The store
+is never guessed at: an entry that cannot be read is not rebuilt from a memory of
+it, and a store that cannot be parsed is refused rather than overwritten.
+
   python3 check_evidence.py key --stamp "..." --watch a b/    the inputs' key
   python3 check_evidence.py hit --name headroom --of KEY      ISO time and the
                                                               measurement, exit 3
                                                               when it is not this
                                                               key's evidence
   python3 check_evidence.py record --name headroom --of KEY --summary "..."
-  python3 check_evidence.py list                              what is stored
+  python3 check_evidence.py list                              what is stored,
+                                                              and what is stale
+  python3 check_evidence.py prune                             drop the entries
+                                                              whose inputs left
 """
 import hashlib
 import json
@@ -83,6 +94,19 @@ def load():
     except (OSError, ValueError):
         return {}
     return store if isinstance(store, dict) else {}
+
+
+def stale(entry):
+    """Why an entry no longer describes this tree, or "" when it still does."""
+    if not isinstance(entry, dict):
+        return "it is not an entry this store wrote"
+    watch = entry.get("watch")
+    if not watch:
+        return "it names no inputs, so nothing can say whether it still fits"
+    for path in watch:
+        if not Path(path).exists():
+            return "it watches %s, which this tree no longer holds" % path
+    return ""
 
 
 def parse(rest):
@@ -143,6 +167,9 @@ def main(argv):
             "key": options["of"],
             "summary": options["summary"],
             "at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            # What the key was taken over, so a later run can say whether those
+            # inputs are still here - a key alone cannot answer that.
+            "watch": options["watches"],
         }
         STORE.write_text(json.dumps(store, indent=2, sort_keys=True) + "\n",
                          encoding="utf-8")
@@ -153,14 +180,47 @@ def main(argv):
         if not store:
             print("nothing proved yet: %s holds no entry" % named(STORE))
             return 0
+        gone = 0
         for name in sorted(store):
             entry = store[name]
-            print("%-12s %-18s %s  %s" % (name, entry.get("at", "?"),
-                                          entry.get("key", "?"),
-                                          entry.get("summary", "")))
+            why = stale(entry)
+            gone += 1 if why else 0
+            if not isinstance(entry, dict):
+                print("%-12s %s" % (name, why))
+                continue
+            print("%-12s %-18s %-16s %s%s" % (
+                name, entry.get("at", "?"), entry.get("key", "?"),
+                entry.get("summary", ""),
+                "  (stale: %s)" % why if why else ""))
+        if gone:
+            print("%d of %d no longer describe this tree: prune drops them"
+                  % (gone, len(store)))
         return 0
 
-    print("is not a subcommand: key, hit, record or list", file=sys.stderr)
+    if command == "prune":
+        if not STORE.exists():
+            return 0
+        try:
+            raw = json.loads(STORE.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            print("refuses to prune %s: it cannot be read, so nothing in it can "
+                  "be judged" % named(STORE), file=sys.stderr)
+            return 2
+        store = raw if isinstance(raw, dict) else {}
+        dropped = [(name, stale(store[name])) for name in sorted(store)
+                   if stale(store[name])]
+        if not dropped:
+            return 0
+        for name, why in dropped:
+            print("pruned %s: %s" % (name, why))
+            del store[name]
+        print("pruned %d of %d entries, %d kept"
+              % (len(dropped), len(dropped) + len(store), len(store)))
+        STORE.write_text(json.dumps(store, indent=2, sort_keys=True) + "\n",
+                         encoding="utf-8")
+        return 0
+
+    print("is not a subcommand: key, hit, record, list or prune", file=sys.stderr)
     return 2
 
 

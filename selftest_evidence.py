@@ -9,7 +9,7 @@ unnoticed until the day it reused the wrong build.
 
 Each case runs the checker in a throwaway repo with one small sketch, records a
 measurement, and changes exactly one thing - a byte, the stamp, the store, the
-subcommand. Nothing here compiles anything.
+subcommand, or the deck's own folder going away. Nothing here compiles anything.
 
   python3 selftest_evidence.py     exit 0 when the cache still refuses what it must
 """
@@ -48,7 +48,7 @@ def keyed(root, stamp="core=one"):
 
 def record(root, stamp="core=one"):
     return run(root, "record", "--name", "headroom", "--of", keyed(root, stamp),
-               "--summary", MEASURED)
+               "--watch", "demo_deck", "--summary", MEASURED)
 
 
 def case_nothing_kept(base):
@@ -104,6 +104,36 @@ def case_corrupt_store(base):
 def case_unknown_command(base):
     root = tree(base)
     return run(root, "frobnicate"), []
+
+
+def case_prune_deck_gone(base):
+    root = tree(base)
+    key = keyed(root)
+    record(root)
+    shutil.rmtree(root / "demo_deck")
+    pruned = run(root, "prune")
+    return run(root, "hit", "--name", "headroom", "--of", key), [pruned.stdout]
+
+
+def case_prune_keeps_what_is_here(base):
+    root = tree(base)
+    record(root)
+    pruned = run(root, "prune")
+    return run(root, "hit", "--name", "headroom", "--of", keyed(root)), [pruned.stdout]
+
+
+def case_prune_unreadable(base):
+    root = tree(base)
+    record(root)
+    (root / ".gate_evidence.json").write_text("{ no json here\n", encoding="utf-8")
+    return run(root, "prune"), []
+
+
+def case_list_reports_stale(base):
+    root = tree(base)
+    record(root)
+    shutil.rmtree(root / "demo_deck")
+    return run(root, "list"), []
 
 
 CASES = [
@@ -168,6 +198,34 @@ CASES = [
         build=case_unknown_command,
         code=2,
         want=["is not a subcommand"],
+        forbids=[],
+    ),
+    dict(
+        name="a deck that left the tree loses its entry",
+        build=case_prune_deck_gone,
+        code=3,
+        want=["demo_deck"],
+        forbids=[MEASURED],
+    ),
+    dict(
+        name="pruning a store that still describes this tree drops nothing",
+        build=case_prune_keeps_what_is_here,
+        code=0,
+        want=[MEASURED],
+        forbids=["pruned"],
+    ),
+    dict(
+        name="a store it cannot read is refused, not overwritten",
+        build=case_prune_unreadable,
+        code=2,
+        want=["refuses to prune"],
+        forbids=[],
+    ),
+    dict(
+        name="the store reports a stale entry before anything drops it",
+        build=case_list_reports_stale,
+        code=0,
+        want=["stale"],
         forbids=[],
     ),
 ]

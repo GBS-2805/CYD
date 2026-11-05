@@ -717,7 +717,10 @@ deleted. What is left is the part that was never about the count.
   holds, prints the measurement it recorded instead of compiling. It is for the
   minutes between changes and never for a release: the run that ships is the one
   without it, and a run that reused anything says so instead of claiming to have
-  passed everything.
+  passed everything. A store outlives the tree it describes, so a full run first
+  drops every entry whose deck or file this tree no longer holds, and
+  `python3 check_evidence.py list` prints what is left, marking as stale anything
+  a `prune` would take.
 * **Work reaches a branch by merge, never by copy**, so
   [the section above](#one-chat-one-tree) is the whole of it: a branch is mergeable
   on its own terms, nothing here needs anyone's permission, and a number a merge
