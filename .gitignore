@@ -24,6 +24,12 @@ artifacts/renders/scroll.png
 .build_figures.json
 .scratch/
 
+# What each full step last measured, keyed on the bytes that produced it, written
+# by check_evidence.py. Evidence about this worktree, not part of the tree: a
+# clone starts with none, and `./check.sh --full` proves every step for real
+# unless --cached is asked for.
+.gate_evidence.json
+
 # The published render bundle: copied from artifacts/renders/ by
 # publish_renders.py on every build, so it is output, not a second copy.
 artifacts/site/public/

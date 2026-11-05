@@ -3,19 +3,26 @@
 # One gate, two speeds. A rule has one home, and this is where to run them from.
 #
 #   ./check.sh          what a commit must pass            (~3 s)
-#   ./check.sh --full   what a release must pass           (~7 min: the decks on
-#   ./check.sh --full <folder> ...   the same for the decks you name: their
-#                       headroom, their old-core build and their two-build repro,
-#                       with the other decks left alone. The APK and the frames are
-#                       app-wide, so they still run.
-#                       both cores, the old ones compared with old_core.json, and
-#                       each deck built twice, so it needs all three toolchains — source
-#                       ~/.arduino-cyd/env.sh, ~/.arduino-cyd-2/env.sh or ~/.arduino15/env.sh for the old
-#                       core, and ~/.android-offsite/env.sh)
+#   ./check.sh --full   what a release must pass           (~7 min): every deck on
+#                       both cores, the old ones compared with old_core.json, each
+#                       deck built twice, the nine frames redrawn, the APK built
+#                       and rebuilt. It needs all three toolchains: source
+#                       ~/.arduino-cyd-3/env.sh, ~/.arduino-cyd-2/env.sh (or
+#                       ~/.arduino15/env.sh) for the old core, and
+#                       ~/.android-offsite/env.sh.
+#   ./check.sh --full <folder> ...
+#                       the same for the decks you name — their headroom, their
+#                       old-core build and their two-build repro — with the other
+#                       decks left alone. The APK and the frames are app-wide, so
+#                       they still run.
+#   ./check.sh --full --cached      the same steps without re-proving what this
+#                       tree already proved: each expensive step hashes its inputs
+#                       first, and one whose bytes match .gate_evidence.json is not
+#                       compiled again. For working on the tree, never for a release.
 #   ./check.sh --selftest  the checkers' own refusals       (~10 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
-# nobody exercises: --selftest runs the eleven selftest_*.py files, which hand each
+# nobody exercises: --selftest runs the twelve selftest_*.py files, which hand each
 # checker a throwaway repo and a stand-in (compiler, capture script, git repo) and
 # make it refuse.
 #
@@ -40,6 +47,8 @@ mkdir -p .scratch
 
 full=0
 selftest=0
+cached=0
+reused=0
 decks=()
 failures=0
 
@@ -50,6 +59,7 @@ for arg in "$@"; do
   case "$arg" in
     --full)     full=1 ;;
     --selftest) selftest=1 ;;
+    --cached)   cached=1 ;;
     -h|--help)
       awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
       exit 0 ;;
@@ -66,6 +76,11 @@ for arg in "$@"; do
   esac
 done
 
+# Reuse is a mode of the work, not of the release: asking for it also asks for
+# the full set, and then each expensive step may answer from what this tree
+# already proved. The store is only ever written by a step that really ran.
+if [ "$cached" -eq 1 ]; then full=1; fi
+
 step () {
   local name="$1" filter="$2"; shift 2
   local out=".scratch/gate-$name.log"
@@ -75,6 +90,9 @@ step () {
   end=$(date +%s%N); ms=$(( (end-start)/1000000 ))
   last=$(grep -E "$filter" "$out" | tail -1)
   [ -n "$last" ] || last=$(tail -1 "$out")
+  # The step's own sentence, for the evidence cache and for anything else that
+  # wants the measurement rather than a second grep of the log.
+  STEP_LINE="$last"
   if [ "$rc" -eq 0 ]; then
     printf 'ok    %-15s %6d ms  %s\n' "$name" "$ms" "$last"
   else
@@ -82,6 +100,47 @@ step () {
     failures=$((failures + 1))
     echo "----- $name"; sed -n '1,40p' "$out"; echo "-----"
   fi
+}
+
+# A step whose inputs are hashed before it runs. With --cached a run whose bytes
+# this tree already proved says so and returns without compiling; a changed byte,
+# a missing entry or a store that cannot be read all fall through to the real
+# step, and a step that fails is never recorded. Naming a deck changes the key,
+# so one deck's evidence can never answer for two.
+step_evidenced () {
+  local name="$1" filter="$2" stamp="$3"; shift 3
+  local watch=()
+  while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do watch+=("$1"); shift; done
+  [ "$#" -gt 0 ] && shift
+  if [ "$cached" -eq 0 ]; then
+    step "$name" "$filter" "$@"
+    return
+  fi
+  local start=$SECONDS ms key said when summary rc
+  local scribble=".scratch/gate-$name.key"
+  start=$(date +%s%N)
+  key=$(python3 check_evidence.py key --stamp "$stamp" --watch "${watch[@]}" 2>"$scribble")
+  if [ -z "$key" ]; then
+    say "$name" "nothing to key on, so it is proved again: $(tail -1 "$scribble")"
+    step "$name" "$filter" "$@"
+    return
+  fi
+  if said=$(python3 check_evidence.py hit --name "$name" --of "$key" 2>/dev/null); then
+    when=${said%%$'\t'*}
+    summary=${said#*$'\t'}
+    ms=$(( ($(date +%s%N)-start)/1000000 ))
+    printf 'cached %-14s %6d ms  %s\n' "$name" "$ms" "$summary"
+    echo "       that measurement was taken at $when on these same bytes; it was not run now"
+    reused=$((reused + 1))
+    return 0
+  fi
+  step "$name" "$filter" "$@"
+  rc=$?
+  if [ "$rc" -eq 0 ] && [ -n "${STEP_LINE:-}" ]; then
+    python3 check_evidence.py record --name "$name" --of "$key" \
+      --summary "$STEP_LINE" >/dev/null 2>&1
+  fi
+  return "$rc"
 }
 
 # A step whose prerequisite is not on this machine says which one, the way the
@@ -126,6 +185,7 @@ if [ "$selftest" -eq 1 ]; then
   step "sketch selftest" 'branches of check_sketch_repro'   python3 selftest_sketch_repro.py
   step "gate selftest"   'branches of check.sh'            python3 selftest_gate.py
   step "apk selftest"    'branches of check_apk'           python3 selftest_apk.py
+  step "cache selftest"  'branches of check_evidence'      python3 selftest_evidence.py
   step "map selftest"    'branches of check_map'           python3 selftest_map.py
   echo
   if [ "$failures" -gt 0 ]; then
@@ -221,7 +281,21 @@ else
 fi
 
 if [ "$full" -eq 1 ]; then
-  step "headroom" 'deck\(s\) fit'       python3 check_headroom.py "${cli_args[@]}" ${decks[@]+"${decks[@]}"}
+  # What a key covers: the decks this run proves (the ones named, or every deck
+  # the tree holds), so a run scoped to one deck can never answer for two.
+  watched=()
+  if [ "${#decks[@]}" -gt 0 ]; then
+    watched=("${decks[@]}")
+  else
+    for descriptor in */widget.json; do watched+=("$(dirname "$descriptor")"); done
+  fi
+  # A toolchain is an input too: a core installed into another root is another
+  # build, so its stamp is in every key the decks are proved under.
+  stamp_deck="cli=${cli:-none} data=${ARDUINO_DIRECTORIES_DATA:-none}"
+  stamp_android="jdk=${JAVA_HOME:-none} sdk=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-none}}"
+  step_evidenced "headroom" 'deck\(s\) fit' "$stamp_deck" \
+    "${watched[@]}" check_headroom.py check_evidence.py -- \
+    python3 check_headroom.py "${cli_args[@]}" ${decks[@]+"${decks[@]}"}
   # The old core is a separate question, not a second opinion: a deck that fits on
   # 3.3.12 can still overflow on 2.0.17, and that root carries its own data dir and
   # its own Python path, so it is built in a shell that sourced its env.sh. The
@@ -234,27 +308,50 @@ if [ "$full" -eq 1 ]; then
   if [ -n "$abroot" ]; then
     # $0 is the script name bash -c was given, so the env.sh is $1 and the deck
     # names follow it: sourcing then shifting leaves exactly those names.
-    step "old core" 'old_core.json' bash -c \
-      '. "$1"; shift; exec python3 check_old_core.py "$@"' \
+    step_evidenced "old core" 'old_core.json' "ab=$abroot" \
+      "${watched[@]}" check_old_core.py old_core.json check_evidence.py -- \
+      bash -c '. "$1"; shift; exec python3 check_old_core.py "$@"' \
       - "$abroot" ${decks[@]+"${decks[@]}"}
   else
     say "old core" "no A/B root in ~/.arduino-cyd-2 or ~/.arduino15, so the old core was NOT built"
   fi
-  step "renders"  'renders current'     python3 check_renders.py
-  step "apk"      '[0-9] bytes'         bash android-companion/toolchain.sh
+  step_evidenced "renders" 'renders current' "$stamp_android" \
+    android-companion/app/src/main/java android-companion/app/src/main/res \
+    android-companion/capture.sh check_renders.py check_evidence.py \
+    "${watched[@]}" -- python3 check_renders.py
+  step_evidenced "apk" '[0-9] bytes' "$stamp_android" \
+    android-companion/app/src/main/java android-companion/app/src/main/res \
+    android-companion/app/src/main/AndroidManifest.xml \
+    android-companion/build.gradle android-companion/settings.gradle \
+    android-companion/gradle.properties android-companion/toolchain.sh \
+    check_apk.py check_evidence.py "${watched[@]}" -- \
+    bash android-companion/toolchain.sh
   # One build can never say whether the archive reproduces: AGP restamped a block
   # on every run until 2026-11-03 and nothing noticed for weeks. Two builds, twice
   # the cost, and the only question is whether the bytes match.
-  step "repro"    'same bytes'          python3 check_repro.py
+  step_evidenced "repro" 'same bytes' "$stamp_android" \
+    android-companion/app/src/main/java android-companion/app/src/main/res \
+    android-companion/app/src/main/AndroidManifest.xml \
+    android-companion/build.gradle android-companion/settings.gradle \
+    android-companion/gradle.properties android-companion/toolchain.sh \
+    check_repro.py check_apk.py check_evidence.py "${watched[@]}" -- \
+    python3 check_repro.py
   # The sketches are flashed, so their bytes matter the same way the APK's do:
   # each deck is compiled twice and the images must match.
   # The decks compile together, so a new deck costs a compile, not a run.
-  step "sketch repro" 'same bytes'      python3 check_sketch_repro.py "${cli_args[@]}" ${decks[@]+"${decks[@]}"}
+  step_evidenced "sketch repro" 'same bytes' "$stamp_deck" \
+    "${watched[@]}" check_sketch_repro.py check_evidence.py -- \
+    python3 check_sketch_repro.py "${cli_args[@]}" ${decks[@]+"${decks[@]}"}
 fi
 
 echo
 if [ "$failures" -gt 0 ]; then
   echo "$failures step(s) failed"
   exit 1
+fi
+if [ "$reused" -gt 0 ]; then
+  echo "every check passed, $reused of them reused from .gate_evidence.json:"
+  echo "those steps were not run this time, so this is not the release gate"
+  exit 0
 fi
 echo "every check passed"
