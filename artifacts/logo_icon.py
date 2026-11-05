@@ -389,7 +389,7 @@ def sheet():
     """One picture to link: the mark at launcher sizes, in both common masks.
 
     CONVENTIONS.md makes a linked render the gate before anything ships, and the
-    icon is not one of the app's nine screens, so it gets its own sheet.
+    icon is not one of the app's screens, so it gets its own sheet.
     """
     src = Image.open(os.path.join(HERE, "launcher-preview.png"))
     width, height = 1000, 560

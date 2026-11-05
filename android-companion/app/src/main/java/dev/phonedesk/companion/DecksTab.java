@@ -2,22 +2,50 @@ package dev.phonedesk.companion;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.graphics.Typeface;
+import android.graphics.Color;
 import android.text.InputFilter;
 import android.text.InputType;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
- * Live monitor for CYD decks: what is linked, how healthy the link is, what is
- * advertising nearby, and which decks the phone has met before.
+ * PAIRED: the live link, then every deck the app knows.
+ *
+ * <b>One list, two states.</b> The decks this phone has paired with come first, each
+ * led by its own {@link LedMarquee} — lit and chasing for the board the bridge is
+ * talking to now, lit and steady for one it has met before. The decks it has never
+ * been paired with follow under OFF, dark, including any bundled deck advertising in
+ * range with nothing to link, so a board can still be paired without a section of its
+ * own.
+ *
+ * <b>A deck carries a palette, and the deck is what wears it.</b> Each paired deck has
+ * a {@link DeckLook} — one of the site's three palettes and one of its two pages — and
+ * the byte that look encodes is written to the board, whose own {@code THEMES[]} table
+ * has a row per palette per page. So the swatch changes the glass, and this row only
+ * reports it: the ringed swatch is the palette that deck is set to, and the page circle
+ * is the page the board answered with. Keeping the row in the app's inks is what lets a
+ * list of three decks read as one list while each of their screens is a different
+ * palette.
+ *
+ * The page half is the deck's, not the app's: a board's sketch carries two pages, and
+ * the sun/crescent circle writes that one byte down the link. It is dimmed on a deck
+ * with no link, because there is nothing to write to.
+ *
+ * The card that used to sit above this list said the same three facts as the row it
+ * belonged to, so it is gone; the bridge card still opens the page with what the link
+ * is doing.
  */
 final class DecksTab extends ScrollView {
 
@@ -42,8 +70,8 @@ final class DecksTab extends ScrollView {
         this.source = source;
         setBackgroundColor(Ui.BG);
         body = Ui.column(activity);
-        body.setPadding(Ui.dp(activity, 16), Ui.dp(activity, 8),
-                Ui.dp(activity, 16), Ui.dp(activity, 24));
+        body.setPadding(Ui.dp(activity, 16), Ui.dp(activity, 6),
+                Ui.dp(activity, 16), Ui.dp(activity, 20));
         addView(body, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
 
@@ -71,17 +99,20 @@ final class DecksTab extends ScrollView {
             sb.append(nearby.mac).append(':').append(nearby.rssi / 5).append(';');
         }
         sb.append('#');
-        // The name is in here on purpose: a rename writes to the board, comes back
-        // in the identity document and moves nothing else, so without it the row
-        // would keep the old label until something unrelated changed.
-        for (DeckStore.Known deck : known) sb.append(deck.key()).append(':')
-                .append(deck.name).append(';');
+        // The name and the look are in here on purpose: a rename writes to the board,
+        // comes back in the identity document and moves nothing else, and a ringed
+        // swatch is read when the row is built — without them the row would keep the old
+        // label and the old ring until something unrelated changed.
+        for (DeckStore.Known deck : known) {
+            sb.append(deck.key()).append(':').append(deck.name).append(':')
+                    .append(DeckStore.look(activity, deck.key()).encode()).append(';');
+        }
         return sb.toString();
     }
 
     private String live(DeckService.Snapshot snapshot) {
         long now = System.currentTimeMillis();
-        if (!snapshot.running) return "Bridge stopped — start it from Setup";
+        if (!snapshot.running) return "Bridge stopped — start it from the side panel";
         if (snapshot.linked) {
             return "linked " + Ui.duration(snapshot.connectedAtMs, now)
                     + "  ·  " + snapshot.rssi + " dBm"
@@ -96,215 +127,289 @@ final class DecksTab extends ScrollView {
 
     private void build(DeckService.Snapshot snapshot, List<DeckStore.Known> known) {
         body.removeAllViews();
+        body.addView(bridgeCard(snapshot));
 
-        LinearLayout status = Ui.card(activity);
+        body.addView(Ui.section(activity, "DECKS"));
+        if (known.isEmpty()) {
+            body.addView(hint("No deck has been paired yet. Start the bridge and link one "
+                    + "from the OFF list below."));
+        } else {
+            for (DeckStore.Known deck : known) {
+                View card = deckCard(deck, snapshot);
+                Ui.space(activity, card, 6);
+                body.addView(card);
+            }
+        }
+        body.addView(offList(snapshot, known));
+
+        TextView note = hint("One deck is linked at a time, so a second CYD in range never "
+                + "steals the connection. A swatch sets that deck's own palette and writes it "
+                + "down the link; the page circle is the board's own, the same way.");
+        note.setPadding(0, Ui.dp(activity, 14), 0, 0);
+        body.addView(note);
+    }
+
+    /** What the link is doing, and the only card above the list. */
+    private View bridgeCard(DeckService.Snapshot snapshot) {
+        LinearLayout card = Ui.card(activity);
         TextView heading = Ui.text(activity, snapshot.running ? "BRIDGE ACTIVE" : "BRIDGE STOPPED",
                 11, snapshot.running ? Ui.GOOD : Ui.PINK);
         heading.setLetterSpacing(0.14f);
-        status.addView(heading);
+        card.addView(heading);
 
         liveLine = Ui.text(activity, live(snapshot), 14, Ui.TEXT);
-        liveLine.setPadding(0, Ui.dp(activity, 6), 0, 0);
-        status.addView(liveLine);
+        liveLine.setPadding(0, Ui.dp(activity, 5), 0, 0);
+        card.addView(liveLine);
 
-        TextView statusText = Ui.text(activity, snapshot.status, 12, Ui.DIM);
-        statusText.setPadding(0, Ui.dp(activity, 6), 0, 0);
-        status.addView(statusText);
-
-        body.addView(status);
-
-        if (snapshot.linked) {
-            LinearLayout deck = Ui.card(activity);
-            // The board's own name when it gave one, so a rename shows here without
-            // waiting for a re-link.
-            final DeckStore.Known named = DeckStore.byMac(activity, snapshot.deviceMac);
-            deck.addView(Ui.text(activity,
-                    named == null ? snapshot.deviceName : named.name, 18, Ui.TEXT));
-            // Tag first: it is the half of the id that cannot move, and the MAC
-            // below it is only the address this connection happened over.
-            final String where = snapshot.deviceTag.isEmpty()
-                    ? snapshot.deviceMac
-                    : snapshot.deviceTag + " \u00B7 " + snapshot.deviceMac;
-            // Two lines on purpose: the address already fills one, and a line that
-            // wraps in the middle of a fact reads as two facts. Where the deck is on
-            // the first, what it is showing and when it last answered on the second.
-            TextView mac = Ui.text(activity, where, 12, Ui.DIM);
-            mac.setPadding(0, Ui.dp(activity, 4), 0, 0);
-            deck.addView(mac);
-            final String palette = snapshot.theme == DeckTheme.UNKNOWN
-                    ? "theme unknown" : DeckTheme.name(snapshot.theme);
-            TextView wrote = Ui.text(activity, palette + " \u00B7 wrote "
-                    + Ui.ago(snapshot.lastWriteMs, System.currentTimeMillis()), 12, Ui.DIM);
-            wrote.setPadding(0, Ui.dp(activity, 2), 0, 0);
-            deck.addView(wrote);
-            // The way out of a link from the card that shows it, so an unlink never
-            // depends on finding the row for this board further down the page.
-            // Compact and at the end, the way the row's own UNLINK is: stretched
-            // across the card it read as a panel with a word in it.
-            LinearLayout unlinkRow = Ui.row(activity);
-            unlinkRow.setGravity(android.view.Gravity.END);
-            Button unlink = Ui.action(activity, "UNLINK", false);
-            unlink.setOnClickListener(v -> unlinkLinked(snapshot));
-            unlinkRow.addView(unlink);
-            Ui.space(activity, unlinkRow, 10);
-            deck.addView(unlinkRow);
-            Ui.space(activity, deck, 10);
-            body.addView(deck);
-        }
-
-        body.addView(Ui.section(activity, "NEARBY"));
-        if (snapshot.nearby.isEmpty()) {
-            body.addView(Ui.text(activity, snapshot.running
-                    ? "No decks advertising right now."
-                    : "Start the bridge to scan for decks.", 13, Ui.DIM));
-        } else {
-            for (DeckService.Nearby entry : snapshot.nearby) addNearbyRow(entry, snapshot);
-        }
-
-        body.addView(Ui.section(activity, "SAVED DECKS"));
-        if (known.isEmpty()) {
-            body.addView(Ui.text(activity,
-                    "Decks appear here after the first successful link.", 13, Ui.DIM));
-        } else {
-            for (DeckStore.Known deck : known) addKnownRow(deck, snapshot);
-        }
-
-        TextView hint = Ui.text(activity,
-                "One deck is linked at a time. Linking here pins the bridge to that board, "
-                        + "so a second CYD in range never steals the connection.",
-                12, Ui.DIM);
-        hint.setPadding(0, Ui.dp(activity, 18), 0, 0);
-        body.addView(hint);
-    }
-
-    private void addNearbyRow(DeckService.Nearby entry, DeckService.Snapshot snapshot) {
-        LinearLayout card = Ui.row(activity);
-        card.setBackground(Ui.rounded(activity, Ui.CARD, Ui.EDGE, 12));
-        card.setPadding(Ui.dp(activity, 14), Ui.dp(activity, 10),
-                Ui.dp(activity, 10), Ui.dp(activity, 10));
-
-        LinearLayout labels = Ui.column(activity);
-        labels.addView(Ui.text(activity, entry.name, 15, Ui.TEXT));
-        TextView detail = Ui.text(activity,
-                entry.mac + "  ·  " + entry.rssi + " dBm  ·  " + Ui.ago(entry.seenMs,
-                        System.currentTimeMillis()), 12, Ui.DIM);
-        detail.setPadding(0, Ui.dp(activity, 2), 0, 0);
-        labels.addView(detail);
-
-        card.addView(labels, new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-        if (entry.mac.equalsIgnoreCase(snapshot.deviceMac)) {
-            TextView badge = Ui.text(activity, "LINKED", 11, Ui.GOOD);
-            badge.setTypeface(Typeface.DEFAULT_BOLD);
-            card.addView(badge);
-        } else {
-            Button link = Ui.action(activity, "LINK", true);
-            link.setOnClickListener(v -> DeckService.connectTo(entry.mac));
-            card.addView(link);
-        }
-
-        Ui.space(activity, card, 8);
-        body.addView(card);
-    }
-
-    private void addKnownRow(DeckStore.Known deck, DeckService.Snapshot snapshot) {
-        LinearLayout card = Ui.row(activity);
-        card.setBackground(Ui.rounded(activity, Ui.CARD, Ui.EDGE, 12));
-        card.setPadding(Ui.dp(activity, 14), Ui.dp(activity, 10),
-                Ui.dp(activity, 10), Ui.dp(activity, 10));
-
-        LinearLayout labels = Ui.column(activity);
-        labels.addView(Ui.text(activity, deck.name, 15, Ui.TEXT));
-        // One row per board, keyed by widget and tag: the tag is the half of the id
-        // that cannot move. The address is in the card above, where the link is.
-        final String where = deck.tag.isEmpty() ? deck.mac : deck.tag;
-        final boolean linked = deck.mac.equalsIgnoreCase(snapshot.deviceMac);
-        // The build only comes from a live read, so a deck that is not linked right
-        // now shows no version rather than the last one it happened to report.
-        final String build = linked ? SketchVersion.label(snapshot.deviceVersion) : "";
-        TextView detail = Ui.text(activity,
-                where + " \u00B7 linked "
-                        + Ui.ago(deck.seenMs, System.currentTimeMillis())
-                        // Its own line: the row is too narrow to end a dot mid-sentence.
-                        + (build.isEmpty() ? "" : "\n" + build),
-                12, Ui.DIM);
-        detail.setPadding(0, Ui.dp(activity, 2), 0, 0);
-        labels.addView(detail);
-        labels.addView(themePair(deck, snapshot, linked));
-
-        card.addView(labels, new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-        if (linked) {
-            // Naming needs the link: the label is a write to the board, and one deck
-            // is linked at a time. Then the way out, which drops the link and
-            // forgets the row in one tap.
-            Button rename = Ui.action(activity, "RENAME", false);
-            rename.setOnClickListener(v -> rename(deck));
-            card.addView(rename);
-
-            Button unlink = Ui.action(activity, "UNLINK", false);
-            unlink.setOnClickListener(v -> unlink(deck, true));
-            LinearLayout.LayoutParams spare =
-                    new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT);
-            spare.leftMargin = Ui.dp(activity, 8);
-            card.addView(unlink, spare);
-        } else {
-            Button link = Ui.action(activity, "LINK", false);
-            link.setOnClickListener(v -> DeckService.connectTo(deck.mac));
-            card.addView(link);
-
-            Button forget = Ui.action(activity, "FORGET", false);
-            forget.setOnClickListener(v -> unlink(deck, false));
-            LinearLayout.LayoutParams spare =
-                    new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT);
-            spare.leftMargin = Ui.dp(activity, 8);
-            card.addView(forget, spare);
-        }
-        Ui.space(activity, card, 8);
-        body.addView(card);
+        TextView status = Ui.text(activity, snapshot.status, 12, Ui.DIM);
+        status.setPadding(0, Ui.dp(activity, 5), 0, 0);
+        card.addView(status);
+        return card;
     }
 
     /**
-     * The palette pair for one deck, and the only place a deck's palette is set.
-     * Every row carries it, because every board keeps its own palette in NVS; only
-     * the linked one can be written, since the link carries one deck at a time, so
-     * an unlinked row says what it needs first instead of a chip that would write
-     * nowhere.
+     * One paired deck: its marquee, its name and what is known, then the four circles
+     * and the actions the link allows — two rows, no third.
      */
-    private LinearLayout themePair(DeckStore.Known deck, DeckService.Snapshot snapshot,
-                                   boolean linked) {
+    private View deckCard(DeckStore.Known deck, DeckService.Snapshot snapshot) {
+        final boolean live = deck.mac.equalsIgnoreCase(snapshot.deviceMac) && snapshot.linked;
+        final DeckLook look = DeckStore.look(activity, deck.key());
+        // The board's own answer wins while it is the board being talked to: the page
+        // circle shows what the deck is showing, not what was last asked for. A deck
+        // flashed before the palettes reached the sketch answers 0 or 1, and then the
+        // page comes from the stored look instead of from a row it does not have.
+        final boolean light = live && DeckTheme.known(snapshot.theme)
+                ? DeckTheme.page(snapshot.theme) : look.light;
+
+        LinearLayout card = Ui.column(activity);
+        card.setBackground(Ui.rounded(activity, Color.TRANSPARENT, Ui.EDGE, 0));
+        card.setPadding(Ui.dp(activity, 13), Ui.dp(activity, 11),
+                Ui.dp(activity, 13), Ui.dp(activity, 11));
+
+        LinearLayout head = Ui.row(activity);
+        LedMarquee marquee = new LedMarquee(activity);
+        marquee.set(live ? LedMarquee.CHASE : LedMarquee.STEADY);
+        LinearLayout.LayoutParams marqueeParams = new LinearLayout.LayoutParams(
+                Ui.dp(activity, 40), Ui.dp(activity, 12));
+        marqueeParams.rightMargin = Ui.dp(activity, 11);
+        head.addView(marquee, marqueeParams);
+
+        LinearLayout labels = Ui.column(activity);
+        TextView title = Ui.text(activity, deck.name, 15, Ui.TEXT);
+        title.setTypeface(Ui.medium(activity));
+        labels.addView(title);
+        final String where = deck.tag.isEmpty() ? deck.mac : deck.tag;
+        // The build only comes from a live read, so a deck that is not linked right
+        // now shows no version rather than the last one it happened to report.
+        final String build = live ? SketchVersion.label(snapshot.deviceVersion) : "";
+        TextView detail = Ui.text(activity,
+                where + "  ·  " + (live ? "linked now"
+                        : "paired " + Ui.ago(deck.seenMs, System.currentTimeMillis()))
+                        + (build.isEmpty() ? "" : "  ·  " + build),
+                12, Ui.DIM);
+        labels.addView(detail);
+        head.addView(labels, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        if (live) head.addView(Ui.chip(activity, "LIVE", true));
+        card.addView(head);
+
+        LinearLayout foot = Ui.row(activity);
+        foot.setPadding(0, Ui.dp(activity, 9), 0, 0);
+        foot.addView(circles(deck, look, light, live));
+        View spacer = new View(activity);
+        foot.addView(spacer, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        foot.addView(actionButtons(deck, live));
+        card.addView(foot);
+        return card;
+    }
+
+    /**
+     * The three swatches and the page circle.
+     *
+     * A swatch is the palette's band with a dot of the ink that sits on it, ringed when
+     * it is the one this deck is set to — the same drawing as the app's own appearance
+     * row, because it is the same choice made for a smaller thing. A tap stores the look
+     * and writes its byte to the board: the swatch is a remote control for the deck's
+     * own palette, not a repaint of this row.
+     */
+    private View circles(DeckStore.Known deck, DeckLook look, boolean light, boolean live) {
         LinearLayout row = Ui.row(activity);
-        row.setPadding(0, Ui.dp(activity, 8), 0, 0);
-        final int live = linked ? snapshot.theme : DeckTheme.UNKNOWN;
-        row.addView(chip(DeckTheme.PAPER, live, deck, linked));
-        row.addView(chip(DeckTheme.INK, live, deck, linked));
-        if (!linked) {
-            TextView hint = Ui.text(activity, "link to set", 11, Ui.DIM);
-            hint.setPadding(Ui.dp(activity, 8), 0, 0, 0);
-            row.addView(hint);
+        for (int i = 0; i < Palette.SCHEMES.length; ++i) {
+            final Palette.Scheme scheme = Palette.SCHEMES[i];
+            final int index = i;
+            View swatch = AppearanceStrip.swatch(activity, scheme, i == look.palette, Ui.TEXT);
+            swatch.setContentDescription("Palette " + scheme.id);
+            swatch.setOnClickListener(v -> {
+                DeckStore.setLook(activity, deck.key(), look.withPalette(index));
+                signature = "";
+                refresh();
+            });
+            Ui.pressable(activity, swatch, 13);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    Ui.dp(activity, 26), Ui.dp(activity, 26));
+            params.rightMargin = Ui.dp(activity, 8);
+            row.addView(swatch, params);
+        }
+
+        View page = AppearanceStrip.page(activity, light, Ui.EDGE, Ui.TEXT);
+        page.setContentDescription(light ? "Dark page" : "Light page");
+        LinearLayout.LayoutParams pageParams = new LinearLayout.LayoutParams(
+                Ui.dp(activity, 26), Ui.dp(activity, 26));
+        pageParams.leftMargin = Ui.dp(activity, 2);
+        if (live) {
+            page.setOnClickListener(v -> {
+                DeckStore.setLook(activity, deck.key(), look.withLight(!light));
+                DeckService.setDeckTheme(deck.mac, !light ? DeckTheme.PAPER : DeckTheme.INK);
+                signature = "";
+                refresh();
+            });
+            Ui.pressable(activity, page, 13);
+        } else {
+            // The page is a write to the board, and the link carries one deck at a
+            // time: an unlinked row says what it needs instead of a circle that would
+            // write nowhere.
+            page.setAlpha(0.4f);
+            page.setEnabled(false);
+        }
+        row.addView(page, pageParams);
+        return row;
+    }
+
+    /** RENAME and UNLINK while the deck is linked; LINK and FORGET when it is not. */
+    private View actionButtons(DeckStore.Known deck, boolean live) {
+        LinearLayout row = Ui.row(activity);
+        row.setGravity(Gravity.END);
+
+        if (live) {
+            Button rename = button("RENAME", false);
+            rename.setOnClickListener(v -> rename(deck));
+            row.addView(rename);
+
+            Button unlink = button("UNLINK", false);
+            unlink.setOnClickListener(v -> unlink(deck, true));
+            row.addView(unlink, gap());
+        } else {
+            Button link = button("LINK", true);
+            link.setOnClickListener(v -> DeckService.connectTo(deck.mac));
+            row.addView(link);
+
+            Button forget = button("FORGET", false);
+            forget.setOnClickListener(v -> unlink(deck, false));
+            row.addView(forget, gap());
         }
         return row;
     }
 
-    /** One palette chip: filled when the deck is on it, dead when it is not linked. */
-    private Button chip(int theme, int live, DeckStore.Known deck, boolean linked) {
-        Button chip = Ui.action(activity, DeckTheme.name(theme), live == theme);
+    /**
+     * A deck the phone has no record of: the bundled sketches, and any board
+     * advertising this minute. Dark marquee, no circles — there is nothing to remember
+     * yet — and a LINK where there is an address to link to.
+     */
+    private View offList(DeckService.Snapshot snapshot, List<DeckStore.Known> known) {
+        LinearLayout group = Ui.column(activity);
+
+        Set<String> seenIds = new HashSet<>();
+        Set<String> seenMacs = new HashSet<>();
+        for (DeckStore.Known deck : known) {
+            seenIds.add(deck.id);
+            seenMacs.add(deck.mac.toUpperCase(Locale.US));
+        }
+
+        int rows = 0;
+        for (WidgetCatalog.Widget widget : WidgetCatalog.all(activity)) {
+            if (!widget.usable() || seenIds.contains(widget.id)) continue;
+            group.addView(offRow(widget.name.isEmpty() ? widget.id : widget.name,
+                    widget.board.isEmpty() ? "never paired" : widget.board + " · never paired",
+                    null));
+            ++rows;
+        }
+
+        for (DeckService.Nearby entry : snapshot.nearby) {
+            if (seenMacs.contains(entry.mac.toUpperCase(Locale.US))) continue;
+            group.addView(offRow(entry.name,
+                    entry.mac + "  ·  " + entry.rssi + " dBm  ·  in range", entry));
+            ++rows;
+        }
+
+        if (rows == 0) {
+            group.addView(hint(snapshot.running
+                    ? "Every deck this app ships is paired with this phone, and nothing "
+                            + "else is advertising."
+                    : "Start the bridge from the side panel to scan for decks."));
+        }
+        return group;
+    }
+
+    /** One unpaired deck: an unlit strip, its name, what is known, and maybe a LINK. */
+    private View offRow(String name, String detail, DeckService.Nearby advertising) {
+        LinearLayout row = Ui.row(activity);
+        row.setPadding(0, Ui.dp(activity, 10), 0, Ui.dp(activity, 10));
+
+        LedMarquee marquee = new LedMarquee(activity);
+        marquee.set(LedMarquee.OFF);
+        LinearLayout.LayoutParams marqueeParams = new LinearLayout.LayoutParams(
+                Ui.dp(activity, 40), Ui.dp(activity, 12));
+        marqueeParams.rightMargin = Ui.dp(activity, 11);
+        row.addView(marquee, marqueeParams);
+
+        LinearLayout labels = Ui.column(activity);
+        TextView title = Ui.text(activity, name, 15, Ui.TEXT);
+        title.setTypeface(Ui.medium(activity));
+        labels.addView(title);
+        TextView sub = Ui.text(activity, detail, 12, Ui.DIM);
+        labels.addView(sub);
+        row.addView(labels, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        if (advertising != null) {
+            final String mac = advertising.mac;
+            Button link = Ui.action(activity, "LINK", true);
+            link.setOnClickListener(v -> DeckService.connectTo(mac));
+            row.addView(link);
+        }
+
+        LinearLayout cell = Ui.column(activity);
+        cell.addView(row, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        cell.addView(Ui.rule(activity));
+        return cell;
+    }
+
+    /** The row's own button: 11sp in a hairline box, or the band fill for LINK. */
+    private Button button(String label, boolean primary) {
+        Button button = new Button(activity);
+        button.setText(label);
+        button.setAllCaps(false);
+        button.setTypeface(Ui.medium(activity));
+        button.setTextSize(11);
+        button.setTextColor(primary ? Ui.ON_FILL : Ui.TEXT);
+        button.setBackground(Ui.rounded(activity, primary ? Ui.BAND : Color.TRANSPARENT,
+                primary ? 0 : Ui.EDGE, 0));
+        Ui.pressable(activity, button, 0);
+        button.setMinHeight(Ui.dp(activity, 34));
+        button.setMinimumHeight(Ui.dp(activity, 34));
+        button.setMinWidth(0);
+        button.setMinimumWidth(0);
+        button.setPadding(Ui.dp(activity, 12), Ui.dp(activity, 4),
+                Ui.dp(activity, 12), Ui.dp(activity, 4));
+        button.setLetterSpacing(0.04f);
+        return button;
+    }
+
+    private LinearLayout.LayoutParams gap() {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         params.leftMargin = Ui.dp(activity, 8);
-        chip.setLayoutParams(params);
-        if (linked) {
-            chip.setOnClickListener(v -> DeckService.setDeckTheme(deck.mac, theme));
-        } else {
-            chip.setAlpha(0.45f);
-            chip.setEnabled(false);
-        }
-        return chip;
+        return params;
+    }
+
+    private TextView hint(String text) {
+        TextView view = Ui.text(activity, text, 12, Ui.DIM);
+        view.setLineSpacing(Ui.dp(activity, 2), 1f);
+        return view;
     }
 
     /**
@@ -342,21 +447,6 @@ final class DecksTab extends ScrollView {
         if (!deck.id.isEmpty()) DeckRegistry.forget(activity, deck.id);
         if (linked) DeckService.unlink(activity, deck.mac);
         Actions.toast(activity, (linked ? "Unlinked " : "Forgot ") + deck.name);
-        signature = "";
-        refresh();
-    }
-
-    /** The card above carries no {@link DeckStore.Known}, so it forgets by address. */
-    private void unlinkLinked(DeckService.Snapshot snapshot) {
-        DeckStore.Known known = DeckStore.byMac(activity, snapshot.deviceMac);
-        if (known != null) {
-            unlink(known, true);
-            return;
-        }
-        DeckStore.forget(activity, snapshot.deviceMac);
-        if (!snapshot.deviceId.isEmpty()) DeckRegistry.forget(activity, snapshot.deviceId);
-        DeckService.unlink(activity, snapshot.deviceMac);
-        Actions.toast(activity, "Unlinked " + snapshot.deviceName);
         signature = "";
         refresh();
     }

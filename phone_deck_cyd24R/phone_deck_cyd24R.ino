@@ -100,11 +100,20 @@ static constexpr int SCREEN_W = 320;
 static constexpr int SCREEN_H = 240;
 
 // ---------------------------------------------------------------- palette ---
-// Two themes, and nothing in between: 0 PAPER is black ink on an off-white page,
-// 1 INK is the same page inverted. One ink, one ground, and the last six slots
-// step that ink so the same draw calls still say "this one, not that one" without
-// hue. A new widget starts from these two; add a theme only when a screen cannot
-// be read in mono at all.
+// Eight rows, and the companion app picks one with a single byte. Rows 0 and 1 are
+// the neutral pair the deck shipped with: 0 PAPER is black ink on an off-white page,
+// 1 INK is the same page inverted. Rows 2 to 7 are the site's three palettes twice,
+// in the order the app's appearance row draws its swatches:
+//
+//   2 GREEN light  3 GREEN dark  4 MOSS light  5 MOSS dark  6 NAVY light  7 NAVY dark
+//
+// The index is `2 + palette * 2 + (light ? 0 : 1)`, computed on both ends, so a
+// swatch tapped in the app is the row this table is read at. The first four slots are
+// the page (ground, panel, lifted panel, hairline), the next two the ink, and the last
+// six the one highlight at different strengths: a palette changes the page and the ink,
+// never the grammar. Where a palette's own accent cannot carry a word on its light page
+// (green's lime on cream is 2.2:1) that row uses the band darkened until it can --
+// recorded here rather than hidden, and measured by check_widget_assets.py.
 //
 // The first six are ground, panel, lifted panel, hairline, ink and dim ink. The
 // last six keep their jobs and lose their colours: accent for the link, the
@@ -133,7 +142,31 @@ static constexpr Palette THEMES[] = {
   // 1 INK - the same page inverted: off-white ink on black
   { 0x0000 /* #000000 */, 0x1082 /* #101010 */, 0x18E3 /* #1c1c1a */, 0x39C6 /* #3a3a37 */,
     0xF79D /* #f1f0eb */, 0xAD34 /* #a8a7a2 */, 0xF79D /* #f1f0eb */, 0x6B4C /* #6a6a66 */,
-    0xFFFF /* #ffffff */, 0x8C50 /* #8c8b86 */, 0xF79D /* #f1f0eb */, 0xB5B6 /* #b6b5b0 */ },
+    0xFFFF /* #ffffff */, 0x8C50 /* #8c8b86 */, 0xF79D /* #f1f0eb */, 0xB5B6 /* #b5b5b0 */ },
+  // 2 GREEN light - the site's original: lime band, cream page, near-black ink
+  { 0xF77C /* #f2eee3 */, 0xE71A /* #e5e1d7 */, 0xDEB9 /* #d8d4cb */, 0xA513 /* #a3a19a */,
+    0x10A2 /* #131513 */, 0x630B /* #63625e */, 0x0B09 /* #0f604a */, 0x9594 /* #93b2a3 */,
+    0x0B09 /* #0f604a */, 0x630B /* #63625e */, 0x0B09 /* #0f604a */, 0x630B /* #63625e */ },
+  // 3 GREEN dark - its night page, with the lime as the one highlight
+  { 0x10A2 /* #131513 */, 0x2124 /* #232422 */, 0x31A6 /* #323430 */, 0x630B /* #62625c */,
+    0xF77C /* #f2eee3 */, 0x9CD2 /* #9d9b94 */, 0x1715 /* #12e2ad */, 0x134A /* #136b54 */,
+    0x0DF2 /* #0fbf92 */, 0x9CD2 /* #9d9b94 */, 0x1715 /* #12e2ad */, 0x9CD2 /* #9d9b94 */ },
+  // 4 MOSS light - the cream page, the moss band as the ink that carries a word
+  { 0xE6F9 /* #e7ddce */, 0xDE98 /* #dad2c4 */, 0xCE57 /* #cdc8ba */, 0x9CF2 /* #9a9e92 */,
+    0x0944 /* #0e2a24 */, 0x5B4C /* #5c6b61 */, 0x0288 /* #005043 */, 0x8512 /* #86a294 */,
+    0x0288 /* #005043 */, 0x5B4C /* #5c6b61 */, 0x0288 /* #005043 */, 0x5B4C /* #5c6b61 */ },
+  // 5 MOSS dark - the green night page and the lime the owner photographs
+  { 0x0944 /* #0e2a24 */, 0x19A6 /* #1d3730 */, 0x2A07 /* #2d433c */, 0x5B4C /* #5b6960 */,
+    0xE6F9 /* #e7ddce */, 0x9CF2 /* #999c91 */, 0xD710 /* #d6e381 */, 0x63C9 /* #62784b */,
+    0xD710 /* #d6e381 */, 0x9CF2 /* #999c91 */, 0xD710 /* #d6e381 */, 0x9CF2 /* #999c91 */ },
+  // 6 NAVY light - the powder blue-grey page, the navy band as the emphasis
+  { 0xA598 /* #a1b0c3 */, 0x9D37 /* #98a6b9 */, 0x8CD5 /* #8e9bae */, 0x73F1 /* #727c8f */,
+    0x18E5 /* #1c1d2f */, 0x4A6C /* #494f61 */, 0x216A /* #242d55 */, 0x6BD2 /* #6d7995 */,
+    0x216A /* #242d55 */, 0x4A6C /* #494f61 */, 0x216A /* #242d55 */, 0x4A6C /* #494f61 */ },
+  // 7 NAVY dark - slate ink on near-black blue, with its teal highlight
+  { 0x18E5 /* #1c1d2f */, 0x2147 /* #26293b */, 0x31A8 /* #313446 */, 0x4A8C /* #4b5163 */,
+    0xA598 /* #a1b0c3 */, 0x73D1 /* #717b8e */, 0x75B6 /* #72b6b4 */, 0x42EC /* #405d67 */,
+    0x75B6 /* #72b6b4 */, 0x73D1 /* #717b8e */, 0x75B6 /* #72b6b4 */, 0x73D1 /* #717b8e */ },
 };
 
 static constexpr uint8_t THEME_COUNT = sizeof(THEMES) / sizeof(THEMES[0]);
@@ -142,6 +175,12 @@ static constexpr uint8_t THEME_COUNT = sizeof(THEMES) / sizeof(THEMES[0]);
 // without a re-flash; 1 INK is the default because a dark room is the usual one.
 static constexpr uint8_t THEME_DEFAULT = 1;  // INK
 static uint8_t themeIndex = THEME_DEFAULT;
+
+// The name the footer prints, one per row above and in the same order. Short because
+// the footer shares its line with the unread count; the app spells the same choice
+// out in full on the deck's row ("MOSS DARK").
+static const char *const THEME_NAMES[] = {"PAPER", "INK", "GREEN L", "GREEN D",
+                                          "MOSS L", "MOSS D", "NAVY L", "NAVY D"};
 
 // The twelve names the drawing code already uses. Plain variables rather than
 // constexpr, so a write from the phone can reassign them without touching a
@@ -2758,8 +2797,9 @@ static void drawHome() {
   else snprintf(count, sizeof(count), "INBOX CLEAR");
   drawTextAt(count, MARGIN, 204, 1, unread > 0 ? C_YELLOW : C_ACCENT, C_BG);
   char foot[24];
-  snprintf(foot, sizeof(foot), "THEME %02d %s", themeIndex,
-           themeIndex == 0 ? "PAPER" : "INK");
+  const char *themeWord = themeIndex < THEME_COUNT ? THEME_NAMES[themeIndex]
+                                                   : THEME_NAMES[THEME_DEFAULT];
+  snprintf(foot, sizeof(foot), "THEME %02d %s", themeIndex, themeWord);
   drawTextRight(foot, SCREEN_W - MARGIN, 204, 1, C_DIM, C_BG);
 }
 

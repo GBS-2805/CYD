@@ -5,7 +5,7 @@
 #   ./check.sh          what a commit must pass            (3.8 s)
 #   ./check.sh --full   what a release must pass           (423 s): every deck on
 #                       both cores, the old ones compared with old_core.json, each
-#                       deck built twice, the nine frames redrawn, the APK built
+#                       deck built twice, every frame redrawn, the APK built
 #                       and rebuilt, measured here on 2026-11-05 with both decks.
 #                       It needs all three toolchains: source
 #                       ~/.arduino-cyd-3/env.sh, ~/.arduino-cyd-2/env.sh (or

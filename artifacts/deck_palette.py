@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Draw one page per deck theme from the sketch's own THEMES table.
 
-The nine frames in `artifacts/renders/` are the app. Nothing here has ever shown
+The frames in `artifacts/renders/` are the app. Nothing here has ever shown
 what the board's glass looks like, so every claim about the deck's palette rests on
-reading two tables. This reads those tables — both decks, both themes — and draws
+reading two tables. This reads those tables — both decks, every row — and draws
 the twelve slots with the ink each one actually carries, at the panel's own
 320x240, so a colour that cannot be read is visible without a board.
 
@@ -58,20 +58,26 @@ def ratio(a, b):
 
 
 def themes(sketch):
-    """The two rows of `THEMES[]`, as slot -> #rrggbb, read from the comments."""
+    """Every row of `THEMES[]`, as name -> slot -> #rrggbb, read from the comments."""
     text = sketch.read_text(encoding="utf-8")
     start = text.find("THEMES[]")
     if start < 0:
         raise SystemExit("%s has no THEMES[] table" % sketch.name)
     block = text[start:text.find("};", start)]
     found = re.findall(r"0x[0-9A-Fa-f]{4}\s*/\*\s*(#[0-9a-fA-F]{6})\s*\*/", block)
-    if len(found) < 24:
-        raise SystemExit("%s: %d hex comments, wanted 24 for two themes"
-                         % (sketch.name, len(found)))
-    rows = {}
-    for name, chunk in (("PAPER", found[:12]), ("INK", found[12:24])):
-        rows[name] = dict(zip(SLOTS, chunk))
-    return rows
+    rows = [found[i:i + 12] for i in range(0, len(found) - 11, 12)]
+    if not rows:
+        raise SystemExit("%s: no twelve-slot row in THEMES[]" % sketch.name)
+    table = re.search(r"THEME_NAMES\[\]\s*=\s*\{(.*?)\}", text, re.S)
+    names = re.findall(r'"([^"]+)"', table.group(1)) if table else []
+    while len(names) < len(rows):
+        names.append("PAPER" if not names else "INK")
+    return {names[i]: dict(zip(SLOTS, row)) for i, row in enumerate(rows)}
+
+
+def page_slug(theme):
+    return (theme.lower().replace(" l", " light").replace(" d", " dark")
+            .replace(" ", "-"))
 
 
 def font(px, bold=False):
@@ -126,14 +132,14 @@ def main():
         rows = themes(folder / (folder.name + ".ino"))
         for theme, slots in rows.items():
             image = page(folder.name, theme, slots)
-            path = OUT / ("%s-%s.png" % (folder.name, theme.lower()))
+            path = OUT / ("%s-%s.png" % (folder.name, page_slug(theme)))
             image.save(path)
             wrote.append((path, slots))
             print("%-46s %s  %s" % (path.relative_to(ROOT).as_posix(), theme,
                                     "  ".join("%s %s" % (ink_slot, "%.2f" % ratio(
                                         slots[ink_slot], slots[surface]))
                                         for _, ink_slot, surface, _ in PAIRS)))
-    print("\n%d page%s written; each is the table drawn, not a deck screen"
+    print("\n%d page%s written; each is a table drawn, not a deck screen"
           % (len(wrote), "" if len(wrote) == 1 else "s"))
     return 0
 

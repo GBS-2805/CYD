@@ -5,6 +5,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -28,26 +29,25 @@ import java.util.List;
 /**
  * A picture of the app, not a picture of a redraw.
  *
- * Every frame here is the app's own screen: {@link TopBar} and the tab class are
- * instantiated, laid out and drawn by Android's own renderer — the platform's
- * fonts, the platform's vector drawables, the platform's text layout — so nothing
- * here can disagree with the phone about where a glyph sits, how wide a row is or
- * what a drawable looks like.
+ * Every frame here is the app's own screen: {@link TopBar} and the screen or overlay
+ * class are instantiated, laid out and drawn by Android's own renderer — the real
+ * Poppins from {@code res/font}, the platform's vector drawables, the platform's text
+ * layout — so nothing here can disagree with the phone about where a glyph sits, how
+ * wide a row is or what a drawable looks like.
  *
- * A state the screen reaches by tapping is reached by tapping: {@code home-open}
- * is the BOARDS row clicked, {@code projects-open} is the first project's header
- * clicked. Nothing sets a fold flag behind the screen's back.
+ * The overlays are drawn as they are presented: a frame whose name ends in
+ * {@code -sheet} or is {@code side-panel} is laid out at the phone's own height with
+ * the scrim and the panel over the page behind it, because a sheet is a thing on top
+ * of a screen rather than a screen. {@code pull-down} is in flow under the bar, which
+ * is where the app puts it.
  *
- * Frames are the full height of what the screen builds, not a viewport, so a
- * scrolled-away row is in the picture and a screen that grows stays visible.
- *
- * One fixture is not something a tap can reach: PAIRED is drawn against a linked-deck
- * snapshot the test supplies, because a JVM has no radio and no board to talk to. That
- * snapshot goes to the bar as well, because {@code MainActivity} pushes one into it
- * every second — without the same call here the bar said IDLE above a screen that said
- * linked, which is a state the phone cannot reach. The card, the rows, the pill and
- * every string are still {@code DecksTab}'s and {@code TopBar}'s own code: the test
- * hands them a link, not a layout.
+ * One fixture is not something a tap can reach: every frame that shows a link is
+ * drawn against a linked-deck snapshot the test supplies, because a JVM has no radio
+ * and no board to talk to. That snapshot goes to the bar as well, because
+ * {@code MainActivity} pushes one into it every second — without the same call here
+ * the bar said IDLE above a screen that said linked, which is a state the phone
+ * cannot reach. The rows, the marquee and every string are still the app's own code:
+ * the test hands them a link, not a layout.
  */
 @RunWith(RobolectricTestRunner.class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -55,7 +55,7 @@ import java.util.List;
 public final class CaptureTest {
 
     private static final int WIDTH = 393;
-
+    private static final int PHONE_HEIGHT = 852;
 
     private static final String DECK_MAC = "A4:CF:12:8B:3D:6E";
     private static final String DECK_TAG = "8B3D6E";
@@ -79,30 +79,51 @@ public final class CaptureTest {
         pinDeck();
         pinFile();
 
-        capture("home", MainActivity.HOME, drawer(), null);
-        capture("home-open", MainActivity.HOME, drawer(), "BOARDS");
-        capture("paired", MainActivity.SECTION_DECKS, new DecksTab(host, this::linked), null,
-                linked());
-        capture("projects", MainActivity.SECTION_PROJECTS, new ProjectsTab(host), null);
-        capture("projects-open", MainActivity.SECTION_PROJECTS, new ProjectsTab(host),
-                firstName());
-        capture("projects-edit", MainActivity.SECTION_PROJECTS, new ProjectsTab(host),
-                "ADD A PROJECT");
-        captureTaps("projects-file", MainActivity.SECTION_PROJECTS, new ProjectsTab(host),
-                OWN_CARD, "CHANGE");
-        capture("serial", MainActivity.SECTION_SERIAL, new BoardTab(host), null);
-        // SETTINGS is drawn in the paper palette on purpose: it is the screen the
-        // switch lives on, so one frame shows the control and what it does, and the
-        // light theme is in the gate instead of only in a description of it.
-        Ui.applyTheme(Ui.PAPER);
-        capture("settings", MainActivity.SECTION_SETTINGS, new SetupTab(host), null);
-        Ui.applyTheme(Ui.INK);
+        // PAIRED is where the app opens: the live link, no overlay.
+        capture("paired", MainActivity.SECTION_DECKS,
+                new DecksTab(host, this::linked), linked(), null);
+
+        // The two controls the site has, each in a picture of its own.
+        capture("pull-down", MainActivity.SECTION_DECKS,
+                new DecksTab(host, this::linked), linked(),
+                new PullDown(host, index -> { }));
+
+        SidePanel panel = new SidePanel(host, row -> { });
+        panel.show();
+        captureOverlay("side-panel", MainActivity.SECTION_DECKS,
+                new DecksTab(host, this::linked), linked(), panel);
+
+        // The two sheets.
+        BridgeSheet bridge = new BridgeSheet(host);
+        bridge.refresh();
+        Sheet bridgeSheet = new Sheet(host);
+        bridgeSheet.open("Bridge", bridge);
+        captureOverlay("bridge-sheet", MainActivity.SECTION_DECKS,
+                new DecksTab(host, this::linked), linked(), bridgeSheet);
+
+        AppearanceSheet appearance = new AppearanceSheet(host);
+        Sheet appearanceSheet = new Sheet(host);
+        appearanceSheet.open("Appearance", appearance);
+        captureOverlay("appearance-sheet", MainActivity.SECTION_DECKS,
+                new DecksTab(host, this::linked), linked(), appearanceSheet);
+
+        capture("projects", MainActivity.SECTION_PROJECTS, new ProjectsTab(host), null, null);
+        capture("projects-open", MainActivity.SECTION_PROJECTS, new ProjectsTab(host), null,
+                null, firstName());
+        capture("serial", MainActivity.SECTION_SERIAL, new BoardTab(host), null, null);
+
+        // SETTINGS is drawn on the light page on purpose: it is the screen the
+        // permissions live on, so one frame shows the list and the light page it can
+        // be read on, and the light theme is in the gate instead of only described.
+        Ui.applyTheme(Palette.MOSS, true);
+        capture("settings", MainActivity.SECTION_SETTINGS, new SetupTab(host), null, null);
+        Ui.applyTheme(Appearance.palette(host), Appearance.light(host));
     }
 
     /**
-     * The theme switch rebuilds the activity — a colour is read when a view is
+     * The appearance change rebuilds the activity — a colour is read when a view is
      * built, so {@code recreate()} is how the app repaints itself. That rebuild
-     * used to land on the drawer however deep the user was, because nothing
+     * used to land on the front page however deep the user was, because nothing
      * carried the section across. This drives the platform's own save and restore,
      * the same pair {@code recreate()} calls, rather than a copy of the logic.
      */
@@ -116,32 +137,54 @@ public final class CaptureTest {
     }
 
     /**
-     * The scroll offset is the platform's to keep: every screen carries a stable
-     * id, so {@code ScrollView} writes its offset into the saved view state and
-     * reads it back on the rebuild. This lays the app out, scrolls SETTINGS,
-     * rebuilds, and asks the new screen where it is.
+     * The scroll offset comes back with the rebuild.
+     *
+     * It is carried by {@code MainActivity} rather than by the view hierarchy: a
+     * scroll view restores its own offset during its first layout, when the rebuilt
+     * child has no height, so the value is clamped away. This lays the app out,
+     * scrolls SETTINGS, rebuilds, lays the rebuilt tree out and lets the posted
+     * restore run — the order a phone goes through.
      */
     @Test
     public void theScrollComesBackWithTheRebuild() {
         org.robolectric.android.controller.ActivityController<MainActivity> controller =
                 Robolectric.buildActivity(MainActivity.class).setup();
         MainActivity activity = controller.get();
-        activity.showSection(MainActivity.SECTION_SETTINGS);
+        // The shelf, not SETTINGS: a scroll offset can only be restored on a screen
+        // with something to scroll, and SETTINGS now fits a tall phone outright.
+        activity.showSection(MainActivity.SECTION_PROJECTS);
 
         View root = activity.getWindow().getDecorView();
         root.measure(View.MeasureSpec.makeMeasureSpec(WIDTH, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(852, View.MeasureSpec.EXACTLY));
-        root.layout(0, 0, WIDTH, 852);
+                View.MeasureSpec.makeMeasureSpec(PHONE_HEIGHT, View.MeasureSpec.EXACTLY));
+        root.layout(0, 0, WIDTH, PHONE_HEIGHT);
 
-        ScrollView settings = activity.findViewById(MainActivity.ID_SETTINGS);
-        assertNotNull("SETTINGS is a screen with a scroll offset", settings);
-        settings.scrollTo(0, 120);
-        assertEquals("the screen has to scroll before the restore means anything",
-                120, settings.getScrollY());
+        ScrollView shelf = activity.findViewById(MainActivity.ID_PROJECTS);
+        assertNotNull("BOARDS is a screen with a scroll offset", shelf);
+        assertTrue("the shelf has to be taller than the screen for this to mean anything",
+                shelf.getChildAt(0).getHeight() > shelf.getHeight());
+        shelf.scrollTo(0, 120);
+        assertEquals(120, shelf.getScrollY());
 
         controller.recreate();
 
-        ScrollView again = controller.get().findViewById(MainActivity.ID_SETTINGS);
+        // The app carries the offset and applies it on the first layout that has
+        // content under it; the platform's own restore lands before the new child has
+        // a height and is clamped away.
+        //
+        // Robolectric runs the activity's first posted work during recreate() — before
+        // any layout — and the shelf's own refresh queues a run that re-applies the
+        // offset it read at that moment, which is zero. On a phone the layout comes
+        // first and that read is the restored value. So the queued work is drained
+        // first here, and the tree is laid out after it, which is the same order seen
+        // from the other side.
+        org.robolectric.shadows.ShadowLooper.idleMainLooper();
+        View rebuilt = controller.get().getWindow().getDecorView();
+        rebuilt.measure(View.MeasureSpec.makeMeasureSpec(WIDTH, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(PHONE_HEIGHT, View.MeasureSpec.EXACTLY));
+        rebuilt.layout(0, 0, WIDTH, PHONE_HEIGHT);
+
+        ScrollView again = controller.get().findViewById(MainActivity.ID_PROJECTS);
         assertNotNull(again);
         assertEquals(120, again.getScrollY());
     }
@@ -201,9 +244,9 @@ public final class CaptureTest {
         snapshot.deviceTag = DECK_TAG;
         // The row prints the linked deck's build; the frame should show one.
         snapshot.deviceVersion = "1.0.0";
-        // The palette the board answers with, so the PAIRED rows draw a lit chip
-        // rather than a pair that says nothing about this deck.
-        snapshot.theme = DeckTheme.INK;
+        // The row the board answers with: navy on its dark page, the same look the
+        // store holds, so the page circle and the deck agree.
+        snapshot.theme = DeckTheme.of(Palette.NAVY, false);
         snapshot.rssi = -61;
         snapshot.writes = 214;
         snapshot.notices = 3;
@@ -214,16 +257,20 @@ public final class CaptureTest {
         return snapshot;
     }
 
-    /** The saved-deck row the same board would leave behind, a day old and steady. */
+    /**
+     * The saved-deck row the same board would leave behind, a day old and steady.
+     *
+     * The look is navy on its dark page, which is also the page the board answered
+     * with: the frame then shows a chosen palette, the crescent and a linked deck all
+     * agreeing. The palette itself is drawn on the deck now, not on this row, so what
+     * the capture has to prove here is only that the ring sits on the right swatch.
+     */
     private void pinDeck() {
         DeckStore.rememberAt(host, DeckIdentity.parse("{\"id\":\"" + DECK_ID
                         + "\",\"widget\":\"phone_deck_cyd24R\",\"tag\":\"" + DECK_TAG
                         + "\",\"name\":\"Phone Deck " + DECK_TAG + "\"}"),
                 DECK_MAC, "Phone Deck", now - 86_400_000L);
-    }
-
-    private DrawerHome drawer() {
-        return new DrawerHome(host, index -> { });
+        DeckStore.setLook(host, DECK_ID, new DeckLook(Palette.NAVY, false));
     }
 
     /** The top of the shelf: whatever the store would put first, opened like a tap. */
@@ -236,9 +283,7 @@ public final class CaptureTest {
     /**
      * One card with a file, stored the way the shelf would store one. It has to be a
      * card of the user's own: a widget ships its sketch inside the app and a
-     * catalogue card is an installer link, so neither can hold a file. Without this
-     * the FILE badge and the file block would be in no frame at all — a render
-     * cannot show what the app never held.
+     * catalogue card is an installer link, so neither can hold a file.
      */
     private void pinFile() {
         List<FlashLibrary.Entry> entries = FlashLibrary.list(host);
@@ -259,33 +304,32 @@ public final class CaptureTest {
         ProjectStore.save(host, projects);
     }
 
+    /** One screen in the bar's column, full height, optionally tapped. */
+    private void capture(String name, int section, View screen, DeckService.Snapshot link,
+                         View flow) throws Exception {
+        draw(name, section, screen, flow, new String[0], link, null, false);
+    }
+
+    private void capture(String name, int section, View screen, DeckService.Snapshot link,
+                         View flow, String tap) throws Exception {
+        draw(name, section, screen, flow, new String[] { tap }, link, null, false);
+    }
+
+    /** A screen with an overlay on top, at the phone's own height. */
+    private void captureOverlay(String name, int section, View screen,
+                                DeckService.Snapshot link, View overlay) throws Exception {
+        draw(name, section, screen, null, new String[0], link, overlay, true);
+    }
+
     /**
      * The bar and one screen in a column, exactly as {@code MainActivity.buildUi}
      * stacks them, optionally tapped, then drawn and written out.
      */
-    private void capture(String name, int section, View screen, String tap) throws Exception {
-        draw(name, section, screen, tap == null ? new String[0] : new String[] { tap }, null);
-    }
-
-    /**
-     * A state two taps away: {@code ATTACH A FILE} lives on an opened card, so the
-     * frame opens the project first and then taps the button inside it.
-     */
-    private void captureTaps(String name, int section, View screen, String... taps)
+    private void draw(String name, int section, View screen, View flow, String[] taps,
+                      DeckService.Snapshot link, View overlay, boolean viewport)
             throws Exception {
-        draw(name, section, screen, taps, null);
-    }
-
-    /** As above, with the link state the bar is drawn against; null is a stopped bridge. */
-    private void capture(String name, int section, View screen, String tap,
-                         DeckService.Snapshot link) throws Exception {
-        draw(name, section, screen, tap == null ? new String[0] : new String[] { tap }, link);
-    }
-
-    private void draw(String name, int section, View screen, String[] taps,
-                      DeckService.Snapshot link) throws Exception {
-        LinearLayout root = Ui.column(host);
-        root.setBackgroundColor(Ui.BG);
+        LinearLayout page = Ui.column(host);
+        page.setBackgroundColor(Ui.BG);
 
         TopBar bar = new TopBar(host);
         bar.showSection(section);
@@ -293,21 +337,38 @@ public final class CaptureTest {
         // it drew a bridge the frame below it contradicted.
         bar.showLink(link == null ? new DeckService.Snapshot() : link,
                 link != null && link.running);
-        root.addView(bar.bar, new LinearLayout.LayoutParams(
+        page.addView(bar.bar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        if (flow != null) {
+            page.addView(flow, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
 
         if (screen != null) {
             refresh(screen);
-            root.addView(screen, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            page.addView(screen, viewport
+                    ? new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+                    : new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT));
             for (String tap : taps) {
                 tapText(screen, tap);
                 refresh(screen);
             }
         }
 
+        FrameLayout root = new FrameLayout(host);
+        root.addView(page, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        if (overlay != null) {
+            root.addView(overlay, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            refreshOverlay(overlay);
+        }
+
         root.measure(View.MeasureSpec.makeMeasureSpec(WIDTH, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(4000, View.MeasureSpec.AT_MOST));
+                View.MeasureSpec.makeMeasureSpec(viewport ? PHONE_HEIGHT : 4000,
+                        viewport ? View.MeasureSpec.EXACTLY : View.MeasureSpec.AT_MOST));
         root.layout(0, 0, root.getMeasuredWidth(), root.getMeasuredHeight());
 
         Bitmap bitmap = Bitmap.createBitmap(
@@ -324,10 +385,18 @@ public final class CaptureTest {
                 + bitmap.getHeight() + " -> " + file.getAbsolutePath());
     }
 
+    /** A sheet's content is asked for its state the way the app's loop does. */
+    private static void refreshOverlay(View overlay) {
+        if (overlay instanceof Sheet) {
+            View content = ((Sheet) overlay).content();
+            refresh(content);
+        }
+    }
+
     /**
      * Clicks what says {@code label}: the view itself when it carries the click
      * listener, the row around it when the listener is one level up, which is how
-     * {@code DrawerHome.menuRow} and the shelf's header are wired.
+     * the pull-down's rows and the shelf's header are wired.
      */
     private static boolean tapText(View root, String label) {
         TextView found = find(root, label);
@@ -363,12 +432,14 @@ public final class CaptureTest {
         return out.toString();
     }
 
-    /** The screens build themselves on refresh, the same call the phone makes. */
+    /** The screens and sheets build themselves on refresh, the same call the phone makes. */
     private static void refresh(View screen) {
-        if (screen instanceof DrawerHome) ((DrawerHome) screen).refresh();
-        else if (screen instanceof DecksTab) ((DecksTab) screen).refresh();
+        if (screen == null) return;
+        if (screen instanceof DecksTab) ((DecksTab) screen).refresh();
         else if (screen instanceof ProjectsTab) ((ProjectsTab) screen).refresh();
         else if (screen instanceof BoardTab) ((BoardTab) screen).refresh();
         else if (screen instanceof SetupTab) ((SetupTab) screen).refresh();
+        else if (screen instanceof BridgeSheet) ((BridgeSheet) screen).refresh();
+        else if (screen instanceof AppearanceSheet) ((AppearanceSheet) screen).refresh();
     }
 }

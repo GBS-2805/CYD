@@ -74,8 +74,10 @@ FACE_FOR = {1: "body", 2: "display", 3: "display", 4: "clock"}
 class Panel:
     """The subset of Adafruit_GFX these two sketches draw with, on a PIL image."""
 
-    def __init__(self, slots):
+    def __init__(self, slots, index=0, label="PAPER"):
         self.slots = slots
+        self.theme_index = index
+        self.theme_label = label
         self.c = {k: tuple(int(v[i:i + 2], 16) for i in (1, 3, 5))
                   for k, v in slots.items()}
         self.image = Image.new("RGB", (W, H), self.c["bg"])
@@ -350,7 +352,7 @@ def page_phone_home(p):
 
     p.text_at("%d NEW" % UNREAD if UNREAD else "INBOX CLEAR", MARGIN, 204, 1,
               "yellow" if UNREAD else "accent", "bg")
-    p.text_right("THEME 00 %s" % ("PAPER" if p.slots is PHONE_THEMES["PAPER"] else "INK"),
+    p.text_right("THEME %02d %s" % (p.theme_index, p.theme_label),
                  W - MARGIN, 204, 1, "dim", "bg")
 
 
@@ -580,19 +582,39 @@ def themes(sketch):
         raise SystemExit("%s has no THEMES[] table" % sketch.name)
     block = text[start:text.find("};", start)]
     found = re.findall(r"0x[0-9A-Fa-f]{4}\s*/\*\s*(#[0-9a-fA-F]{6})\s*\*/", block)
-    if len(found) < 24:
-        raise SystemExit("%s: %d hex comments, wanted 24" % (sketch.name, len(found)))
-    return {"PAPER": dict(zip(SLOTS, found[:12])),
-            "INK": dict(zip(SLOTS, found[12:24]))}
+    rows = [found[i:i + 12] for i in range(0, len(found) - 11, 12)]
+    if not rows:
+        raise SystemExit("%s: no twelve-slot row in THEMES[]" % sketch.name)
+    names = theme_names(text)
+    if len(names) < len(rows):
+        raise SystemExit("%s: %d rows but %d names in THEME_NAMES"
+                         % (sketch.name, len(rows), len(names)))
+    return {names[i]: dict(zip(SLOTS, row)) for i, row in enumerate(rows)}
+
+
+def theme_names(text):
+    """The sketch's own short names, in table order, as the footer prints them."""
+    table = re.search(r"THEME_NAMES\[\]\s*=\s*\{(.*?)\}", text, re.S)
+    if table:
+        names = re.findall(r'"([^"]+)"', table.group(1))
+        if names:
+            return names
+    return ["PAPER", "INK"]
+
+
+def page_slug(theme):
+    """`GREEN L` -> `green-light`, so a palette row reads in a filename."""
+    return (theme.lower().replace(" l", " light").replace(" d", " dark")
+            .replace(" ", "-"))
 
 
 def render(deck, pages, table, out_dir):
     wrote = []
-    for theme, slots in table.items():
+    for index, (theme, slots) in enumerate(table.items()):
         for name, draw in pages:
-            panel = Panel(slots)
+            panel = Panel(slots, index, theme)
             draw(panel)
-            path = out_dir / ("%s-%s-%s.png" % (deck, name, theme.lower()))
+            path = out_dir / ("%s-%s-%s.png" % (deck, name, page_slug(theme)))
             panel.image.save(path)
             wrote.append(path)
     return wrote
@@ -607,8 +629,10 @@ def main():
     for deck, pages, table in (("phone", PHONE_PAGES, PHONE_THEMES),
                                ("spotify", SPOTIFY_PAGES, SPOTIFY_THEMES)):
         wrote += render(deck, pages, table, OUT)
-    print("%d page%s drawn: every page both decks can show, both themes"
-          % (len(wrote), "" if len(wrote) == 1 else "s"))
+    print("%d page%s drawn: every page both decks can show, in %d phone and %d "
+          "spotify theme%s" % (len(wrote), "" if len(wrote) == 1 else "s",
+                                len(PHONE_THEMES), len(SPOTIFY_THEMES),
+                                "" if len(SPOTIFY_THEMES) == 1 else "s"))
     for path in wrote:
         try:
             print("  %s" % path.relative_to(ROOT).as_posix())

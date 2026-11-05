@@ -91,6 +91,7 @@ public final class HostTests {
         nowPacket();
         linkCommand();
         deckTheme();
+        deckLook();
 
         System.out.println();
         if (failures.isEmpty()) {
@@ -913,6 +914,54 @@ public final class HostTests {
         check("contrast: a quarter-strength ink on the off-white is refused ("
                         + tenths(Contrast.ratio(0x40000000, Palette.LIGHT_FIELD)) + " < 3.0)",
                 Contrast.ratio(0x40000000, Palette.LIGHT_FIELD) < Contrast.QUIET);
+        sitePalettes();
+    }
+
+    /**
+     * The site's three palettes, both pages of each, held to the same floors the
+     * monochrome pair is.
+     *
+     * These are the app's own colours now, copied from the owner's stylesheet, and a
+     * copy is exactly the kind of thing that keeps every one of its floors while a
+     * page turns over and one ink lands on the wrong ground — moss's lime accent on
+     * moss's own cream page measures 1.03:1, which is why the "good" status is
+     * allowed to fall back to body ink instead of the accent.
+     *
+     * The band's four values are measured against the band, not the page, because the
+     * band is the ground they are drawn on and it does not turn over.
+     */
+    private static void sitePalettes() {
+        for (Palette.Scheme scheme : Palette.SCHEMES) {
+            page(scheme.id + " dark", scheme.pageDark, scheme.onDark, scheme.dimDark,
+                    scheme.ruleDark);
+            page(scheme.id + " light", scheme.pageLight, scheme.onLight, scheme.dimLight,
+                    scheme.ruleLight);
+            check("contrast: " + scheme.id + " band ink carries body text at 4.5:1 ("
+                            + tenths(Contrast.ratio(scheme.bandInk, scheme.band)) + ")",
+                    Contrast.ratio(scheme.bandInk, scheme.band) >= Contrast.BODY);
+            check("contrast: " + scheme.id + " band hint clears 3:1 ("
+                            + tenths(Contrast.ratio(scheme.bandDim, scheme.band)) + ")",
+                    Contrast.ratio(scheme.bandDim, scheme.band) >= Contrast.QUIET);
+            check("contrast: " + scheme.id + " band rule is visible at 1.5:1 ("
+                            + tenths(Contrast.ratio(scheme.bandLine, scheme.band)) + ")",
+                    Contrast.ratio(scheme.bandLine, scheme.band) >= Contrast.RULE);
+            check("contrast: " + scheme.id + " ink on the accent clears 4.5:1 ("
+                            + tenths(Contrast.ratio(scheme.accentInk, scheme.accent)) + ")",
+                    Contrast.ratio(scheme.accentInk, scheme.accent) >= Contrast.BODY);
+        }
+    }
+
+    /** One page of one palette: body ink, hint ink and the hairline on it. */
+    private static void page(String name, int page, int on, int dim, int rule) {
+        check("contrast: " + name + " body ink on the page clears 4.5:1 ("
+                        + tenths(Contrast.ratio(on, page)) + ")",
+                Contrast.ratio(on, page) >= Contrast.BODY);
+        check("contrast: " + name + " hint ink on the page clears 3:1 ("
+                        + tenths(Contrast.ratio(dim, page)) + ")",
+                Contrast.ratio(dim, page) >= Contrast.QUIET);
+        check("contrast: " + name + " hairline is visible at 1.5:1 ("
+                        + tenths(Contrast.ratio(rule, page)) + ")",
+                Contrast.ratio(rule, page) >= Contrast.RULE);
     }
 
     /**
@@ -1006,8 +1055,9 @@ public final class HostTests {
 
     /**
      * The palette byte is the one thing both ends must agree on: 0 PAPER, 1 INK,
-     * nothing else written and nothing else accepted. The app draws "PAPER" on a
-     * chip that sends 0 to a board whose own table calls 0 PAPER, so a swap here
+     * then 2 + palette * 2 + (light ? 0 : 1) for the site's palettes on both pages —
+     * the arithmetic the sketch's THEMES[] is indexed by. The app draws "MOSS DARK"
+     * on a chip that sends 5 to a board whose own row 5 is moss dark, so a swap here
      * is a switch that lies in both directions at once.
      */
     private static void deckTheme() {
@@ -1019,13 +1069,73 @@ public final class HostTests {
                 DeckTheme.decode(new byte[] {0}) == DeckTheme.PAPER);
         check("theme: a read of 1 decodes to INK",
                 DeckTheme.decode(new byte[] {1}) == DeckTheme.INK);
+        check("theme: green, moss and navy are rows 2 to 7, light before dark",
+                DeckTheme.of(Palette.GREEN, true) == 2
+                        && DeckTheme.of(Palette.GREEN, false) == 3
+                        && DeckTheme.of(Palette.MOSS, true) == 4
+                        && DeckTheme.of(Palette.MOSS, false) == 5
+                        && DeckTheme.of(Palette.NAVY, true) == 6
+                        && DeckTheme.of(Palette.NAVY, false) == 7);
+        check("theme: a row says which palette and which page it is",
+                DeckTheme.palette(5) == Palette.MOSS && !DeckTheme.page(5)
+                        && DeckTheme.palette(6) == Palette.NAVY && DeckTheme.page(6)
+                        && DeckTheme.palette(DeckTheme.PAPER) == DeckTheme.UNKNOWN);
         check("theme: a palette the board does not have is unknown, not guessed",
-                DeckTheme.decode(new byte[] {2}) == DeckTheme.UNKNOWN
+                DeckTheme.decode(new byte[] {8}) == DeckTheme.UNKNOWN
+                        && DeckTheme.decode(new byte[] {(byte) 0xFF}) == DeckTheme.UNKNOWN
                         && DeckTheme.decode(new byte[0]) == DeckTheme.UNKNOWN
                         && DeckTheme.decode(null) == DeckTheme.UNKNOWN);
         check("theme: the chips are named the way the deck's table spells them",
                 DeckTheme.name(DeckTheme.PAPER).equals("PAPER")
-                        && DeckTheme.name(DeckTheme.INK).equals("INK"));
+                        && DeckTheme.name(DeckTheme.INK).equals("INK")
+                        && DeckTheme.name(5).equals("MOSS DARK")
+                        && DeckTheme.name(2).equals("GREEN LIGHT"));
+    }
+
+    /**
+     * A deck's look is the site's palette for the app's drawing and the board's byte
+     * for the board's. The two halves have to stay one object: a page that drew the
+     * light field while the board was sent INK would be a row that describes a deck it
+     * is not looking at.
+     */
+    private static void deckLook() {
+        check("look: the light page is that palette's light row",
+                new DeckLook(Palette.MOSS, true).boardTheme() == 4
+                        && new DeckLook(Palette.GREEN, true).boardTheme() == 2
+                        && DeckTheme.page(new DeckLook(Palette.NAVY, true).boardTheme()));
+        check("look: the dark page is that palette's dark row",
+                new DeckLook(Palette.MOSS, false).boardTheme() == 5
+                        && new DeckLook(Palette.NAVY, false).boardTheme() == 7
+                        && !DeckTheme.page(
+                                new DeckLook(Palette.GREEN, false).boardTheme()));
+        check("look: the page drawn is that palette's own pair",
+                new DeckLook(Palette.GREEN, true).page() == Palette.GREEN_SCHEME.pageLight
+                        && new DeckLook(Palette.GREEN, true).on()
+                                == Palette.GREEN_SCHEME.onLight
+                        && new DeckLook(Palette.NAVY, false).page()
+                                == Palette.NAVY_SCHEME.pageDark
+                        && new DeckLook(Palette.NAVY, false).on()
+                                == Palette.NAVY_SCHEME.onDark);
+        check("look: the marquee and the live chip take that palette's accent",
+                new DeckLook(Palette.NAVY, true).accent() == Palette.NAVY_SCHEME.accent
+                        && new DeckLook(Palette.NAVY, true).accentInk()
+                                == Palette.NAVY_SCHEME.accentInk);
+        DeckLook stored = new DeckLook(Palette.NAVY, true);
+        check("look: a stored look reads back as the one that was stored",
+                stored.encode().equals("2|1")
+                        && DeckLook.decode(stored.encode(), DeckLook.DEFAULT).palette
+                                == Palette.NAVY
+                        && DeckLook.decode(stored.encode(), DeckLook.DEFAULT).light);
+        check("look: nothing stored, or nothing readable, draws the default",
+                DeckLook.decode(null, DeckLook.DEFAULT) == DeckLook.DEFAULT
+                        && DeckLook.decode("", DeckLook.DEFAULT).palette == Palette.MOSS
+                        && DeckLook.decode("9|0", DeckLook.DEFAULT).light == false
+                        && DeckLook.decode("1|7", DeckLook.DEFAULT).palette == Palette.MOSS
+                        && DeckLook.decode("x|0", DeckLook.DEFAULT).palette == Palette.MOSS);
+        check("look: a palette past the three is clamped, not a crash",
+                new DeckLook(7, false).palette == Palette.MOSS
+                        && new DeckLook(-1, false).palette == Palette.MOSS
+                        && new DeckLook(7, true).withPalette(2).palette == Palette.NAVY);
     }
 
     /**

@@ -41,6 +41,16 @@ PAPER = ["#f1f0eb", "#e8e7e2", "#dddcd7", "#b3b1ac", "#000000", "#5b5a56",
          "#000000", "#a9a8a3", "#1a1a18", "#7a7974", "#000000", "#4e4d49"]
 INK = ["#000000", "#101010", "#1c1c1a", "#3a3a37", "#f1f0eb", "#a8a7a2",
        "#f1f0eb", "#6a6a66", "#ffffff", "#8c8b86", "#f1f0eb", "#b6b5b0"]
+# The six palette rows a deck carries: name, page, body ink. The checker compares
+# those two slots and nothing else, so the other ten are the caller's business.
+PALETTE_ROWS = [
+    ("2 GREEN LIGHT", "#f2eee3", "#131513"),
+    ("3 GREEN DARK", "#131513", "#f2eee3"),
+    ("4 MOSS LIGHT", "#e7ddce", "#0e2a24"),
+    ("5 MOSS DARK", "#0e2a24", "#e7ddce"),
+    ("6 NAVY LIGHT", "#a1b0c3", "#1c1d2f"),
+    ("7 NAVY DARK", "#1c1d2f", "#a1b0c3"),
+]
 
 
 def tree(dest):
@@ -69,12 +79,16 @@ def descriptor(dest, meta):
     (dest / WIDGET / "widget.json").write_text(json.dumps(meta))
 
 
-def themed(dest, paper=None, ink=None):
-    """A sketch whose THEMES table says the app's two pages, or not."""
+def themed(dest, paper=None, ink=None, palette=None):
+    """A sketch whose THEMES table says the app's pages and palettes, or does not."""
     paper = list(paper or PAPER)
     ink = list(ink or INK)
+    palette = list(palette or PALETTE_ROWS)
     rows = []
     for name, slots in (("0 PAPER", paper), ("1 INK", ink)):
+        rows.append("  // %s\n  { %s }," % (name, ", ".join("0x0000 /* %s */" % h for h in slots)))
+    for name, page, body in palette:
+        slots = [page, "#000000", "#000000", "#000000", body] + ["#000000"] * 7
         rows.append("  // %s\n  { %s }," % (name, ", ".join("0x0000 /* %s */" % h for h in slots)))
     text = ("struct Palette { uint16_t a, b; };\nstatic constexpr Palette THEMES[] = {\n"
             + "\n".join(rows) + "\n};\n")
@@ -89,6 +103,13 @@ def wrong_paper(dest):
 
 def wrong_ink(dest):
     themed(dest, ink=INK[:4] + ["#ff00ff"] + INK[5:])
+
+
+def wrong_palette(dest):
+    """Green's light page painted as something the app's scheme never says."""
+    rows = list(PALETTE_ROWS)
+    rows[0] = (rows[0][0], "#ff00ff", rows[0][2])
+    themed(dest, palette=rows)
 
 
 def grid_sketch(dest, line, margin=12, pad=10):
@@ -337,6 +358,12 @@ CASES = [
         mutate=margin_off_grid,
         want_code=1,
         want=["sets MARGIN 8 and CARD_PAD 10; the deck grid is 12 and 10"],
+    ),
+    dict(
+        name="a deck whose palette page is not the app's is refused",
+        mutate=wrong_palette,
+        want_code=1,
+        want=["draws the green light page as #ff00ff, but Palette.GREEN_SCHEME says #f2eee3"],
     ),
     dict(
         name="a second copy of a sketch outside its widget folder is refused",

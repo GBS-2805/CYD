@@ -9,12 +9,12 @@ are `artifacts/renders/`'s, and `check_renders.py` is what keeps those honest.
 
 The gallery is a **scroll**, not a contact sheet: one screen under the next at phone
 width, separated by a hairline and one line of caption, so opening it and dragging down
-walks the app from the front page to settings. A strip of nine thumbnails shows the
+walks the app from its first page to settings. A strip of thumbnails shows the
 shape of the app and nothing readable; this shows what the phone shows.
 
 The strip is the one exception, because a single chat message wants one picture. It is
-drawn here from the same nine frames the page uses, so it cannot be the seven-frame
-strip an earlier capture left in `renders/` while the app grew two screens.
+drawn here from the same frames the page uses, so it cannot be a strip an earlier
+capture left in `renders/` while the app grew more screens.
 
     python3 artifacts/publish_renders.py          # rebuild the bundle
     # then deploy artifacts/site/manifest.json with the sites tooling
@@ -32,17 +32,16 @@ PUBLIC = HERE / "site" / "public"
 
 # Every frame the capture writes, in the order a person meets them in the app.
 SCREENS = [
-    ("home", "The drawer", "PAIRED, BOARDS, SERIAL, and the owner's mark"),
-    ("home-open", "BOARDS expanded", "the boards that hold projects, one row each"),
-    ("projects", "The shelf", "alphabetical, folded, with the libraries note first"),
-    ("projects-open", "One project open", "its notes, log, deck block and actions"),
-    ("projects-edit", "Adding a project",
-     "the form the shelf opens: name, tagline, status, notes, DELETE"),
-    ("projects-file", "Attaching a file",
-     "the picker as a card: every sketch and image FILES holds, one tap each"),
-    ("paired", "The link", "telemetry, the deck card, what is advertising, saved decks"),
-    ("serial", "USB", "the flasher, its three retries, the monitor"),
-    ("settings", "Settings", "permissions, the allowlist, the bridge"),
+    ("paired", "Paired", "the link, then three decks drawn in their own three palettes"),
+    ("pull-down", "The pull-down", "PAIRED, BOARDS, SERIAL, in flow under the header"),
+    ("side-panel", "The side panel",
+     "SETTINGS, DECKS, BRIDGE, APPEARANCE, and the palette at its foot"),
+    ("bridge-sheet", "Bridge", "the switch, its state, and what it needs first"),
+    ("appearance-sheet", "Appearance", "three palettes and the one page switch"),
+    ("projects", "Boards", "the shelf, alphabetical and folded, libraries note first"),
+    ("projects-open", "One board open", "its notes, log, deck block and actions"),
+    ("serial", "Serial", "the target, the USB flasher and the monitor"),
+    ("settings", "Settings", "every permission in one list, each with its LED"),
 ]
 
 PAGE = """<!doctype html>
@@ -53,14 +52,15 @@ PAGE = """<!doctype html>
 <title>Off-site — the app, scrolling</title>
 <style>
   :root {{
-    --field: #000000; --band: #e4e3de; --ink: #000000;
-    --on: #f1f0eb; --dim: rgba(241, 240, 235, .70); --rule: rgba(241, 240, 235, .23);
+    /* Moss, the app's own default: the page, its band, and the ink on each. */
+    --field: #0e2a24; --band: #005043; --ink: #e7ddce;
+    --on: #e7ddce; --dim: rgba(231, 221, 206, .72); --rule: rgba(231, 221, 206, .24);
   }}
   * {{ box-sizing: border-box; }}
   body {{
     margin: 0; background: var(--field); color: var(--on);
-    font: 15px/1.55 "DejaVu Sans Mono", ui-monospace, SFMono-Regular, Menlo,
-          Consolas, monospace;
+    font: 15px/1.55 Poppins, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+          sans-serif;
   }}
   header {{
     position: sticky; top: 0; z-index: 2; background: var(--band); color: var(--ink);
@@ -103,23 +103,24 @@ PAGE = """<!doctype html>
 """
 
 
-# The strip one chat message shows. Drawn from the same nine frames the page uses, at
+# The strip one chat message shows. Drawn from the same frames the page uses, at
 # publish time: a strip copied out of `renders/` is how the published one came to show
-# the seven frames of an earlier capture a week after the app had grown two more.
+# a week-old capture's seven frames while the app drew nine.
 STRIP = "chat-sheet.jpg"
 THUMB = 196                          # a 393 px capture at half width
 GUTTER = 10
 PAD = 12
-FIELD = (0x3F, 0x4E, 0x96)           # Palette.FIELD, the page's own ground
-BAND = (0xD9, 0xD9, 0xD9)            # Palette.BAND, the hairline the app draws
+FIELD = (0x0E, 0x2A, 0x24)           # moss: Palette.MOSS_SCHEME's dark page
+BAND = (0x3C, 0x57, 0x4F)            # the hairline that page draws its cells in
 
 
 def strip():
-    """One row of the nine screens, drawn from the frames just copied into `public/`.
+    """One row of the screens, drawn from the frames just copied into `public/`.
 
-    The page is a scroll because nine screens side by side are unreadable at phone
-    width; this is those same nine as one picture, so it is drawn rather than carried
-    in `renders/`, where a copy dates while the app moves. The frames keep their own
+    The page is a scroll because frames side by side are unreadable at phone
+    width; this is those same frames as one picture, so it is drawn rather than
+    carried in `renders/`, where a copy dates while the app moves. The frames keep
+    their own
     proportions and hang from the same top edge, so a short screen is a short card.
     """
     shots = []
@@ -163,6 +164,12 @@ def main():
     logo = HERE / "logo-compare.png"
     if logo.is_file():
         shutil.copyfile(logo, PUBLIC / logo.name)
+
+    # The deck's own glass: the phone deck's front page in every palette row, drawn
+    # by artifacts/deck_screens.py from the sketch's own draw calls. Copied so a
+    # palette can be looked at on a phone, not only inside the app's frames.
+    for page in sorted((HERE / "decks").glob("phone-home-*.png")):
+        shutil.copyfile(page, PUBLIC / ("deck-" + page.name))
 
     # The download has to be the APK this tree built. It used to be copied by hand
     # after every build, which is a step that gets skipped exactly when the build

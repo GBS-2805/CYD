@@ -49,7 +49,7 @@ RENDER_DECKS = ROOT / "artifacts/deck_screens.py"
 def deck_page_problems():
     """Every page both decks can show is drawn, and the copies on disk are today's.
 
-    The app's nine frames are held to the source by check_renders.py; the decks had
+    The app's frames are held to the source by check_renders.py; the decks had
     no such gate, so a sketch could change and leave a picture of the old glass
     behind. This draws every page again into a temp dir and compares bytes.
     """
@@ -81,18 +81,47 @@ def deck_page_problems():
     return problems
 
 
-def palette_problems(folders):
-    """Both decks draw the same two pages the app draws, or say which disagrees.
+def palette_schemes(source):
+    """The three site schemes in `Palette.java`, in the order `Palette.SCHEMES` lists them.
 
-    A sketch is pasted on its own into ArduinoDroid, so its palette cannot be
-    imported from the app — it is a second copy of the same four values. This is
-    the check that the copy still says what `Palette.java` says.
+    Each is seventeen ints: the band, its ink, dim, line, hover, the accent and its
+    ink, then the dark page's five and the light page's five. A deck's palette row
+    carries the page and the body ink, so those are what this reads out of it.
+    """
+    found = {}
+    for match in re.finditer(
+            r"static final Scheme (\w+) = new Scheme\(\"(\w+)\", new int\[\] \{(.*?)\}\);",
+            source, re.S):
+        values = re.findall(r"0x([0-9A-Fa-f]{8})", match.group(3))
+        if len(values) < 17:
+            continue
+        found[match.group(1)] = {
+            "id": match.group(2),
+            "dark": "#" + values[7][2:].lower(),
+            "darkInk": "#" + values[8][2:].lower(),
+            "light": "#" + values[12][2:].lower(),
+            "lightInk": "#" + values[13][2:].lower(),
+        }
+    return [found[name] for name in ("GREEN_SCHEME", "MOSS_SCHEME", "NAVY_SCHEME")
+            if name in found]
+
+
+def palette_problems(folders):
+    """Every deck row says the colour the app's palette says, or names the one that does not.
+
+    A sketch is pasted on its own into ArduinoDroid, so its table cannot import the
+    app's — it is a second copy. Rows 0 and 1 are the neutral pair and are held to
+    `LIGHT_FIELD`/`LIGHT_TEXT` and `DARK_FIELD`/`DARK_TEXT`; rows 2 to 7 are the site's
+    three palettes twice and are held to each scheme's own page and body ink, at
+    `2 + palette * 2 + (light ? 0 : 1)`. A swatch that names a row the glass paints
+    differently is the drift this catches.
     """
     problems = []
     if not PALETTE.is_file():
         return problems
     source = PALETTE.read_text(encoding="utf-8")
-    pages = {"paper": ("LIGHT_FIELD", "LIGHT_TEXT"), "ink": ("DARK_FIELD", "DARK_TEXT")}
+    neutral = {"paper": ("LIGHT_FIELD", "LIGHT_TEXT"), "ink": ("DARK_FIELD", "DARK_TEXT")}
+    schemes = palette_schemes(source)
     for folder in folders:
         sketch = folder / (folder.name + ".ino")
         if not sketch.is_file():
@@ -103,16 +132,34 @@ def palette_problems(folders):
             continue                      # a widget with no palette table
         block = text[start:text.find("};", start)]
         found = re.findall(r"0x[0-9A-Fa-f]{4}\s*/\*\s*(#[0-9a-fA-F]{6})\s*\*/", block)
-        if len(found) < 2 * len(SLOTS):
+        rows = [found[i:i + len(SLOTS)]
+                for i in range(0, len(found) - len(SLOTS) + 1, len(SLOTS))]
+        if len(rows) < len(neutral):
             continue                      # not a twelve-slot table; check_docs has it
-        rows = {"paper": found[:len(SLOTS)], "ink": found[len(SLOTS):2 * len(SLOTS)]}
-        for name, (ground_const, ink_const) in pages.items():
+        for name, (ground_const, ink_const) in neutral.items():
+            row = rows[0 if name == "paper" else 1]
             for slot, constant, word in ((0, ground_const, "page"), (4, ink_const, "ink")):
                 want = argb(source, constant)
-                got = rows[name][slot]
+                got = row[slot]
                 if want and got.lower() != want.lower():
                     problems.append("%s draws the %s %s as %s, but Palette.%s is %s"
                                     % (shown(sketch), name, word, got, constant, want))
+        for index, scheme in enumerate(schemes):
+            for light in (True, False):
+                row = 2 + index * 2 + (0 if light else 1)
+                if row >= len(rows):
+                    continue
+                which = "light" if light else "dark"
+                for slot, key, word in ((0, which, "page"),
+                                        (4, which + "Ink", "ink")):
+                    want = scheme[key]
+                    got = rows[row][slot]
+                    if want and got.lower() != want.lower():
+                                                problems.append(
+                            "%s draws the %s %s %s as %s, but "
+                            "Palette.%s_SCHEME says %s"
+                            % (shown(sketch), scheme["id"], which, word,
+                               got, scheme["id"].upper(), want))
     return problems
 
 

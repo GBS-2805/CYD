@@ -80,7 +80,7 @@ deliberately one file; splitting one fails with
 and neither fits the default 1,310,720-byte slot any more — the phone deck's radio
 alone measured 816,643 B — so pick that scheme in ArduinoDroid's board menu before
 compiling. The scheme is written at flash time: a board carrying the default
-partition keeps it until an upload built for this one lands. `1,179,334 B` of
+partition keeps it until an upload built for this one lands. `1,179,690 B` of
 `3,145,728` for the phone deck, `1,891,309 B` for the Spotify deck, both measured
 on core 3.3.12.
 

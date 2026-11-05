@@ -373,7 +373,7 @@ final class ProjectsTab extends ScrollView {
         final boolean on = activeFilter == filter;
         TextView chip = Ui.text(activity, label, 10, on ? Ui.BAND_INK : Ui.DIM);
         chip.setLetterSpacing(0.1f);
-        chip.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        Ui.strong(chip);
         chip.setBackground(Ui.rounded(activity, on ? Ui.ACCENT : Ui.CARD_HI,
                 on ? Ui.ACCENT : Ui.EDGE, 8));
         chip.setPadding(Ui.dp(activity, 9), Ui.dp(activity, 5),
@@ -414,7 +414,7 @@ final class ProjectsTab extends ScrollView {
         TextView status = Ui.text(activity, ProjectStore.statusLabel(project.status), 10,
                 ProjectStore.statusColor(project.status));
         status.setLetterSpacing(0.12f);
-        status.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        Ui.strong(status);
         status.setPadding(Ui.dp(activity, 8), 0, 0, 0);
         meta.addView(status);
 
@@ -423,7 +423,7 @@ final class ProjectsTab extends ScrollView {
         if (!project.fileName.isEmpty() && !project.catalog) {
             TextView file = Ui.text(activity, "FILE", 10, Ui.ACCENT);
             file.setLetterSpacing(0.12f);
-            file.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+            Ui.strong(file);
             file.setBackground(Ui.rounded(activity, Ui.CARD_HI, Ui.ACCENT, 6));
             file.setPadding(Ui.dp(activity, 6), Ui.dp(activity, 2),
                     Ui.dp(activity, 6), Ui.dp(activity, 2));
@@ -621,7 +621,7 @@ final class ProjectsTab extends ScrollView {
                 card.addView(hint);
             } else {
                 TextView line = Ui.text(activity, "SKETCH  " + seedFile, 11, Ui.ACCENT);
-                line.setTypeface(Typeface.MONOSPACE);
+                line.setTypeface(Ui.face(line.getContext()));
                 card.addView(line);
                 Button another = Ui.action(activity, "CHANGE SKETCH", false);
                 another.setOnClickListener(v -> openSketchPicker());
@@ -684,7 +684,7 @@ final class ProjectsTab extends ScrollView {
         field.setSingleLine(true);
         field.setInputType(InputType.TYPE_CLASS_TEXT);
         field.setTextSize(13);
-        field.setTypeface(Typeface.MONOSPACE);
+        field.setTypeface(Ui.face(field.getContext()));
         field.setTextColor(Ui.TEXT);
         field.setHintTextColor(Ui.DIM);
         field.setBackground(Ui.rounded(activity, Ui.INPUT, Ui.EDGE, 8));
@@ -745,7 +745,7 @@ final class ProjectsTab extends ScrollView {
         FlashLibrary.Entry entry = entryNamed(project.fileName);
 
         TextView line = Ui.text(activity, "FILE  " + project.fileName, 11, Ui.ACCENT);
-        line.setTypeface(Typeface.MONOSPACE);
+        line.setTypeface(Ui.face(line.getContext()));
         block.addView(line);
 
         // The record keeps the name, not the bytes: a file deleted from FILES is a

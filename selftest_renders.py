@@ -32,8 +32,8 @@ except ImportError:  # the gate cannot run without it either
 
 ROOT = Path(__file__).resolve().parent
 CHECK = ROOT / "check_renders.py"
-SCREENS = ["home", "home-open", "paired", "projects", "projects-open", "projects-edit",
-           "projects-file", "serial", "settings"]
+SCREENS = ["paired", "pull-down", "side-panel", "bridge-sheet", "appearance-sheet",
+           "projects", "projects-open", "serial", "settings"]
 SIZE = (6, 4)
 INK = (10, 20, 30)
 
@@ -68,7 +68,7 @@ def rewrite_stub(text):
 
 
 def diverge(dest):
-    png(dest / "android-companion" / "fixtures" / "home.png", colour=(200, 0, 0))
+    png(dest / "android-companion" / "fixtures" / "paired.png", colour=(200, 0, 0))
 
 
 def resize(dest):
@@ -102,7 +102,8 @@ CASES = [
         name="a pixel the app no longer draws is refused",
         mutate=diverge,
         want_code=1,
-        want=["artifacts/renders/home.png no longer matches the app", "1 of 9 renders stale"],
+        want=["artifacts/renders/paired.png no longer matches the app",
+              "1 of 9 renders stale"],
     ),
     dict(
         name="a frame at the wrong size is refused with both sizes",
@@ -127,7 +128,7 @@ CASES = [
         name="a capture that wrote no frame says so",
         mutate=no_frames,
         want_code=1,
-        want=["home was not captured"],
+        want=["paired was not captured"],
     ),
     dict(
         name="a failed capture compares nothing and fails",
@@ -146,7 +147,7 @@ CASES = [
         mutate=None,
         args=["nope"],
         want_code=2,
-        want=["unknown screen: nope", "the capture knows: home"],
+        want=["unknown screen: nope", "the capture knows: paired"],
     ),
 ]
 

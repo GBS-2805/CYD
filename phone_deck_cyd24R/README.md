@@ -2,17 +2,23 @@
 
 A phone dashboard for the **ESP32-2432S024R** (2.4" resistive-touch CYD): clock,
 battery and notifications, set like a woodblock print — flat panels, heavy rules,
-one ink, nothing shaded. It ships **two monochrome themes** of twelve slots each:
+one ink, nothing shaded. It ships **eight rows** of twelve slots each: the original
+monochrome pair, then the owner's site in its three palettes twice —
 
 * **0 PAPER** — black ink on an off-white page.
 * **1 INK** — the same page inverted: off-white ink on black.
+* **2 GREEN light** / **3 GREEN dark** — the lime band's cream page, or its night page.
+* **4 MOSS light** / **5 MOSS dark** — the cream page, or the green page with the lime.
+* **6 NAVY light** / **7 NAVY dark** — powder blue-grey, or slate on near-black blue.
 
-INK is the default, and the companion app switches either way down the link
-(`6f2d0008-…`, one byte) without a re-flash; the board keeps the choice in NVS.
-The last six slots are the ink at different strengths rather than hues, so link
-state, the one action and the battery warning separate by luminance. The full
-table is `THEMES[]` at the top of the sketch, one `0x5655 /* #rrggbb */` entry
-per slot.
+The index is `2 + palette * 2 + (light ? 0 : 1)`, computed by this sketch and the
+companion app alike, so a swatch tapped in the app is the row the glass draws. INK is
+what a board shows before any phone writes, and the app sets the rest down the link
+(`6f2d0008-…`, one byte) without a re-flash; the board keeps the choice in NVS. The
+last six slots are the one highlight at different strengths rather than hues, so link
+state, the one action and the battery warning separate by luminance. The full table is
+`THEMES[]` at the top of the sketch, one `0x5655 /* #rrggbb */` entry per slot, and
+`THEME_NAMES[]` beside it is the name the footer prints.
 
 The folder and the sketch share one name, `phone_deck_cyd24R`, like every widget
 here: ArduinoDroid compiles one `.ino` whose name must match its folder, and
@@ -287,14 +293,15 @@ service.
 | Notification | `6f2d0004-9a3c-4b57-9d21-6a1e0c4f8b10` | UTF-8 `app\|title\|body`, any part may be empty |
 | Identity | `6f2d0005-9a3c-4b57-9d21-6a1e0c4f8b10` | **read** |
 | Now playing | `6f2d0006-9a3c-4b57-9d21-6a1e0c4f8b10` | UTF-8 `state\|position\|duration\|title\|artist\|album`, whole seconds, state `play`/`pause`/`stop` |
-| Theme | `6f2d0008-9a3c-4b57-9d21-6a1e0c4f8b10` | **read/write**, 1 byte: `0` PAPER, `1` INK — applied, stored in NVS and repainted |
+| Theme | `6f2d0008-9a3c-4b57-9d21-6a1e0c4f8b10` | **read/write**, 1 byte: `0` PAPER, `1` INK, then `2 + palette * 2 + (light ? 0 : 1)` for green, moss and navy — applied, stored in NVS and repainted |
 | Label | `6f2d0009-9a3c-4b57-9d21-6a1e0c4f8b10` | **read/write**, up to 16 printable ASCII bytes: the owner's name for this board |
 
-The palette is a setting now. `0` is PAPER and `1` is INK, the same two entries
-`THEMES[]` has always had, and a write applies it, stores it in the `settings`
-namespace beside `bri` and repaints whichever page is showing. A read answers
-where the board actually is, so the app lights a chip from the board's own answer
-rather than from what it last sent. `THEME_COUNT` and the clamp on the stored
+The palette is a setting now: one byte naming a row of `THEMES[]`, applied, stored
+in the `settings` namespace beside `bri` and repainted on whichever page is showing.
+A write is `2 + palette * 2 + (light ? 0 : 1)` — the same arithmetic the app's
+`DeckTheme` does — so the six palette rows are the phone's three swatches and its
+page circle. A read answers where the board actually is, so the app's page circle
+follows the board's own answer rather than what it last sent. `THEME_COUNT` and the clamp on the stored
 byte are what keep a corrupt value from leaving the deck with no palette and no
 way back to one; a byte past the table is ignored, not guessed at. That is also
 why the deck has no theme page: the switch is the phone's, one pair of chips per
@@ -489,10 +496,10 @@ is.
    GFX, Adafruit ILI9341, XPT2046_Touchscreen — and record the `Sketch uses …`
    line and the md5 ArduinoDroid reports.
 2. In the app: PAIRED, scan, LINK the board. The card shows the tag, the MAC and
-   `PAPER` or `INK`. That word is the byte the board reads back, so `theme
-   unknown` there means the characteristic did not answer.
-3. Tap `INK` on the saved row: the glass repaints inverted within a second and the
-   card keeps saying `INK`. Tap `PAPER`: the same, the other way.
+   the palette it answered with (`MOSS DARK`, say). That name is the byte the board
+   reads back, so a dash there means the characteristic did not answer.
+3. Tap the moss swatch on that row: its ring moves, and the glass repaints in moss
+   within a second. Tap the page circle: the same palette on its other page.
 4. Flip SETTINGS → APPEARANCE on the phone. The phone and the linked deck should
    end on the same page, because the app writes its choice down the link.
 5. Power-cycle the board with the backlight switch off and on: it must come back on
@@ -521,11 +528,11 @@ core **3.3.12**, `PartitionScheme=huge_app`:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,179,334 | **1,966,394** | 3,145,728 (37 % used) |
+| flash | 1,179,690 | **1,966,038** | 3,145,728 (37 % used) |
 | DRAM | 45,332 globals | **282,348** | 327,680 |
 
 The root behind those figures is `~/.arduino-cyd/env.sh`, the one whose `env.sh`
-pins its own data and library dirs: `check_docs.py --refresh` re-read 1,179,334 B
+pins its own data and library dirs: `check_docs.py --refresh` re-read 1,179,690 B
 and 45,332 B from it on 2026-11-04. While that script set only `PATH` the same
 build went through `~/.arduino15` and printed 1,168,282 B — 32 B under with the
 globals identical — another worktree's root prints the same size, and
@@ -536,7 +543,7 @@ number (see
 The check refuses a deck that overflows, that drops under **64 KiB** of free flash
 or that leaves under **160 KiB** of DRAM — the last floor is just over the
 153,600 B a full 320x240 RGB565 framebuffer needs. So this deck has almost two megabytes of flash to grow into, and one
-framebuffer's worth of DRAM slack. It takes a **1,966,394-byte** addition to
+framebuffer's worth of DRAM slack. It takes a **1,966,038-byte** addition to
 overflow the slot now. On the default scheme it took far less: a
 1,400,000-byte const table measured 1,668,748 B and overflowed the
 1,310,720-byte slot it was built for, which is the refusal that named the need
@@ -560,12 +567,12 @@ from the repo root, after sourcing a toolchain.
     [`old_core.json`](../old_core.json) — size, globals and md5 together, measured
     2026-11-04 through `~/.arduino-cyd-2` — because a 2.0.17 figure quoted here
     would be checked against the 3.3.12 build and refused.
-* Core **3.3.12** links it at 1,179,334 bytes (37 % of 3,145,728) with 45,332 bytes of RAM
-  (13 % of 327,680), `EXIT=0` under `--warnings all`, re-measured on 2026-11-04 with the new typeface. An earlier 3.3.12 build on a shorter path reported 1,163,930 / 45,004,
+* Core **3.3.12** links it at 1,179,690 bytes (37 % of 3,145,728) with 45,332 bytes of RAM
+  (13 % of 327,680), `EXIT=0` under `--warnings all`, re-measured on 2026-11-05 with the eight-row palette. An earlier 3.3.12 build on a shorter path reported 1,163,930 / 45,004,
   so 3.x is path-sensitive too — 1,137–1,141 kB, not a fixed count.
 * The bundled copy matches byte for byte after `:app:syncWidgets`;
   `check_widget_assets.py` prints `2 widgets bundled, every copy matches`
-  (this sketch md5 `abef49da…`, the Spotify one `0a2147b9…`).
+  (this sketch md5 `1a04a453…`, the Spotify one `0a2147b9…`).
 * Core 3.x costs this sketch ~1.1 kB of flash and ~3.6 kB of RAM over 2.0.17 —
   nothing like the Spotify deck's 155 kB gap, which is that sketch's network
   stack rather than the core (see the build note in
@@ -605,6 +612,6 @@ The first flash of a new board is the test of those, not a formality.
 
 ## Measured
 
-`check_headroom.py` built this sketch on 2026-11-04 with core 3.3.12 and read
-`Sketch uses 1,179,334 bytes` and `45,332 bytes` of globals; this folder's sketch
-md5 is `abef49da…`.
+`check_headroom.py` built this sketch on 2026-11-05 with core 3.3.12 and read
+`Sketch uses 1,179,690 bytes` and `45,332 bytes` of globals; this folder's sketch
+md5 is `1a04a453…`.

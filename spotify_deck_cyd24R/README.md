@@ -456,6 +456,45 @@ sketch left 343,307 B. Re-measure with
 `python3 ../check_headroom.py spotify_deck_cyd24R` from the repo root, after
 sourcing a toolchain.
 
+### What cannot be trimmed
+
+Measured here on **2026-11-05** by re-linking this sketch against edited copies of
+the core's link list — `tools/esp32-libs/3.3.12/flags/ld_libs`, which is what
+`compiler.c.elf.libs` points at, overridden per build with
+`--build-property compiler.c.elf.libs="@<copy>"`. Nothing committed was changed:
+the attempts are throwaway build paths, and the committed build is untouched.
+
+| removed from the link | result |
+| --- | --- |
+| `esp_netif`, mesh, pp, protocomm, protobuf-c, both provisioning libs | fails to link: 157 undefined symbols (`esp_netif_attach`, `IP_EVENT`, `NETWORK_PROV_EVENT`) |
+| the same without `esp_netif` | fails: 124 undefined (`bt_mesh_*`, `esp_wifi_internal_free_rx_buffer`) |
+| `pp` alone | fails: 114 undefined (`esp_wifi_internal_free_rx_buffer`, `hal_crypto_enable`, `hal_ba_session_restore_by_hw_index`) |
+| provisioning, protocomm, protobuf-c, Rainmaker | fails: `NETWORK_PROV_EVENT`, `network_prov_mgr_deinit` |
+
+The symbol table says why each one is load-bearing, and two of the names mislead:
+
+* **`pp` is not the ping client its name suggests.** It defines
+  `esp_wifi_internal_free_rx_buffer`, which `libesp_wifi.a` calls, and
+  `hal_crypto_enable`, which `libnet80211.a` calls — it is the WiFi driver's own
+  HAL. Its 57,893 B of the image is not removable.
+* **Bluedroid pulls the mesh library.** `bt_mesh_v11_init` lives in
+  `libble_mesh.a` and is wanted by `libbt.a`, so any deck with BLE links it; it
+  contributes **0 B** to the loaded image, so dropping it saves nothing and breaks
+  the link.
+* **Provisioning is inside the precompiled WiFi stack.** `NETWORK_PROV_EVENT` is
+  defined in `network_provisioning.a` and referenced by
+  `libespressif__esp_rainmaker.a`; removing both still leaves
+  `network_prov_mgr_deinit` wanted by another SDK archive.
+
+The groups were never worth much, either: of the loaded image, mesh is 0 B,
+`protocomm` 299 B, `network_provisioning` 3,470 B and `esp_netif` 12,621 B — about
+**16,390 B, 0.9 %**, had every one of them come out cleanly. The remaining lever
+is no better: adding `-Wl,--gc-sections` to `compiler.c.elf.extra_flags` links and
+changes nothing, **1,891,309 B**, byte for byte the same size. This core ships
+ESP-IDF as precompiled `lib/*.a`, so the only way to a smaller WiFi stack is a
+custom IDF build with a cut `sdkconfig` — a different build system, for under a
+percent.
+
 ### At a glance
 
 **Verified here** — none of this needs hardware:

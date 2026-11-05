@@ -201,7 +201,7 @@ final class BoardTab extends ScrollView {
         monitorInput.setTextSize(12);
         monitorInput.setTextColor(Ui.TEXT);
         monitorInput.setHintTextColor(Ui.DIM);
-        monitorInput.setTypeface(Typeface.MONOSPACE);
+        monitorInput.setTypeface(Ui.face(monitorInput.getContext()));
         monitorInput.setBackground(Ui.rounded(activity, Ui.INPUT, Ui.EDGE, 8));
         monitorInput.setPadding(Ui.dp(activity, 10), Ui.dp(activity, 8),
                 Ui.dp(activity, 10), Ui.dp(activity, 8));

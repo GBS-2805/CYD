@@ -213,8 +213,8 @@ final class WidgetCatalog {
         widget.board = "2432S024R";
         widget.tagline = "INSIDE APP";
         widget.body = "A desk dashboard for your phone: clock, battery and notifications, "
-                + "set like a woodblock print in two monochrome themes: black ink on an "
-                + "off-white page, or the same page inverted.";
+                + "set like a woodblock print: the neutral paper/ink pair, then the site's "
+                + "green, moss and navy on either of their two pages.";
         widget.notes = "Bundled with the app: copy it into ArduinoDroid and compile, there is "
                 + "nothing to download. Compile it on PartitionScheme=huge_app, the 3 MB "
                 + "APP slot.";

@@ -9,17 +9,26 @@ A single-module Android app in Java, **no AndroidX and no third-party
 libraries**, so Gradle resolves only the Android Gradle Plugin. Package
 `dev.phonedesk.companion`, `minSdk` 26, `targetSdk` 35.
 
-The drawer (`DrawerHome`) is the front page and `MainActivity` hosts it:
+`MainActivity` opens on **PAIRED** and hosts two controls and two sheets, the
+arrangement the owner's site uses:
 
 | File | Role |
 | --- | --- |
-| `MainActivity.java` | Header pill, drawer host, 1 s refresh loop, permissions, SAF result |
-| `DrawerHome.java` | The front page: `PAIRED`, `BOARDS`, `SERIAL`, and the gear that opens `SETUP` |
-| `TopBar.java` | The crumb, the centred mark, the link pill and the gear: one row, built by `TopBar` so the render host can measure it |
-| `DecksTab.java` | Live monitor: link telemetry, nearby scan results, saved decks |
+| `MainActivity.java` | Header pill, the pull-down and the side panel, 1 s refresh loop, the carried scroll offset, permissions, SAF result |
+| `PullDown.java` | The accordion under the header: `PAIRED`, `BOARDS`, `SERIAL`, in flow rather than over the page |
+| `SidePanel.java` | The right-hand panel: `SETTINGS`, `BRIDGE`, `APPEARANCE`, and the palette at its foot |
+| `Sheet.java` | The bottom sheet the two panel rows open: scrim, overline, 40dp close, hairline |
+| `DeckLook.java` | One deck's palette and page, and the byte that page is written as |
+| `LedMarquee.java` | Six square LEDs: dark for never paired, lit for paired, chasing for linked |
+| `BridgeSheet.java` | The bridge's own start/stop, its state and the notes that used to sit under Settings |
+| `AppearanceSheet.java` | The three palettes and the page toggle, named in words |
+| `AppearanceStrip.java` | The site's two controls as one row: three band-coloured swatches with an ink dot, and a sun/crescent circle |
+| `Appearance.java` | The stored palette and page, in its own preferences file |
+| `TopBar.java` | The pull-down chevron and page name, the centred mark, the link pill and the burger: one row, built by `TopBar` so the render host can measure it |
+| `DecksTab.java` | PAIRED: the link, then every deck as a tile of its own palette — marquee, inks, ringed swatch, page circle — and the unpaired decks below |
 | `ProjectsTab.java` | Notebook: status chips, project cards, deck libraries, recipes |
 | `BoardTab.java` | Target picker, USB probe/restart, imported images, flashing, serial monitor |
-| `SetupTab.java` | Notification access, Bluetooth, battery settings, start/stop |
+| `SetupTab.java` | SETTINGS: every permission in one list with a lit or dark LED, the notification filter, the last crash |
 | `DeckService.java` | Foreground service: scan, GATT link, write queue, snapshot API |
 | `DeckStore.java` | SharedPreferences: known decks and the preferred MAC |
 | `DeckIdentity.java` | Parses the deck's one-line identity JSON, from BLE or `/deck.json` |
@@ -35,7 +44,7 @@ The drawer (`DrawerHome`) is the front page and `MainActivity` hosts it:
 | `EspRom.java` | ROM protocol: SLIP, sync, register reads, flash write, MD5 verify, hard reset |
 | `FirmwareNotes.java` | SharedPreferences log per firmware: build label, touch status, notes |
 | `DeckNotificationListener.java` | Forwards posted notifications to the service |
-| `Ui.java` | Palette, rounded cards, buttons, duration/size formatting |
+| `Ui.java` | Palette, square cards and chips, Poppins, buttons, duration/size formatting |
 | `Actions.java` | Shared toast, clipboard, link and save helpers |
 | `CrashLog.java` | Uncaught-exception handler and the LAST CRASH reader |
 | `SpotifyCallbackActivity.java` | Catches `phonedesk://spotify-callback` and hands the code to the deck through the browser |
@@ -116,9 +125,9 @@ reason to add a resource pipeline.
 ### The shelf names its bytes
 
 Every sketch card on the flash shelf now carries the sketch's own fingerprint
-beside COPY — `151,242 B  ·  abef49da`, its length and the first eight digits of
+beside COPY — `154,522 B  ·  1a04a453`, its length and the first eight digits of
 its md5. The bytes on that card are the bytes COPY pastes, and Arduino answers
-with the size it compiled (`Sketch uses 1,179,334 bytes`), so a sketch pasted out
+with the size it compiled (`Sketch uses 1,179,690 bytes`), so a sketch pasted out
 of an older install is visible before it is flashed rather than after: the two
 numbers disagree. `SketchStamp` does the formatting and four host checks hold it,
 including the md5 of `abc` and the thousands separator the docs use.
@@ -377,22 +386,25 @@ URL and a flashing note. Decisions behind it:
   `ets Jul 29 2019 12:21:46` because the boot-mode line sat past the 32nd byte;
   the ROM's date and `boot:0x13` versus `boot:0x3` are what identify the chip and
   whether IO0 took effect.
-- **Palette**: two palettes and nothing else — **INK** is off-white ink on black,
-  **PAPER** is black ink on the off-white page. The app's is its own switch in
-  SETTINGS; a deck's is its own pair on PAIRED, so the two ends move separately.
-  The band is a shade of that same
-  off-white in both, because the owner's mark is drawn in black on a light ground:
-  it keeps black ink and the artwork needs no plate behind it. Every other ink is
-  the page's opposite at an alpha — `GOOD` .78, `DIM` .70, `VIOLET` .66, the
-  hairline .23 — with `PINK` the one step above the text (pure white on black,
-  black on paper), so a status separates by luminance. A card is a **hairline cell
-  on the page** (`Ui.CARD` is the page); surfaces that need a fill of their own —
-  a secondary action, a chip off, the drawer's board row — use `Ui.CARD_HI`, a 12 %
-  wash in the opposite ink; a text field takes `Ui.INPUT`, one step higher at 18 %,
-  so the box reads as a box and its placeholder is not the faintest ink on the
-  page. The live pill is the one filled
-  shape on the band: black fill, band-paper text. Monospace did not move: the deck
-  is a terminal, so the font stayed.
+- **Palette**: the app draws the owner's site, three palettes by two pages.
+  `Palette.Scheme` holds **green**, **moss** and **navy** as the stylesheet writes
+  them — the page, the band, the words on that band and an accent — and
+  `Appearance` stores which set and which page, applying both before the first view
+  exists. **The band never turns over**: only the page does, so the header is the
+  same in both modes and flipping the theme moves nothing in the chrome. That is
+  also why the owner's mark is tinted with the band's own ink (`SRC_IN`, alpha kept,
+  so the ghost inside the C survives): on lime it stays near-black, on moss and navy
+  it is cream or powder, which is what the site does with `currentColor`.
+  A card is a **hairline cell on the page** (`Ui.CARD` is the page); a chip is the
+  same cell with an uppercase 11sp word in it; the one filled action is the band
+  colour with the band's ink on it, and the accent is a **fill** — a live pill, a
+  lit LED — with `Ui.ON_ACCENT` as its word. `GOOD` falls back to body ink when the
+  accent cannot carry a word on the page (moss's lime on moss's cream is 1.03:1), and
+  an error is written in body ink because the site has no red — the lit or dark LED
+  beside a state is what carries it, so colour is never the only channel.
+  **Poppins** replaced the monospace: the same three weights the site sets its prose
+  in, subset with `fonts.py` to the glyphs this app prints, 31,744 B for all three
+  faces in `res/font/`.
 - **The floors are measured, not assumed.** `Palette` holds both themes (so the
   host suite can read them without Android) and `Contrast` does WCAG 2.1 arithmetic
   on them; `HostTests.contrast()` walks each theme's inks and holds body ink to
@@ -503,10 +515,12 @@ URL and a flashing note. Decisions behind it:
 - The app is **Off-site** (`android:label`, header title). The package stays
   `dev.phonedesk.companion` and the APK stays `dist/PhoneDeckBridge-debug.apk`, so
   an upgrade replaces the installed copy instead of sitting beside it.
-- Three drawer sections: **PAIRED** (live link), **BOARDS** (the notebook: status
-  chips, cards, deck libraries) and **SERIAL** (target picker, USB probe/restart,
-  images, flashing and the serial monitor), with **SETUP** behind the gear in the
-  top bar (permissions, bridge switch, last crash).
+- The pull-down carries the three destinations: **PAIRED** (live link), **BOARDS**
+  (the notebook: status chips, cards, deck libraries) and **SERIAL** (target picker,
+  USB probe/restart, images, flashing and the serial monitor). The side panel
+  carries setup: **SETTINGS** (every permission in one list, the notification
+  filter, the last crash), **DECKS**, **BRIDGE** and **APPEARANCE**, with the
+  palette at its foot. Where you go is one list; how the app is set up is another.
 - `BoardTab` owns every call that touches the ESP32: `UsbSerialCh340`, `EspRom`,
   the USB permission receiver and the flash progress. The project shelf never
   opens the port, which is what lets each tab keep a single job.
@@ -612,28 +626,28 @@ Identical to the sketch, checked against its `onWrite` handlers:
   `./check.sh --selftest`, and the pre-commit hook runs it when a
   `check_*.py` or `selftest_*.py` is staged. That is the gap it closes: the three
   newest docs refusals were found by a reader, because nothing had ever run them.
-- **The app has two palettes, and both are measured, not eyeballed.** SETTINGS
-  carries an APPEARANCE card whose PAPER and INK are one segmented switch, and the
-  card says the choice is the app's alone — a deck's palette is its own pair on
-  PAIRED; the
-  choice is stored in its own `appearance` preferences file and applied before the
-  first view exists, and switching recreates the activity because every colour in
-  this app is read when a view is constructed. **The screen you were on comes back
-  with it**: `onSaveInstanceState` carries the section and `onCreate` reopens it
-  after the UI is built, so the switch in SETTINGS leaves you in SETTINGS — the
-  rebuild used to land on the drawer, which read as the app restarting.
-  `CaptureTest.sectionSurvivesTheRebuild` reproduces it through the platform's own
-  save and restore, so a future rebuild cannot quietly lose it again. **The scroll
-  offset and the unfolded cards come back as well**: every screen has a stable id,
-  which is what lets `ScrollView` restore its own offset from the saved view state,
-  and `ProjectsTab` puts the open card ids in the activity's bundle, because a fold
-  has no view property behind it. `theScrollComesBackWithTheRebuild` and
-  `theOpenCardsComeBackWithTheRebuild` fail if either half regresses. The band keeps its value in both
-  themes on purpose — it is the ground the owner's mark was drawn on, so a band
-  that turned over would put a plate behind artwork that has none — which is why a
-  primary action fills with the page's ink and carries the page itself as its
-  label. Both themes are held to the same floors: 185 host checks, ten of them
-  label-on-fill pairs and each theme's inks against field, fill and hairline.
+- **The app draws the site's three palettes, and every role is measured.**
+  APPEARANCE (the panel's third sheet, and the same two controls at the panel's
+  foot) offers GREEN, MOSS and NAVY as three band-coloured swatches with an ink dot
+  and one sun/crescent circle for the page; the words underneath name the result,
+  so the state is never colour alone. The choice is stored in its own `appearance`
+  preferences file and applied before the first view exists, and changing it
+  recreates the activity because every colour in this app is read when a view is
+  constructed. **The band never turns over**: only the page does, so the header is
+  identical in both modes, and the mark is tinted with the band's own ink — the
+  site's `currentColor`, drawn here with `SRC_IN` so the ghost inside the C is
+  kept. A deck's palette is still the deck's: two chips on each linked card on
+  PAIRED write that board alone. **The page you were on comes back with it**:
+  `onSaveInstanceState` carries the section and `onCreate` reopens it after the UI
+  is built, so a palette change leaves you where you were. **The scroll offset
+  comes back too**, carried by the activity (`KEY_SCROLL`) and applied on the first
+  layout with a follow-up post: `ScrollView` restores its own offset before the
+  rebuilt child has any height, so its answer was clamped away, and
+  `theScrollComesBackWithTheRebuild` is what caught that. `ProjectsTab` still puts
+  the open card ids in the activity's bundle, because a fold has no view property
+  behind it. All six palette/page combinations are held to the same floors: 220
+  host checks, among them each palette's body, quiet and hairline roles measured on
+  both pages and every label measured against the fill under it.
 - **The committed tree builds on its own.** Measured on 2026-11-02: `git archive
   HEAD` into an empty directory plus a fresh `git init` — no built assets, no
   `.build_figures.json`, nothing in `dist/` the commit does not hold — passed the
@@ -690,7 +704,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   sketches they name are inside the APK, `assets/widgets/phone_deck_cyd24R/` and
   `assets/widgets/spotify_deck_cyd24R/`, and `check_widget_assets.py` in the repo
   root compares those copies with `../<folder>/<sketch>.ino` byte for byte (phone
-  deck md5 `abef49da…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
+  deck md5 `1a04a453…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
   header rewrite, and `00bb1560…`, `eca02e93…`, `49f29bcb…` before the Bluetooth
   link, the callback change and the one-line answer — both in sync on 2026-11-02).
   The rewrite makes the phone-over-Bluetooth source the deck's first one and
@@ -699,7 +713,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   **compiles here**, measured on 2026-11-04 once `~/.arduino-cyd/env.sh` was
   sourced — `check_docs.py`'s gate built it on the `huge_app` partition and read
   1,891,309 B with 69,164 B of globals, beside the phone deck's
-  1,179,334 B / 45,332 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
+  1,179,690 B / 45,332 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
   `PATH`, so that build goes through `~/.arduino15` and reads 1,880,053 B — 48 B
   under with the globals identical, the build-root sensitivity the docs record.
   The root that first printed that figure reads 1,878,661 B, 16 B over. Neither board has run it.
@@ -774,8 +788,10 @@ Identical to the sketch, checked against its `onWrite` handlers:
   the 3 MB partition, again when the library box began refusing NimBLE-Arduino, and
   again when a new project could start from an imported sketch: the unsigned file
   is 227,458 bytes, `release.sh` signs it with a 4096-bit key and writes
-  **243,311 bytes** (238 kB), and the debug APK in `dist/` is
-  239,217 bytes. The code is the same in both archives — `classes.dex` is 249,492
+  **243,311 bytes** (238 kB), and the debug APK in `dist/` was 239,217 bytes then.
+  Rebuilt on 2026-11-05 after the restyle and the three Poppins faces, the same
+  debug APK is **272,209 bytes** (266 kB), sha256 beginning `15ca87b1` — 32,992 bytes
+  for the fonts and the new views, and still 55 kB under the ceiling. The code is the same in both archives — `classes.dex` is 249,492
   bytes and `resources.arsc` 1,980 bytes either way — so the 4,094-byte difference
   is packaging, alignment and the signing block rather than a different build, and
   no one figure is a guide to the others. It is versionCode 1,
@@ -966,7 +982,7 @@ every run, so it is never a picture of an earlier capture.
 | What | Where |
 | --- | --- |
 | Gallery (a scroll, one screen under the next) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/ |
-| One screen | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/home.png — likewise `home-open`, `projects`, `projects-open`, `projects-edit`, `projects-file`, `paired`, `serial`, `settings` |
+| One screen | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/paired.png — likewise `pull-down`, `side-panel`, `bridge-sheet`, `appearance-sheet`, `projects`, `projects-open`, `serial`, `settings` |
 | The strip (one row of the nine, for a single message) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/chat-sheet.jpg |
 | Preview copy | https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/ — the same bundle, deployed first and kept for a second look |
 | Bundle source | [`artifacts/site/`](../artifacts/site/) (`worker.js`, `manifest.json`), built by [`artifacts/publish_renders.py`](../artifacts/publish_renders.py) into the gitignored `artifacts/site/public/` |

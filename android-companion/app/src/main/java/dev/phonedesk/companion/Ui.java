@@ -20,71 +20,151 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
- * Small view factory so every screen shares the deck's palette without a resource
+ * Small view factory so every screen shares the app's palette without a resource
  * pipeline. Keeping the UI programmatic is what lets the app build with no
  * AndroidX and lets javac type-check it.
+ *
+ * The shapes are the owner's site's: <b>no radius anywhere</b> except a circle (the
+ * drawer's close, the palette swatches, the theme toggle). A card is a hairline
+ * rectangle with the page showing through it, a chip is a hairline rectangle with an
+ * uppercase word in it, and the filled action is the band colour with the band's own
+ * ink on it. That is the whole grammar; there is no elevation, no shadow and no
+ * second border weight.
  */
 final class Ui {
 
     // The values live in {@link Palette} so the host suite can measure them without
     // Android; these names are what every screen still uses, and they keep their
-    // jobs — ACCENT is the fill a primary action carries, PINK the one error ink,
-    // GOOD success, VIOLET the quietest status.
-    static int BG = Palette.DARK_FIELD;
-    static int CARD = Palette.DARK_FIELD;
-    static int CARD_HI = Palette.DARK_WASH;
-    /** A text field's fill: one step above CARD_HI, so the box reads as a box. */
-    static int INPUT = Palette.DARK_INPUT;
-    static int EDGE = Palette.DARK_EDGE;
-    static int TEXT = Palette.DARK_TEXT;
-    static int DIM = Palette.DARK_DIM;
-    static int ACCENT = Palette.DARK_PRIMARY;
-    static int VIOLET = Palette.DARK_QUIET;
-    static int PINK = Palette.DARK_ALOUD;
-    static int GOOD = Palette.DARK_OK;
-    static int BAND = Palette.BAND;
-    static int BAND_INK = Palette.INK;
-    static int BAND_DIM = Palette.BAND_DIM;
-    static int BAND_RULE = Palette.BAND_RULE;
-    /** Text on a filled primary action: the page's own ink, so it is always the
-     * opposite of the fill — black on the off-white button, off-white on the black. */
-    static int ON_FILL = Palette.DARK_FIELD;
+    // jobs — ACCENT is the one highlight (a live chip, a lit LED), PINK the ink an
+    // error is written in, GOOD a healthy status, VIOLET the quietest status.
+    static int BG = Palette.MOSS_SCHEME.pageDark;
+    static int CARD = Palette.MOSS_SCHEME.pageDark;
+    static int CARD_HI = Palette.MOSS_SCHEME.tintDark;
+    /** A text field's fill: the same wash, so a box reads as a box by its hairline. */
+    static int INPUT = Palette.MOSS_SCHEME.tintDark;
+    static int EDGE = Palette.MOSS_SCHEME.ruleDark;
+    /** A wash over the page: the site's {@code --tint}. */
+    static int TINT = Palette.MOSS_SCHEME.tintDark;
+    static int TEXT = Palette.MOSS_SCHEME.onDark;
+    static int DIM = Palette.MOSS_SCHEME.dimDark;
+    /** The one highlight, as a <b>fill</b>: a live chip, a lit LED, a marked word. */
+    static int ACCENT = Palette.MOSS_SCHEME.accent;
+    /** The word on that fill. */
+    static int ON_ACCENT = Palette.MOSS_SCHEME.accentInk;
+    static int VIOLET = Palette.MOSS_SCHEME.dimDark;
+    static int PINK = Palette.MOSS_SCHEME.onDark;
+    static int GOOD = Palette.MOSS_SCHEME.accent;
+    static int BAND = Palette.MOSS_SCHEME.band;
+    static int BAND_INK = Palette.MOSS_SCHEME.bandInk;
+    static int BAND_DIM = Palette.MOSS_SCHEME.bandDim;
+    static int BAND_RULE = Palette.MOSS_SCHEME.bandLine;
+    static int BAND_HOVER = Palette.MOSS_SCHEME.bandHover;
+    /** Text on a filled primary action: the band's own ink. */
+    static int ON_FILL = Palette.MOSS_SCHEME.bandInk;
 
-    /** The app's two palettes, by the name its switch uses — the same two words a
-     * deck's row uses, so one vocabulary covers both ends. */
-    static final int INK = 0;
-    static final int PAPER = 1;
+    /** The palette on show, and whether its light page is the one drawn. */
+    private static Palette.Scheme scheme = Palette.MOSS_SCHEME;
+    private static boolean light;
+    private static Typeface regular;
+    private static Typeface mediumFace;
+    private static Typeface strongFace;
 
     /**
-     * Swap every ink for the chosen palette. Called before the first view is built,
-     * and again after the switch stores its answer — which is why the switch
-     * recreates the activity: a colour here is read when a view is constructed, so a
-     * screen already on show keeps the palette it was built in.
+     * Swap every ink for the chosen palette and page. Called before the first view
+     * is built, and again after a control stores its answer — which is why those
+     * controls recreate the activity: a colour here is read when a view is
+     * constructed, so a screen already on show keeps the palette it was built in.
      *
-     * This is the <b>app's</b> palette and nothing else. A deck keeps its own in
-     * NVS and is set from its row on PAIRED, so the two ends never share a value.
+     * This is the <b>app's</b> palette and nothing else. A deck keeps its own row of
+     * its sketch's {@code THEMES[]} in NVS and is set from its row on PAIRED, so the
+     * two ends never share a value — a deck can be moss dark while the phone is green
+     * light.
      */
-    static void applyTheme(int palette) {
-        final boolean light = palette == PAPER;
-        BG = light ? Palette.LIGHT_FIELD : Palette.DARK_FIELD;
+    static void applyTheme(int palette, boolean lightPage) {
+        scheme = Palette.scheme(palette);
+        light = lightPage;
+        final boolean l = lightPage;
+        BG = l ? scheme.pageLight : scheme.pageDark;
         CARD = BG;
-        CARD_HI = light ? Palette.LIGHT_WASH : Palette.DARK_WASH;
-        INPUT = light ? Palette.LIGHT_INPUT : Palette.DARK_INPUT;
-        EDGE = light ? Palette.LIGHT_EDGE : Palette.DARK_EDGE;
-        TEXT = light ? Palette.LIGHT_TEXT : Palette.DARK_TEXT;
-        DIM = light ? Palette.LIGHT_DIM : Palette.DARK_DIM;
-        ACCENT = light ? Palette.LIGHT_PRIMARY : Palette.DARK_PRIMARY;
-        VIOLET = light ? Palette.LIGHT_QUIET : Palette.DARK_QUIET;
-        PINK = light ? Palette.LIGHT_ALOUD : Palette.DARK_ALOUD;
-        GOOD = light ? Palette.LIGHT_OK : Palette.DARK_OK;
-        BAND = Palette.BAND;
-        BAND_INK = Palette.INK;
-        BAND_DIM = Palette.BAND_DIM;
-        BAND_RULE = Palette.BAND_RULE;
-        ON_FILL = light ? Palette.LIGHT_FIELD : Palette.DARK_FIELD;
+        CARD_HI = l ? scheme.tintLight : scheme.tintDark;
+        INPUT = CARD_HI;
+        EDGE = l ? scheme.ruleLight : scheme.ruleDark;
+        TINT = CARD_HI;
+        TEXT = l ? scheme.onLight : scheme.onDark;
+        DIM = l ? scheme.dimLight : scheme.dimDark;
+        ACCENT = scheme.accent;
+        ON_ACCENT = scheme.accentInk;
+        VIOLET = DIM;
+        // An error is written in the page's loudest ink rather than a red the site
+        // does not have: the lit/off LED beside it is what carries the state, so
+        // colour is never the only channel.
+        PINK = TEXT;
+        // The accent is a fill first. Where it cannot carry a word on this page —
+        // moss's lime on moss's own cream is 1.03:1 — the healthy status takes body
+        // ink instead of an unreadable one.
+        GOOD = Contrast.ratio(scheme.accent, BG) >= Contrast.QUIET ? scheme.accent : TEXT;
+        BAND = scheme.band;
+        BAND_INK = scheme.bandInk;
+        BAND_DIM = scheme.bandDim;
+        BAND_RULE = scheme.bandLine;
+        BAND_HOVER = scheme.bandHover;
+        ON_FILL = scheme.bandInk;
+    }
+
+    /** The palette on show, for the one screen that draws a swatch of each. */
+    static Palette.Scheme scheme() {
+        return scheme;
+    }
+
+    static boolean light() {
+        return light;
     }
 
     private Ui() {
+    }
+
+    /**
+     * Poppins, subset to what this app prints, from {@code res/font}. It is the same
+     * three weights the owner's site sets its prose in, and it is what makes the
+     * phone read as the site rather than as a generic Android app.
+     *
+     * A build with no font resource — a stripped APK, a host render with no
+     * resources — falls back to the platform face instead of failing: a screen in
+     * Roboto is a wrong typeface, a crash is a missing screen.
+     */
+    static Typeface face(Context context) {
+        if (regular == null) regular = load(context, R.font.poppins_400);
+        return regular;
+    }
+
+    /** 500: a row's name, a live chip, the word on a filled action. */
+    static Typeface medium(Context context) {
+        if (mediumFace == null) mediumFace = load(context, R.font.poppins_500);
+        return mediumFace;
+    }
+
+    /** 600: the loudest word on a screen, and nothing else. */
+    static Typeface strong(Context context) {
+        if (strongFace == null) strongFace = load(context, R.font.poppins_600);
+        return strongFace;
+    }
+
+    private static Typeface load(Context context, int id) {
+        try {
+            return context.getResources().getFont(id);
+        } catch (Throwable missing) {
+            return Typeface.DEFAULT;
+        }
+    }
+
+    /** Put a view's word in the 500 face without reaching for a family name. */
+    static void medium(TextView view) {
+        view.setTypeface(medium(view.getContext()));
+    }
+
+    /** Put a view's word in the 600 face. */
+    static void strong(TextView view) {
+        view.setTypeface(strong(view.getContext()));
     }
 
     static int dp(Context context, int value) {
@@ -92,11 +172,26 @@ final class Ui {
                 context.getResources().getDisplayMetrics()));
     }
 
+    /**
+     * A rectangle with an optional hairline. {@code radiusDp} stays in the signature
+     * because the four circles — the drawer's close, three swatches and the theme
+     * toggle — are the only rounded things on the site, and they are drawn by passing
+     * half their width here.
+     */
     static GradientDrawable rounded(Context context, int fill, int stroke, int radiusDp) {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setShape(GradientDrawable.RECTANGLE);
         drawable.setColor(fill);
         drawable.setCornerRadius(dp(context, radiusDp));
+        if (stroke != 0) drawable.setStroke(dp(context, 1), stroke);
+        return drawable;
+    }
+
+    /** A circle: the four round controls, and the LED. */
+    static GradientDrawable circle(Context context, int fill, int stroke) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setShape(GradientDrawable.OVAL);
+        drawable.setColor(fill);
         if (stroke != 0) drawable.setStroke(dp(context, 1), stroke);
         return drawable;
     }
@@ -118,36 +213,52 @@ final class Ui {
         TextView view = new TextView(context);
         view.setText(value);
         view.setTextSize(sizeSp);
-        // Monospace throughout: the deck is a terminal, so the phone reads as the
-        // same instrument rather than a generic Material app.
-        view.setTypeface(Typeface.MONOSPACE);
+        view.setTypeface(face(context));
         view.setTextColor(color);
+        view.setLineSpacing(0, 1.35f);
         return view;
     }
 
+    /**
+     * A section label: 11sp, uppercase, .14em. The site's overline, which is the
+     * only place a heading is allowed to be quiet.
+     */
     static TextView section(Context context, String value) {
-        TextView view = text(context, value, 12, DIM);
+        TextView view = text(context, value.toUpperCase(java.util.Locale.US), 11, DIM);
         view.setLetterSpacing(0.14f);
-        view.setPadding(0, dp(context, 18), 0, dp(context, 8));
+        view.setPadding(0, dp(context, 22), 0, dp(context, 10));
         return view;
     }
 
-    /** Rounded card with the standard fill, hairline edge and inner padding. */
+    /**
+     * A card: the page showing through, one hairline, no radius. The site's cells
+     * share their hairlines, so the fill is the page itself and the border is the
+     * whole of the shape.
+     */
     static LinearLayout card(Context context) {
         LinearLayout card = column(context);
-        card.setBackground(rounded(context, CARD, EDGE, 14));
-        card.setPadding(dp(context, 14), dp(context, 12), dp(context, 14), dp(context, 12));
+        card.setBackground(rounded(context, Color.TRANSPARENT, EDGE, 0));
+        card.setPadding(dp(context, 18), dp(context, 16), dp(context, 18), dp(context, 16));
         return card;
+    }
+
+    /** A hairline across a column: the site's {@code border-top}. */
+    static View rule(Context context) {
+        View line = new View(context);
+        line.setBackgroundColor(EDGE);
+        line.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, dp(context, 1))));
+        return line;
     }
 
     /**
      * An icon from `res/drawable`, square and already tinted.
      *
-     * Icons are shapes now, not characters: U+2699 and U+2039 were whatever the
-     * monospace face happened to carry, so their weight and optical size were the
-     * font's and a device without the glyph had no icon at all. A drawable is the
-     * same mark on every phone, and `SRC_IN` recolours it to the ink the row is
-     * drawn in instead of asking for a second asset per colour.
+     * Icons are shapes, not characters: U+2699 and U+2039 were whatever the typeface
+     * happened to carry, so their weight and optical size were the font's and a
+     * device without the glyph had no icon at all. A drawable is the same mark on
+     * every phone, and `SRC_IN` recolours it to the ink the row is drawn in instead
+     * of asking for a second asset per colour.
      */
     static ImageView icon(Context context, int drawable, int sizeDp, int color) {
         ImageView view = new ImageView(context);
@@ -170,7 +281,7 @@ final class Ui {
      * pressed state: nothing on screen moved between the tap and the next screen
      * arriving, so a tap read as ignored until it worked. This keeps the view's
      * own background as the ripple's content and its shape as the mask, so the
-     * ripple is clipped to the card's radius instead of washing a square over it.
+     * ripple is clipped to the card's shape instead of washing past it.
      */
     static void pressable(Context context, View view, int radiusDp) {
         final Drawable content = view.getBackground();
@@ -224,23 +335,28 @@ final class Ui {
                 + 0.114 * Color.blue(argb));
     }
 
-    static Button action(Context context, String label, boolean primary) {        Button button = new Button(context);
+    /**
+     * The one filled action on a screen: the band colour, the band's ink, square,
+     * 56dp tall. {@code primary == false} is the same box outlined instead of filled,
+     * so a pair reads as one offer and its alternative rather than two offers.
+     */
+    static Button action(Context context, String label, boolean primary) {
+        Button button = new Button(context);
         button.setText(label);
         button.setAllCaps(false);
-        button.setTypeface(Typeface.MONOSPACE);
-        button.setTextSize(13);
+        button.setTypeface(medium(context));
+        button.setTextSize(14);
         button.setTextColor(primary ? ON_FILL : TEXT);
-        button.setBackground(rounded(context, primary ? ACCENT : CARD_HI,
-                primary ? ACCENT : EDGE, 10));
-        pressable(context, button, 10);
-        // 48dp is the shortest a finger hits reliably. Thirteen-sp monospace text
-        // with 8dp of padding above and below came to about 33dp, which is short
-        // enough that a tap aimed at the button lands on the card behind it.
-        button.setMinHeight(dp(context, 48));
-        button.setMinimumHeight(dp(context, 48));
+        button.setBackground(rounded(context, primary ? BAND : Color.TRANSPARENT,
+                primary ? 0 : EDGE, 0));
+        pressable(context, button, 0);
+        // 48dp is the shortest a finger hits reliably; the site's control is 56dp.
+        button.setMinHeight(dp(context, 52));
+        button.setMinimumHeight(dp(context, 52));
         button.setMinWidth(0);
         button.setMinimumWidth(0);
-        button.setPadding(dp(context, 14), dp(context, 8), dp(context, 14), dp(context, 8));
+        button.setPadding(dp(context, 18), dp(context, 10), dp(context, 18), dp(context, 10));
+        button.setLetterSpacing(0.04f);
         return button;
     }
 
@@ -256,17 +372,29 @@ final class Ui {
         Button button = new Button(context);
         button.setText(label);
         button.setAllCaps(false);
-        button.setTypeface(Typeface.MONOSPACE);
+        button.setTypeface(medium(context));
         button.setTextSize(13);
         button.setTextColor(on ? ON_FILL : TEXT);
-        button.setBackground(rounded(context, on ? TEXT : Color.TRANSPARENT, on ? TEXT : EDGE, 8));
-        pressable(context, button, 8);
-        button.setMinHeight(dp(context, 40));
-        button.setMinimumHeight(dp(context, 40));
+        button.setBackground(rounded(context, on ? TEXT : Color.TRANSPARENT, on ? TEXT : EDGE, 0));
+        pressable(context, button, 0);
+        button.setMinHeight(dp(context, 44));
+        button.setMinimumHeight(dp(context, 44));
         button.setMinWidth(0);
         button.setMinimumWidth(0);
         button.setPadding(dp(context, 12), dp(context, 8), dp(context, 12), dp(context, 8));
         return button;
+    }
+
+    /** A chip: an uppercase word in a hairline box, or the accent fill when live. */
+    static TextView chip(Context context, String label, boolean live) {
+        TextView view = text(context, label.toUpperCase(java.util.Locale.US), 11,
+                live ? ON_ACCENT : DIM);
+        view.setLetterSpacing(0.1f);
+        view.setTypeface(medium(context));
+        view.setBackground(live ? rounded(context, ACCENT, ACCENT, 0)
+                : rounded(context, Color.TRANSPARENT, EDGE, 0));
+        view.setPadding(dp(context, 9), dp(context, 4), dp(context, 9), dp(context, 4));
+        return view;
     }
 
     static void space(Context context, View view, int topDp) {

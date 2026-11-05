@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Stack the nine screens into one tall picture that reads as a scroll on a phone.
+"""Stack the app's frames into one tall picture that reads as a scroll on a phone.
 
-Nine frames side by side shrink to a strip of thumbnails: the phone fits the
-*width*, so each screen ends up narrower than a line of this docstring. This lays
-them one under the other at twice their width, each with its name and one line of
-what it shows, so opening the file is a scroll through the app — front page to
-settings — at a size a phone can actually read.
+Side by side they shrink to a strip of thumbnails: the phone fits the *width*, so
+each screen ends up narrower than a line of this docstring. This lays them one
+under the other at twice their width, each with its name and one line of what it
+shows, so opening the file is a scroll through the app — the page, its pull-down,
+the panel and its sheets, the shelf, and settings — at a size a phone can read.
 
     python3 artifacts/render_scroll.py
 
@@ -33,23 +33,23 @@ UI = os.path.join(ROOT, "android-companion", "app", "src", "main", "java",
                   "dev", "phonedesk", "companion", "Palette.java")
 OUT = os.path.join(HERE, "renders", "scroll.png")
 
-ORDER = ["home", "home-open", "projects", "projects-open", "projects-edit",
-         "projects-file", "paired", "serial", "settings"]
+ORDER = ["paired", "pull-down", "side-panel", "bridge-sheet",
+         "appearance-sheet", "projects", "projects-open", "serial", "settings"]
 SCALE = 2                   # a capture is 393 px wide; the scroll reads at 786
 BAR = 78                    # the caption strip above each screen
 PAD = 28
 MARK_PX = 132               # the mark's width in the header, at twice its dp size
 
 NOTES = {
-    "home": "the drawer: PAIRED, BOARDS, SERIAL, and the owner's mark",
-    "home-open": "BOARDS expands to the board alone",
+    "paired": "the page: the link, then each deck drawn in its own palette",
+    "pull-down": "PAIRED, BOARDS, SERIAL: the left corner, in flow",
+    "side-panel": "MORE: SETTINGS, BRIDGE, APPEARANCE, and the palette",
+    "bridge-sheet": "the bridge's own start, on the sheet",
+    "appearance-sheet": "three palettes and the one page switch",
     "projects": "the shelf, alphabetical and folded",
     "projects-open": "one project's body, log and actions",
-    "projects-edit": "the form: name, tagline, status, notes, and DELETE",
-    "projects-file": "the picker: what FILES holds, tapped to attach",
-    "paired": "the link pill, the deck card, the LAN block",
     "serial": "the USB flasher and its sweep",
-    "settings": "off the gear, not a fourth row",
+    "settings": "every permission, each with its LED",
 }
 
 
@@ -113,7 +113,7 @@ def main():
     draw.text(((width - draw.textlength("[OFF-SITE]", font=title)) / 2, title_y),
               "[OFF-SITE]", font=title, fill=ui["TEXT"])
 
-    line = "nine screens \u00b7 captured from the app, not redrawn"
+    line = "%d screens \u00b7 captured from the app, not redrawn" % len(frames)
     draw.text(((width - draw.textlength(line, font=caption)) / 2, caption_y),
               line, font=caption, fill=ui["DIM"])
 

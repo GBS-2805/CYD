@@ -91,7 +91,7 @@ sketch and the descriptor `id`, which always move together:
   Read the marking, never a product listing.
 * **Budget for 4 MB of flash and no PSRAM.** Both decks are built and flashed on
   `PartitionScheme=huge_app`, which gives the app 3,145,728 bytes. The phone deck
-  takes 1,179,334 of them, 37 % of its 3,145,728-byte slot, and the Spotify deck
+  takes 1,179,690 of them, 37 % of its 3,145,728-byte slot, and the Spotify deck
   1,891,309, 60 % of the same 3,145,728-byte slot. They moved on 2026-11-04 because the phone
   deck's radio alone measured 816,643 B, which left it 128 kB of the default
   1,310,720-byte slot — under the gate's own floor plus one framebuffer. DRAM is 327,680 bytes with ~300 kB of heap
@@ -122,7 +122,7 @@ with the date and the command that printed it, because a number without a run be
 it is the drift this file exists to stop.
 
 1. **The phone deck, on `huge_app`.** BLE only, so no network and no TLS, at
-   1,179,334 B, 37 % of its 3,145,728 B slot — the scheme `toolchain.sh` pins,
+   1,179,690 B, 37 % of its 3,145,728 B slot — the scheme `toolchain.sh` pins,
    so an ArduinoDroid upload has to carry it too.
    Compile it in ArduinoDroid with Adafruit GFX, Adafruit ILI9341 and
    XPT2046_Touchscreen, and record the `Sketch uses …` line and the `md5sum` of the
@@ -194,7 +194,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app my_widget
   globals, Spotify 1,122,281 B, 85 % of 1,310,720, / 53,572 B globals. Those are
   48 B and 32 B above the same sketches built straight through `arduino-cli` from
   another path — the build-root sensitivity above, not a different toolchain. The
-  mirror has since moved the phone deck, 1,179,334 B on `huge_app` today with
+  mirror has since moved the phone deck, 1,179,690 B on `huge_app` today with
   45,332 B of globals, and the Spotify sketch to 1,125,781 B, 85 % of 1,310,720,
   53,636 B globals, as [`check_headroom.py`](check_headroom.py) read both of them
   on 2026-11-01 — that Spotify file is the one before the Bluetooth link
@@ -233,7 +233,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app my_widget
   end ever observed, and the next build printed 1,878,661 twice.
 * **A size names the root that printed it, and here that root is
   `~/.arduino-cyd-3`.** The current 3.3.12 figures in these docs — phone deck
-  1,179,334 B / 45,332 B of globals, the linked Spotify deck 1,891,309 B /
+  1,179,690 B / 45,332 B of globals, the linked Spotify deck 1,891,309 B /
   69,164 B on `huge_app`, the unlinked Spotify deck 1,125,781 B — are that
   root's, read through `arduino-cli` 1.5.2-rc.1 on 2026-11-02. It is the root
   worth naming because its `env.sh` pins its own data, download and user dirs;
@@ -499,16 +499,24 @@ static uint8_t themeIndex = 1;   // which one is live; the app writes it
   placeholder allowed 3:1 as a hint. Lifting a fill one step can quiet the word on
   it while every check that measures ink against the page still passes, which is
   how a button becomes a caption without anyone editing its colour.
-* **Ship monochrome.** Two themes: 0 PAPER (black ink on an off-white page) and
-  1 INK (the same page inverted), the last six roles stepping that one ink, so a
-  new widget needs no colour decisions to be readable. A widget that genuinely needs colour adds a theme to
-  its own table and says why in its README.
-* **A deck's two pages are the app's two pages.** The sketch is pasted on its own
-  into ArduinoDroid, so it cannot import the palette — its table is a second copy
-  of four values. `check_widget_assets.py` reads each sketch's `THEMES[]` comments
-  and `Palette.java`, and refuses a deck whose PAPER ground or ink is not
-  `LIGHT_FIELD`/`LIGHT_TEXT`, or whose INK ground or ink is not `DARK_FIELD`/
-  `DARK_TEXT`. `artifacts/deck_palette.py` draws both decks' tables at the panel's
+* **The phone app ships the site's three palettes, and so does a deck.**
+  `Palette.Scheme` holds GREEN, MOSS and NAVY as the site's stylesheet writes them
+  — page, band, the words on that band, and an accent — and `Appearance` stores
+  which set and which page. **The band never turns over**: only the page does, so
+  the chrome is identical in both modes and the mark is tinted with the band's own
+  ink. A widget that needs a state colour uses the accent as a **fill** with
+  `Ui.ON_ACCENT` on it, never as ink on the page, because moss's lime on moss's
+  cream is 1.03:1; `HostTests.sitePalettes()` measures every role of all six
+  combinations at the floors above. A deck carries them too: `THEMES[]` holds the
+  neutral `PAPER`/`INK` pair plus the three palettes twice, and the app addresses a
+  row as `2 + palette * 2 + (light ? 0 : 1)`.
+* **A deck's rows are the app's palettes.** The sketch is pasted on its own into
+  ArduinoDroid, so it cannot import the palette — its table is a second copy of the
+  pages and inks. `check_widget_assets.py` reads each sketch's `THEMES[]` comments
+  and `Palette.java`, refuses a deck whose PAPER ground or ink is not
+  `LIGHT_FIELD`/`LIGHT_TEXT` or whose INK ground or ink is not `DARK_FIELD`/
+  `DARK_TEXT`, and then holds rows 2 to 7 to each `Scheme`'s own page and body ink
+  at that same index — a swatch cannot name a row the glass paints differently. `artifacts/deck_palette.py` draws both decks' tables at the panel's
   320x240 into `artifacts/decks/`; that is a palette proof, not a capture.
   **A change to a deck page ends in a drawing of it.** `artifacts/deck_screens.py`
   ports every page both sketches can show — the phone deck's home, messages, now
@@ -791,20 +799,20 @@ One command per stage, and each one is checked rather than assumed:
   up to date (`app/build.gradle`) instead of every compile being re-run by
   `--rerun-tasks`. The daemon is kept and its JDK passed explicitly.
 * **The published page is a scroll, not a contact sheet.**  `publish_renders.py` stacks
-  the nine at phone width with a hairline and one caption between them, so dragging
+  the frames at phone width with a hairline and one caption between them, so dragging
   down walks the app; the strip it serves beside them exists for a single message, not
-  for reading, and the same script draws it from those same nine frames on every run —
-  a strip kept in `renders/` is how the published one came to show seven frames a week
-  after the app had nine. The addresses are recorded in
+  for reading, and the same script draws it from those same frames on every run —
+  a strip kept in `renders/` is how the published one came to show a week-old
+  capture's seven frames while the app drew ten. The addresses are recorded in
   [`android-companion/HANDOFF.md`](android-companion/HANDOFF.md#where-the-renders-live).
 * **A count of the screens is checked, not remembered.** [`check_screens.py`](check_screens.py)
   reads every tracked file for a number before *screens*, *frames* or *captures* and
   compares it with the frames git holds in `artifacts/renders/`, so "the seven screens"
-  fails the day there are nine. A paragraph that also spells today's count is a
-  history rather than a claim — that is what keeps the strip's "seven frames a week
-  after the app had nine" readable — and the selftests are skipped, because a
+  fails the day there are ten. A paragraph that also spells today's count is a
+  history rather than a claim — that is what keeps the strip's "seven frames while
+  the app drew ten" readable — and the selftests are skipped, because a
   fixture's job is to say the wrong number. Seven files had drifted from seven to
-  nine before it existed: the design page, its README, this gate's own header, the
+  ten before it existed: the design page, its README, this gate's own header, the
   capture script, a Gradle comment, a cost table and the screen baseline page.
 * **An emulator is not the upgrade it sounds like.** It would answer a different
   question — a device screenshot with the phone's fonts and status bar — while the
@@ -816,23 +824,26 @@ One command per stage, and each one is checked rather than assumed:
 
 ## App UI
 
-The app is a drawer (`DrawerHome`) with three rows: `PAIRED` (the row that
-opens the link and the bridge), `BOARDS` (the one that opens the shelf) and
-`SERIAL`. The first two were labelled `DECKS` and `PROJECTS` until 2026-11-01;
-the names behind them did not move — `DecksTab`, `ProjectsTab`, `SECTION_DECKS`,
-`SECTION_PROJECTS` and the `"decks"`/`"projects"` prefs keys still describe what
-the screens are — so a grep for the old words finds code, not copy.
-`SETTINGS` is deliberately not a fourth: it is configuration rather
-than navigation, so it hangs off the gear at the outer end of the top bar, past
-the link pill. The app's own appearance choice — **PAPER** or **INK** — lives there
-in its own card, and it is the app's alone: a deck's palette is set per board on
-PAIRED, so each end has a switch. `Ui` holds the live inks as mutable statics, `Ui.applyTheme` swaps
-them, and the switch stores the answer with `Appearance` and recreates the
+The app has two lists, and they are different questions: **where you go** is the
+pull-down in the top bar's left corner, and **how it is set up** is the side panel
+behind the burger at the other end. The pull-down opens `PAIRED` (the page the app
+starts on), `BOARDS` (the shelf) and `SERIAL`, in flow under the header rather than
+over the page, so nothing is hidden while the list is open. The panel opens
+`SETTINGS`, `DECKS`, `BRIDGE` and `APPEARANCE` as bottom sheets, with the three
+palette swatches and the page toggle repeated at its foot. The first two sections
+were labelled `DECKS` and `PROJECTS` until 2026-11-01; the names behind them did not
+move — `DecksTab`, `ProjectsTab`, `SECTION_DECKS`, `SECTION_PROJECTS` and the
+`"decks"`/`"projects"` prefs keys still describe what the screens are — so a grep
+for the old words finds code, not copy.
+The app's appearance is three palettes by two pages, and it is the app's alone: a
+deck's palette is set per board on PAIRED, so each end has a switch. `Ui` holds the
+live inks as mutable statics, `Ui.applyTheme` swaps
+them, and the choice stores the answer with `Appearance` and recreates the
 activity, because a colour is read when a view is built and a screen already on
 show would otherwise keep the theme it was drawn in. **The section survives that
 rebuild.** `MainActivity` saves it in `onSaveInstanceState` and reopens it after
-`buildUi()`, so switching themes in SETTINGS leaves you in SETTINGS; until
-2026-11-04 the rebuild landed on the drawer from wherever the user was, which is
+`buildUi()`, so switching themes in the panel leaves you in the panel; until
+2026-11-04 the rebuild landed on the front page from wherever the user was, which is
 a bug rather than a repaint. `CaptureTest.sectionSurvivesTheRebuild` drives the
 platform's own save and restore — the pair `recreate()` calls — instead of a copy
 of the rule. **The scroll offset and the unfolded cards come back too.** Each
@@ -983,7 +994,7 @@ the front page needs no second navigation.
   copies the committed frames into `artifacts/site/public/` with a gallery page, and
   that bundle is deployed as the static site below. So the step after a capture is
   `python3 artifacts/publish_renders.py`, then the deploy, then one *labelled* link
-  per touched screen — `[Home, the drawer](https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/home.png)`. Publishing the renders
+  per touched screen — `[Paired](https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/paired.png)`. Publishing the renders
   is part of shipping them; publishing the code still needs asking. The fast gate
   itself draws the nine frames whenever a staged file could move a pixel — the
   app's Java, its resources or the capture — so a commit cannot leave them behind;

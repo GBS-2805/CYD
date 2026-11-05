@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Fail when a file claims a screen count this tree does not draw.
 
-Seven files said seven long after the app drew nine: the design page's lede, its
+Files went on saying a count the app had grown past: the design page's lede, its
 README, the gate's own header, the capture script, a Gradle comment, a cost table
 and the screen baseline page. Each was true the week it was written, none of them
-moved when two screens arrived, and a reader found them instead of a check.
+moved when new screens arrived, and a reader found them instead of a check.
 
 What counts as a claim: a number word or digits immediately before *screens*,
-*frames* or *captures* — "the nine screens", "seven frames", "a seven-frame strip",
-"7 captures". The count this tree draws is the number of frames git holds under
+*frames* or *captures* — "the N screens", "N frames", "an N-frame strip",
+"N captures". The count this tree draws is the number of frames git holds under
 `artifacts/renders/`, so the answer comes from the committed pictures rather than
 from a number written down here. One or two screens is a part of the app rather
 than the app — "scrolling from one screen to another" is not a count of it, and a
@@ -16,8 +16,8 @@ cost table's "one capture" is one command — so the scan starts at three.
 
 A file may still describe a past state: a claim is allowed when the paragraph
 around it also spells the count this tree draws. That is what makes it a history
-("the strip came to show seven frames a week after the app had nine") rather than a
-claim, and it reads as one to a person too. The selftests are skipped, because a
+("the strip came to show a week-old seven frames while the app drew nine") rather
+than a claim, and it reads as one to a person too. The selftests are skipped, because a
 fixture's whole job is to say the wrong number out loud.
 
 Only tracked files are read: a clone is what these docs describe, and the gate's

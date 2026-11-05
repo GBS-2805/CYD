@@ -5,43 +5,51 @@ waits for a phone to write its Phone Link characteristics. Android has no built-
 way to do that, so this app is the phone side — and it is also where the CYDs are
 monitored and where firmware sketches are kept for ArduinoDroid.
 
-The drawer is the front page; it opens three sections, and the gear at the outer end of the top bar, past the link pill, opens
-settings:
+Two controls, as on the owner's site. The **pull-down** in the left corner of the
+top bar carries where you go; the **side panel** behind the burger carries how the
+app is set up:
 
-| Section | What it is for |
+| Where | What it is for |
 | --- | --- |
-| **PAIRED** | Live link: what is connected, signal, uptime, packets, nearby decks |
-| **BOARDS** | Alphabetical shelf: every project folded to its name, kind and status, opening to its body, log, links and actions, under one libraries disclaimer |
-| **SERIAL** | Target board, OTG connection, bootloader probe, image flashing, serial monitor |
-| **SETTINGS** (gear, top bar) | Permissions, notifications, battery, the dark/light theme, bridge switch, last crash |
+| **PAIRED** (pull-down) | The link, then every deck the phone knows: the marquee chasing for the linked board, steady for one it has met, dark for one it has not, and each row drawn in the palette that deck is set to, with that palette's swatch ringed |
+| **BOARDS** (pull-down) | Alphabetical shelf: every project folded to its name, kind and status, opening to its body, log, links and actions, under one libraries disclaimer |
+| **SERIAL** (pull-down) | Target board, OTG connection, bootloader probe, image flashing, serial monitor |
+| **SETTINGS** (side panel) | All permissions in one list with a lit or dark LED, the notification filter, battery, last crash |
+| **BRIDGE** (side panel) | The bridge's own start and stop, its state, and what it refuses to do without Bluetooth |
+| **APPEARANCE** (side panel) | The three palettes and the one page switch, and the same pair as one row at the panel's foot |
 
 Ask it anything about the deck's state and it answers from the link itself, not
 from guesswork: `linked 4m 12s · -62 dBm · 18 packets · 5 notices`.
 
-**Two palettes, two places.** The app's own is set in **SETTINGS → APPEARANCE**:
-**PAPER** is black ink on an off-white page, **INK** is the same page inverted. That
-choice is the app's alone — stored, kept across a restart, and applied by rebuilding
-the screen, because every colour is read when a view is built. A deck's palette is
-the deck's: each row on PAIRED carries the same two words and writes that board
-alone, so the phone and a CYD can sit on different pages without either switch
-knowing about the other. The top band stays light either way: it is the ground the
-mark was drawn on, so it needs no plate behind it.
+**Three palettes, two pages.** The app draws the site's own three colour sets —
+**GREEN**, **MOSS** and **NAVY** — each with a light page and a dark one, chosen in
+**APPEARANCE** and stored in its own preferences file. **The band never turns
+over:** only the page does, so the header is identical in both modes, and the
+mark is tinted with the band's own ink, which is what the site does with
+`currentColor`. Every deck carries the same three swatches and the same
+sun/crescent circle on its row on PAIRED, and the chosen palette is the one that
+carries the ring — the row's own inks stay the app's, so three decks still read as
+one list. The page half is the board's own: a CYD's sketch carries two pages,
+**PAPER** and **INK**, and the page circle writes that byte down the link to that
+board alone, so the phone and the deck can sit on different pages without either
+switch knowing about the other.
 
 ## Monitoring your CYDs
 
 - The bridge scans for decks advertising the Phone Link service (or the name
-  "Phone Deck") and lists them under **NEARBY** with signal strength.
+  "Phone Deck") and lists them under **OFF** on PAIRED with signal strength and a
+  **LINK**.
 - **One deck is linked at a time.** That is a firmware and Android limit, not an
   app choice: each CYD accepts one phone, and the app keeps a single GATT link.
 - Tapping **LINK** on a row pins the bridge to that board. Once pinned, another
   CYD in range never steals the connection; the choice survives restarts.
-- Every deck that links is remembered under **SAVED DECKS** with its last-seen
+- Every deck that links is remembered as its own tile on PAIRED with its last-seen
   time, so a board that is switched off still shows up.
   Its linked row carries **RENAME**, which writes a name of up to 16
   characters to the board and stores it there, so the name follows the
   deck rather than the phone.
-- **UNLINK** drops the link and forgets the row in one tap — on the linked deck's
-  card, or on its SAVED DECKS row where it replaces the `LINKED` badge. The scan
+- **UNLINK** drops the link and forgets the row in one tap, on the deck's own row
+  where it sits beside **RENAME**. The scan
   keeps running but stops linking by itself until you tap LINK, so the board you
   just forgot is not taken straight back. A deck that is only remembered carries
   **FORGET**, which removes the record and leaves the current link alone.
@@ -214,14 +222,16 @@ ROM protocol: SLIP framing, sync, register reads, `FLASH_BEGIN`/`FLASH_DATA`/
 | Notification | `6f2d0004-…` | UTF-8 `App\|Title\|Text`, truncated to 120 bytes |
 | Identity | `6f2d0005-…` | **read** — the deck's one line of JSON, parsed by `DeckIdentity`; a network deck answers the same document at `GET /deck.json` |
 | Now playing | `6f2d0006-…` | UTF-8 `state\|position\|duration\|title\|artist\|album`, whole seconds, state `play`/`pause`/`stop`, written once a second while something plays |
-| Theme | `6f2d0008-…` | **read/write**, 1 byte: `0` PAPER, `1` INK. Each deck's own pair on PAIRED writes it, so a board's palette is the board's; the app's appearance switch never touches one |
+| Theme | `6f2d0008-…` | **read/write**, 1 byte: `2 + palette * 2 + (light ? 0 : 1)`, plus `0`/`1` for the neutral pair. A deck's swatches and page circle on PAIRED write it, so the glass draws the palette that row rings; the app's appearance switch never touches one |
 
 The palette lives at both ends, and each end has its own switch. The app's is in
-SETTINGS → APPEARANCE and changes only the app. A deck's is on its row on PAIRED:
-PAPER or INK, written down the link to that board alone, and the chip that is
-filled is the palette the board answered with, not the last one tapped. Only the
-linked row can be written — the link carries one deck at a time — so an unlinked
-row says `link to set` instead of a chip that would write nowhere. A deck flashed
+the side panel: APPEARANCE, or the same row at the panel's foot, and it changes
+only the app. A deck's is on its own row on PAIRED: three swatches for the palette
+that row is drawn in, and a sun/crescent circle for the page; both write one byte
+(`2 + palette * 2 + (light ? 0 : 1)`) down the link to that board alone, and the
+sketch draws that row of its own `THEMES[]`. Only a linked row can write its page —
+the link carries one deck at a time — so an unlinked row says `LINK TO SET THE
+PAGE` instead of a circle that would write nowhere. A deck flashed
 before `6f2d0008-…` existed has no palette characteristic, and nothing is written
 rather than writing nowhere. The two choices stay independent because the two
 surfaces are: a board read from across a room need not be set the way the phone is
@@ -301,7 +311,7 @@ through Gradle; a raw `javac` build produces an APK-less class check and the
 BOARDS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
-[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (222 kB,
+[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (266 kB,
 package `dev.phonedesk.companion`, debug-signed). Install it with
 `adb install -r dist/PhoneDeckBridge-debug.apk`, or copy it to the phone and open
 it with "install unknown apps" allowed.
