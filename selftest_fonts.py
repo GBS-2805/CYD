@@ -11,6 +11,7 @@ name it.
   python3 selftest_fonts.py      exit 0 when every branch still behaves
 """
 
+import importlib.util
 import re
 import shutil
 import subprocess
@@ -20,9 +21,25 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 CHECK = ROOT / "check_fonts.py"
-SKETCHES = ("phone_deck_cyd24R/phone_deck_cyd24R.ino",
-            "spotify_deck_cyd24R/spotify_deck_cyd24R.ino")
-RENDERER = "artifacts/deck_screens.py"
+
+
+def canonical_paths():
+    """The decks and the renderer check_fonts.py reads, taken from it, not copied.
+
+    Both were written out again here, so a third deck or a moved renderer would
+    have left these fixtures copying the old set: the cases would still pass,
+    against a tree the checker had stopped looking at. Reading the checker keeps
+    the throwaway tree the one the gate actually measures.
+    """
+    spec = importlib.util.spec_from_file_location("check_fonts_under_test", CHECK)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return tuple(module.SKETCHES), module.RENDERER
+
+
+SKETCHES, RENDERER = canonical_paths()
+if not SKETCHES or not RENDERER:
+    raise SystemExit("check_fonts.py names no sketch or no renderer to stand in")
 BODY_BITS = r"(static const uint8_t DeckFontBodyBits\[\] PROGMEM = \{)(.*?)(\};)"
 BODY_ROWS = r"(static const GFXglyph DeckFontBodyGlyphs\[\] PROGMEM = \{)(.*?)(\};)"
 PADDED = ("            stride = (w + 7) // 8\n"

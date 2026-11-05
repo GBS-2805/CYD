@@ -14,6 +14,7 @@ bundled copy, then breaks exactly one of those and asks what the check says.
 
 Nothing is built and nothing outside the temp directory is touched.
 """
+import importlib.util
 import json
 import os
 import shutil
@@ -35,7 +36,20 @@ static const Rect CARD = {12, 40, 296, 76};
 void setup() {}
 void loop() {}
 """
-ASSETS = "android-companion/app/src/main/assets/widgets"
+# The asset tree and the grid, read from the checker rather than written out again:
+# a moved asset folder or a re-set grid used to leave these fixtures measuring the
+# old rules, so a case could pass against a tree the gate no longer inspects.
+def canonical_widgets():
+    spec = importlib.util.spec_from_file_location("check_widget_assets_under_test", CHECK)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_WIDGETS = canonical_widgets()
+ASSETS = _WIDGETS.ASSETS.relative_to(_WIDGETS.ROOT).as_posix()
+GRID_MARGIN = _WIDGETS.GRID_MARGIN
+GRID_PAD = _WIDGETS.GRID_PAD
 PALETTE = ROOT / "android-companion/app/src/main/java/dev/phonedesk/companion/Palette.java"
 PAPER = ["#f1f0eb", "#e8e7e2", "#dddcd7", "#b3b1ac", "#000000", "#5b5a56",
          "#000000", "#a9a8a3", "#1a1a18", "#7a7974", "#000000", "#4e4d49"]
@@ -112,7 +126,7 @@ def wrong_palette(dest):
     themed(dest, palette=rows)
 
 
-def grid_sketch(dest, line, margin=12, pad=10):
+def grid_sketch(dest, line, margin=GRID_MARGIN, pad=GRID_PAD):
     """A sketch with the deck's grid and one rect where the case puts it."""
     text = ("/* stand-in deck */\nstatic constexpr int SCREEN_W = 320;\n"
             "static constexpr int MARGIN = %d;\nstatic constexpr int CARD_PAD = %d;\n"

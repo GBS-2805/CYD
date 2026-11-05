@@ -17,6 +17,7 @@ one thing — a pixel, a size, a file, the script's exit code.
 
 Pillow is the gate's own dependency, so nothing extra is installed.
 """
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -32,8 +33,26 @@ except ImportError:  # the gate cannot run without it either
 
 ROOT = Path(__file__).resolve().parent
 CHECK = ROOT / "check_renders.py"
-SCREENS = ["paired", "pull-down", "side-panel", "bridge-sheet", "appearance-sheet",
-           "projects", "projects-open", "serial", "settings"]
+
+
+def canonical_screens():
+    """The screens check_renders.py knows, read from it rather than copied here.
+
+    This list used to be written out again, and it went stale the day the app's
+    screens were renamed: four cases stood in frames no capture writes, so they
+    failed for a reason that had nothing to do with the refusals they exist to
+    prove. Reading the checker's own list means a rename moves both halves at once
+    and this file cannot describe a capture that no longer exists.
+    """
+    spec = importlib.util.spec_from_file_location("check_renders_under_test", CHECK)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return list(module.SCREENS)
+
+
+SCREENS = canonical_screens()
+if not SCREENS:
+    raise SystemExit("check_renders.py names no screen, so there is nothing to stand in")
 SIZE = (6, 4)
 INK = (10, 20, 30)
 
@@ -147,7 +166,7 @@ CASES = [
         mutate=None,
         args=["nope"],
         want_code=2,
-        want=["unknown screen: nope", "the capture knows: paired"],
+        want=["unknown screen: nope", "the capture knows: " + SCREENS[0]],
     ),
 ]
 
