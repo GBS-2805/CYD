@@ -2,7 +2,7 @@
 #
 # One gate, two speeds. A rule has one home, and this is where to run them from.
 #
-#   ./check.sh          what a commit must pass            (~3 s)
+#   ./check.sh          what a commit must pass            (3.8 s)
 #   ./check.sh --full   what a release must pass           (423 s): every deck on
 #                       both cores, the old ones compared with old_core.json, each
 #                       deck built twice, the nine frames redrawn, the APK built
@@ -28,12 +28,16 @@
 #                       compiled again. Evidence about a deck or a file this tree
 #                       no longer holds is dropped before the run. For working on
 #                       the tree, never for a release.
-#   ./check.sh --selftest  the checkers' own refusals       (~10 s, no toolchain)
+#   ./check.sh --selftest  the checkers' own refusals       (13.7 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
 # nobody exercises: --selftest runs the twelve selftest_*.py files, which hand each
 # checker a throwaway repo and a stand-in (compiler, capture script, git repo) and
-# make it refuse.
+# make it refuse. All three durations in this header were timed on this tree on
+# 2026-11-05 — the full run with both decks and all three toolchains — so a reader
+# on a slower machine knows which figures to re-take before trusting the gap. Every
+# run prints its own total on the last line (`took 3.8 s (3811 ms)`), so re-taking
+# one is a run, not a stopwatch.
 #
 # Fast:  docs (figures, links, prose, the recorded APK bytes and its ceiling),
 #        widget assets, the
@@ -53,6 +57,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT" || exit 1
 mkdir -p .scratch
+gate_start=$(date +%s%N)
 
 full=0
 selftest=0
@@ -172,6 +177,13 @@ say () {
   printf 'note  %-15s %s\n' "$1" "$2"
 }
 
+# The run's own total, so the durations in this file's header can be re-taken by
+# running the gate instead of wrapping it in a stopwatch.
+elapsed () {
+  local ms=$(( ($(date +%s%N) - gate_start) / 1000000 ))
+  printf 'took %d.%d s (%d ms)\n' $(( ms / 1000 )) $(( (ms % 1000) / 100 )) "$ms"
+}
+
 # The gate finds the deck toolchain the way CONVENTIONS says to, so it does not
 # depend on which shell launched it.
 cli="${ARDUINO_CLI:-}"
@@ -212,9 +224,11 @@ if [ "$selftest" -eq 1 ]; then
   echo
   if [ "$failures" -gt 0 ]; then
     echo "$failures step(s) failed"
+    elapsed
     exit 1
   fi
   echo "every check passed"
+  elapsed
   exit 0
 fi
 
@@ -381,6 +395,7 @@ fi
 echo
 if [ "$failures" -gt 0 ]; then
   echo "$failures step(s) failed"
+  elapsed
   exit 1
 fi
 if [ "$reused" -gt 0 ]; then
@@ -402,4 +417,5 @@ if [ "$decks_only" -eq 1 ]; then
     echo "the frames and the APK were not built either"
   fi
 fi
+elapsed
 exit 0

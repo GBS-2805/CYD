@@ -39,6 +39,10 @@ REFUSAL = "does not pin the arduino-cli directories"
 # it to skip the app while proving no deck at all.
 NARROW_REFUSAL = "--decks-only names no deck"
 
+# Every run ends with its own total, which is how the durations in the gate's
+# header are refreshed: a copy of the gate that fails its steps still times itself.
+TIMED = "took "
+
 # What both deck toolchains write: the three directories arduino-cli reads, so a
 # build in this root cannot reach ~/.arduino15's core or ~/.arduino15's caches.
 PINNED = """# stand-in for the file both deck toolchains write
@@ -124,7 +128,7 @@ CASES = [
         name="a root that pins its directories gets past the guard",
         build=case_pinned_home,
         want_code=None,             # anything but the refusal's 2
-        want=[],
+        want=[TIMED],               # and it says how long it took
         forbids=[REFUSAL],
     ),
     dict(
