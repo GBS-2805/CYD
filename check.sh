@@ -3,10 +3,14 @@
 # One gate, two speeds. A rule has one home, and this is where to run them from.
 #
 #   ./check.sh          what a commit must pass            (3.8 s)
-#   ./check.sh --full   what a release must pass           (423 s): every deck on
-#                       both cores, the old ones compared with old_core.json, each
-#                       deck built twice, every frame redrawn, the APK built
-#                       and rebuilt, measured here on 2026-11-05 with both decks.
+#   ./check.sh --full   what a release must pass           (423 s cold, 345 s warm):
+#                       every deck on both cores, the old ones compared with
+#                       old_core.json, each deck built twice, every frame redrawn,
+#                       the APK built and rebuilt. Both figures were measured here
+#                       on 2026-11-05 with both decks, the second after the Arduino
+#                       build caches had warmed: 345015 ms over fifteen steps, of
+#                       which the sketch repro took 166 s and the old core 64 s.
+#                       The gap is the cache, so quote the run you made.
 #                       It needs all three toolchains: source
 #                       ~/.arduino-cyd-3/env.sh, ~/.arduino-cyd-2/env.sh (or
 #                       ~/.arduino15/env.sh) for the old core, and
