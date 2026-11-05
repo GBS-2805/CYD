@@ -15,6 +15,12 @@
 #                       old-core build and their two-build repro — with the other
 #                       decks left alone. The APK and the frames are app-wide, so
 #                       they still run.
+#   ./check.sh --decks-only <folder> ...
+#                       those decks and nothing app-wide: their headroom, their
+#                       old-core build and their two-build repro, with the frames,
+#                       the APK and its rebuild skipped. It proves the decks you
+#                       named still fit and still build the same bytes twice, and
+#                       nothing about the app — so it is never the release gate.
 #   ./check.sh --full --cached      the same steps without re-proving what this
 #                       tree already proved: each expensive step hashes its inputs
 #                       first, and one whose bytes match .gate_evidence.json is not
@@ -50,6 +56,7 @@ mkdir -p .scratch
 full=0
 selftest=0
 cached=0
+decks_only=0
 reused=0
 decks=()
 failures=0
@@ -62,6 +69,7 @@ for arg in "$@"; do
     --full)     full=1 ;;
     --selftest) selftest=1 ;;
     --cached)   cached=1 ;;
+    --decks-only) decks_only=1 ;;
     -h|--help)
       awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
       exit 0 ;;
@@ -82,6 +90,17 @@ done
 # the full set, and then each expensive step may answer from what this tree
 # already proved. The store is only ever written by a step that really ran.
 if [ "$cached" -eq 1 ]; then full=1; fi
+
+# Naming decks is what makes the gate narrower, so --decks-only with no name has
+# nothing to narrow: it would skip the app and prove no deck, and a run that
+# measured nothing must not read as a pass.
+if [ "$decks_only" -eq 1 ]; then
+  full=1
+  if [ "${#decks[@]}" -eq 0 ]; then
+    printf 'error: --decks-only names no deck, so it would skip the app and prove nothing. Name the decks to prove.\n' >&2
+    exit 2
+  fi
+fi
 
 step () {
   local name="$1" filter="$2"; shift 2
@@ -324,27 +343,32 @@ if [ "$full" -eq 1 ]; then
   else
     say "old core" "no A/B root in ~/.arduino-cyd-2 or ~/.arduino15, so the old core was NOT built"
   fi
-  step_evidenced "renders" 'renders current' "$stamp_android" \
-    android-companion/app/src/main/java android-companion/app/src/main/res \
-    android-companion/capture.sh check_renders.py check_evidence.py \
-    "${watched[@]}" -- python3 check_renders.py
-  step_evidenced "apk" '[0-9] bytes' "$stamp_android" \
-    android-companion/app/src/main/java android-companion/app/src/main/res \
-    android-companion/app/src/main/AndroidManifest.xml \
-    android-companion/build.gradle android-companion/settings.gradle \
-    android-companion/gradle.properties android-companion/toolchain.sh \
-    check_apk.py check_evidence.py "${watched[@]}" -- \
-    bash android-companion/toolchain.sh
-  # One build can never say whether the archive reproduces: AGP restamped a block
-  # on every run until 2026-11-03 and nothing noticed for weeks. Two builds, twice
-  # the cost, and the only question is whether the bytes match.
-  step_evidenced "repro" 'same bytes' "$stamp_android" \
-    android-companion/app/src/main/java android-companion/app/src/main/res \
-    android-companion/app/src/main/AndroidManifest.xml \
-    android-companion/build.gradle android-companion/settings.gradle \
-    android-companion/gradle.properties android-companion/toolchain.sh \
-    check_repro.py check_apk.py check_evidence.py "${watched[@]}" -- \
-    python3 check_repro.py
+  # The app is one build, and --decks-only is the mode that leaves it alone: the
+  # frames, the APK and its second build are the three steps that prove the app
+  # rather than a deck, and skipping them is what makes this run narrower.
+  if [ "$decks_only" -eq 0 ]; then
+    step_evidenced "renders" 'renders current' "$stamp_android" \
+      android-companion/app/src/main/java android-companion/app/src/main/res \
+      android-companion/capture.sh check_renders.py check_evidence.py \
+      "${watched[@]}" -- python3 check_renders.py
+    step_evidenced "apk" '[0-9] bytes' "$stamp_android" \
+      android-companion/app/src/main/java android-companion/app/src/main/res \
+      android-companion/app/src/main/AndroidManifest.xml \
+      android-companion/build.gradle android-companion/settings.gradle \
+      android-companion/gradle.properties android-companion/toolchain.sh \
+      check_apk.py check_evidence.py "${watched[@]}" -- \
+      bash android-companion/toolchain.sh
+    # One build can never say whether the archive reproduces: AGP restamped a block
+    # on every run until 2026-11-03 and nothing noticed for weeks. Two builds, twice
+    # the cost, and the only question is whether the bytes match.
+    step_evidenced "repro" 'same bytes' "$stamp_android" \
+      android-companion/app/src/main/java android-companion/app/src/main/res \
+      android-companion/app/src/main/AndroidManifest.xml \
+      android-companion/build.gradle android-companion/settings.gradle \
+      android-companion/gradle.properties android-companion/toolchain.sh \
+      check_repro.py check_apk.py check_evidence.py "${watched[@]}" -- \
+      python3 check_repro.py
+  fi
   # The sketches are flashed, so their bytes matter the same way the APK's do:
   # each deck is compiled twice and the images must match.
   # The decks compile together, so a new deck costs a compile, not a run.
@@ -361,6 +385,20 @@ fi
 if [ "$reused" -gt 0 ]; then
   echo "every check passed, $reused of them reused from .gate_evidence.json:"
   echo "those steps were not run this time, so this is not the release gate"
-  exit 0
+elif [ "$decks_only" -eq 1 ]; then
+  echo "every check passed for ${decks[*]}: headroom, the old core and two builds that match"
+else
+  echo "every check passed"
 fi
-echo "every check passed"
+# A run that never built the app has not proved it, and its last line says which
+# two things were left out rather than leaving a reader to remember. When reuse
+# has already said this is not the release gate, it says what else was skipped
+# instead of repeating itself.
+if [ "$decks_only" -eq 1 ]; then
+  if [ "$reused" -eq 0 ]; then
+    echo "the frames and the APK were not built, so this is not the release gate"
+  else
+    echo "the frames and the APK were not built either"
+  fi
+fi
+exit 0

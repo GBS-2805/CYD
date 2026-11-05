@@ -710,7 +710,12 @@ deleted. What is left is the part that was never about the count.
   runs one command cannot skip a step by forgetting it. `./check.sh --full <folder>`
   proves the decks you name — their headroom, their old-core build and their
   two-build repro — and leaves the other decks alone; the APK and the frames are
-  app-wide, so they still run. The release gate is the run with no names on it.
+  app-wide, so they still run. `./check.sh --decks-only <folder>` is the narrower
+  form: the same three deck steps with the frames and the APK skipped, so it
+  proves the decks named still fit and still build the same bytes twice, and
+  nothing about the app. It is for the minutes after a sketch edit, and its last
+  line says which two things were not built, so a working run cannot be read as
+  the release gate. The release gate is the run with no names on it.
   `--cached` is the working form of that gate: it hashes each expensive step's
   inputs — the decks it proves, the app sources, the checker itself, and a stamp
   naming the toolchain — and, when those bytes match what `.gate_evidence.json`

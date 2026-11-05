@@ -35,6 +35,10 @@ CHECK = ROOT / "check.sh"
 GATE = ROOT / "check.sh"
 REFUSAL = "does not pin the arduino-cli directories"
 
+# The narrower form of the gate is scoped by naming decks, so the flag alone asks
+# it to skip the app while proving no deck at all.
+NARROW_REFUSAL = "--decks-only names no deck"
+
 # What both deck toolchains write: the three directories arduino-cli reads, so a
 # build in this root cannot reach ~/.arduino15's core or ~/.arduino15's caches.
 PINNED = """# stand-in for the file both deck toolchains write
@@ -69,13 +73,13 @@ def env_for(home, **extra):
     return dict(clean, HOME=str(home), **extra)
 
 
-def run_gate(tmp, env):
+def run_gate(tmp, env, args=()):
     """Run a copy of the gate, so a refusal cannot touch this tree."""
     copy = Path(tmp) / "gate"
     copy.mkdir(parents=True)
     shutil.copy(GATE, copy / "check.sh")
     return subprocess.run(
-        ["bash", str(copy / "check.sh")],
+        ["bash", str(copy / "check.sh"), *args],
         capture_output=True,
         text=True,
         cwd=str(copy),
@@ -110,6 +114,11 @@ def case_stale_default(tmp):
     return env_for(home)
 
 
+def case_decks_only_alone(tmp):
+    """Any pinned root: --decks-only with no deck is refused before it runs."""
+    return case_pinned_home(tmp)
+
+
 CASES = [
     dict(
         name="a root that pins its directories gets past the guard",
@@ -139,6 +148,14 @@ CASES = [
         want=[REFUSAL, ".arduino-cyd/env.sh"],
         forbids=[],
     ),
+    dict(
+        name="--decks-only with no deck is refused rather than proving nothing",
+        build=case_decks_only_alone,
+        args=["--decks-only"],
+        want_code=2,
+        want=[NARROW_REFUSAL, "Name the decks to prove"],
+        forbids=[REFUSAL],
+    ),
 ]
 
 
@@ -151,7 +168,7 @@ def main():
             work = Path(tmp) / f"case{index}"
             work.mkdir()
             env = case["build"](work)
-            done = run_gate(work, env)
+            done = run_gate(work, env, case.get("args", ()))
             output = done.stdout + done.stderr
 
             problems = []
