@@ -725,7 +725,10 @@ deleted. What is left is the part that was never about the count.
   passed everything. A store outlives the tree it describes, so a full run first
   drops every entry whose deck or file this tree no longer holds, and
   `python3 check_evidence.py list` prints what is left, marking as stale anything
-  a `prune` would take.
+  a `prune` would take. The store holds one entry per step name, so a
+  scoped run for the other deck re-proves the three steps it takes: a cached
+  figure is warm for the deck proved last, which is why a widget README quotes the
+  date and the deck behind its number rather than a bare duration.
 * **Work reaches a branch by merge, never by copy**, so
   [the section above](#one-chat-one-tree) is the whole of it: a branch is mergeable
   on its own terms, nothing here needs anyone's permission, and a number a merge

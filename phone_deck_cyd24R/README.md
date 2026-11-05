@@ -157,6 +157,24 @@ build shells out to its bundled `esptool.py`, which imports `pyserial`: if the
 `python3 -m pip install --target ~/.arduino-pylibs pyserial` and
 `export PYTHONPATH=~/.arduino-pylibs`.
 
+**What proves a change to this deck.** The root's [`check.sh`](../check.sh) is
+the gate, and the deck-scoped forms are the ones a sketch edit needs:
+
+```bash
+./check.sh --decks-only phone_deck_cyd24R           # headroom, the old core, two builds
+./check.sh --decks-only --cached phone_deck_cyd24R  # the same, reusing what this tree proved
+./check.sh --full phone_deck_cyd24R                 # those three, plus the frames and the APK
+```
+
+Measured here on 2026-11-05 with core 3.3.12 from `/tmp/arduino-cyd-3`:
+**168 s**, and **3.7 s** with `--cached`; the three steps inside it took 44 s of
+headroom, 26 s on 2.0.17 and 95 s for the two builds. `--decks-only` skips the
+frames and the APK build, so it proves this deck still fits and still builds the
+same bytes twice, and nothing about the app — the release gate is `./check.sh`
+with no names on it. What each form proves, and the one-entry-per-step caveat
+behind a cached figure, are in
+[`CONVENTIONS.md`](../CONVENTIONS.md#working-in-this-repo).
+
 The USB bridge is a **CH340** (`1a86:7523`, one interface), so a data cable is
 enough for a port to appear and `lsusb` separates a dead cable from a dead board.
 Its DTR/RTS lines reset the ESP32, so `arduino-cli upload` needs no BOOT press.

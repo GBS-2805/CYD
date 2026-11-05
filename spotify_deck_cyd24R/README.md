@@ -298,6 +298,24 @@ The script is the same one the phone deck ships and shares its install root, so
 a machine that can build one can build both. It uses the **default partition
 scheme**; see the measurement below for why that is enough.
 
+**What proves a change to this deck.** The root's [`check.sh`](../check.sh) is
+the gate, and the deck-scoped forms are the ones a sketch edit needs:
+
+```bash
+./check.sh --decks-only spotify_deck_cyd24R           # headroom, the old core, two builds
+./check.sh --decks-only --cached spotify_deck_cyd24R  # the same, reusing what this tree proved
+./check.sh --full spotify_deck_cyd24R                 # those three, plus the frames and the APK
+```
+
+Measured here on 2026-11-05 with core 3.3.12 from `/tmp/arduino-cyd-3`:
+**269 s**, and **4.2 s** with `--cached`; the three steps inside it took 72 s of
+headroom, 39 s on 2.0.17 and 154 s for the two builds. `--decks-only` skips the
+frames and the APK build, so it proves this deck still fits and still builds the
+same bytes twice, and nothing about the app — the release gate is `./check.sh`
+with no names on it. What each form proves, and the one-entry-per-step caveat
+behind a cached figure, are in
+[`CONVENTIONS.md`](../CONVENTIONS.md#working-in-this-repo).
+
 ## Flash it — from a computer, or from the phone
 
 Both decks are ordinary Arduino sketches and both travel on the phone: the app
