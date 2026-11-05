@@ -13,17 +13,26 @@
    a variable here, say so in the handoff, and the Java gets that value.
    =========================================================================== */
 :root {
-  /* palette — Ui.BG … Ui.GOOD, the deck's INK theme slot for slot */
-  --bg:      #000000;   /* Ui.BG       screen ground              */
-  --card:    #0e0e0e;   /* Ui.CARD     card fill, pill fill       */
-  --card-hi: #1c1c1c;   /* Ui.CARD_HI  secondary action, chip off */
-  --edge:    #333333;   /* Ui.EDGE     1dp hairline               */
-  --text:    #ffffff;   /* Ui.TEXT     primary ink                */
-  --dim:     #8c8c8c;   /* Ui.DIM      secondary ink, hints        */
-  --accent:  #ffffff;   /* Ui.ACCENT   link state, primary action  */
-  --violet:  #707070;   /* Ui.VIOLET   a section tag               */
-  --pink:    #d4d4d4;   /* Ui.PINK     destructive, error          */
-  --good:    #a0a0a0;   /* Ui.GOOD     success                     */
+  /* Two themes and nothing else: black ink on an off-white page, or the same
+     page inverted. These are the dark values; the light ones swap the page and
+     the ink. The band is a shade of the same off-white because the mark is black
+     on it. HostTests.contrast() holds every ink to 3:1 against its own page (or
+     4.5:1 for body), so a quiet ink cannot drift below the floor. */
+  --bg:        #000000;                  /* Ui.BG       the page           */
+  --card:      #000000;                  /* Ui.CARD     a cell + hairline  */
+  --card-hi:   rgba(255, 255, 255, .12); /* Ui.CARD_HI  a wash             */
+  --input:     rgba(255, 255, 255, .18); /* Ui.INPUT    a text field's fill */
+  --edge:      rgba(241, 240, 235, .23); /* Ui.EDGE     the hairline       */
+  --text:      #f1f0eb;                  /* Ui.TEXT     body ink           */
+  --dim:       rgba(241, 240, 235, .70); /* Ui.DIM      secondary ink      */
+  --accent:    #f1f0eb;                  /* Ui.ACCENT   the primary fill   */
+  --violet:    rgba(241, 240, 235, .66); /* Ui.VIOLET   the quietest ink   */
+  --pink:      #ffffff;                  /* Ui.PINK     error, banned      */
+  --good:      rgba(241, 240, 235, .78); /* Ui.GOOD     success            */
+  --band:      #e4e3de;                  /* Ui.BAND     the header bar     */
+  --ink:       #000000;                  /* Ui.INK      ink on the band    */
+  --band-dim:  rgba(0, 0, 0, .5);        /* Ui.BAND_DIM hints on the band  */
+  --band-rule: rgba(0, 0, 0, .14);       /* Ui.BAND_RULE a rule on the band */
 
   /* radii, in dp — Ui.rounded(Context, fill, stroke, radiusDp) */
   --r-card:   14px;     /* Ui.card()                                  */
@@ -38,7 +47,7 @@
           "Liberation Mono", monospace;
 
   /* screen metrics */
-  --bar-top: 14px;  --bar-side: 18px;  --bar-bottom: 8px;   /* MainActivity.buildTopBar */
+  --bar-top: 10px;  --bar-side: 18px;  --bar-bottom: 10px;  /* TopBar: centred on the mark */
   --body-side: 16px; --body-top: 8px;  --body-bottom: 24px; /* section bodies          */
   --drawer-side: 18px; --drawer-bottom: 28px;               /* DrawerHome body padding */
 }
@@ -96,22 +105,30 @@ figcaption span { color: #6d6d6d; }
 
 /* --- top bar — MainActivity.buildTopBar() --------------------------------- */
 .bar { display: flex; align-items: center;
-       padding: var(--bar-top) var(--bar-side) var(--bar-bottom); }
-.crumb { flex: 1; font-size: 12px; letter-spacing: .12em; color: var(--dim);
+       padding: var(--bar-top) var(--bar-side) var(--bar-bottom);
+       background: var(--band); color: var(--ink); }
+/* the owner's mark — TopBar(): the file's ink alone, on the band it was drawn on,
+   on the bar's centre line: the crumb and the right-hand group take equal halves
+   of the spare width */
+.logo { width: 26px; height: 26px; margin: 0 12px; display: block; }
+.crumb { flex: 1; font-size: 12px; letter-spacing: .12em; color: var(--band-dim);
          padding: 6px 12px 6px 0; }
-.bar--section .crumb { color: var(--text); }       /* showSection(): TEXT      */
+.bar--section .crumb { color: var(--ink); }        /* showSection(): INK       */
+.right { flex: 1; display: flex; align-items: center; justify-content: flex-end; }
 .pill { font-size: 11px; letter-spacing: .14em; font-weight: 700;
-        color: var(--dim); background: var(--card);
-        border: 1px solid var(--edge); border-radius: var(--r-pill);
+        color: var(--band-dim); background: none;
+        border: 1px solid var(--band-rule); border-radius: var(--r-pill);
         padding: 6px 12px; white-space: nowrap; }
-.gear { font-size: 15px; line-height: 1; color: var(--dim);
+/* the linked pill — TopBar.showLink(): the one filled shape on the band */
+.pill--live { background: var(--ink); border-color: var(--ink); color: var(--band); }
+.gear { font-size: 15px; line-height: 1; color: var(--band-dim);
         padding: 4px 2px 4px 10px; margin-left: 10px; }
-.bar--settings .gear { color: var(--text); }        /* gear lit on SETTINGS     */
+.bar--settings .gear { color: var(--ink); }         /* gear lit on SETTINGS     */
 
 /* --- drawer front page — DrawerHome --------------------------------------- */
 .drawer { padding: var(--body-top) var(--drawer-side) var(--drawer-bottom); }
 .wordmark { font-size: 34px; font-weight: 700; letter-spacing: .06em;
-            text-align: center; padding-top: 60px; }
+            text-align: center; padding-top: 24px; }   /* the mark moved to the bar */
 .status-line { font-size: 10px; letter-spacing: .16em; color: var(--dim);
                text-align: center; padding-top: 10px; }
 .menu-row { display: flex; align-items: center; justify-content: space-between;
@@ -141,7 +158,7 @@ figcaption span { color: #6d6d6d; }
         border-radius: var(--r-card); padding: 12px 14px; }
 .hint  { font-size: 11px; color: var(--dim); line-height: 1.6; }
 .warn  { font-size: 11px; color: var(--pink); line-height: 1.6; }
-.field { margin-top: 14px; background: var(--card-hi);
+.field { margin-top: 14px; background: var(--input);
          border: 1px solid var(--edge); border-radius: var(--r-field);
          padding: 8px 12px; font-size: 13px; color: var(--dim); }
 .chips { display: flex; gap: 6px; padding: 10px 0 4px; overflow: hidden; }
@@ -149,7 +166,7 @@ figcaption span { color: #6d6d6d; }
          background: var(--card-hi); border: 1px solid var(--edge);
          border-radius: var(--r-field); color: var(--dim); padding: 5px 9px;
          white-space: nowrap; }
-.chip--on { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.chip--on { background: var(--accent); border-color: var(--accent); color: var(--ink); }
 
 /* spacing utilities, each one a Ui.space(context, view, n) in the Java */
 .mt-4 { margin-top: 4px; }  .mt-6 { margin-top: 6px; }   .mt-8 { margin-top: 8px; }
@@ -178,7 +195,7 @@ figcaption span { color: #6d6d6d; }
           border-radius: var(--r-action); color: var(--text);
           padding: 8px 14px; line-height: 1.2; text-align: center; }
 .action--primary { background: var(--accent); border-color: var(--accent);
-                   color: var(--bg); }
+                   color: var(--ink); }
 .action--dim { color: var(--dim); }
 .action--full { display: block; width: 100%; }
 /* two copy buttons a row — ProjectsTab.librariesCard(); 11sp so the longest
@@ -201,9 +218,15 @@ figcaption span { color: #6d6d6d; }
 <body>
 
 <h1>OFF-SITE — phone app, UI file</h1>
-<p class="lede">    <strong>This is the whole app, drawn as one static page.</strong> Seven screens, at
-  the reference phone's 393 × 852 dp, using the same dp, sp, radii and colours the
-  Android views use. No build step: open this file in any browser and edit it.
+<p class="lede">    <strong>This is the app's previous layout, drawn as one static page.</strong> It
+  opened on a drawer with three rows and a PAPER/INK switch; the app now opens on
+  PAIRED with the pull-down in the top bar's left corner and a side panel behind the
+  burger, on the site's three palettes. What is drawn here — seven of the app's nine frames, every
+  one but the editor card and the file picker, which came later — is still the app's
+  measurements: the reference phone's 393 × 852 dp, the same dp, sp, radii and
+  colours the Android views use. The current drawing of the app is the captures in
+  <code>../../artifacts/renders/</code>. No build step: open this file in any browser
+  and edit it.
 </p>
 <p class="lede">
   Edit it however you like — but keep the file honest. Every measurement here was
@@ -229,11 +252,14 @@ figcaption span { color: #6d6d6d; }
      ====================================================================== -->
 <figure>
   <div class="screen">
-    <!-- MainActivity.buildTopBar(): crumb, pill, gear at the outer edge -->
+    <!-- TopBar: the crumb, the mark on the centre line, the pill and the gear -->
     <div class="bar">
       <div class="crumb">OFF-SITE</div>
-      <div class="pill">IDLE</div>
-      <div class="gear">&#9881;&#65038;</div>
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
+      <div class="right">
+        <div class="pill">IDLE</div>
+        <div class="gear">&#9881;&#65038;</div>
+      </div>
     </div>
 
     <!-- DrawerHome.build() -->
@@ -276,8 +302,11 @@ figcaption span { color: #6d6d6d; }
   <div class="screen">
     <div class="bar">
       <div class="crumb">OFF-SITE</div>
-      <div class="pill">IDLE</div>
-      <div class="gear">&#9881;&#65038;</div>
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
+      <div class="right">
+        <div class="pill">IDLE</div>
+        <div class="gear">&#9881;&#65038;</div>
+      </div>
     </div>
 
     <div class="drawer">
@@ -329,8 +358,11 @@ figcaption span { color: #6d6d6d; }
   <div class="screen">
     <div class="bar bar--section">
       <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
-      <div class="pill">IDLE</div>
-      <div class="gear">&#9881;&#65038;</div>
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
+      <div class="right">
+        <div class="pill">IDLE</div>
+        <div class="gear">&#9881;&#65038;</div>
+      </div>
     </div>
 
     <div class="body">
@@ -445,8 +477,11 @@ figcaption span { color: #6d6d6d; }
   <div class="screen">
     <div class="bar bar--section">
       <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
-      <div class="pill">IDLE</div>
-      <div class="gear">&#9881;&#65038;</div>
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
+      <div class="right">
+        <div class="pill">IDLE</div>
+        <div class="gear">&#9881;&#65038;</div>
+      </div>
     </div>
 
     <div class="body">
@@ -574,8 +609,11 @@ figcaption span { color: #6d6d6d; }
   <div class="screen">
     <div class="bar bar--section">
       <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
-      <div class="pill">IDLE</div>
-      <div class="gear">&#9881;&#65038;</div>
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
+      <div class="right">
+        <div class="pill">IDLE</div>
+        <div class="gear">&#9881;&#65038;</div>
+      </div>
     </div>
 
     <div class="body">
@@ -633,8 +671,11 @@ figcaption span { color: #6d6d6d; }
   <div class="screen">
     <div class="bar bar--section bar--settings">
       <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
-      <div class="pill">IDLE</div>
-      <div class="gear">&#9881;&#65038;</div>
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
+      <div class="right">
+        <div class="pill">IDLE</div>
+        <div class="gear">&#9881;&#65038;</div>
+      </div>
     </div>
 
     <div class="body">
@@ -695,8 +736,11 @@ figcaption span { color: #6d6d6d; }
   <div class="screen">
     <div class="bar bar--section">
       <div class="crumb">&lsaquo;&nbsp; OFF-SITE</div>
-      <div class="pill">LINKED</div>
-      <div class="gear">&#9881;&#65038;</div>
+      <img class="logo" src="../../artifacts/logo-source.svg" alt="">
+      <div class="right">
+        <div class="pill pill--live">LINKED</div>
+        <div class="gear">&#9881;&#65038;</div>
+      </div>
     </div>
 
     <div class="body">
@@ -769,7 +813,7 @@ figcaption span { color: #6d6d6d; }
 <table>
   <tr><th>Here</th><th>In the app</th></tr>
   <tr><td>.screen</td><td>one full screen, 393 × 852 dp</td></tr>
-  <tr><td>.bar / .crumb / .pill / .gear</td><td>MainActivity.buildTopBar, showSection</td></tr>
+  <tr><td>.bar / .logo / .crumb / .pill / .gear</td><td>TopBar, showSection — the mark on the bar's centre line</td></tr>
   <tr><td>.drawer / .wordmark / .status-line</td><td>DrawerHome.build</td></tr>
   <tr><td>.menu-row</td><td>DrawerHome.menuRow</td></tr>
   <tr><td>.board-row</td><td>DrawerHome.boardRow (a board in the drawer, opening the shelf)</td></tr>

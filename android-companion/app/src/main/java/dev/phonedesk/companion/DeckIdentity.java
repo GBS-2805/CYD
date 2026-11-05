@@ -6,7 +6,7 @@ package dev.phonedesk.companion;
  * A network deck serves this document at {@code GET /deck.json}; a Bluetooth deck
  * publishes the same keys in a read-only characteristic on its Phone Link service.
  * The common keys are {@code id}, {@code widget}, {@code tag}, {@code name},
- * {@code role}, {@code board} and {@code link}, and only a network deck adds
+ * {@code role}, {@code board}, {@code v} and {@code link}, and only a network deck adds
  * {@code ip}, {@code setup} and {@code signed} — a missing key reads as empty or
  * false, so one parser holds either deck.
  *
@@ -27,6 +27,7 @@ final class DeckIdentity {
     String role = "";
     String board = "";
     String link = "";
+    String version = "";
     String ip = "";
     boolean signed;
     boolean setup;
@@ -48,10 +49,15 @@ final class DeckIdentity {
         identity.id = value(json, "id");
         identity.widget = value(json, "widget");
         identity.tag = value(json, "tag");
-        identity.label = value(json, "name");
+        identity.label = value(json, "label");
+        // A deck flashed before the label existed answers only `name`.
+        if (identity.label.isEmpty()) identity.label = value(json, "name");
         identity.role = value(json, "role");
         identity.board = value(json, "board");
         identity.link = value(json, "link");
+        // The document names the build; a deck flashed before it answers nothing.
+        identity.version = value(json, "v");
+        if (identity.version.isEmpty()) identity.version = value(json, "version");
         identity.ip = value(json, "ip");
         identity.signed = flag(json, "signed");
         identity.setup = flag(json, "setup");

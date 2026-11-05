@@ -48,6 +48,17 @@ final class ProjectsTab extends ScrollView {
     private List<FlashLibrary.Entry> currentEntries = new ArrayList<>();
     /** Ids whose details are showing; everything else stays folded. */
     private final Set<String> expanded = new HashSet<>();
+    /** The project whose card is the edit form, and whether that form adds a new one. */
+    private String editing;
+    private boolean creating;
+    /** The project whose file picker is showing, or null for none. */
+    private String picking;
+    /** A sketch a fresh record will be made from, and the import that answers it. */
+    private String seedFile = "";
+    private String seedName = "";
+    private boolean pendingSketch;
+    /** Where a card sends a file it cannot flash itself; null in a JVM capture. */
+    private Handoff handoff;
 
     ProjectsTab(Activity activity) {
         super(activity);
@@ -65,7 +76,7 @@ final class ProjectsTab extends ScrollView {
         search.setTextSize(13);
         search.setTextColor(Ui.TEXT);
         search.setHintTextColor(Ui.DIM);
-        search.setBackground(Ui.rounded(activity, Ui.CARD_HI, Ui.EDGE, 8));
+        search.setBackground(Ui.rounded(activity, Ui.INPUT, Ui.EDGE, 8));
         search.setPadding(Ui.dp(activity, 12), Ui.dp(activity, 8),
                 Ui.dp(activity, 12), Ui.dp(activity, 8));
         search.addTextChangedListener(new TextWatcher() {
@@ -100,6 +111,7 @@ final class ProjectsTab extends ScrollView {
                 .append('b').append(BoardCatalog.selectedIndex(activity))
                 .append('f').append(activeFilter)
                 .append('q').append(query)
+                .append('k').append(picking)
                 .append('e').append(expanded.size());
         for (String id : expanded) sig.append('x').append(id);
         if (!sig.toString().equals(signature)) {
@@ -191,11 +203,23 @@ final class ProjectsTab extends ScrollView {
 
         body.addView(filterRow(projects));
 
+        // Add and edit sit with the shelf, and the form is one of its cards rather
+        // than a dialog: a dialog is a second window, so the capture could not draw
+        // it and the render gate would have nothing to compare.
+        body.addView(addRow());
+        if (creating) body.addView(editorCard(null));
+
         int shown = 0;
         for (ProjectStore.Project project : projects) {
             if (activeFilter >= 0 && project.status != activeFilter) continue;
             if (!matches(project)) continue;
-            body.addView(projectCard(project));
+            if (!creating && project.id.equals(editing)) {
+                body.addView(editorCard(project));
+            } else if (project.id.equals(picking)) {
+                body.addView(pickerCard(project));
+            } else {
+                body.addView(projectCard(project));
+            }
             ++shown;
         }
         if (shown == 0) {
@@ -253,10 +277,22 @@ final class ProjectsTab extends ScrollView {
         card.addView(hint);
 
         if (!never.isEmpty()) {
-            TextView warning = Ui.text(activity,
-                    "Never install " + String.join(" or ", never)
-                            + ": it shadows the ESP32 core's BLE headers and every build fails.",
-                    11, Ui.PINK);
+            // Two different refusals, so one line each: ArduinoBLE shadows the core's
+            // own headers, and another BLE library is not a compile problem at all —
+            // it is a rewrite of every call this sketch makes, which is why it is
+            // named here rather than left to be discovered after installing it.
+            StringBuilder banned = new StringBuilder();
+            for (String name : never) {
+                if (banned.length() > 0) banned.append('\n');
+                banned.append("Never install ").append(name).append(": ");
+                if (name.toLowerCase(Locale.US).contains("arduinoble")) {
+                    banned.append("it shadows the ESP32 core's BLE headers and every build fails.");
+                } else {
+                    banned.append("the deck is built on the core's own stack, so another "
+                            + "BLE library is a rewrite of the link, not an install.");
+                }
+            }
+            TextView warning = Ui.text(activity, banned.toString(), 11, Ui.PINK);
             warning.setPadding(0, Ui.dp(activity, 8), 0, 0);
             warning.setLineSpacing(Ui.dp(activity, 2), 1f);
             card.addView(warning);
@@ -335,9 +371,9 @@ final class ProjectsTab extends ScrollView {
 
     private void addChip(LinearLayout row, String label, int filter) {
         final boolean on = activeFilter == filter;
-        TextView chip = Ui.text(activity, label, 10, on ? Ui.BG : Ui.DIM);
+        TextView chip = Ui.text(activity, label, 10, on ? Ui.BAND_INK : Ui.DIM);
         chip.setLetterSpacing(0.1f);
-        chip.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        Ui.strong(chip);
         chip.setBackground(Ui.rounded(activity, on ? Ui.ACCENT : Ui.CARD_HI,
                 on ? Ui.ACCENT : Ui.EDGE, 8));
         chip.setPadding(Ui.dp(activity, 9), Ui.dp(activity, 5),
@@ -378,9 +414,25 @@ final class ProjectsTab extends ScrollView {
         TextView status = Ui.text(activity, ProjectStore.statusLabel(project.status), 10,
                 ProjectStore.statusColor(project.status));
         status.setLetterSpacing(0.12f);
-        status.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        Ui.strong(status);
         status.setPadding(Ui.dp(activity, 8), 0, 0, 0);
         meta.addView(status);
+
+        // A filed card says so while folded: whether it can run a file is the
+        // difference between a note and something to copy or flash.
+        if (!project.fileName.isEmpty() && !project.catalog) {
+            TextView file = Ui.text(activity, "FILE", 10, Ui.ACCENT);
+            file.setLetterSpacing(0.12f);
+            Ui.strong(file);
+            file.setBackground(Ui.rounded(activity, Ui.CARD_HI, Ui.ACCENT, 6));
+            file.setPadding(Ui.dp(activity, 6), Ui.dp(activity, 2),
+                    Ui.dp(activity, 6), Ui.dp(activity, 2));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            params.leftMargin = Ui.dp(activity, 8);
+            meta.addView(file, params);
+        }
         header.addView(meta, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
@@ -393,6 +445,10 @@ final class ProjectsTab extends ScrollView {
         card.addView(name);
 
         View.OnClickListener flip = v -> toggle(project.id);
+        // The header is the target for the whole accordion; without a ripple it was
+        // a row that either opened the card or did not, with nothing in between.
+        header.setBackground(Ui.rounded(activity, 0, 0, 10));
+        Ui.pressable(activity, header, 10);
         header.setOnClickListener(flip);
         name.setOnClickListener(flip);
         fold.setOnClickListener(flip);
@@ -409,7 +465,9 @@ final class ProjectsTab extends ScrollView {
             card.addView(description);
         }
 
-        if (!project.libraries.isEmpty()) {
+        // A prebuilt image's card says "Prebuilt image." in that field, which as a
+        // NEEDS line reads like a library nobody has installed.
+        if (!project.libraries.isEmpty() && project.kind != ProjectStore.KIND_IMAGE) {
             TextView libs = Ui.text(activity, "NEEDS  " + project.libraries, 11, Ui.ACCENT);
             libs.setPadding(0, Ui.dp(activity, 6), 0, 0);
             libs.setLineSpacing(Ui.dp(activity, 2), 1f);
@@ -420,6 +478,11 @@ final class ProjectsTab extends ScrollView {
         if (lan != null && lan.lan) card.addView(deckCard(lan));
 
         card.addView(logView(project));
+
+        // Only a card the app may change can be given a file: a widget's card is
+        // the descriptor's and already knows which sketch it ships with, and a
+        // catalogue card is an installer link with no bytes here to attach.
+        if (!project.inside() && !project.catalog) card.addView(fileBlock(project));
 
         LinearLayout primary = Ui.row(activity);
         primary.setPadding(0, Ui.dp(activity, 10), 0, 0);
@@ -438,15 +501,21 @@ final class ProjectsTab extends ScrollView {
                 primary.addView(save, spaced(8));
             }
         } else {
-            Button installer = Ui.action(activity, "INSTALLER", true);
-            installer.setOnClickListener(v -> Actions.openUrl(activity, project.installerUrl));
-            primary.addView(installer);
-
-            Button source = Ui.action(activity, "SOURCE", false);
-            source.setOnClickListener(v -> Actions.openUrl(activity, project.sourceUrl));
-            primary.addView(source, spaced(8));
+            // A project added here has no links yet, and a button that opens
+            // nothing is a lie about what the card can do.
+            if (!project.installerUrl.isEmpty()) {
+                Button installer = Ui.action(activity, "INSTALLER", true);
+                installer.setOnClickListener(v -> Actions.openUrl(activity, project.installerUrl));
+                primary.addView(installer);
+            }
+            if (!project.sourceUrl.isEmpty()) {
+                Button source = Ui.action(activity, "SOURCE", false);
+                source.setOnClickListener(v -> Actions.openUrl(activity, project.sourceUrl));
+                if (primary.getChildCount() == 0) primary.addView(source);
+                else primary.addView(source, spaced(8));
+            }
         }
-        card.addView(primary);
+        if (primary.getChildCount() > 0) card.addView(primary);
 
         LinearLayout secondary = Ui.row(activity);
         secondary.setPadding(0, Ui.dp(activity, 8), 0, 0);
@@ -459,7 +528,17 @@ final class ProjectsTab extends ScrollView {
         state.setOnClickListener(v -> pickStatus(project));
         secondary.addView(state, spaced(8));
 
-        if (!project.inside()) {
+        // Only a record this app made can be edited: a widget's card belongs to its
+        // descriptor and a catalogue card's name, tagline and body are the
+        // catalogue's; both are rewritten on read, so a save there would forget.
+        if (!project.inside() && !project.catalog) {
+            Button edit = Ui.action(activity, "EDIT", false);
+            edit.setOnClickListener(v -> startEdit(project));
+            secondary.addView(edit, spaced(8));
+        }
+        // A recipe is an esptool line for a prebuilt image; a sketch has no image
+        // to merge, so the button would describe a flash that cannot happen.
+        if (project.kind == ProjectStore.KIND_IMAGE) {
             Button recipe = Ui.action(activity, "RECIPE", false);
             recipe.setOnClickListener(v -> copyRecipe(project));
             secondary.addView(recipe, spaced(8));
@@ -467,6 +546,448 @@ final class ProjectsTab extends ScrollView {
         card.addView(secondary);
         Ui.space(activity, card, 8);
         return card;
+    }
+
+    /** The one affordance the shelf was missing: a way to put something on it. */
+    private LinearLayout addRow() {
+        LinearLayout row = Ui.row(activity);
+        row.setPadding(0, Ui.dp(activity, 6), 0, 0);
+        Button add = Ui.action(activity, "ADD A PROJECT", false);
+        add.setOnClickListener(v -> startCreate());
+        Ui.fullWidth(activity, add);
+        row.addView(add);
+        return row;
+    }
+
+    private void startCreate() {
+        creating = true;
+        editing = null;
+        signature = "";
+        seedFile = "";
+        seedName = "";
+        pendingSketch = false;
+        refresh();
+    }
+
+    private void startEdit(ProjectStore.Project project) {
+        creating = false;
+        editing = project.id;
+        signature = "";
+        refresh();
+    }
+
+    private void closeEditor() {
+        creating = false;
+        editing = null;
+        signature = "";
+        seedFile = "";
+        seedName = "";
+        pendingSketch = false;
+        refresh();
+    }
+
+    /**
+     * Add and edit, in place.
+     *
+     * The fields are the record's own: name, tagline, status and notes. Name and
+     * tagline are descriptor-owned on a card that ships inside the app, which is
+     * why those cards offer no EDIT - a save there would be overwritten by the
+     * next read, and a control that forgets is worse than one that is absent.
+     */
+    private LinearLayout editorCard(ProjectStore.Project project) {
+        final boolean fresh = project == null;
+        LinearLayout card = Ui.card(activity);
+
+        TextView title = Ui.text(activity, fresh ? "NEW PROJECT" : "EDIT PROJECT", 10,
+                Ui.ACCENT);
+        title.setLetterSpacing(0.14f);
+        card.addView(title);
+
+        // A new project can start from the sketch rather than from its name: the
+        // file is what the card is for, and retyping its name is the step that gets
+        // skipped. An existing card attaches from its own ATTACH A FILE instead.
+        if (fresh) {
+            if (seedFile.isEmpty()) {
+                Button sketch = Ui.action(activity, "IMPORT A .INO", false);
+                sketch.setOnClickListener(v -> openSketchPicker());
+                Ui.space(activity, sketch, 8);
+                Ui.fullWidth(activity, sketch);
+                card.addView(sketch);
+                TextView hint = Ui.text(activity,
+                        "Optional. A sketch names the card and stays attached to it.",
+                        11, Ui.DIM);
+                hint.setPadding(0, Ui.dp(activity, 6), 0, 0);
+                hint.setLineSpacing(Ui.dp(activity, 2), 1f);
+                card.addView(hint);
+            } else {
+                TextView line = Ui.text(activity, "SKETCH  " + seedFile, 11, Ui.ACCENT);
+                line.setTypeface(Ui.face(line.getContext()));
+                card.addView(line);
+                Button another = Ui.action(activity, "CHANGE SKETCH", false);
+                another.setOnClickListener(v -> openSketchPicker());
+                Ui.space(activity, another, 6);
+                card.addView(another);
+            }
+        }
+
+        EditText name = input("Name, e.g. Kitchen sensor", fresh ? seedName : project.name);
+        Ui.space(activity, name, 8);
+        card.addView(name);
+
+        EditText tagline = input("One line: what it is", fresh ? "" : project.tagline);
+        Ui.space(activity, tagline, 6);
+        card.addView(tagline);
+
+        Spinner status = new Spinner(activity);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(activity,
+                android.R.layout.simple_spinner_item, ProjectStore.STATUS_LABELS);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        status.setAdapter(adapter);
+        status.setSelection(fresh ? ProjectStore.STATUS_WANT : project.status);
+        Ui.space(activity, status, 6);
+        card.addView(status);
+
+        EditText notes = input("Notes: what it needs, what broke", fresh ? "" : project.notes);
+        notes.setSingleLine(false);
+        notes.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        notes.setMinLines(3);
+        notes.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        Ui.space(activity, notes, 6);
+        card.addView(notes);
+
+        LinearLayout buttons = Ui.row(activity);
+        buttons.setPadding(0, Ui.dp(activity, 10), 0, 0);
+
+        Button save = Ui.action(activity, fresh ? "ADD" : "SAVE", true);
+        save.setOnClickListener(v -> saveEditor(project, name, tagline, status, notes));
+        buttons.addView(save);
+
+        Button cancel = Ui.action(activity, "CANCEL", false);
+        cancel.setOnClickListener(v -> closeEditor());
+        buttons.addView(cancel, spaced(8));
+
+        if (!fresh) {
+            Button remove = Ui.action(activity, "DELETE", false);
+            remove.setOnClickListener(v -> confirmDelete(project));
+            buttons.addView(remove, spaced(8));
+        }
+        card.addView(buttons);
+        Ui.space(activity, card, 8);
+        return card;
+    }
+
+    /** One text field, styled like the search box so the form reads as the shelf. */
+    private EditText input(String hint, String value) {
+        EditText field = new EditText(activity);
+        field.setHint(hint);
+        field.setText(value);
+        field.setSingleLine(true);
+        field.setInputType(InputType.TYPE_CLASS_TEXT);
+        field.setTextSize(13);
+        field.setTypeface(Ui.face(field.getContext()));
+        field.setTextColor(Ui.TEXT);
+        field.setHintTextColor(Ui.DIM);
+        field.setBackground(Ui.rounded(activity, Ui.INPUT, Ui.EDGE, 8));
+        field.setPadding(Ui.dp(activity, 10), Ui.dp(activity, 6),
+                Ui.dp(activity, 10), Ui.dp(activity, 6));
+        return field;
+    }
+
+    private void saveEditor(ProjectStore.Project project, EditText name, EditText tagline,
+                            Spinner status, EditText notes) {
+        String title = name.getText().toString().trim();
+        if (title.isEmpty()) {
+            Actions.toast(activity, "A project needs a name");
+            return;
+        }
+        ProjectStore.Project record = project == null
+                ? new ProjectStore.Project() : new ProjectStore.Project(project);
+        if (project == null) {
+            // An app-made record, which is also the kind this app may delete: a
+            // widget's card belongs to its descriptor and would simply come back.
+            record.id = "user:" + System.currentTimeMillis();
+            record.kind = ProjectStore.KIND_SKETCH;
+            record.touch = FirmwareNotes.TOUCH_UNTESTED;
+        }
+        // The sketch arrived before the record did, so it is attached here: ADD is
+        // the moment the card gains a file, and the kind already says sketch.
+        if (project == null && !seedFile.isEmpty()) record.fileName = seedFile;
+        record.name = title;
+        record.tagline = tagline.getText().toString().trim();
+        record.notes = notes.getText().toString().trim();
+        record.status = status.getSelectedItemPosition();
+        record.updatedMs = System.currentTimeMillis();
+        ProjectStore.write(activity, record);
+        closeEditor();
+        Actions.toast(activity, project == null ? "Added " + title : "Saved " + title);
+    }
+
+    /**
+     * The file a card names, and the two things a file is good for here.
+     *
+     * A sketch copies its source into ArduinoDroid, which is the app that can
+     * compile and upload it; an image is handed to the USB flasher on SERIAL,
+     * which is the only path in this app that writes bytes to a board. A card with
+     * no file offers one button rather than two controls that would do nothing.
+     */
+    private LinearLayout fileBlock(ProjectStore.Project project) {
+        LinearLayout block = Ui.column(activity);
+        block.setPadding(0, Ui.dp(activity, 10), 0, 0);
+
+        if (project.fileName.isEmpty()) {
+            Button attach = Ui.action(activity, "ATTACH A FILE", false);
+            attach.setOnClickListener(v -> startPicking(project));
+            Ui.fullWidth(activity, attach);
+            block.addView(attach);
+            return block;
+        }
+
+        FlashLibrary.Entry entry = entryNamed(project.fileName);
+
+        TextView line = Ui.text(activity, "FILE  " + project.fileName, 11, Ui.ACCENT);
+        line.setTypeface(Ui.face(line.getContext()));
+        block.addView(line);
+
+        // The record keeps the name, not the bytes: a file deleted from FILES is a
+        // card naming something gone, and saying so beats a FLASH that fails on tap.
+        TextView detail = Ui.text(activity, entry == null
+                ? "Not in FILES any more. Attach it again."
+                : Ui.size(entry.size) + "  \u00B7  "
+                        + (entry.textual() ? "sketch source" : "image"), 11, Ui.DIM);
+        detail.setPadding(0, Ui.dp(activity, 2), 0, 0);
+        block.addView(detail);
+
+        LinearLayout actions = Ui.row(activity);
+        actions.setPadding(0, Ui.dp(activity, 8), 0, 0);
+        if (entry != null && entry.textual()) {
+            Button copy = Ui.action(activity, "COPY SOURCE", true);
+            copy.setOnClickListener(v -> Actions.copyOrSay(activity, entry.name,
+                    FlashLibrary.read(activity, entry)));
+            actions.addView(copy);
+        } else if (entry != null) {
+            Button flash = Ui.action(activity, "FLASH", true);
+            flash.setOnClickListener(v -> flashFile(entry));
+            actions.addView(flash);
+        }
+        Button change = Ui.action(activity, entry == null ? "ATTACH" : "CHANGE", false);
+        change.setOnClickListener(v -> startPicking(project));
+        if (actions.getChildCount() == 0) actions.addView(change);
+        else actions.addView(change, spaced(8));
+        block.addView(actions);
+        return block;
+    }
+
+    /** Hands an image to the flasher on SERIAL. A capture has no screen to send it to. */
+    private void flashFile(FlashLibrary.Entry entry) {
+        if (handoff == null) {
+            Actions.toast(activity, "Open SERIAL to flash " + entry.name);
+            return;
+        }
+        handoff.flash(entry.name);
+    }
+
+    /**
+     * The picker, as a card where the project's own was: the same reason as the
+     * editor. It lists what FILES holds, because that is the one place a file can
+     * come from without a second window the capture could not draw.
+     */
+    private LinearLayout pickerCard(ProjectStore.Project project) {
+        LinearLayout card = Ui.card(activity);
+
+        TextView title = Ui.text(activity, "ATTACH TO " + project.name.toUpperCase(Locale.US),
+                10, Ui.ACCENT);
+        title.setLetterSpacing(0.12f);
+        card.addView(title);
+
+        TextView hint = Ui.text(activity,
+                "A sketch copies into ArduinoDroid; a .bin image flashes from SERIAL.",
+                11, Ui.DIM);
+        hint.setPadding(0, Ui.dp(activity, 6), 0, 0);
+        hint.setLineSpacing(Ui.dp(activity, 2), 1f);
+        card.addView(hint);
+
+        // The one thing this picker could not do was add to what it lists: a card
+        // wanted a sketch, and the shelf sent the user to SERIAL to fetch it first.
+        Button bring = Ui.action(activity, "IMPORT A FILE", true);
+        bring.setOnClickListener(v -> importFile());
+        Ui.space(activity, bring, 8);
+        Ui.fullWidth(activity, bring);
+        card.addView(bring);
+
+        int listed = 0;
+        for (FlashLibrary.Entry entry : currentEntries) {
+            ++listed;
+            Button pick = Ui.action(activity,
+                    entry.name + "  \u00B7  " + Ui.size(entry.size), false);
+            pick.setTextSize(12);
+            pick.setOnClickListener(v -> saveFile(project, entry));
+            Ui.space(activity, pick, 8);
+            card.addView(pick);
+        }
+        if (listed == 0) {
+            TextView empty = Ui.text(activity,
+                    "FILES is empty. IMPORT A FILE above, or import on SERIAL.", 11, Ui.DIM);
+            empty.setPadding(0, Ui.dp(activity, 8), 0, 0);
+            card.addView(empty);
+        }
+
+        Button cancel = Ui.action(activity, "CANCEL", false);
+        cancel.setOnClickListener(v -> closePicker());
+        Ui.space(activity, cancel, 10);
+        card.addView(cancel);
+
+        Ui.space(activity, card, 8);
+        return card;
+    }
+
+    private void startPicking(ProjectStore.Project project) {
+        creating = false;
+        editing = null;
+        picking = project.id;
+        signature = "";
+        refresh();
+    }
+
+    private void closePicker() {
+        picking = null;
+        signature = "";
+        refresh();
+    }
+
+    /**
+     * Attaching is the record's own change, so it goes through the store like any
+     * other edit. The kind follows the file, because the kind is what the card says
+     * it is built from: a .bin makes RECIPE honest, a sketch makes it a lie.
+     */
+    private void saveFile(ProjectStore.Project project, FlashLibrary.Entry entry) {
+        ProjectStore.Project record = new ProjectStore.Project(project);
+        record.fileName = entry.name;
+        record.kind = entry.textual() ? ProjectStore.KIND_SKETCH : ProjectStore.KIND_IMAGE;
+        record.updatedMs = System.currentTimeMillis();
+        ProjectStore.write(activity, record);
+        picking = null;
+        signature = "";
+        refresh();
+        Actions.toast(activity, "Attached " + entry.name);
+    }
+
+    /** The library entry a record names, or null once the file is gone from FILES. */
+    private FlashLibrary.Entry entryNamed(String name) {
+        if (name == null || name.isEmpty()) return null;
+        for (FlashLibrary.Entry entry : currentEntries) {
+            if (entry.name.equals(name)) return entry;
+        }
+        return null;
+    }
+
+    /** Beside the serial tab's own importer; the activity routes each one back. */
+    static final int REQUEST_IMPORT = 42;
+
+    /** The platform's document picker: the shelf can add to FILES, not just read it. */
+    private boolean importFile() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        try {
+            activity.startActivityForResult(intent, REQUEST_IMPORT);
+            return true;
+        } catch (Exception e) {
+            Actions.toast(activity, "No file picker");
+            return false;
+        }
+    }
+
+    /**
+     * The editor's picker. It shares the attach picker's request code because both
+     * answers put a file in FILES; {@code pendingSketch} is what tells the answer
+     * which of the two asked.
+     */
+    private void openSketchPicker() {
+        pendingSketch = true;
+        if (!importFile()) pendingSketch = false;
+    }
+
+    /** "kitchen_sensor.ino" offers "Kitchen sensor": a default that can be typed over. */
+    private static String suggestName(String fileName) {
+        String base = fileName;
+        int dot = base.lastIndexOf('.');
+        if (dot > 0) base = base.substring(0, dot);
+        base = base.replace('_', ' ').replace('-', ' ').trim().replaceAll("\\s+", " ");
+        if (base.isEmpty()) return "";
+        String lower = base.toLowerCase(Locale.US);
+        return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
+    }
+
+    /**
+     * What the picker came back with. The list is rebuilt in place rather than
+     * closed: the file was imported to be attached to this card, so the next tap
+     * should be the file, not ATTACH again.
+     */
+    void imported(FlashLibrary.Entry entry) {
+        if (pendingSketch) {
+            // The editor's import: a sketch it can be named after, or a refusal that
+            // says so rather than a card that quietly gained an image as its "sketch".
+            pendingSketch = false;
+            seedFile = "";
+            seedName = "";
+            if (entry == null) {
+                Actions.toast(activity, "Import failed");
+            } else if (!entry.textual()) {
+                Actions.toast(activity, entry.name + " is not a sketch");
+            } else {
+                seedFile = entry.name;
+                seedName = suggestName(entry.name);
+                Actions.toast(activity, "Sketch imported");
+            }
+            signature = "";
+            refresh();
+            return;
+        }
+        Actions.toast(activity, entry != null ? "Imported. Tap it to attach." : "Import failed");
+        signature = "";
+        refresh();
+    }
+
+    /** The serial tab, reached through the activity that owns both screens. */
+    interface Handoff {
+        void flash(String entryName);
+    }
+
+    void handoff(Handoff where) {
+        handoff = where;
+    }
+
+    private void confirmDelete(ProjectStore.Project project) {
+        new AlertDialog.Builder(activity)
+                .setTitle("Delete " + project.name + "?")
+                .setMessage("The card and its log go with it. A project that ships inside "
+                        + "the app has no DELETE: it is the descriptor's, not the shelf's.")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    ProjectStore.remove(activity, project.id);
+                    closeEditor();
+                    Actions.toast(activity, "Deleted " + project.name);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /** The cards that are unfolded, for the rebuild the theme switch causes. */
+    String[] expandedIds() {
+        return expanded.toArray(new String[0]);
+    }
+
+    /**
+     * Puts the folds back. Called before the first build, so the shelf draws the
+     * cards open instead of opening them a frame later, and it resets the
+     * signature because the folds are part of what a rebuild compares.
+     */
+    void restoreExpanded(String[] ids) {
+        if (ids == null) return;
+        expanded.clear();
+        for (String id : ids) {
+            if (id != null && !id.isEmpty()) expanded.add(id);
+        }
+        signature = "";
     }
 
     private void toggle(String id) {
@@ -566,8 +1087,8 @@ final class ProjectsTab extends ScrollView {
         } else {
             StringBuilder text = new StringBuilder();
             text.append("TOUCH: ").append(FirmwareNotes.touchLabel(project.touch).toUpperCase());
-            if (!project.build.isEmpty()) text.append("   ·   BUILD: ").append(project.build);
-            text.append("   ·   ").append(Ui.ago(project.updatedMs, System.currentTimeMillis()));
+            if (!project.build.isEmpty()) text.append("  \u00B7  BUILD: ").append(project.build);
+            text.append("  \u00B7  ").append(Ui.ago(project.updatedMs, System.currentTimeMillis()));
             if (!project.notes.isEmpty()) text.append('\n').append(project.notes);
             view = Ui.text(activity, text.toString(), 11,
                     project.touch == FirmwareNotes.TOUCH_BROKEN ? Ui.PINK : Ui.GOOD);

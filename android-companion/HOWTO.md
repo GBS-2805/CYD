@@ -29,6 +29,18 @@ board, tap **LINK** on that board's row.
 Saved decks keep their last-seen time, so you can identify a board that is
 currently switched off. Bring it near the phone and tap LINK again.
 
+## Unlink, or forget a deck
+
+**UNLINK** is on the linked deck's own card at the top of PAIRED, and replaces the
+`LINKED` badge on its SAVED DECKS row. One tap drops the link, removes the row and
+stops the bridge linking by itself — which is the point: a board you flashed is
+typically sitting right there, and an unlink that re-links in the next scan is not
+an unlink. The scan keeps running, so **LINK** on any NEARBY row takes a deck again
+whenever you want one.
+
+A deck that is only remembered, not linked, shows **FORGET** instead: it removes
+the record and leaves whatever link is up alone.
+
 ## Check the link health
 
 The **PAIRED** status card shows, live:
@@ -64,6 +76,14 @@ folder — `phone_deck_cyd24R.ino` or `spotify_deck_cyd24R.ino`. Each sketch is
 deliberately one file; splitting one fails with
 `deck_types.h: No such file or directory`.
 
+**Partition scheme: `huge_app`, the 3 MB APP slot.** Both sketches are built for it
+and neither fits the default 1,310,720-byte slot any more — the phone deck's radio
+alone measured 816,643 B — so pick that scheme in ArduinoDroid's board menu before
+compiling. The scheme is written at flash time: a board carrying the default
+partition keeps it until an upload built for this one lands. `1,179,690 B` of
+`3,145,728` for the phone deck, `1,891,309 B` for the Spotify deck, both measured
+on core 3.3.12.
+
 ## Install Marauder, Bruce or Launcher on the CYD
 
 Other firmwares are not flashed by this app. **BOARDS** opens the
@@ -94,8 +114,8 @@ needs exactly the same three libraries:
 
 | Sketch | Libraries | Never install |
 | --- | --- | --- |
-| Phone Deck (`phone_deck_cyd24R.ino`) | Adafruit GFX Library, Adafruit ILI9341, XPT2046_Touchscreen | ArduinoBLE |
-| Spotify Deck (`spotify_deck_cyd24R.ino`) | the same three | ArduinoBLE |
+| Phone Deck (`phone_deck_cyd24R.ino`) | Adafruit GFX Library, Adafruit ILI9341, XPT2046_Touchscreen | ArduinoBLE, NimBLE-Arduino |
+| Spotify Deck (`spotify_deck_cyd24R.ino`) | the same three | ArduinoBLE, NimBLE-Arduino |
 | Marauder / Bruce / Launcher | none — flash the prebuilt image | — |
 
 ### Install them without retyping the names
@@ -226,11 +246,12 @@ sketch inside the APK against the file its descriptor names
 | `Java compile was UP-TO-DATE` | something restored a build directory; drop `--no-clean` |
 | `<id>/<sketch> is stale` | `syncWidgets` did not run — check that the folder's `widget.json` names an existing sketch |
 | `the APK carries no assets/widgets/…` | the descriptor exists but the build skipped the task; build through Gradle |
+| `drawable-<density>/logo_mark.png (N bytes) is not in the APK` | the archive holds a different mark: rebuild from a `clean`, and check that `artifacts/logo_icon.py` wrote all five densities |
 | `apksigner rejected the APK` | the `Android Debug` keystore in `~/.android` is missing or unreadable |
 
 The size is not byte-stable: two builds of the same sources differ by a dozen
 bytes because the dex files carry build-time data. Treat the printed number as
-"about 160 kB", not as a checksum.
+"about 198 kB", not as a checksum.
 
 ## Flash an image from the phone over USB
 
@@ -352,6 +373,31 @@ silence is not a fault by itself. Confirm the rate matches the sketch, then tap
 at 115200 or 74880 points at the cable, the adapter, or the sketch's baud rather
 than at the app. The USB probe has run on a phone; this monitor has not, so treat
 the counters as unmeasured rather than as expected values.
+
+## Test the phone's send path with a loopback
+
+This asks one question and needs no board: do the app's bytes leave the phone at
+all? A jumper answers it.
+
+1. Take a spare **CH340** module — the same chip as the CYD's own bridge — and
+   jumper its TX pin to its RX pin. Nothing else is connected to it.
+2. Plug it into the phone through the OTG adapter and data cable the deck uses,
+   and accept Android's permission prompt.
+3. Open **BOARD**, leave **MONITOR** off, and tap **PROBE**. The reset steps have
+   nothing to drive on a bare module, so expect them to report no boot text.
+4. Read the round line: `N B in / M B out`.
+
+- **`in` close to `out`** — the frames left the phone and came back through the
+  jumper, so the app's write path works and the fault sits on the deck's side of
+  the cable. That contradicts the 2026-11-03 log, so check the jumper is TX to RX
+  and not TX to GND before believing it.
+- **`in` at zero while `out` climbs** — the writes never left the phone, or the
+  adapter dropped them, which puts the fault in the driver's bulk transfer.
+- **Text instead of a count** — the jumper is echoing a boot banner, so something
+  other than a bare module is plugged in.
+
+Write the first round line down verbatim with its rate: the two byte counts are the
+whole claim, and `HANDOFF.md` is where the result belongs.
 
 ## Troubleshooting
 

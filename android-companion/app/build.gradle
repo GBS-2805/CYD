@@ -22,6 +22,14 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    testOptions {
+        // Robolectric draws the app's own views with Android's own renderer, so it
+        // needs the merged manifest and the real resources, not just the bytecode.
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
+
     buildTypes {
         debug {
             // Private builds only. A debuggable APK lets any machine with adb
@@ -85,4 +93,20 @@ tasks.register("syncWidgets") {
 
 afterEvaluate {
     tasks.named("preBuild").configure { dependsOn("syncWidgets") }
+}
+
+tasks.withType(Test).configureEach {
+    outputs.upToDateWhen { false }
+}
+
+dependencies {
+    // The capture: the app's real screens, drawn by the platform's own graphics
+    // stack on the JVM, so a render is a picture of the app rather than a redraw.
+    // The capture test writes PNGs as a side effect, so Gradle's up-to-date check cannot
+    // see that app/build/capture was deleted and skips the run entirely (exit 0, zero
+    // frames). The old answer was --rerun-tasks, which also re-runs every compile: 21 s to
+    // redraw every screen whose code had not changed. Declaring the test tasks never
+    // current costs nothing — they take seconds — and leaves every other task's caching.
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
 }

@@ -16,6 +16,9 @@ import java.util.List;
  * {@link EspRom} on a JVM is to compile it against something with the same shape.
  */
 final class UsbSerialCh340 {
+    /** Set by the host tests to the clock they installed in EspRom. */
+    static EspRom.Clock clock;
+
 
     /** Called for every command frame that arrives, with the checksum it carried. */
     interface Responder {
@@ -33,6 +36,12 @@ final class UsbSerialCh340 {
 
     private final ByteArrayOutputStream inbound = new ByteArrayOutputStream();
     private final ByteArrayOutputStream commandBytes = new ByteArrayOutputStream();
+    /**
+     * Every byte handed to the port, untouched — SLIP framing and all. The decoded
+     * lists above share the header layout the protocol writes, so a mistake in that
+     * layout would look correct to them; this is the copy an independent pin reads.
+     */
+    final ByteArrayOutputStream wire = new ByteArrayOutputStream();
     private boolean inFrame;
     private Responder responder;
 
@@ -75,6 +84,7 @@ final class UsbSerialCh340 {
      */
     void write(byte[] data) throws IOException {
         if (failWrites) throw new IOException("USB write failed");
+        wire.write(data, 0, data.length);
         for (byte value : data) {
             final int current = value & 0xFF;
             if (current == 0xC0) {
@@ -122,7 +132,9 @@ final class UsbSerialCh340 {
                 try {
                     // A real port blocks; sleeping a little keeps the caller's
                     // deadline loop from spinning at full speed.
-                    Thread.sleep(Math.min(Math.max(timeoutMs, 1), 2));
+                    final long pauseMs = Math.min(Math.max(timeoutMs, 1), 2);
+                    if (clock != null) clock.sleep(pauseMs);
+                    else Thread.sleep(pauseMs);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }

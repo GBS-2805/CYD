@@ -26,6 +26,8 @@ final class DeckStore {
 
     private static final String PREFS = "decks";
     private static final String PREFERRED = "preferred";
+    /** A deck's own palette and page, keyed by {@link Known#key()}. */
+    private static final String LOOK = "k:";
     private static final char SEP = '\u0001';
 
     static final class Known {
@@ -67,10 +69,19 @@ final class DeckStore {
      * itself the next time each board links.
      */
     static void remember(Context context, DeckIdentity identity, String mac, String fallbackName) {
+        rememberAt(context, identity, mac, fallbackName, System.currentTimeMillis());
+    }
+
+    /**
+     * The same write at a known instant. A capture pins the row's age this way, so the
+     * frame reads "1d ago" on every run instead of aging between them.
+     */
+    static void rememberAt(Context context, DeckIdentity identity, String mac,
+                           String fallbackName, long seenMs) {
         if (mac == null || mac.isEmpty()) return;
         final String id = identity != null && identity.usable() ? identity.id : "";
         final String key = id.isEmpty() ? mac : id;
-        final String label = name(identity, fallbackName);
+        final String label = name(identity, fallbackName, mac);
 
         final SharedPreferences.Editor edit = prefs(context).edit();
         for (Known other : all(context)) {
@@ -81,13 +92,26 @@ final class DeckStore {
         edit.remove("m:" + mac);
         edit.putString("d:" + key, (identity == null ? "" : identity.widget) + SEP
                 + (identity == null ? "" : identity.tag) + SEP
-                + label + SEP + mac + SEP + System.currentTimeMillis());
+                + label + SEP + mac + SEP + seenMs);
         edit.apply();
     }
 
-    private static String name(DeckIdentity identity, String fallbackName) {
+    private static String name(DeckIdentity identity, String fallbackName, String mac) {
         if (identity != null && !identity.label.isEmpty()) return identity.label;
-        return fallbackName == null || fallbackName.isEmpty() ? "Phone Deck" : fallbackName;
+        return withMacSuffix(fallbackName, mac);
+    }
+
+    /**
+     * Two boards of one widget are both "Phone Deck" until they are named, so an
+     * unnamed one carries the tail of its address instead: two rows a person can
+     * tell apart without opening either.
+     */
+    static String withMacSuffix(String name, String mac) {
+        final String base = name == null || name.isEmpty() ? "Phone Deck" : name;
+        if (mac == null) return base;
+        final String tail = mac.replace(":", "");
+        if (tail.length() < 4) return base;
+        return base + " \u00b7" + tail.substring(tail.length() - 4);
     }
 
     static List<Known> all(Context context) {
@@ -106,7 +130,8 @@ final class DeckStore {
                 } else if (key.startsWith("m:")) {
                     // A row written before decks had ids: name, seen.
                     out.add(new Known("", "", "",
-                            parts.length > 0 && !parts[0].isEmpty() ? parts[0] : "Phone Deck",
+                            withMacSuffix(parts.length > 0 ? parts[0] : "",
+                                    key.substring(2)),
                             key.substring(2), parseLong(parts.length > 1 ? parts[1] : "")));
                 }
             }
@@ -138,16 +163,32 @@ final class DeckStore {
         return null;
     }
 
-    /** Forgets the deck itself, wherever it is now addressed. */
+    /** Forgets the deck itself, wherever it is now addressed, and the look it had. */
     static void forget(Context context, String idOrMac) {
         SharedPreferences.Editor edit = prefs(context).edit();
         for (Known known : all(context)) {
             if (known.key().equals(idOrMac) || known.mac.equalsIgnoreCase(idOrMac)) {
                 edit.remove("d:" + known.key());
+                edit.remove(LOOK + known.key());
             }
         }
         edit.remove("m:" + idOrMac);
+        edit.remove(LOOK + idOrMac);
         edit.apply();
+    }
+
+    /**
+     * The palette and page a deck is drawn in on PAIRED. A deck that has never been
+     * given one takes the app's own default, so the list never has a row with no
+     * colour, and the answer survives a reboot because it is a preference.
+     */
+    static DeckLook look(Context context, String key) {
+        return DeckLook.decode(prefs(context).getString(LOOK + key, ""), DeckLook.DEFAULT);
+    }
+
+    static void setLook(Context context, String key, DeckLook look) {
+        if (key == null || key.isEmpty() || look == null) return;
+        prefs(context).edit().putString(LOOK + key, look.encode()).apply();
     }
 
     static String preferred(Context context) {

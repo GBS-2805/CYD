@@ -3,10 +3,10 @@
      verbatim from the artwork (viewBox 120.6 x 123.11) and only scaled and centred.
      Android pathData is SVG's grammar, so they need no rewriting.
 
-     The logo draws the ghost as a hole in one black contour, so the white it
+     The mark is a standalone G — one ink contour plus marks — so the white it
      reads against is the background layer (ic_launcher_background), and the box
      is fitted to the 72dp safe zone of the 108dp canvas: a launcher mask may crop
-     the disc's outer edge, never the mouth. -->
+     the letter's outer edge, never its counter. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"

@@ -5,15 +5,16 @@
   "sketch": "phone_deck_cyd24R.ino",
   "board": "2432S024R",
   "tagline": "INSIDE APP",
-  "body": "A desk dashboard for your phone: clock, battery and notifications, set like a woodblock print in two monochrome themes \u2014 black ink on paper, or white ink on black.",
-  "notes": "Bundled with the app: copy it into ArduinoDroid and compile, there is nothing to download. With the bridge linked, whatever is playing on the phone is mirrored onto the deck over the same link, with no Spotify sign-in.",
+  "body": "A desk dashboard for your phone: clock, battery and notifications, set like a woodblock print in two monochrome themes: black ink on an off-white page, or the same page inverted.",
+  "notes": "Bundled with the app: copy it into ArduinoDroid and compile, there is nothing to download. With the bridge linked, whatever is playing on the phone is mirrored onto the deck over the same link, with no Spotify sign-in. The SPOTIFY row on the front page opens it. Compile it on PartitionScheme=huge_app, the 3 MB APP slot: the radio does not fit the default one.",
   "libraries": [
     "Adafruit GFX Library",
     "Adafruit ILI9341",
     "XPT2046_Touchscreen"
   ],
   "never": [
-    "ArduinoBLE"
+    "ArduinoBLE",
+    "NimBLE-Arduino"
   ],
   "ble": {
     "service": "6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10",

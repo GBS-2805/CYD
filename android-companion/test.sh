@@ -39,6 +39,15 @@ cp "$PKG/SpotifyLink.java" "$OUT/src/dev/phonedesk/companion/"
 cp "$PKG/LanDeck.java" "$OUT/src/dev/phonedesk/companion/"
 cp "$PKG/DeckIdentity.java" "$OUT/src/dev/phonedesk/companion/"
 cp "$PKG/NowPacket.java" "$OUT/src/dev/phonedesk/companion/"
+cp "$PKG/LinkCommand.java" "$OUT/src/dev/phonedesk/companion/"
+cp "$PKG/BondAdvice.java" "$OUT/src/dev/phonedesk/companion/"
+cp "$PKG/NoticeText.java" "$OUT/src/dev/phonedesk/companion/"
+cp "$PKG/Palette.java" "$OUT/src/dev/phonedesk/companion/"
+cp "$PKG/DeckTheme.java" "$OUT/src/dev/phonedesk/companion/"
+cp "$PKG/DeckLook.java" "$OUT/src/dev/phonedesk/companion/"
+cp "$PKG/Contrast.java" "$OUT/src/dev/phonedesk/companion/"
+cp "$PKG/SketchStamp.java" "$OUT/src/dev/phonedesk/companion/"
+cp "$PKG/SketchVersion.java" "$OUT/src/dev/phonedesk/companion/"
 cp "$HERE/test/stub/UsbSerialCh340.java" "$OUT/src/dev/phonedesk/companion/"
 cp "$HERE/test/HostTests.java" "$OUT/src/dev/phonedesk/companion/"
 
@@ -49,6 +58,15 @@ printf '\n== host tests (%s)\n' "$("$BIN/java" -version 2>&1 | awk -F'"' 'NR == 
   "$OUT/src/dev/phonedesk/companion/LanDeck.java" \
   "$OUT/src/dev/phonedesk/companion/DeckIdentity.java" \
   "$OUT/src/dev/phonedesk/companion/NowPacket.java" \
+  "$OUT/src/dev/phonedesk/companion/LinkCommand.java" \
+  "$OUT/src/dev/phonedesk/companion/BondAdvice.java" \
+  "$OUT/src/dev/phonedesk/companion/NoticeText.java" \
+  "$OUT/src/dev/phonedesk/companion/Palette.java" \
+  "$OUT/src/dev/phonedesk/companion/DeckTheme.java" \
+  "$OUT/src/dev/phonedesk/companion/DeckLook.java" \
+  "$OUT/src/dev/phonedesk/companion/Contrast.java" \
+  "$OUT/src/dev/phonedesk/companion/SketchStamp.java" \
+  "$OUT/src/dev/phonedesk/companion/SketchVersion.java" \
   "$OUT/src/dev/phonedesk/companion/UsbSerialCh340.java" \
   "$OUT/src/dev/phonedesk/companion/HostTests.java"
 "$BIN/java" -cp "$OUT/classes" dev.phonedesk.companion.HostTests

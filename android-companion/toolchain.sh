@@ -44,6 +44,16 @@ done
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # this script lives in android-companion
 APP_DIR="$HERE"
+
+# Signing. AGP signs with the machine's debug key, and the archive is signed again
+# below to drop the build-time block AGP stamps into it, so the key named here is
+# the only signature that ships. It is the project's own key, kept in the tree
+# with the standard debug password: a per-machine debug key would make the bytes
+# differ between machines, which is the one thing this script now promises not to
+# do. A real key overrides it.
+KEYSTORE="${OFFSITE_KEYSTORE:-$HERE/keystore/debug.jks}"
+KEYSTORE_PASS="${OFFSITE_KEYSTORE_PASS:-android}"
+KEYSTORE_ALIAS="${OFFSITE_KEYSTORE_ALIAS:-androiddebugkey}"
 APK_REL="app/build/outputs/apk/debug/app-debug.apk"
 DIST="$HERE/dist/PhoneDeckBridge-debug.apk"
 
@@ -196,6 +206,23 @@ APK="$APP_DIR/$APK_REL"
 [ -f "$APK" ] || fail "no APK at $APK"
 BT="$ANDROID_SDK_ROOT/build-tools/$BUILD_TOOLS"
 
+# ------------------------------------------------------- reproducible bytes ---
+# AGP writes a "Dependency Info Block" into the APK Signing Block and fills it
+# differently on every build, unchanged sources included: it describes the
+# dependency set, and it was the one part of the archive that moved (AOSP issue
+# 268071369). Everything else held byte for byte across two builds here — the same
+# 21 entries in the same order, the same bytes, the same v2 and v3 signatures — so
+# the fix is to rewrite the archive and sign it again. zipalign drops the signing
+# block on its way through, and apksigner adds back only signatures, which are
+# deterministic for an RSA key.
+say "strip the build-time signing block and sign again"
+[ -f "$KEYSTORE" ] || fail "no keystore at $KEYSTORE; the project keeps one at android-companion/keystore/debug.jks"
+"$BT/zipalign" -f 4 "$APK" "$APK.rebuilt" || fail "zipalign could not rewrite the archive"
+"$BT/apksigner" sign --ks "$KEYSTORE" --ks-pass "pass:$KEYSTORE_PASS" \
+  --key-pass "pass:$KEYSTORE_PASS" --ks-key-alias "$KEYSTORE_ALIAS" \
+  "$APK.rebuilt" || fail "apksigner could not sign the rebuilt archive"
+mv -f "$APK.rebuilt" "$APK"
+
 say "verify signature"
 "$BT/apksigner" verify "$APK" || fail "apksigner rejected the APK"
 "$BT/apksigner" verify -v "$APK" | grep -i 'scheme' || true
@@ -257,16 +284,45 @@ done
 [ "$SEEN" -eq 1 ] || fail "no */widget.json beside $HERE; nothing to verify"
 rm -rf "$TMP"
 
+say "verify the bar's mark ships at every density"
+# AGP shortens resource paths — the launcher icon lands as res/BW.xml — so the
+# entries are not named logo_mark and a grep for the name proves nothing. Match the
+# archive's PNGs by content instead: the five densities are the whole res/*.png
+# list, because the mark is the only raster in the app. What this catches is a
+# density left behind at an older size, or a build that shipped a bitmap the tree
+# no longer holds — both of which look like "the mark is there" to a reader.
+MARK_TMP="$(mktemp -d)"
+unzip -qq -o "$APK" 'res/*' -d "$MARK_TMP" || fail "could not read res/ out of the APK"
+find "$MARK_TMP/res" -name '*.png' -print > "$MARK_TMP/pngs" 2>/dev/null || true
+[ -s "$MARK_TMP/pngs" ] || fail "the APK holds no PNG under res/; the bar's mark did not ship"
+: > "$MARK_TMP/apk.md5"
+while IFS= read -r png; do md5of "$png" >> "$MARK_TMP/apk.md5"; done < "$MARK_TMP/pngs"
+for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+  SRC="$HERE/app/src/main/res/drawable-$density/logo_mark.png"
+  [ -f "$SRC" ] || fail "no drawable-$density/logo_mark.png beside $HERE"
+  WANT="$(md5of "$SRC")"
+  BYTES="$(wc -c < "$SRC" | tr -d ' ')"
+  grep -qx "$WANT" "$MARK_TMP/apk.md5" \
+    || fail "drawable-$density/logo_mark.png ($BYTES bytes) is not in the APK; the build shipped a different mark"
+  printf '  %s/logo_mark.png  %s bytes  %s\n' "$density" "$BYTES" "$WANT"
+done
+rm -rf "$MARK_TMP"
+
 # ---------------------------------------------------------------- ship it -----
 
 mkdir -p "$(dirname "$DIST")"
 cp "$APK" "$DIST"
 SIZE="$(wc -c < "$DIST" | tr -d ' ')"
 say "ship $DIST"
-printf '  %s bytes (%s kB)\n  sha256 %s\n' "$SIZE" "$((SIZE / 1024))" \
+printf '  %s bytes (%s kB)\n  signed with %s\n  sha256 %s\n' "$SIZE" "$(( (SIZE + 512) / 1024 ))" \
+  "$KEYSTORE" \
   "$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$DIST" | awk '{print $1}'; else shasum -a 256 "$DIST" | awk '{print $1}'; fi)"
 
-# The archive is not byte-reproducible: dex files carry build-time data, so the
-# hash moves even when the sources do not. `dist/README` in the app docs is where
-# the size is quoted; update it when this number changes.
+# The bytes are reproducible on one machine: the same sources, the pinned
+# toolchain and the same debug keystore give the same hash, which is what
+# stripping the dependency block above buys. A different keystore signs different
+# bytes, which is what a signature is; OFFSITE_KEYSTORE overrides both halves.
+# `HANDOFF.md` holds these exact bytes, and `README.md` beside it plus
+# `dist/index.html` quote the size to the nearest kB, so update them when this
+# number changes.
 say "done — source $ROOT/env.sh to use the toolchain in this shell"

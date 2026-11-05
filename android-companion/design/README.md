@@ -6,19 +6,31 @@ you could open, poke at and hand back. This folder is that artifact.
 It is **not** a build input. Nothing here is compiled, packaged into the APK or
 read at runtime. It is a drawing that is metric-accurate enough to argue with.
 
+**It draws the previous layout, and says so.** The page was drawn when the app
+opened on a drawer with three rows and a PAPER/INK switch; the app now opens on
+PAIRED, with the pull-down in the top bar's left corner and a side panel behind the
+burger, on the site's three palettes. The current drawing of the app is the
+captures in [`../../artifacts/renders/`](../../artifacts/renders/), which
+`capture.sh` takes from the views themselves and `check_renders.py` holds to the
+pixels. This page is kept as the measurement record of the layout it describes.
+
 ## Files
 
 | File | What it is |
 | --- | --- |
-| `ui.html` | The app's seven screens at 393 × 852 dp, one static page. Open it in any browser. No build, no server, no dependencies. |
+| `ui.html` | Seven of the app's nine frames, from the previous layout — all but the editor card and the file picker — at 393 × 852 dp, one static page. Open it in any browser. No build, no server, no dependencies. |
 | `tokens.json` | The same numbers as data — palette, radii, type sizes, letter-spacing, padding — each tied to the `Ui.java` constant or the method that uses it. This is what a handoff gets diffed against. |
 | `README.md` | This file. |
 
 Both files were written by reading the Java, not by memory: the colours came from
 `Ui.java`, the metrics from `MainActivity.buildTopBar()`, `DrawerHome`,
-`ProjectsTab`, `DecksTab`, `BoardTab` and `SetupTab`. The `render_ui.py` script in
-the parent folder draws the same seven screens to PNG from the same numbers, so
-there are three descriptions of one design and they have to agree.
+`ProjectsTab`, `DecksTab`, `BoardTab` and `SetupTab`. The `capture.sh` script in
+the parent folder draws the app's nine screens to PNG from the same numbers; this
+page draws seven of them, from the layout that was current when it was written, so
+the two are descriptions of one design and they have to agree. The two missing from
+`ui.html` are the editor card and the file picker: both came after this page was
+drawn, and its frames are numbered 1 to 7.
+
 
 ## Opening and editing it
 

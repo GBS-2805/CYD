@@ -3,15 +3,24 @@
 
 The four `d` strings are copied out of `logo-source.svg` unchanged — Android's
 pathData is SVG's own grammar, so the artwork ships verbatim inside a <group>
-that only scales and centres it. This script writes the three resource files and
+that only scales and centres it. This script writes the four resource files and
 rasterises the result through the same transform for review.
+
+The mark is the owner's **G** — G for ghost — and the artwork is black ink on a
+white ground: one spiral, the C, with the ghost sitting in the gap between its
+turns and the ghost's eyes and mouth back in ink inside that gap. Every white
+pixel in the file is therefore the canvas showing through the spiral, not a
+shape, so the top bar takes the ink alone — one PNG per density, its band filling
+the gap — and the ghost reads as the band seen through the C. Drawing the ink
+white on a dark field instead makes a white ring around a black blob, which is
+not the artwork.
 
     python3 artifacts/logo_icon.py            write the res files and previews
     python3 artifacts/logo_icon.py --dry-run  only print the geometry it would use
 
 The scale keeps the whole mark inside the 72dp safe zone of the 108dp adaptive
 canvas, which is what the icon this replaces did: no launcher mask may crop the
-ghost's mouth.
+letter's counter.
 """
 
 import math
@@ -28,8 +37,12 @@ RES = os.path.join(ROOT, "android-companion", "app", "src", "main", "res")
 
 CANVAS = 108.0          # the adaptive-icon canvas, in dp
 SAFE = 72.0             # what every launcher mask is guaranteed to show
+MARK_DP = 26.0          # the top bar draws the mark this wide: the ink's own box,
+                        # and shorter than the 27dp pill that sets the bar's height
+DENSITIES = ((1.0, "mdpi"), (1.5, "hdpi"), (2.0, "xhdpi"),
+             (3.0, "xxhdpi"), (4.0, "xxxhdpi"))
 INK = "#000000"         # the logo's own ink
-GROUND = "#FFFFFF"      # the logo draws the ghost as a hole: the ground is white
+GROUND = "#FFFFFF"      # the logo's own ground, and the file's
 
 TOKEN = re.compile(r"([MmLlCcAaZzHhVv])|(-?\d*\.?\d+(?:[eE][-+]?\d+)?)")
 
@@ -193,10 +206,10 @@ def write_res(box, paths, scale, dx, dy):
         '<!-- The owner\'s logo, not a redraw: the four path strings below are copied\n'
         '     verbatim from the artwork (viewBox %s x %s) and only scaled and centred.\n'
         '     Android pathData is SVG\'s grammar, so they need no rewriting.\n\n'
-        '     The logo draws the ghost as a hole in one black contour, so the white it\n'
+        '     The mark is a standalone G — one ink contour plus marks — so the white it\n'
         '     reads against is the background layer (ic_launcher_background), and the box\n'
         '     is fitted to the %sdp safe zone of the 108dp canvas: a launcher mask may crop\n'
-        '     the disc\'s outer edge, never the mouth. -->\n'
+        '     the letter\'s outer edge, never its counter. -->\n'
         '<vector xmlns:android="http://schemas.android.com/apk/res/android"\n'
         '    android:width="108dp"\n'
         '    android:height="108dp"\n'
@@ -205,13 +218,13 @@ def write_res(box, paths, scale, dx, dy):
         '%s\n%s    </group>\n</vector>\n'
     ) % (num(box[2]), num(box[3]), num(SAFE), group, body)
 
-    # One path, evenOdd: the same four subpaths, so eyes and mouth become holes in
-    # the contour. Tinted, that is the logo's negative — the ghost reads as a gap.
+    # One path, evenOdd: the same four subpaths, so the interior marks punch through
+    # one tinted layer, which is all a themed icon is ever given.
     monochrome = (
         '<?xml version="1.0" encoding="utf-8"?>\n'
         '<!-- Themed icons (Android 13+) keep one layer\'s alpha and tint it. The four\n'
-        '     subpaths are the logo\'s own; evenOdd turns the eyes and the mouth into\n'
-        '     holes, which is the only form of this mark that survives being flattened\n'
+        '     subpaths are the mark\'s own; evenOdd folds the letter and its marks into\n'
+        '     one shape, the only form of this mark that survives being flattened\n'
         '     to a single tint. -->\n'
         '<vector xmlns:android="http://schemas.android.com/apk/res/android"\n'
         '    android:width="108dp"\n'
@@ -228,8 +241,8 @@ def write_res(box, paths, scale, dx, dy):
     background = (
         '<?xml version="1.0" encoding="utf-8"?>\n'
         '<resources>\n'
-        '    <!-- The logo\'s ground. Its single black contour carries the ghost as a\n'
-        '         hole, so white here is what the ghost is drawn as. -->\n'
+        '    <!-- The logo\'s ground. The G is one ink contour, so the plate behind it is\n'
+        '         the white the letter is cut against. -->\n'
         '    <color name="ic_launcher_background">%s</color>\n'
         '</resources>\n'
     ) % GROUND
@@ -243,10 +256,104 @@ def write_res(box, paths, scale, dx, dy):
         open(path, "w").write(text)
         print("wrote", os.path.relpath(path, ROOT))
 
+    write_mark()
+
+
+def mark_cut(width_px, supersample=4):
+    """The artwork's ink alone, `width_px` wide: everything that is not ink is gone.
+
+    The file is one black spiral — the C — and the ghost sits in the gap between
+    its turns, so that white is the canvas showing through rather than a body drawn
+    inside the ink. White here is therefore a single region and all of it is
+    background, which makes the alpha simply the ink's own mask. Keying the white,
+    flooding it from the border and outlining the disc are three ways to invent a
+    boundary this file does not have: each one keeps either a white notch beside
+    the shoulder or a white plate behind the whole mark, and both were shipped here
+    and rejected. Nothing is recoloured either — the eyes and the mouth are ink
+    inside the gap, so a mark drawn in one ink is the file's own drawing.
+
+    Cropped to the ink's box and scaled once, so the four `d` strings are the whole
+    of the artwork's shape at every size.
+    """
+    box, paths = svg_paths()
+    ink = mark_mask(box, paths, width_px * supersample, supersample=1)
+    image = Image.new("RGBA", ink.size, (0, 0, 0, 255))
+    image.putalpha(ink)
+    image = image.crop(ink.getbbox())
+
+    height = max(1, int(round(width_px * image.size[1] / image.size[0])))
+    return image.resize((width_px, height), Image.LANCZOS)
+
+
+def write_mark():
+    """One PNG per density, so no device rescales the mark at run time."""
+    for factor, bucket in DENSITIES:
+        folder = os.path.join(RES, "drawable-" + bucket)
+        os.makedirs(folder, exist_ok=True)
+        image = mark_cut(int(round(MARK_DP * factor)))
+        path = os.path.join(folder, "logo_mark.png")
+        image.save(path)
+        print("wrote", os.path.relpath(path, ROOT), "%dx%d" % image.size)
+
 
 def num(value):
     text = ("%.4f" % value).rstrip("0").rstrip(".")
     return text or "0"
+
+
+# ------------------------------------------------------------------- mark ----
+
+def mark_mask(box, paths, width_px, supersample=4):
+    """The mark as an alpha mask, filled even-odd: one letter, four subpaths.
+
+    A scanline fill rather than a polygon per shape, because the mark is one
+    contour whose subpaths overlap: only the combined even-odd winding count
+    says which pixels are ink, and Pillow's `polygon` knows nothing about holes.
+    Drawn at 4x and scaled down once, which is the whole of its antialiasing.
+    """
+    scale = width_px * supersample / box[2]
+    subpaths = []
+    for d in paths:
+        subpaths.extend(flatten(d, scale, -box[0] * scale, -box[1] * scale))
+    width = max(1, int(round(box[2] * scale)))
+    height = max(1, int(round(box[3] * scale)))
+
+    mask = Image.new("L", (width, height), 0)
+    pen = ImageDraw.Draw(mask)
+    for row in range(height):
+        y = row + 0.5
+        crossings = []
+        for sub in subpaths:
+            for i, (x0, y0) in enumerate(sub):
+                x1, y1 = sub[(i + 1) % len(sub)]
+                if (y0 <= y < y1) or (y1 <= y < y0):
+                    crossings.append(x0 + (y - y0) * (x1 - x0) / (y1 - y0))
+        crossings.sort()
+        for i in range(0, len(crossings) - 1, 2):
+            pen.line([(crossings[i], row), (crossings[i + 1], row)], fill=255)
+
+    return mask.resize((max(1, int(round(width_px))),
+                        max(1, int(round(width_px * box[3] / box[2])))),
+                       Image.LANCZOS)
+
+
+_marks = {}
+
+
+def mark_image(width_px, ink=(255, 255, 255)):
+    """The mark alone, `width_px` wide, in one ink, transparent everywhere else.
+
+    The renderer and the scroll composer both call this, so the G is rasterised
+    from the artwork every time rather than pasted from a picture of itself.
+    """
+    key = (int(width_px), tuple(ink))
+    if key not in _marks:
+        box, paths = svg_paths()
+        mask = mark_mask(box, paths, key[0])
+        image = Image.new("RGBA", mask.size, key[1] + (0,))
+        image.putalpha(mask)
+        _marks[key] = image
+    return _marks[key]
 
 
 # --------------------------------------------------------------- preview ----
@@ -282,7 +389,7 @@ def sheet():
     """One picture to link: the mark at launcher sizes, in both common masks.
 
     CONVENTIONS.md makes a linked render the gate before anything ships, and the
-    icon is not one of render_ui.py's seven screens, so it gets its own sheet.
+    icon is not one of the app's screens, so it gets its own sheet.
     """
     src = Image.open(os.path.join(HERE, "launcher-preview.png"))
     width, height = 1000, 560
@@ -325,6 +432,69 @@ def mask(size, shape):
     return alpha
 
 
+def palette(name, fallback):
+    """One colour from Palette.java, so this sheet cannot invent the app's own grey."""
+    text = open(os.path.join(ROOT, "android-companion", "app", "src", "main", "java",
+                             "dev", "phonedesk", "companion", "Palette.java")).read()
+    found = re.search(r"\b%s\s*=\s*0x([0-9A-Fa-f]{8})" % name, text)
+    if not found:
+        return fallback
+    value = int(found.group(1), 16)
+    return ((value >> 16) & 255, (value >> 8) & 255, value & 255)
+
+
+def compare():
+    """One picture to link: the file, and the bar's mark at three densities.
+
+    The eyes are 8% of the artwork's width, so at the bar's 26dp they are 2px at
+    mdpi and 6px on a 2.75x phone. Showing all three is the honest way to say "the
+    eyes are there": a single mdpi frame is a downscale, and a downscale of a thin
+    dark shape on white is not evidence that the shape is missing.
+    """
+    box, paths = svg_paths()
+    field = palette("FIELD", (63, 78, 150))
+    band = palette("BAND", (217, 217, 217))
+    canvas = Image.new("RGB", (1000, 470), field)
+    draw = ImageDraw.Draw(canvas)
+    # Pillow's default face is a bitmap with no em dash, no multiplication sign and
+    # no middot: the first sheet printed empty boxes where those were. ASCII only.
+    caption = ImageFont.load_default(15)
+    dim = (226, 229, 242)
+
+    hero = 220
+    plate = Image.new("RGB", (hero + 40, int(hero * box[3] / box[2]) + 40), (255, 255, 255))
+    cut = mark_cut(hero)
+    plate.paste(cut, (20, 20), cut)
+    canvas.paste(plate, (26, 30))
+    draw.text((26, 30 + plate.size[1] + 10),
+              "the file: the artwork on the white canvas it ships on", fill=dim, font=caption)
+
+    # The three are on the bar's band, because that is where they now live: the
+    # band is the grey standing in for the white ground the file was drawn on.
+    draw.rounded_rectangle([306, 20, 990, 152], radius=12, fill=band)
+
+    mark = int(round(MARK_DP))
+    drawn = [(mark, "%ddp at mdpi: %dpx" % (mark, mark)),
+             (mark * 2, "2x: %dpx" % (mark * 2)),
+             (int(round(mark * 2.75)), "2.75x: what the phone shows")]
+    for column, (px, label) in enumerate(drawn):
+        x = 320 + column * 226
+        image = mark_cut(px)
+        canvas.paste(image, (x, 30), image)
+        draw.text((x, 190), label, fill=dim, font=caption)
+
+    for line, text in enumerate([
+            "the bar's mark: the same file's ink alone, so the ghost is the band",
+            "showing through the C and its eyes and mouth are the file's own ink.",
+            "The eyes are 8% of the artwork's width: 2px at mdpi, 6px on a",
+            "2.75x phone - mdpi is the harshest view of them."]):
+        draw.text((320, 330 + line * 24), text, fill=dim, font=caption)
+
+    path = os.path.join(HERE, "logo-compare.png")
+    canvas.save(path)
+    print("wrote", os.path.relpath(path, ROOT))
+
+
 def main(argv):
     box, paths = svg_paths()
     scale, dx, dy = transform_for(box)
@@ -335,6 +505,7 @@ def main(argv):
     write_res(box, paths, scale, dx, dy)
     preview(box, paths, scale, dx, dy)
     sheet()
+    compare()
     return 0
 
 

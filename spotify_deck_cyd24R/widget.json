@@ -6,7 +6,7 @@
   "board": "2432S024R",
   "tagline": "WIFI OR PHONE",
   "body": "The network deck with a Bluetooth second source: it signs in to Spotify with a refresh token, and with no sign-in at all it shows and drives the phone's own player over the link. Either way the screen's three chips send previous, play/pause and next. Mono ink on paper, same as its sibling.",
-  "notes": "First boot opens a WiFi access point called Spotify Deck and serves a setup page at http://192.168.4.1: join it from the phone, type the WiFi password and a Spotify client id and let it join your network. Pair the deck in this app once with the address it prints, then SIGN IN starts the whole thing from here: Spotify's reply comes back to the app, the app hands the code to the deck and the deck stores the token. Without the app the page at http://<deck-ip>/spotify takes the address the browser lands on. It also speaks the Phone Link service, so with no credentials at all it boots straight into the player page and mirrors whatever the phone is playing, with the chips asking the phone instead of Spotify; this build needs PartitionScheme=huge_app, and flashing the phone deck afterwards re-partitions the board back. Hold the SETUP chip in the footer, or type setup + Enter at 115200, to run it again; hold the screen four seconds at boot to forget the stored credentials.",
+  "notes": "First boot opens a WiFi access point called Spotify Deck and serves a setup page at http://192.168.4.1: join it from the phone, type the WiFi password and a Spotify client id and let it join your network. Pair the deck in this app once with the address it prints, then SIGN IN starts the whole thing from here: Spotify's reply comes back to the app, the app hands the code to the deck and the deck stores the token. Without the app the page at http://<deck-ip>/spotify takes the address the browser lands on. It also speaks the Phone Link service, so with no credentials at all it boots straight into the player page and mirrors whatever the phone is playing, with the chips asking the phone instead of Spotify; both decks here are built and flashed on PartitionScheme=huge_app, the 3 MB APP slot, so every upload from this app carries the same scheme. Hold the SETUP chip in the footer, or type setup + Enter at 115200, to run it again; hold the screen four seconds at boot to forget the stored credentials.",
   "ble": {
     "nameMatch": [
       "spotify deck"
@@ -25,6 +25,7 @@
     "XPT2046_Touchscreen"
   ],
   "never": [
-    "ArduinoBLE"
+    "ArduinoBLE",
+    "NimBLE-Arduino"
   ]
 }

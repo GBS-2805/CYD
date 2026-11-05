@@ -1,0 +1,20 @@
+{
+  "command": "bash -c '. \"$0\" && exec python3 check_headroom.py' ~/.arduino-cyd-2/env.sh",
+  "core": "2.0.17",
+  "decks": {
+    "phone_deck_cyd24R": {
+      "globals": 41764,
+      "md5": "1a04a453da5656fb943b25b5069740a2",
+      "slot": 3145728,
+      "used": 1178717
+    },
+    "spotify_deck_cyd24R": {
+      "globals": 63316,
+      "md5": "0a2147b9fa9baedcd355fd9d637650cb",
+      "slot": 3145728,
+      "used": 1760129
+    }
+  },
+  "measured": "2026-11-05",
+  "root": "~/.arduino-cyd-2"
+}

@@ -10,3 +10,34 @@ __pycache__/
 # these two belong to no build and no doc, so the tree stays clean without them.
 artifacts/*.diff
 artifacts/launcher-icon.png
+# Written by logo_icon.py on every run: the sheet below them is the one to keep.
+artifacts/launcher-preview.png
+artifacts/launcher-preview-masked.png
+artifacts/launcher-preview-squircle.png
+
+# Compositions of frames that are already committed beside them: a tall scroll of
+# the nine screens and a strip of them, rebuilt on demand rather than tracked.
+artifacts/renders/scroll.png
+
+# check_docs.py's last measurement of each deck: local, machine-specific,
+# and discarded the moment a sketch or the compiler changes.
+.build_figures.json
+.scratch/
+
+# What each full step last measured, keyed on the bytes that produced it, written
+# by check_evidence.py. Evidence about this worktree, not part of the tree: a
+# clone starts with none, and `./check.sh --full` proves every step for real
+# unless --cached is asked for.
+.gate_evidence.json
+
+# The published render bundle: copied from artifacts/renders/ by
+# publish_renders.py on every build, so it is output, not a second copy.
+artifacts/site/public/
+
+# The deck compilers write a per-FQBN cache beside the sketch when a compile runs
+# without --build-path, and check_headroom builds in place on purpose so its
+# figures are the ones the docs quote. That cache is output, not source: the
+# `tracked` step refuses a source file a clone would not have, and a compiler
+# cache is exactly the kind of file it should not be asked about.
+phone_deck_cyd24R/build/
+spotify_deck_cyd24R/build/

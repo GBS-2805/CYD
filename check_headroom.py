@@ -20,6 +20,7 @@ same core puts the sketch at a different build path, and that moves the count by
 tens of bytes (1,165,174 here against 1,165,222 through toolchain.sh).
 """
 import argparse
+import hashlib
 import os
 import re
 import shutil
@@ -28,19 +29,27 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-FQBN = "esp32:esp32:esp32"
+# The 3 MB app slot is this repo's standard, not a per-deck exception: the
+# default scheme gives the app 1,310,720 bytes, and the phone deck's BLE stack
+# alone measured 816,643 B on 2026-11-04. A builder that names no scheme gets
+# huge_app, so no widget can be quietly checked against a slot it will not use.
+FQBN = "esp32:esp32:esp32:PartitionScheme=huge_app"
 
-# A deck that has outgrown the default scheme says so here, and the ceiling still
-# comes from the compiler rather than this table: with huge_app it prints
-# 3,145,728, so the same floors are applied to a bigger slot. Only the Spotify
-# deck is listed, because Bluetooth does not fit beside WiFi, TLS and its setup
-# server in 1,310,720 bytes.
-PARTITION = {"spotify_deck_cyd24R": "PartitionScheme=huge_app"}
+# The two floors, in KiB. They live here so `--help` and the environment agree,
+# and check_old_core.py applies the same words to an old-core build.
+DEFAULT_MIN_FREE_KB = 64
+DEFAULT_MIN_RAM_KB = 160
+
+# The ceiling still comes from the compiler rather than this file: huge_app prints
+# 3,145,728, so the same floors apply to the bigger slot, and a deck that is moved
+# to another scheme is measured against whatever that scheme reports.
+# Overrides, for a widget that ever needs a different scheme. Empty on purpose:
+# everything here is huge_app, so the table says nothing rather than repeating it.
+PARTITION = {}
 
 
 def fqbn_for(folder):
-    extra = PARTITION.get(folder.name)
-    return f"{FQBN}:{extra}" if extra else FQBN
+    return PARTITION.get(folder.name, FQBN)
 
 FLASH_RE = re.compile(
     r"Sketch uses (\d+) bytes \((\d+)%\) of program storage space\. "
@@ -52,6 +61,21 @@ RAM_RE = re.compile(
 )
 
 
+def sketch_of(folder):
+    """The one file a deck folder's sketch can be, per CONVENTIONS.
+
+    One home for that rule: the docs gate, the 2.0.17 gate and this one all ask
+    here, so no two of them can decide a deck is a different file.
+    """
+    folder = Path(folder)
+    return folder / f"{folder.name}.ino"
+
+
+def md5(path):
+    """A file's md5, the digest every checker quotes and compares."""
+    return hashlib.md5(Path(path).read_bytes()).hexdigest()
+
+
 def find_sketches(wanted):
     """Every top-level folder whose name matches its single .ino, per CONVENTIONS."""
     if wanted:
@@ -59,7 +83,7 @@ def find_sketches(wanted):
     else:
         folders = sorted(ROOT.iterdir())
     for folder in folders:
-        if folder.is_dir() and (folder / f"{folder.name}.ino").is_file():
+        if folder.is_dir() and sketch_of(folder).is_file():
             yield folder
 
 
@@ -84,6 +108,32 @@ def env_kb(name, fallback):
         raise SystemExit(2)
 
 
+def verdict(used, slot, ram_free, min_flash, min_ram):
+    """Every way a deck misses its margin, in the order a reader wants them.
+
+    One home for the two floors: the gate's `old core` step builds on 2.0.17 and
+    compares against old_core.json instead of against today's core, but a deck
+    that no longer fits is a deck that no longer fits on either.
+    """
+    problems = []
+    flash_free = slot - used
+    if flash_free < 0:
+        problems.append(
+            "flash OVER by {:,} B - this deck needs huge_app".format(-flash_free)
+        )
+    elif flash_free < min_flash:
+        problems.append(
+            "flash tight: {:,} B is under the {:,} B floor".format(
+                flash_free, min_flash
+            )
+        )
+    if ram_free < min_ram:
+        problems.append(
+            "RAM tight: {:,} B is under the {:,} B floor".format(ram_free, min_ram)
+        )
+    return problems
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Compile each deck and check its flash and RAM headroom."
@@ -102,14 +152,14 @@ def main():
     parser.add_argument(
         "--min-free-kb",
         type=int,
-        default=env_kb("HEADROOM_MIN_FREE_KB", 64),
+        default=env_kb("HEADROOM_MIN_FREE_KB", DEFAULT_MIN_FREE_KB),
         metavar="KB",
         help="free flash each deck must keep, in KiB (default: 64)",
     )
     parser.add_argument(
         "--min-free-ram-kb",
         type=int,
-        default=env_kb("HEADROOM_MIN_RAM_KB", 160),
+        default=env_kb("HEADROOM_MIN_RAM_KB", DEFAULT_MIN_RAM_KB),
         metavar="KB",
         help="DRAM each deck must leave for the stack and its buffers, in KiB "
         "(default: 160, just over the 153,600 B a full framebuffer needs)",
@@ -180,14 +230,7 @@ def main():
             # A link that fails still prints the size it could not place, so read
             # the numbers and say what happened instead of a bare "compile failed".
             problems.append("build failed")
-        if flash_free < 0:
-            problems.append(f"flash OVER by {-flash_free:,} B - this deck needs huge_app")
-        elif flash_free < min_flash:
-            problems.append(
-                f"flash tight: {flash_free:,} B is under the {min_flash:,} B floor"
-            )
-        if ram_free < min_ram:
-            problems.append(f"RAM tight: {ram_free:,} B is under the {min_ram:,} B floor")
+        problems.extend(verdict(used, slot, ram_free, min_flash, min_ram))
         if problems:
             status = "; ".join(problems)
             failures += 1

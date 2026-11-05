@@ -32,6 +32,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
+    <!-- SETTINGS asks for this app's own exemption rather than opening the list.
+         It is a sideloaded app; Play would want a policy justification. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <!-- USB host mode is how the app talks to the board's CH340 bridge. Not
          required: the rest of the app works fine on a phone without OTG. -->
     <uses-feature

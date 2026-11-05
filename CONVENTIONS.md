@@ -1,7 +1,7 @@
 # Conventions — ESP32-2432S024R widgets
 
-House rules for every project in this repo. They exist so a new widget — or a new
-chat — does not have to rediscover them. If a rule stops being true, change it
+House rules for every project in this repo. They exist so a new widget does not have
+to rediscover them. If a rule stops being true, change it
 here in the same change as the code that broke it.
 
 **Scope: the ESP32-2432S024R only** — the 2.4" CYD with a resistive panel, an
@@ -15,32 +15,35 @@ controller or bridge gets its own section here first.
   either breaks the phone workflow and the app's build. The name carries the
   board it runs on — see [Naming](#naming-topic_deck_board) below.
 * One sketch, one tab, **no extra headers**. A pasted `.ino` cannot see a header
-  beside it.
+  beside it. **And one copy of it.** A `.ino` lives in its widget folder, plus the
+  bundle Gradle writes under `app/src/main/assets/`; `check_widget_assets.py`
+  refuses any other `.ino` in the tree, because a hand-made second copy is the one
+  a reader opens by mistake. `android-companion/dist/` held the phone sketch three
+  layout generations old — a pre-grid margin, the removed CLEAR chip, the CALIBRATE
+  row — with nothing compiling or reading it.
 * Each **widget** folder has one `README.md`: what it is, how to flash it, the
-  traps, and what is verified. No `HOWTO.md`, no `HANDOFF.md`, no `DECK_HANDOFF.md`
-  inside one — a task that needs steps gets them in that README. The app folder is
-  the one exception, because it carries three documents with three audiences and
-  one `README.md` holding all of them was unreadable:
+  traps, and what is verified. No `HOWTO.md`, no `HANDOFF.md` beside it — a task
+  that needs steps gets them in that README. The app folder is the one exception,
+  because it carries three documents with three audiences and one `README.md`
+  holding all of them was unreadable:
   [`android-companion/README.md`](android-companion/README.md) is the product and
   its build, [`HOWTO.md`](android-companion/HOWTO.md) is the step-by-step a person
   follows on the phone, and [`HANDOFF.md`](android-companion/HANDOFF.md) is the
   state behind the code — what exists, what is verified, what is not. The root
-  keeps [`DECK_HANDOFF.md`](DECK_HANDOFF.md) for the same reason: the deck-to-app
-  hand-off crosses both trees, so it belongs to neither folder.
+  keeps no page of its own: a step that crosses a folder lives in the folder it
+  acts on, which is why syncing a sketch into the APK is written down in
+  [`android-companion/README.md`](android-companion/README.md#build).
 * Add the row to the [root README](README.md) table in the same change.
 * Widgets bundled into the APK also carry [`widget.json`](phone_deck_cyd24R/widget.json)
   (`schema: 1`, with `id`, `name`, `sketch`, `board`, `tagline`, `body`, `notes`,
   `libraries`, `never`, and a `ble` block when it speaks BLE). The app copies the
   sketch at build time, so `android-companion/app/src/main/assets/widgets/<id>/`
-  must hold a byte-identical copy. Check it with
-  [`check_widget_assets.py`](check_widget_assets.py) before committing: it fails
-  when a descriptor names a missing sketch, when a bundled copy has drifted, or
-  when `assets/widgets/` holds a widget no descriptor claims.
-* **A deck's id is its own and no rule pools it.** Each folder keeps its name, its
-  `widget.json`, its `README.md` and the id its sketch prints: `<widget>-<tag>`,
-  the folder-named widget plus the low 24 bits of that board's efuse MAC. A
-  re-flash keeps the id, a second board of the same widget is a second id, and this
-  file records rules — it never assigns, renames or merges a deck's id.
+  must hold a byte-identical copy. That tree is **gitignored build output** —
+  Gradle rewrites it before every build and nothing under it belongs in a commit,
+  so a sketch edit wants a re-sync, not a staged file. Check the copy with
+  [`check_widget_assets.py`](check_widget_assets.py) after any sketch edit: it
+  fails when a descriptor names a missing sketch, when a bundled copy has drifted,
+  or when `assets/widgets/` holds a widget no descriptor claims.
 
 ### Naming: `<topic>_deck_<board>`
 
@@ -86,22 +89,99 @@ sketch and the descriptor `id`, which always move together:
   `N4XX` is 4 MB of flash and no PSRAM. On a board that does have it, `none found`
   still proves nothing, because `esp32:esp32:esp32` defaults to `PSRAM=disabled`.
   Read the marking, never a product listing.
-* **Budget for 4 MB of flash and no PSRAM.** The default partition scheme gives
-  the app 1,310,720 bytes and the deck takes ~1,168,300 of them (89 % as reported
-  by the compiler, after the mirror). DRAM is 327,680 bytes with ~300 kB of heap
+* **Budget for 4 MB of flash and no PSRAM.** Both decks are built and flashed on
+  `PartitionScheme=huge_app`, which gives the app 3,145,728 bytes. The phone deck
+  takes 1,179,690 of them, 37 % of its 3,145,728-byte slot, and the Spotify deck
+  1,891,309, 60 % of the same 3,145,728-byte slot. They moved on 2026-11-04 because the phone
+  deck's radio alone measured 816,643 B, which left it 128 kB of the default
+  1,310,720-byte slot — under the gate's own floor plus one framebuffer. DRAM is 327,680 bytes with ~300 kB of heap
   free at boot once the display and touch drivers are up; a 320x240 RGB565
   framebuffer is 153,600, so there is room for one, not two. Treat "it fits" as a
   measurement from `Sketch uses ...`, never an assumption.
+* **A behaviour that becomes optional dates every doc that calls it required.**
+  When the Spotify deck stopped needing a token, its header and its "first run"
+  section still described a credential as the way in. A number check cannot see
+  that. When a default, a first boot or a required input changes, grep the folder
+  for the old requirement in the same change and rewrite it as the option it now
+  is.
 * **A control that ignores taps is usually a stale mapping, not a bad control.**
   The deck's `+` chip took no taps while `-` worked and a recalibration fixed it.
   Keep targets at least ~40 px on the short side, clear of the outer 8 px, with a
   few pixels of slop. The panel is resistive and single-touch: a second tap while
   one is latched is a bounce, not input.
 
+### The first session with a board
+
+The Spotify deck's Bluetooth half ran on 2026-11-03 — flashed on `huge_app`, it
+linked to the companion app, mirrored the phone's line and started playback from a
+chip, with the corner chips awkward to hit — and nothing else here has run on
+hardware. The first evening with a board still has an order: the deck that needs
+the least to prove itself goes first, and each step records the one fact the next
+depends on. Write every result into that widget's `README.md` under *Verified*
+with the date and the command that printed it, because a number without a run behind
+it is the drift this file exists to stop.
+
+1. **The phone deck, on `huge_app`.** BLE only, so no network and no TLS, at
+   1,179,690 B, 37 % of its 3,145,728 B slot — the scheme `toolchain.sh` pins,
+   so an ArduinoDroid upload has to carry it too.
+   Compile it in ArduinoDroid with Adafruit GFX, Adafruit ILI9341 and
+   XPT2046_Touchscreen, and record the `Sketch uses …` line and the `md5sum` of the
+   file the phone compiled — the size belongs to the compiler, the md5 to the bytes.
+2. **Flash it, and record the upload.** The phone + OTG + ArduinoDroid path is the
+   one with a successful precedent; note the board it offered, the baud it used and
+   whether the reset was automatic. Never flash with ArduinoBLE installed.
+3. **First boot.** What the glass shows in the first five seconds, the state of the
+   RGB LED (all three driven HIGH at boot, so a lit channel means that pin is LOW),
+   and whether the backlight switch matters. A first screen that never arrives is
+   worth more written down than diagnosed twice.
+4. **Touch, before anything that needs it.** The panel mapping has never been read
+   on this board: run the calibration and record whether taps land at all, then the
+   fit it computed. A control that ignores taps is usually this, not the control.
+5. **The Bluetooth link.** Point the app at the board and record the advertised name
+   and its tag, whether the identity document reads whole at MTU 247, that time,
+   battery and notice all answer (the app refuses a link missing any of them), and
+   the `PAIRED` row's `tag · linked <age>`.
+6. **Two phones.** Which one binds, and what the second is told — the claim has never
+   been exercised with two handsets.
+7. **A power cycle.** Identity and touch fit come back without a rescan or a
+   recalibration; that is NVS doing its job, and it is the last cheap check before
+   the expensive deck.
+8. **The Spotify deck, on `huge_app` — Bluetooth half done on 2026-11-03.** The
+   first sketch here whose partition scheme has to be flashed with it:
+   1,891,309 B, 60 % of its 3,145,728 B slot. Flashed, it linked to the companion app,
+   drew the phone's line and started playback from a chip, so the scheme, the
+   advertise, the identity read, the mirror and the command notify all answered at
+   once; the corner chips were hard to hit, which is why `10bb4b7` enlarged their
+   rects and added the `UNPAIR` hold — neither has been flashed back yet. What that
+   step still owes is the network half: the setup access point, that
+   `GET /deck.json` and `GET /auth?app=1&json=1` answer, the code exchange, and
+   **the heap during the TLS handshake** — the one number this repo has never had,
+   with 53,636 B of globals leaving 268 kB for mbedTLS 3.x.
+9. **The app's own USB flasher, separately.** It is expected to fail — 552 B left
+   the phone per round at 115200, 57600, 230400, 460800 and 74880 in both DTR/RTS
+   polarities, with no sync — so run it as an experiment with the log kept, and never
+   let its result stand in for the sketch's. ArduinoDroid proved that the phone, the
+   adapter and the board can flash; it did not prove that either deck runs. The
+   2026-11-03 log narrows the failure further — the chip reaches `DOWNLOAD_BOOT`
+   with a readable banner at four wirings and five rates while 552 B per round
+   leave the phone unanswered — and since a successful flash already rules the
+   hardware out, the block is this app's send path, not the board.
+
+A board that answers every step is a deck that can be called working. One that fails
+at 3 or 4 is a board or a panel problem, and steps 5 to 8 would have blamed the
+sketch for it.
+
 ## Build
 
+Every widget here is built and flashed on `PartitionScheme=huge_app`, the 3 MB app
+slot. The default scheme's 1,310,720 bytes is less than anything with a radio needs
+— the phone deck's BLE stack alone measured 816,643 B on 2026-11-04 — so the
+scheme is the default everywhere it could be forgotten: in
+[`check_headroom.py`](check_headroom.py), in each widget's `toolchain.sh`, and in
+the copy of the sketch the app hands out.
+
 ```bash
-arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
+arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app my_widget
 ```
 
 * Board package `esp32:esp32`. Both decks default to core **3.3.12** and compile
@@ -110,13 +190,63 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   newest installed platform.
 * **The default path is proven end to end.** `ARDUINO_HOME=~/.arduino-cyd-3
   ./toolchain.sh` in a fresh root installed the core and libraries and built both
-  sketches, exit 0: phone deck 1,165,222 B (88 %) / 45,060 B globals, Spotify
-  1,122,281 B (85 %) / 53,572 B globals. Those are 48 B and 32 B above the same
-  sketches built straight through `arduino-cli` from another path — the build-root
-  sensitivity above, not a different toolchain. The mirror has since moved the
-  phone deck to 1,168,314 B (89 %) / 45,244 B globals and the Spotify deck to
-  1,125,781 B (85 %) / 53,636 B globals, as [`check_headroom.py`](check_headroom.py)
-  read both of them on 2026-11-01.
+  sketches, exit 0: phone deck 1,165,222 B, 88 % of 1,310,720, / 45,060 B
+  globals, Spotify 1,122,281 B, 85 % of 1,310,720, / 53,572 B globals. Those are
+  48 B and 32 B above the same sketches built straight through `arduino-cli` from
+  another path — the build-root sensitivity above, not a different toolchain. The
+  mirror has since moved the phone deck, 1,179,690 B on `huge_app` today with
+  45,332 B of globals, and the Spotify sketch to 1,125,781 B, 85 % of 1,310,720,
+  53,636 B globals, as [`check_headroom.py`](check_headroom.py) read both of them
+  on 2026-11-01 — that Spotify file is the one before the Bluetooth link
+  (`00bb1560`), not a flag on today's.
+* **The numbers in these docs are checked too.** [`check_docs.py`](check_docs.py)
+  builds the decks and reads the markdown, and fails when a quoted flash size or
+  sketch md5 is not one of today's builds — the drift that twice left a README
+  describing last week's sketch — or when a relative link names a file that is
+  gone. It also requires each widget README to carry its
+  own deck's current size, globals and md5. It keeps its last measurement in a
+  gitignored `.build_figures.json` and reuses it only while that deck's sketch,
+  its FQBN and the compiler behind it are all unchanged, so a prose-only commit
+  costs a second instead of a minute; `--refresh` rebuilds anyway, and every run
+  names the decks that came from the file. A past build may stay in the prose,
+  but only by name in that file's `HISTORICAL` table, next to the reason. The
+  table holds two cases and the reason says which: the file that printed a number
+  is gone, or this root cannot print it — the same committed sketch through a
+  root installed under another home differs by tens of bytes, so a tree whose
+  home id is a different length prints a different number for identical bytes.
+  That is registered, not deleted, because a reader on that root has the prose
+  and the build in front of them and needs the difference named. And
+  a sentence that calls one rebuildable has to deny it within a dozen words of
+  the number and of the verb — punctuation between them is not a word, and a
+  path counts once: the builds in `NO_SKETCH` have no committed sketch behind
+  them, and "the pair that rebuilds" credited a phone file this repository
+  has never held until a reader went looking for it. A 2.0.17 figure is not
+  one of those rows: it lives in `old_core.json` beside the md5 of the sketch
+  that printed it, the checker stops vouching for it the moment that sketch
+  moves, and `./check.sh --full` rebuilds on that core and refuses a build that
+  disagrees with it — so an old core's number cannot outlive its file.
+* **Quote the run, not a range.** A figure names the run it came from and is what
+  that run printed. When two builds of one sketch disagree — a pre-commit compile
+  and a direct one printed 1,878,581 and 1,878,629 for the same file — say which
+  one the doc quotes, or quote the one you can repeat. Never publish a span
+  measured at one end: `1,878,613-1,878,661` sat in five places with only the top
+  end ever observed, and the next build printed 1,878,661 twice.
+* **A size names the root that printed it, and here that root is
+  `~/.arduino-cyd-3`.** The current 3.3.12 figures in these docs — phone deck
+  1,179,690 B / 45,332 B of globals, the linked Spotify deck 1,891,309 B /
+  69,164 B on `huge_app`, the unlinked Spotify deck 1,125,781 B — are that
+  root's, read through `arduino-cli` 1.5.2-rc.1 on 2026-11-02. It is the root
+  worth naming because its `env.sh` pins its own data, download and user dirs;
+  `~/.arduino-cyd/env.sh` sets only `PATH`, so sourcing it builds through
+  `~/.arduino15` and reads 1,168,282 B and 1,880,053 B — 32 B and 48 B under with
+  the globals identical — while `/tmp/arduino-cyd-3` was read at 1,168,170 B and
+  1,878,469 B, 144 B and 192 B under. None of that is sketch drift, because the
+  md5s match: it is the build path, so source the `env.sh` whose figures you are
+  quoting, say which root when two disagree, and re-measure a merged number here
+  instead of accepting another tree's last two digits. Both deck toolchains write
+  that file byte for byte identically, and the gate refuses a root whose `env.sh`
+  does not pin the directories — the copy this VM already held was written before
+  they did, which is how one root name came to mean two builds.
 * **The margin is checked, not assumed.** [`check_headroom.py`](check_headroom.py)
   compiles each deck with the deck FQBN and reads the compiler's own `Maximum is
   …` figures, so both ceilings — 1,310,720 B of flash and 327,680 B of DRAM —
@@ -126,11 +256,24 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   (`--min-free-ram-kb`), because a full 320x240 RGB565 framebuffer is 153,600 of
   those bytes and a deck that cannot allocate one is stuck. Every run prints
   used, free and globals per deck, so erosion shows up even when nothing trips.
+* **The host tests run the probe on a clock they drive.** `EspRom` reads every
+  deadline and every pause through `EspRom.Clock`, real by default; `test.sh`
+  installs a virtual clock and the stub port advances it, so a check that runs the
+  real probe against a silent board still tries all five wirings and both windows
+  without waiting for them. Measured on 2026-11-02: 179 s before the seam, 1.45 s
+  after, the same 126 checks then, 185 now. The seam exists because the alternative — a shorter
+  window in the test — would test a different probe.
 * **That check runs on commit.** [`.githooks/pre-commit`](.githooks/pre-commit)
-  compiles the decks whose `<folder>/<folder>.ino` is staged and refuses the
-  commit if one fails, so a sketch cannot grow past its partition unnoticed.
-  Docs-only commits return immediately, the app's synced asset copies are
-  ignored, and `git commit --no-verify` is the deliberate escape hatch. It needs
+  runs the whole fast gate — [`check.sh`](check.sh) — on every commit, so no
+  commit lands with a fast step red: docs, widget assets, the index, the host
+  tests. Compiling the decks whose `<folder>/<folder>.ino` is staged happens in
+  the same pass and refuses a commit whose sketch no longer fits its partition,
+  and a staged `check_*.py` or `selftest_*.py` runs `./check.sh --selftest` as
+  well. A step whose prerequisite is missing — no `arduino-cli`, no built assets,
+  no `javac` — says which one instead of passing quietly, and `check_docs.py`
+  reads its cache when neither a sketch nor the toolchain moved, so a docs-only
+  commit is quick and still refuses a figure from a build that no longer exists.
+  `git commit --no-verify` is the deliberate escape hatch. It needs
   `git config core.hooksPath .githooks` once per clone. A machine with no deck
   toolchain at all says the check did not run and lets the commit through, so a
   fresh clone is never blocked; but a root that exists with no runnable
@@ -144,18 +287,56 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   creates no commit and so checks nothing. A refused merge is left staged rather
   than undone — git prints `Not committing merge` — so finishing it with
   `git commit` runs the gate again.
-* **The gate's refusals are tested without a compiler.**
-  [`selftest_headroom.py`](selftest_headroom.py) hands `check_headroom.py` a
-  stand-in that prints canned `Sketch uses` lines, so an overflow, a tight floor,
-  a DRAM floor, a build that died before printing a size and a folder that is not
-  a deck are re-checked in about a second on a machine with no toolchain. The
-  decks themselves only ever walk the passing path; the overflow path was proved
-  once with a 1.4 MB throwaway sketch, and that is not a test anyone can rerun.
+* **The gate's refusals are tested without a compiler.** Every checker passes
+  on this tree every day, so its failure paths are the part nobody exercises —
+  and the last three docs refusals were found by a reader, not by the check. Each
+  `selftest_*.py` builds a throwaway repo in a temp directory — a stand-in
+  `arduino-cli`, a stand-in `capture.sh`, a real `git init` — and asserts what the
+  checker refuses: 43 docs branches, 23 asset branches, 10 margin branches, 23 old-core  ones, 9 render ones (a moved pixel, a wrong size, a corrupt PNG, a capture that failed), 11 screen ones
+  (a stale count written in words, in digits and with a hyphen, a right count in
+  the wrong paragraph, and frames that do not match the prose), 4 repro ones (two
+  archives of different bytes, of different sizes, a build that fails and a build
+  that ships nothing), 6 sketch ones (two builds that agree, an image that moved,
+  one the second build never wrote, a compile that fails, one that hangs, and a
+  machine with no compiler), 6 on the map itself
+  (a checker with no selftest, a selftest naming a checker that is gone, a
+  selftest with no checker, a tree where every pair is present, and a message
+  no branch asserts) and 4 on
+  the gate itself (a root that pins its directories, a root whose `env.sh` sets only
+  `PATH`, the default root order, and a stale default root). Measured on
+  2026-11-03, with the branch census gone: 3.3 s, 0.6 s, 0.6 s, 1.7 s, 0.9 s,
+  0.7 s, 0.3 s, 1.4 s, 0.4 s and 0.4 s — all ten in **10.2 s** through
+  `./check.sh --selftest`, on a machine with no
+  toolchain. On this shared
+  VM the same command has also taken 4.4 s and 106.5 s an hour apart, which is
+  the machine's load rather than the checkers', so read a slow run as load
+  before assuming a checker got slower. The pre-commit hook runs
+  that command whenever a `check_*.py` or `selftest_*.py` is staged, so a gate
+  refactor cannot land having quietly stopped refusing. The decks themselves only
+  ever walk the passing path; the overflow path was proved once with a 1.3 MB
+  throwaway sketch, and that is not a test anyone can rerun. `check_map.py`
+  prints which branch pins which refusal, as the fast gate's `map` step. It
+  refuses the pairing - a checker with no selftest, a selftest naming a checker
+  that is gone, a selftest with no checker - and every message no branch
+  asserts, which is why that list is empty today: a refusal with no branch
+  behind it fails the gate instead of sitting in a report. That counts a
+  message appended to a problem list and one written with
+  `print(..., file=sys.stderr)`, so a refusal cannot slip past by choosing the
+  other way to say it. The match is word
+  for word, with placeholders, sizes and md5s standing in for the value filled
+  in at run time — a run of words, because a printed size can be "123 bytes" —
+  because a `want` string is a substring of a formatted message. The scan is
+  deliberately small: it reads the literal a checker appends to a problem list
+  or prints to stderr, which is how every refusal here is written. A message a
+  helper returns, one built with `str.format` or `+`, one chosen into a variable
+  or one built by a call is invisible to it, and that is the price of a gate
+  small enough to read rather than one that follows every shape and then needs
+  a branch per shape.
 * **Before you change a sketch, run both.** From the repo root:
 
   ```bash
-  python3 selftest_headroom.py                           # the refusals, ~1 s
-  source ~/.arduino-cyd-3/env.sh && ./check_headroom.py  # the decks, ~17 s warm
+  python3 selftest_headroom.py                                    # the refusals, ~1 s
+  source /tmp/arduino-cyd-3/env.sh && ./check_headroom.py         # the decks, ~17 s warm
   ```
 
   The first says the check still refuses what it should, in about a second and
@@ -169,26 +350,82 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   silently build the wrong core and report 73 % where the release reads 85 %.
   Both together took **18 s** here, on core 3.3.12 with the build cache warm; on
   2026-11-01, after the mirror, `check_headroom.py` over both decks read
-  1,168,314 B (142,406 B free) and 1,125,781 B (184,939 B free), exit 0. A second
+  1,177,962 B (142,406 B free) and 1,125,781 B (184,939 B free), exit 0. A second
   install root read 1,168,170 B (142,550 B free) and 1,125,669 B (185,051 B free)
   for the same two sketches — 144 B and 112 B lower with the globals identical,
   which is the build-root sensitivity above rather than drift in the sketches.
+* **The root is not at the path this file used to name.** On 2026-11-02 the deck
+  toolchain on this VM was at **`/tmp/arduino-cyd-3`** — `bin/arduino-cli`,
+  `env.sh`, core **3.3.12** — while `~/.arduino-cyd-3`, which the command above
+  named until now, does not exist here. So a bare `check_headroom.py` exits 2 with
+  `no arduino-cli found`, and that is a **misplaced root, not a broken install**:
+  source the `env.sh` that exists. `/tmp` is wiped between sessions, so the root is
+  furniture, not state — a session that finds no `arduino-cli` re-provisions it with
+  [`phone_deck_cyd24R/toolchain.sh`](phone_deck_cyd24R/toolchain.sh) instead of
+  concluding the decks cannot be checked.
+* **What the root has to hold.** One core, that chip's compiler, the libraries and
+  `esptool_py`. Measured on 2026-11-02: **7.8 G** installed; **3.3 G** without the
+  toolchains for chips this board is not — `esp-rv32` 2.1 G, the eight other
+  `esp32*-libs` 2.3 G, both `gdb`s 247 M, `openocd-esp32` 11 M, 4.6 G of silicon
+  that is not on the desk; **1.6 G** once the 1.7 G `staging/` of archives goes,
+  since `packages/` already holds what was unpacked. What stays: `esp-x32` 1.1 G,
+  `esp32-libs` 184 M, `esptool_py`, `mkspiffs`, `mklittlefs`. Both decks then built
+  cold, exit 0, twice, on the same figures, so the trim is measured: 94 % → 58 %
+  disk. A second 3.3.12 root is a copy, not an A/B — `~/.arduino-cyd` held 3.3.12
+  at 6.1 G (4.6 G of it those chip toolchains), 1.6 G cut the same way, and still
+  compiled both decks from its own `env.sh`.
+* **The A/B root is the 2.0.17 one, and its Python has to see `serial`.** Cut the
+  same way, `~/.arduino15` went 2.4 G → **1.2G** on 2026-11-02 (662 M
+  `riscv32-esp-elf-gcc`, 413 M of S2/S3 compilers, the `gdb`s, `openocd`) and still
+  built both decks on 2.0.17. Its `esptool_py` 4.5.1 imports `serial`, which only
+  the 3.3.12 root ships, in `pylibs/`; without it every compile dies on
+  `ModuleNotFoundError: No module named 'serial'` before a sketch is touched, which
+  reads like a broken toolchain and is not. So the A/B root carries its own
+  `env.sh`: data dirs pointed at itself, `PYTHONPATH` at the 3.3.12 root's
+  `pylibs/`, `arduino-cli` in its `bin/`, core 2.0.17. On 2026-11-03 this VM had no
+  2.0.17 at all — `~/.arduino15` here is the fallback data dir, holds 3.3.12 and has
+  no `env.sh` — so it was re-provisioned as **`~/.arduino-cyd-2`** (own `data`,
+  `downloads` and `user`, the 3.3.12 libraries copied in). Source the one that
+  exists:
+
+  ```bash
+  source ~/.arduino-cyd-2/env.sh && ./check_headroom.py   # both decks, on 2.0.17
+  ```
+
+  `./check.sh --full` runs that build as its **`old core`** step and compares the
+  result with `old_core.json`, so a figure cannot outlive the sketch that printed
+  it; it says so when no A/B root is found. The file is also checked with no
+  compiler at all: `./check_old_core.py --record`, the fast gate's `old record`
+  step, requires every deck it names to be here with one row and an md5 for a
+  sketch that is in the index, because an md5 of a file a clone would not have
+  describes bytes nobody can check out, and it hashes that sketch and compares:
+  a record that still describes an older file is refused with no compiler at
+  all. Both gates read the file through
+  `check_old_core.read_record()` and judge its rows with `row_shape()`, so a
+  rule about the record cannot hold in one gate and not the other. The same
+  holds for which file a deck is: every checker asks `check_headroom.sketch_of()`
+  and hashes through `check_headroom.md5()`, so a quoted figure, a bundled copy
+  and a recorded md5 are always the same bytes.
 * **A core upgrade costs whatever the sketch's stack costs, not a fixed overhead.**
   Measured on 2026-10-31, one machine, `--warnings all`, fresh build paths,
   same source, going 2.0.17 → 3.3.12: the Bluetooth-only phone deck grows
-  1,162,8xx → 1,165,174 B (about **2.4 kB**), while the WiFi/TLS Spotify deck
-  grows 967,493 → 1,122,249 B (**+154,756 B**, 73 % → **85 %** of the default
-  app partition; the documented 2.0.17 build reads 967,413 on its own path,
-  because the build root moves the last digits). It is not mbedTLS getting
-  fatter: named `mbedtls_*` symbols
-  only go 83,854 → 91,309 B and `wifi`/`lwip` symbols 83,470 → 87,007 B. It is
-  how IDF 5 assembles the network stack — the 3.3.12 image links
+  1,162,8xx → 1,165,174 B (about **2.3 kB**), while the WiFi/TLS Spotify deck
+  grows 967,493 → 1,122,249 B (**+154,756 B**), 73 % → **85 %** of 1,310,720 —
+  the default app partition. Not mbedTLS getting fatter: named `mbedtls_*` symbols
+  only go 83,854 → 91,309 B and `wifi`/`lwip` 83,470 → 87,007 B. It is how IDF 5
+  assembles the network stack — the 3.3.12 image links
   `network_provisioning`, `esp_driver_uart`/`gpio`/`i2c`, `esp_mm` and `espnow`
   that the 2.0.17 image never referenced, its `libnet80211`, `liblwip` and
   `libwpa_supplicant` are each larger, and more of the core's WiFi code is inline
   in headers, so the sketch's own object grows with it. So never scale one
   deck's core delta onto another: recompile and quote `Sketch uses …`, and check
-  the partition before assuming a sketch still fits.
+  the partition before assuming a sketch still fits. The Spotify README's 967,413
+  is the 2026-10-31 file (`ef0681b`) on a path ten characters shorter; at this
+  repo's path it prints 967,493, and the committed Spotify sketch, which has
+  grown the Bluetooth link and the identity since, prints past 1,310,720 B on
+  2.0.17 — over the default slot; the exact figure and md5 are in
+  [`old_core.json`](old_core.json), because a 2.0.17 number quoted in prose is
+  checked against the 3.3.12 build.
 * **Why 3.x is the default, and what would reverse it.** Core 2.0.17 ships
   mbedTLS 2.28.7, a branch that reached end of life at the end of 2024, and the
   Spotify deck's whole job is TLS to a third party — an unpatched TLS stack
@@ -197,19 +434,24 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   Espressif's own 2.0.x support ended in July 2024; and no flash of either deck
   has been confirmed, so today is the cheapest this migration will ever be — both
   already link clean on both cores. The price is **155 kB** in the WiFi deck
-  (343 kB → 185 kB of its app slot) and ~3 kB of RAM; the Bluetooth deck pays
-  2.4 kB. Reverse only for a measured reason: if the WiFi deck runs out of flash,
+  (335 kB → 181 kB of its app slot) and ~3 kB of RAM; the Bluetooth deck pays
+  2.3 kB. Reverse only for a measured reason: if the WiFi deck runs out of flash,
   use `huge_app` (3 MB slot, 36 % used today) rather than an unsupported TLS
   stack. **Still unmeasured: heap during the TLS handshake on 3.x** — the first
   thing to watch when the Spotify deck reaches hardware, since 53,636 B of
-  globals leaves 274 kB and mbedTLS 3.x is the larger consumer.
+  globals leaves 268 kB and mbedTLS 3.x is the larger consumer.
 * Libraries, and only these unless the widget genuinely needs more: `Adafruit GFX
   Library`, `Adafruit ILI9341`, `XPT2046_Touchscreen`.
 * **Never install ArduinoBLE.** Its `BLEDevice.h` shadows the core's header and
   the build dies in a wall of errors. BLE comes from the core (Bluedroid) —
-  `BLEDevice`, `BLEServer`, `BLEClient`.
+  `BLEDevice`, `BLEServer`, `BLEClient`. **`NimBLE-Arduino` is refused for a
+  different reason**: it would compile, but every call the sketch makes is written
+  against Bluedroid, so swapping the stack is a rewrite of the link rather than a
+  library install — and it saves nothing a 3 MB slot needs. Both names live in the
+  descriptors' `never` list, which is what the app's library box prints, and each
+  carries its own reason there: one shadows a header, the other is the wrong API.
 * Use the widget's [`toolchain.sh`](phone_deck_cyd24R/toolchain.sh) rather than
-  assembling a toolchain per chat; it is idempotent and keeps everything under one
+  assembling a toolchain per session; it is idempotent and keeps everything under one
   `ARDUINO_HOME`.
 * Report what actually ran. "Compiles" means a compile exited 0 in this repo.
 * **Flashing from the phone is ArduinoDroid's job, not the app's.** On
@@ -220,12 +462,17 @@ arduino-cli compile --fqbn esp32:esp32:esp32 my_widget
   57600, 230400, 460800 or 74880 baud in either DTR/RTS polarity while 552 B left
   the phone per round. Keep the two apart: a deck flashes from the phone today,
   and the app's USB flasher is the thing that cannot write a board until its
-  packets arrive. A computer over the same cable is the fallback, and it is also
-  the test that separates the app's transmit path from the bridge. That record
+  packets arrive. A computer over the same cable is the fallback for a machine
+  without ArduinoDroid, and it separates the app's transmit path from the bridge
+  the same way the phone's own successful flash already does. That record
   does not name the image that flashed — no log of the session survives in either
   tree — so it proves the phone, the adapter and the board are up to a flash;
-  it does not prove that either deck has run. Do not re-litigate either without a
-  new measurement.
+  it does not prove that either deck has run. A successful flash also rules the
+  hardware out — cable, adapter, board, bridge and ROM all work — so a probe that
+  writes bytes and hears nothing blames this app's send path and nothing else, and
+  a diagnosis that sends the owner back to test the cable is re-testing what a
+  flash has already proven. The flasher stays in the app for a future fix rather
+  than being deleted: ArduinoDroid carries flashing in the meantime.
 
 ## Palette
 
@@ -233,9 +480,9 @@ Widgets that draw a UI keep their palette **in the sketch**, as a table:
 
 ```cpp
 static constexpr Palette THEMES[] = {
-  { 0x10A1 /* #14150f */, 0x2103 /* #20211a */, /* ... twelve entries */ },
+  { 0xF7DF /* #f1f0eb */, 0xE71C /* #e8e7e2 */, /* ... twelve entries */ },
 };
-static constexpr uint8_t THEME_INDEX = 1;   // which one is live
+static uint8_t themeIndex = 1;   // which one is live; the app writes it
 ```
 
 * Twelve fields, fixed order and fixed jobs: ground, panel, lifted panel,
@@ -245,14 +492,91 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
 * Status rules must keep the last three distinguishable in every theme, by
   luminance rather than hue: charging strongest against the ground, the warning
   state next, the healthy state quietest.
-* **Ship monochrome.** Two themes: 0 PAPER (black on white) and 1 INK (white on
-  black), six accent roles as a grey ramp, so a new widget needs no colour
-  decisions to be readable. A widget that genuinely needs colour adds a theme to
-  its own table and says why in its README.
+* **A control's label is measured against the fill under it, not the page.**
+  `HostTests.labels()` holds every pair at 4.5:1 — a secondary action's ink on its
+  wash, a field's text and its placeholder on the field fill, the live segment's
+  label on the page ink, the primary action's label on its fill — with a
+  placeholder allowed 3:1 as a hint. Lifting a fill one step can quiet the word on
+  it while every check that measures ink against the page still passes, which is
+  how a button becomes a caption without anyone editing its colour.
+* **The phone app ships the site's three palettes, and so does a deck.**
+  `Palette.Scheme` holds GREEN, MOSS and NAVY as the site's stylesheet writes them
+  — page, band, the words on that band, and an accent — and `Appearance` stores
+  which set and which page. **The band never turns over**: only the page does, so
+  the chrome is identical in both modes and the mark is tinted with the band's own
+  ink. A widget that needs a state colour uses the accent as a **fill** with
+  `Ui.ON_ACCENT` on it, never as ink on the page, because moss's lime on moss's
+  cream is 1.03:1; `HostTests.sitePalettes()` measures every role of all six
+  combinations at the floors above. A deck carries them too: `THEMES[]` holds the
+  neutral `PAPER`/`INK` pair plus the three palettes twice, and the app addresses a
+  row as `2 + palette * 2 + (light ? 0 : 1)`.
+* **A deck's rows are the app's palettes.** The sketch is pasted on its own into
+  ArduinoDroid, so it cannot import the palette — its table is a second copy of the
+  pages and inks. `check_widget_assets.py` reads each sketch's `THEMES[]` comments
+  and `Palette.java`, refuses a deck whose PAPER ground or ink is not
+  `LIGHT_FIELD`/`LIGHT_TEXT` or whose INK ground or ink is not `DARK_FIELD`/
+  `DARK_TEXT`, and then holds rows 2 to 7 to each `Scheme`'s own page and body ink
+  at that same index — a swatch cannot name a row the glass paints differently. `artifacts/deck_palette.py` draws both decks' tables at the panel's
+  320x240 into `artifacts/decks/`; that is a palette proof, not a capture.
+  **A change to a deck page ends in a drawing of it.** `artifacts/deck_screens.py`
+  ports every page both sketches can show — the phone deck's home, messages, now
+  playing, detail, settings and calibration, and the Spotify deck's player, setup
+  and calibration — into a 320x240 page per theme from each sketch's own draw calls
+  and `THEMES` row. `check_widget_assets.py` draws them all again into a temp dir
+  and refuses a committed page that no longer matches, so editing a sketch without
+  redrawing is a red gate rather than a stale picture. Glyphs are a stand-in for
+  Adafruit's 5x7 and the content is sample data, so a page is a reconstruction, not
+  a capture.
+  **Both decks sit on one grid.** A page runs `MARGIN = 12` to `SCREEN_W - MARGIN`,
+  and everything inside a card starts `CARD_PAD = 10` in from that edge.
+  `check_widget_assets.py` holds every `static const Rect` in a sketch to those two
+  numbers: nothing may cross either page margin, no rect may invent an inset — the
+  8, 18 and 20 px edges the grid pass removed were exactly that — or stop short of
+  one, and a rect that begins on the margin and is wider than half the column has
+  to reach the other side. The sketch's own `MARGIN`/`CARD_PAD` are read where it
+  declares them and refused when they are not the grid's; a sketch drawing the same
+  edges from literals is measured against the grid. Two exemptions are named in the
+  rule rather than guessed: the band above the content, where the wordmark, the
+  link pill and the back button live, and the `_HIT` boxes, which are touch slop
+  and draw nothing.
+* **The theme is chosen at runtime, by the app.** A Phone Link deck carries a
+  read-write palette characteristic (`6f2d0008-…`, one byte, `0` PAPER or `1`
+  INK), applies it, stores it in the `settings` namespace and repaints; the app
+  writes it and reads it back, so a chip is lit by the board's answer rather than
+  by what the phone last sent. A deck keeps **no theme page of its own**: a page
+  that can only say "reflash" is a page that lies about being a control. The
+  compile-time index is gone with it.
 * Keep the `0x5655 /* #rrggbb */` shape: the comment is how the palette is read
   and reviewed, and a reformat that drops it leaves a wall of numbers.
-* The twelve `C_` names are plain variables loaded from the chosen theme, so a
-  picker can reassign them at runtime without touching a draw call.
+* The twelve `C_` names are plain variables loaded through `applyTheme()`, so a
+  write from the phone can reassign them without touching a draw call. Every
+  change goes through that one function, because a half-applied palette is a
+  screen drawn in two greys.
+
+## Typefaces: one bitstream per glyph
+
+Both decks draw text with three faces cut from DejaVu Sans Mono by
+[`artifacts/deck_font.py`](artifacts/deck_font.py) — 11 px body, 20 px display,
+30 px clock — pasted into each sketch as PROGMEM and blitted into the frames by
+[`artifacts/deck_screens.py`](artifacts/deck_screens.py). Adafruit_GFX's
+`drawChar()` pulls a fresh byte every eighth pixel and never pads to a row
+boundary, so a glyph is exactly `ceil(width × height / 8)` bytes and the next
+glyph starts immediately after it.
+
+Padding each row to a whole byte is the trap. It leaves dead bits at the end of
+every row, so every row after the first shifts right and a wide face runs on into
+the next character. The first flash of the phone deck showed it as blocks where
+the letters should be — and the frames could not show it, because the renderer
+was unpacking with the same padding and so drew perfect text over a broken glass.
+Neither deck draws text through `setFont()` and `print()` any more: `blitText()`
+reads the tables itself, clears each glyph cell to the background colour the
+caller asked for (the library refuses that for custom fonts, so a repainted
+label kept the old glyphs under the new ones), and writes horizontal runs.
+[`check_fonts.py`](check_fonts.py) holds the packing: offsets that add up to
+`ceil(w × h / 8)`, a bitmap exactly as long as the last glyph needs, both decks
+carrying the same faces, and a renderer that unpacks continuously.
+[`selftest_fonts.py`](selftest_fonts.py) mutates each of those faults back in and
+expects a refusal.
 
 ## NVS
 
@@ -271,11 +595,11 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
 * Keep every name the widget has ever advertised in the app's `nameMatch`, or
   boards flashed before a rename stop being found.
 * Service and characteristic UUIDs are per deck, never reused across decks, with
-  one deliberate exception: the **Phone Link** service (`6f2d0001-…` and its six
+  one deliberate exception: the **Phone Link** service (`6f2d0001-…` and its seven
   characteristics) is spoken by every deck that talks to the companion app,
   because the app has one scan and one implementation of it. That is what lets one
   phone drive whichever BLE deck is flashed. What stays per deck is the identity
-  document — widget, name, role, board — and the advertised name, which is what
+  document — widget, name, role, v — and the advertised name, which is what
   `nameMatch` reads.
 * A deck that speaks the service must expose **all** of time, battery and notice,
   not just the ones it draws: the app refuses a link to a server missing any of
@@ -283,6 +607,21 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
 * Nothing here pairs in the phone's Bluetooth settings: these are GATT
   peripherals, not keyboards. A design that makes Android treat the board as an
   input device gets the link dropped.
+
+## One build name per sketch
+
+Each sketch declares `DECK_VERSION` — the phone deck `1.0.1`, the Spotify
+deck `1.0.0` today — and that one constant is
+quoted in its identity document as `"v"`, so a linked deck says which firmware it
+is running and the app prints it on the deck's row. The flash shelf reads the same
+declaration out of the bundled sketch and prints it there too, which is the answer
+to "is this the build I think it is?" without a serial cable.
+
+Bump it whenever the sketch changes in a way a reader could notice — a screen, a
+key, a serial line, a fix that alters behaviour — and in the same change. The
+identity document has a hard ceiling of 182 bytes (one read at MTU 185), so the key
+is one letter: the longest document either deck can build is 164 bytes on the phone
+deck and 172 on the Spotify deck, both with a sixteen-character label.
 
 ## Deck identity
 
@@ -321,101 +660,244 @@ static constexpr uint8_t THEME_INDEX = 1;   // which one is live
   the record as the address, never as the key. A board that has not published a
   document (an older flash, a read that failed) is filed under its MAC and
   upgraded the first time it answers, so the list migrates itself.
-* **An identity document is longer than a default ATT MTU.** It is ~150 bytes
-  against the 20 usable at MTU 23, so the app asks for 185 before discovering
-  services and asks again after `onMtuChanged`; a truncated read names no widget
-  and falls back to the address rather than inventing a half id.
+* **An identity document is longer than a default ATT MTU.** It is written from a
+  192-byte buffer against the 20 usable at MTU 23, so the app asks for 247 before
+  discovering services and asks again after `onMtuChanged`; a deck that caps its
+  own MTU lower (the Spotify deck asks 185) still answers, because Android takes
+  the smaller of the two. A truncated read names no widget and falls back to the
+  address rather than inventing a half id.
 
-## The two chats
+## One chat, one tree
 
-Two chats work this repository, each in its own worktree on its own
-`freebuff/<id>` branch. This section is the whole agreement between them; every
-other mention of it in this repo is a pointer back here.
+One chat works this repository, in one worktree, on one branch. Until 2026-11-03 it
+was two — a deck chat beside this one, each in its own worktree — and what let them
+meet went with the split: a branch census compared the two trees and a root hand-off
+page carried a deck commit into the app tree, and one chat needs neither, so both are
+deleted. What is left is the part that was never about the count.
 
-| Chat | Owns | May do without asking |
-| --- | --- | --- |
-| **this chat**, `freebuff/e9252a57…` | both decks, this file, the root checkers and all of `android-companion/` | build, measure and edit any of it; merge the deck chat's branch |
-| **the deck chat**, `freebuff/60e73bbb…` | its own worktree and branch | edit anything in its own tree; merge this branch; read this tree |
-
-* **The app's Java is this chat's.** It was written in the deck chat while the
-  split lasted, which made a deck change that needed one line of Java a two-branch
-  dance and left the two worktrees quoting different numbers. `android-companion/`
-  is edited here now, by the chat that edits the sketches.
-* **A change crosses as a commit and an SHA, never as a file copy.** The chat with
-  work to give commits on its own branch, pushes, and names the SHA; the receiving
-  chat merges it. A merge shows both sides of a disagreement, where a copy
-  silently drops whichever version was written second. Nothing is copied into
-  another chat's worktree — not `android-companion/`, not a sketch, not a doc —
-  and nothing is checked out over files the owner has changed since.
-* **Neither chat writes into the other's worktree**, and no branch checked out
-  somewhere else is force-pushed. A file that appears in a tree without a commit
-  is drift, not a handoff: `git status` there is that tree's owner to explain
-  before anything is merged over it.
-* **A rule has one home.** Anything true of the whole board or of both chats lives
-  in this file; anything true of one widget lives in that widget's `README.md`;
+* **A commit is how work moves, never a file copy.** Every branch here is a line of
+  work in one object store, so a commit on one is already readable from another and
+  `git cherry-pick <sha>` needs nothing pushed — a push is a publish, not a hand-off.
+  A copy silently drops whichever version was written second; a merge shows both
+  sides of the disagreement. Re-measure what a merge brings, because a figure
+  belongs to the root that printed it: the 1,891,309 B above is a branch's
+  1,879,489 B read again through this root, not a number copied across.
+* **A rule has one home.** Anything true of the whole board or of the app lives in
+  this file; anything true of one widget lives in that widget's `README.md`;
   everywhere else a rule is a link, never a restatement. Two copies disagree
   eventually, and then neither is trusted.
 * **A checker beats a paragraph.** If a rule can be tested, it becomes an assertion
   in a root checker and the prose shrinks to a pointer at it — a rule that cannot
   drift does not need repeating.
-* **The owner edits; the other reports.** A failure in another chat's area is
-  reported with the command that printed it and the SHA it printed on, never
-  quietly fixed in that tree.
-* **A measurement is true of the tree that printed it.** Merge this branch before
-  quoting a number, and run [`check_branches.py`](check_branches.py) when a doc and
-  a tree seem to disagree.
 * **Exact bytes live in one file.**
   [`android-companion/HANDOFF.md`](android-companion/HANDOFF.md) keeps the exact APK
   size with the date it was measured; every other file rounds it to the nearest kB,
-  so a rebuild is one edit. A number a chat did not print is quoted with its date
-  or not at all.
+  so a rebuild is one edit. A number nobody printed is quoted with its date or not
+  at all.
 * **Commit before going quiet.** Uncommitted work is what makes an edit look
-  ownerless a session later, so anything left uncommitted gets a line in that
-  tree's `HANDOFF.md` saying what and why.
+  ownerless a session later, so anything left uncommitted gets a line in
+  `HANDOFF.md` saying what and why.
 
 ## Working in this repo
 
 * One widget per change. A change touching two widget folders is two changes.
-* **Two chats share this repo, and [`## The two chats`](#the-two-chats) is the
-  whole agreement.** Nothing needs the other chat's permission: the table is the
-  permission.
-* **Another chat's work reaches this tree by merge, never by copy.** Each chat is
-  a worktree on its own `freebuff/<id>` branch, so a commit made over there
-  leaves `main` green and these numbers true for the tree that printed them, and
-  nothing else notices the two disagree. [`check_branches.py`](check_branches.py)
-  names the branches carrying commits `main` does not have yet, with the worktree
-  that has one checked out; it reads refs and blobs and never a worktree, so it
-  answers even for a tree this chat cannot open. Look at it before believing a doc
-  that seems stale, and merge rather than hand-editing the numbers, because the
-  other branch has usually already re-measured them. It judges content, not just
-  commits: a branch whose changed files are the same bytes `main` already has — a
-  folder renamed here, work rebased over — is reported as nothing to fold, and
-  one whose patches are all upstream drops out the same way, so the list stays
-  what a merge would actually add. The branch on it today is
-  `app/phone-deck-build`, 87 commits back: 21 of its paths carry bytes `main` has
-  no copy of, and they live under `cyd_phone_deck/`, a folder this tree renamed
-  away. The check names that folder instead of guessing, because merging it would
-  bring the folder back — read the paths before merging one, and prefer the branch
-  that measured the numbers.
-* Nothing is pushed or deployed without being asked. The repo stays private.
+* **Run the gates from one command.** [`check.sh`](check.sh) is the fast set a
+  commit must pass — docs (figures, links, prose), widget assets, the 2.0.17
+  record's shape (no compiler needed), the archive in `dist/` (its size ceiling
+  and the sketches bundled in it), the host tests — and `./check.sh --full`
+  adds deck headroom on 3.3.12, the 2.0.17 decks compared with `old_core.json`,
+  the nine render captures, the APK build, two more builds of that APK that must
+  match it byte for byte, and every deck compiled twice with its clock pinned,
+  whose images must match too, the decks compiling concurrently — and `./check.sh --selftest` runs the twelve
+  `selftest_*.py` files in about ten seconds. It also refuses a source file that is in the worktree but not in the
+  index: every commit here stages tracked files, which cannot pick up a new one,
+  and `LinkCommand.java` was referenced by two tracked classes for a day while a
+  clone of the branch would not have compiled. The individual
+  checkers keep their names because the pre-commit hook calls two of them with
+  staged paths; nothing else needs six remembered invocations, and a round that
+  runs one command cannot skip a step by forgetting it. `./check.sh --full <folder>`
+  proves the decks you name — their headroom, their old-core build and their
+  two-build repro — and leaves the other decks alone; the APK and the frames are
+  app-wide, so they still run. `./check.sh --decks-only <folder>` is the narrower
+  form: the same three deck steps with the frames and the APK skipped, so it
+  proves the decks named still fit and still build the same bytes twice, and
+  nothing about the app. It is for the minutes after a sketch edit, and its last
+  line says which two things were not built, so a working run cannot be read as
+  the release gate. The release gate is the run with no names on it.
+  `--cached` is the working form of that gate: it hashes each expensive step's
+  inputs — the decks it proves, the app sources, the checker itself, and a stamp
+  naming the toolchain — and, when those bytes match what `.gate_evidence.json`
+  holds, prints the measurement it recorded instead of compiling. It is for the
+  minutes between changes and never for a release: the run that ships is the one
+  without it, and a run that reused anything says so instead of claiming to have
+  passed everything. A store outlives the tree it describes, so a full run first
+  drops every entry whose deck or file this tree no longer holds, and
+  `python3 check_evidence.py list` prints what is left, marking as stale anything
+  a `prune` would take. The store holds one entry per step name, so a
+  scoped run for the other deck re-proves the three steps it takes: a cached
+  figure is warm for the deck proved last, which is why a widget README quotes the
+  date and the deck behind its number rather than a bare duration.
+* **Work reaches a branch by merge, never by copy**, so
+  [the section above](#one-chat-one-tree) is the whole of it: a branch is mergeable
+  on its own terms, nothing here needs anyone's permission, and a number a merge
+  brings is re-measured here. Read a branch's paths before merging: an older one can
+  *look* like work and be a downgrade, which is what `app/phone-deck-build` was at 87
+  commits back, 21 paths under `cyd_phone_deck/`, a folder this tree renamed away.
+* Nothing is pushed or deployed without being asked, except the render bundle a UI
+  change is shown through: that publish is part of the gate above, not a separate
+  request. The repo stays private.
+* **One kB is 1,024 bytes, and it is written down once, here.** Every size in
+  these docs is binary: 202,353 B is "198 kB", 343,307 B is "335 kB", rounded to
+  the nearest kB with the exact bytes beside it in a table or in `HANDOFF.md`.
+  Decimal kilobytes crept in and read as plausible — 343 kB for 343,307 B, 753 kB
+  for 752,864 B, and "1,123–1,126 kB" for a range that was in bytes — so the
+  unit is stated rather than assumed. `KiB` is never used, because it would say
+  the same thing twice. A figure that is an estimate with no byte count behind it
+  (`~300 kB` of heap) stays as it was measured, and disk sizes are whatever `du`
+  printed (7.8 G), because neither is flash.
 * Numbers in docs are one board's measurements, not a contract. Say which.
+* **Every commit sweeps every file for what it just made untrue.** A sketch, a
+  doc, a README, a script comment and these rules are all descriptions of
+  something, and the description is the part that rots without anyone noticing.
+  Before committing, read the change for what it contradicts — a quoted number,
+  a "still carries", a "not yet", a step that has become optional, a rule whose
+  behaviour moved — and fix it in that commit, or write down why the old text
+  stays. The rules are included: a bullet that no longer describes the code is a
+  bug in the bullet, not a fact about the code. `check_docs.py` holds the quoted
+  sizes, md5s and links; everything else is a reader's job, so do it before the
+  reader does.
+* **Say it in words a person who was not there can use.** A commit subject names
+  what changed and why it matters, in the vocabulary the docs use — no ticket
+  shorthand, no "misc", no list of touched files standing in for a reason. The
+  hand-off note, the chat update and the commit body are one sentence seen from
+  three screens.
+
 * Never document a step as working because it should. The failed handshake is
   recorded with the baud rates and byte counts tried — including which handshake
   failed: the app's, not ArduinoDroid's — and that precision is what stops the
   next attempt from retreating to a cable it does not need.
 
+### The render pipeline, as it stands
+
+One command per stage, and each one is checked rather than assumed:
+
+| Stage | Command | Cost on 2026-11-02 |
+| --- | --- | --- |
+| Capture, install, rebuild the tall sheet and the site bundle | `android-companion/capture.sh` | 12 s warm (21 s cold) |
+| Verify the committed frames still match the app | inside `./check.sh --full` | 9.7 s |
+| Put them online | deploy `artifacts/site/manifest.json` | seconds; the gate, not a separate ask |
+
+* **The capture runs the app, not a drawing.** `CaptureTest` builds `TopBar` and each
+  screen, measures at 393 dp, lays them out and draws with Android's renderer; a state
+  reached by tapping is reached by tapping, and the clock and the link snapshot are
+  frozen so a frame reads the same on every run. Nine frames, `artifacts/renders/`.
+* **The gate captures again on purpose.** `check_renders.py` does not trust the PNGs a
+  previous command installed; it draws them again and compares pixels, which is why
+  "current" means something. That is the one duplicate in the loop and it stays.
+* **Side effects are declared, not worked around.** The test writes PNGs as a side
+  effect, so Gradle cannot see its output disappear; the test tasks say they are never
+  up to date (`app/build.gradle`) instead of every compile being re-run by
+  `--rerun-tasks`. The daemon is kept and its JDK passed explicitly.
+* **The published page is a scroll, not a contact sheet.**  `publish_renders.py` stacks
+  the frames at phone width with a hairline and one caption between them, so dragging
+  down walks the app; the strip it serves beside them exists for a single message, not
+  for reading, and the same script draws it from those same frames on every run —
+  a strip kept in `renders/` is how the published one came to show a week-old
+  capture's seven frames while the app drew ten. The addresses are recorded in
+  [`android-companion/HANDOFF.md`](android-companion/HANDOFF.md#where-the-renders-live).
+* **A count of the screens is checked, not remembered.** [`check_screens.py`](check_screens.py)
+  reads every tracked file for a number before *screens*, *frames* or *captures* and
+  compares it with the frames git holds in `artifacts/renders/`, so "the seven screens"
+  fails the day there are ten. A paragraph that also spells today's count is a
+  history rather than a claim — that is what keeps the strip's "seven frames while
+  the app drew ten" readable — and the selftests are skipped, because a
+  fixture's job is to say the wrong number. Seven files had drifted from seven to
+  ten before it existed: the design page, its README, this gate's own header, the
+  capture script, a Gradle comment, a cost table and the screen baseline page.
+* **An emulator is not the upgrade it sounds like.** It would answer a different
+  question — a device screenshot with the phone's fonts and status bar — while the
+  layout arithmetic is already the app's own; and on this machine it is not even
+  runnable (no `kvm` group, no emulator package, no system image). What captures cannot
+  show is behaviour: touch, ripples, scroll physics, the states behind code a JVM cannot
+  reach. That is the phone's job, and
+  [`HANDOFF.md`](android-companion/HANDOFF.md) keeps that list honest.
+
 ## App UI
 
-The app is a drawer (`DrawerHome`) with three rows: `PAIRED` (the row that
-opens the link and the bridge), `BOARDS` (the one that opens the shelf) and
-`SERIAL`. The first two were labelled `DECKS` and `PROJECTS` until 2026-11-01;
-the names behind them did not move — `DecksTab`, `ProjectsTab`, `SECTION_DECKS`,
-`SECTION_PROJECTS` and the `"decks"`/`"projects"` prefs keys still describe what
-the screens are — so a grep for the old words finds code, not copy.
-`SETTINGS` is deliberately not a fourth: it is configuration rather
-than navigation, so it hangs off the gear at the outer end of the top bar, past
-the link pill. The bottom tab bar is gone on purpose, because a drawer that *is*
+The app has two lists, and they are different questions: **where you go** is the
+pull-down in the top bar's left corner, and **how it is set up** is the side panel
+behind the burger at the other end. The pull-down opens `PAIRED` (the page the app
+starts on), `BOARDS` (the shelf) and `SERIAL`, in flow under the header rather than
+over the page, so nothing is hidden while the list is open. The panel opens
+`SETTINGS`, `DECKS`, `BRIDGE` and `APPEARANCE` as bottom sheets, with the three
+palette swatches and the page toggle repeated at its foot. The first two sections
+were labelled `DECKS` and `PROJECTS` until 2026-11-01; the names behind them did not
+move — `DecksTab`, `ProjectsTab`, `SECTION_DECKS`, `SECTION_PROJECTS` and the
+`"decks"`/`"projects"` prefs keys still describe what the screens are — so a grep
+for the old words finds code, not copy.
+The app's appearance is three palettes by two pages, and it is the app's alone: a
+deck's palette is set per board on PAIRED, so each end has a switch. `Ui` holds the
+live inks as mutable statics, `Ui.applyTheme` swaps
+them, and the choice stores the answer with `Appearance` and recreates the
+activity, because a colour is read when a view is built and a screen already on
+show would otherwise keep the theme it was drawn in. **The section survives that
+rebuild.** `MainActivity` saves it in `onSaveInstanceState` and reopens it after
+`buildUi()`, so switching themes in the panel leaves you in the panel; until
+2026-11-04 the rebuild landed on the front page from wherever the user was, which is
+a bug rather than a repaint. `CaptureTest.sectionSurvivesTheRebuild` drives the
+platform's own save and restore — the pair `recreate()` calls — instead of a copy
+of the rule. **The scroll offset and the unfolded cards come back too.** Each
+screen carries a stable id, so the platform's view-state restore puts the
+`ScrollView` offset back itself — `ScrollView` writes the stored value straight
+into `mScrollY`, before a layout could clamp it — and the shelf saves the ids of
+its open cards with the activity, because a fold is not a view property.
+`theScrollComesBackWithTheRebuild` and `theOpenCardsComeBackWithTheRebuild` hold
+both halves. INK is off-white ink on
+black, PAPER is black ink on the off-white page; the band is a shade of that same
+off-white in both, because it is the ground the mark was drawn on and a band that
+turned with the theme would put a plate behind artwork that has none. The same
+choice is the app's own, and each deck keeps its own PAPER/INK pair on PAIRED, so a phone on one page and a board on the other is a decision rather than drift. The bottom tab bar is gone on purpose, because a drawer that *is*
 the front page needs no second navigation.
+
+* **The top bar carries the owner's mark, centred on the band.** `TopBar` puts
+  `R.drawable.logo_mark` on the centre line of the row every screen sits under —
+  the crumb's half of the spare width and the pill's half are the same weight, so a
+  fixed-width mark between them cannot drift off centre whatever either of them
+  says — and `DrawerHome` no longer draws it: the band is the light ground the artwork was drawn
+  on, so the file needs no plate behind it and the ghost is the band itself showing
+  through the C. The artwork is **one black spiral** — the C — with the ghost sitting
+  in the gap between its turns, so every white pixel in the file is canvas and the
+  mark is the ink and nothing else. Keying that white, flooding it from the border or
+  outlining the disc are three ways to invent a boundary the file does not have; the
+  first two kept a white notch beside the shoulder or a white plate behind the whole
+  mark, and both shipped here before a reader rejected them. On the field it was also
+  a black mark on blue, which is the third reason it belongs on the band. It ships as
+  one PNG per density, `mdpi` 26px through `xxxhdpi` 104px, written by
+  [`artifacts/logo_icon.py`](artifacts/logo_icon.py) from the file's four `d` strings
+  unchanged: a raster because clearing a background is a boundary in the render
+  rather than arithmetic on the path, and five exact sizes because one bitmap
+  rescaled by the framework is resampled on the device. The archive is checked
+  rather than assumed: `./toolchain.sh` hashes every `res/*.png` in the built APK
+  and requires each of the five to be among them, by content because AGP shortens
+  resource paths and a grep for the name finds nothing. The eyes are about 8% of
+  the artwork's width — 2px at mdpi, 6px on a 2.75x phone — so the mdpi capture is
+  the harshest view of them, and it is the view to check before calling them missing.
+  At 26dp the mark is deliberately shorter than the pill's 27dp: the pill sets the
+  bar's height, so the header is as tall as the link state and no taller, and the
+  bar's vertical padding is equal above and below so the mark, the crumb, the pill
+  and the gear all sit on one centre line. The wordmark below takes back the air the
+  mark used to hold.
+
+* **Iconography is drawables, not characters.** The gear and the two chevrons are
+  the places where a glyph was standing in for an icon, and both were a gamble on
+  the phone's monospace face: U+2699 could arrive as emoji colour or as nothing, and
+  U+2039 sat on the text baseline at the font's weight rather than the row's. A real
+  icon is `res/drawable/*.xml` — a 24dp grid, filled black — loaded through
+  `Ui.icon`, which sizes it square and tints it `SRC_IN`, so one asset serves every
+  ink and a lit state is a second `Ui.tint` rather than a second file. The drawer's
+  `+`/`−` stay characters on purpose: they are arithmetic signs on a line, not a
+  shape standing in for a thing.
+
 
 * **BOARDS expands to the board alone.** One row per distinct board, labelled
   exactly as the shelf's crumb labels it — `2.4" CYD (resistive)` — and tapping
@@ -430,6 +912,45 @@ the front page needs no second navigation.
   The screen states where it is — `BOARDS › <board>` — from
   `WidgetCatalog.boardLabel`, the same call the drawer's row is drawn from, so
   the crumb and the drawer cannot drift apart.
+* **The shelf can be edited in place, and the form is a card.** `ADD A PROJECT`
+  and the `EDIT` chip open the same editor with the record's four fields — name,
+  tagline, status, notes. A dialog would be a second window the capture cannot
+  draw, so the render gate would have nothing to compare; a card is also what the
+  shelf already is. A card that ships inside the app has no `EDIT`, and neither
+  does one the catalogue seeded: a widget's name, tagline, body and libraries
+  belong to `widget.json`, a catalogue card's belong to `FirmwareCatalog`, and
+  the store rewrites both on every read, so a field there would forget what it
+  was told. `EDIT` and `DELETE` exist only for records this app made (`user:`
+  ids) for the same reason, and a record added here is `SKETCH` kind, which is
+  why `INSTALLER` and `SOURCE` appear only when a link is set and `RECIPE` only
+  on an `IMAGE`. A new record can also start from the sketch: `IMPORT A .INO`
+  opens the same document picker, its answer seeds the form with the file's own
+  name (extension dropped, underscores read as spaces) and attaches that file on
+  `ADD`,
+  so the card is made knowing what it runs instead of needing `ATTACH` next. An
+  existing card attaches from `ATTACH A FILE`; the two share one request code and
+  `pendingSketch` says which of them asked, so a sketch never lands as an image.
+* **A card can name a file, and the kind follows the file.** `ATTACH A FILE` opens
+  the picker as a card in place of the project's own — the same reason the editor
+  is a card — listing what FILES already holds, because a second picker window is
+  a second thing the capture cannot draw. A `.ino` becomes `COPY SOURCE`, the text
+  ArduinoDroid compiles; a `.bin` becomes `FLASH`, which opens SERIAL with that
+  image marked `PICKED FROM THE SHELF` and leaves the confirm to the flasher, the
+  only screen that writes bytes to a board. The store keeps the file's *name*, not
+  its bytes: a file deleted from FILES draws `Not in FILES any more` instead of a
+  button that fails on tap. `IMPORT A FILE` sits in the picker, so the shelf can add
+  to FILES rather than only read it: the platform's document picker opens, its
+  result goes through `MainActivity` on a second request code, and the list is
+  rebuilt in place so the next tap is the new file rather than ATTACH again. A
+  folded card carries a `FILE` badge when it names one, so the shelf answers
+  "which of these can run something" before anything is opened.
+* **A catalogue card has no file slot.** `marauder`, `bruce` and `launcher` are
+  links to someone else's installer, so their records are marked `catalog` and a
+  read heals one that was given a file: kind back to `IMAGE`, name cleared. Bruce
+  is a browser flasher — there is no `.ino` and no `.bin` here to attach — and a
+  card that offered one was offering a file that cannot exist. Those cards also
+  draw no `NEEDS` line, because the field behind it holds "Prebuilt image." on
+  these seeds and read like a library nobody had installed.
 * **Libraries are one disclaimer at the top of the shelf**, read from the widget
   descriptors and never retyped in Java. Each library is a button that copies the
   exact name ArduinoDroid's library list searches for, and the ArduinoBLE warning
@@ -445,26 +966,74 @@ the front page needs no second navigation.
   address the deck printed. `SIGN IN` fetches the deck's own authorize URL and
   opens it, so the custom scheme still returns into this app; a deck that is
   signed in and out of setup says so instead of asking a page it does not serve.
-* **Every UI change ships a render, and the render is linked before anything
-  ships.** Draw the screens it touches with `android-companion/render_ui.py`, which
-  reads its colours and metrics from `Ui.java`, and keep the PNGs in
-  `artifacts/renders/`. Then *show* them: a clickable link into this workspace —
-  `[home](artifacts/renders/home.png)` — for every screen the change touched, and
-  only those, with `![home](…)` beside it when one is worth eyeballing in the
-  reply. **The link is a gate, not a courtesy: nothing is pushed or published
-  until the owner has a link to a viewable render of what changed.** "It compiles"
+* **A render is a gate before a UI change ships, never a receipt after it.** The
+  order is fixed: draw the screens with `android-companion/capture.sh`, publish
+  them, post one labelled link per screen touched — and only then commit, push or
+  deploy. A turn that changes a pixel ends with those links whether or not anyone
+  asked for one, because the owner reads this chat on a phone and cannot open the
+  worktree: a change with no link is a change he has not seen, however green the
+  gate is. If a frame looks wrong, the change waits; a capture that disagrees with
+  the code is the gate working, not a formality to route around. `check_renders.py`
+  holds the half a machine can hold — the committed frames must be what the app
+  draws — and the link is the half only he can check. The PNGs live in
+  `artifacts/renders/`; *show* them by putting each one somewhere that serves the
+  bytes over public `https` and posting a labelled link —
+  `[Home, the drawer](https://host/abc.png)` — for every screen the change
+  touched, and only those. **Shape matters as much as the file.** The owner reads
+  this chat on a phone, and that client renders neither Markdown images nor bare
+  URLs: `![home](…)` and a naked `https://…` on its own line both arrive as
+  letters on a screen, and a workspace path is worse still, because it opens
+  nothing anywhere but here. What arrives is a *label* wrapped around a public
+  URL, and the host has to still be serving it when he taps. **Send the screens,
+  not a strip.** A phone message is a short list of labelled links, one per
+  screen — `[Paired](https://…/paired.png)` — because the label is the only part
+  the client makes tappable. The gallery is an optional second link;
+  `chat-sheet.jpg` is a desktop extra and never the way a phone is asked to read
+  the screens: it is one row nine frames wide, so every frame lands as a
+  thumbnail. A message whose only link is the gallery or the strip has not sent
+  the renders. **A link is not a
+  gate at all unless it opens.** The first links this repo posted 404'd because the
+  hostname had one character too many, so open every address before sending it —
+  `curl -s -o /dev/null -w '%{http_code}' <url>` printing `200` is the proof; a
+  file sitting in `artifacts/site/public/` proves nothing about the internet. And
+  the address must be a real `https` one: a chat client cannot open
+  `artifacts/renders/home.png`, so [`artifacts/publish_renders.py`](artifacts/publish_renders.py)
+  copies the committed frames into `artifacts/site/public/` with a gallery page, and
+  that bundle is deployed as the static site below. So the step after a capture is
+  `python3 artifacts/publish_renders.py`, then the deploy, then one *labelled* link
+  per touched screen — `[Paired](https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/paired.png)`. Publishing the renders
+  is part of shipping them; publishing the code still needs asking. The fast gate
+  itself draws the nine frames whenever a staged file could move a pixel — the
+  app's Java, its resources or the capture — so a commit cannot leave them behind;
+  posting the link is the one step no checker can do for you. "It compiles"
   says nothing about what a page looks like, and a change nobody looked at is a
   change to be undone later. A change that alters something which is not one of
-  those seven screens — the launcher icon, a design page, `dist/index.html`, the
+  those nine screens — the launcher icon, a design page, `dist/index.html`, the
   app's own copy in `artifacts/` — gets a sheet of its own under `artifacts/` and
   the same link, because the rule is "what a user sees ships with its picture",
-  not "the renderer's seven frames". The PNGs are the page's own images —
+  not "the renderer's nine frames". The PNGs are the page's own images —
   `tokens.json`'s `screens` maps each frame to one — so a change that redraws a
   screen regenerates that render and commits it with the code and the page. A
-  render is metric-accurate, not a device screenshot — say which.
-  [`check_renders.py`](check_renders.py) is what keeps the gate loud: it redraws
-  every screen and fails when a committed PNG no longer matches the picture the
-  app draws, comparing pixels rather than timestamps because git stores no mtime.
+  render is a capture of the app, not a device screenshot — say which.
+* **A render is a capture from the app.** The frames in `artifacts/renders/` are
+  taken by [`android-companion/capture.sh`](android-companion/capture.sh), whose
+  `CaptureTest` instantiates `TopBar` and the screen class, lays them out and draws
+  them with Android's own renderer on the JVM (Robolectric, native graphics). So the
+  pixels carry the platform's fonts, the real vector drawables and the platform's
+  text layout: a padding, a weight, a dp size or a row height is the app's own
+  arithmetic, a moved row cannot leave a stale picture behind, and the gear is
+  `R.drawable.ic_gear` — a drawable, because U+2699 and the two chevrons were
+  characters the monospace face might not carry at all. A state the app
+  reaches by tapping is reached by tapping — `home-open` clicks BOARDS,
+  `projects-open` clicks the first project's header — and a frame is the full height
+  of what the screen builds, so a scrolled-away row is still in the picture. The
+  clock is frozen for the capture, because a shelf that says `3s ago` would otherwise
+  say a different number every run and the gate would flake on a non-change. It is
+  not a device screenshot: nothing here has a phone attached, so say "captured", not
+  "screenshotted", when the difference matters. [`check_renders.py`](check_renders.py)
+  keeps the gate loud: it captures again and fails when a committed PNG no longer
+  matches the pixels the app draws, comparing pixels rather than timestamps because
+  git stores no mtime.
 * **Music is mirrored, not fetched.** Nothing on this board holds a Spotify token
   and nothing asks the user to make a developer app: the companion app reads the
   phone's media session (already permitted by the notification access it needs for
@@ -473,7 +1042,12 @@ the front page needs no second navigation.
   playback itself. A deck with a transport row makes a chip a **request**: it
   raises a notify on `6f2d0007-…` and the phone runs the key against its own
   session, so the lit chip means the round trip, not the outcome, and the next
-  mirror line is what proves it. A deck with no phone linked keeps the Web API
+  mirror line is what proves it. The phone's half is `DeckService`: it calls
+  `setCharacteristicNotification` and writes the CCCD through the same one-op
+  queue as everything else, parses the line in `LinkCommand` (20 bytes, three
+  actions, a uint32 that restarts at 1 on reboot, so a repeated value is one tap),
+  and runs it on its own `MediaController` — `toggle` reading `PlaybackState`
+  rather than remembering what it last sent. A deck with no phone linked keeps the Web API
   path, where the chip really is a command. This is also why the
   two decks differ: the WiFi deck signs itself in and can play on its own, and a
   Bluetooth deck shows the phone's own player instead. Cost of the mirror: one

@@ -12,18 +12,16 @@ compiles the decks and fails one that no longer fits its partition;
 [`selftest_headroom.py`](selftest_headroom.py) proves the check's own refusals in
 about a second, with no toolchain installed.
 
-A screen change is verified by [`check_renders.py`](check_renders.py), which draws
-every screen again with [`android-companion/render_ui.py`](android-companion/render_ui.py)
+A screen change is verified by [`check_renders.py`](check_renders.py), which captures
+every screen again from the app with [`android-companion/capture.sh`](android-companion/capture.sh)
 and fails when a committed PNG in `artifacts/renders/` no longer matches, so a
 forgotten regeneration cannot pass as a reviewed change. It compares pixels, not
 timestamps: git stores no mtime, so a clone stamps every file with the same time.
 
-Each chat works on its own branch in its own worktree — who owns what is
-[`## The two chats`](CONVENTIONS.md#the-two-chats) — so
-[`check_branches.py`](check_branches.py) names the branches holding work `main`
-does not have — commits and bytes, no compile — and drops the ones whose content
-it already has, which makes it the list to merge from before trusting a number
-here.
+One chat works the repo, in this worktree, on one branch. Every figure here was
+printed by this tree, and a number that arrives with a merge is rebuilt here before
+it is quoted — [`## One chat, one tree`](CONVENTIONS.md#one-chat-one-tree) is the
+rule and the reason.
 
 | Project | Folder | What it is | Read |
 | --- | --- | --- | --- |
@@ -46,7 +44,8 @@ cable. It files its projects under **ESP32_Widgets**, with this one as
 **Phone Deck**.
 
 A built debug APK is at [`android-companion/dist/PhoneDeckBridge-debug.apk`](android-companion/dist/PhoneDeckBridge-debug.apk).
-A deck change reaches that APK by commit; the exact commands are in [DECK_HANDOFF.md](DECK_HANDOFF.md).
+A sketch reaches that APK through `:app:syncWidgets`, the step written down in
+[android-companion/README.md](android-companion/README.md#build).
 
 Nothing here needs Bluetooth pairing. The deck is a GATT peripheral, not a
 keyboard, so it does not appear in the phone's Bluetooth settings list.

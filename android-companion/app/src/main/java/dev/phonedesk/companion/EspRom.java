@@ -279,8 +279,8 @@ final class EspRom {
                 + " BOOT.");
         log("   nothing is sent and no line moves for " + (handResetMs / 1000)
                 + " s, because a chip in the loader answers a packet on its own");
-        final long deadline = System.currentTimeMillis() + handResetMs;
-        while (System.currentTimeMillis() < deadline) {
+        final long deadline = clock.now() + handResetMs;
+        while (clock.now() < deadline) {
             try {
                 if (quietSyncRemembered(QUIET_SYNC_ATTEMPTS)) {
                     log("   step 2 answered: BOOT + RESET put the chip in its loader and"
@@ -292,7 +292,7 @@ final class EspRom {
             } catch (IOException e) {
                 // Silent so far; keep listening until the window closes.
             }
-            sleep(250);
+            clock.sleep(250);
         }
         log("   step 2 got no answer in " + (handResetMs / 1000) + " s: either the"
                 + " buttons were not pressed, or the packets are not reaching the chip");
@@ -333,7 +333,7 @@ final class EspRom {
                 if (manual) {
                     log("   hold BOOT down now: this phase pulses EN with IO0 held high,"
                             + " so the strap is the button's");
-                    sleep(bootHoldLeadMs);
+                    clock.sleep(bootHoldLeadMs);
                 }
                 try {
                     return new Sweep(connect(), swap, manual, phase);
@@ -659,7 +659,7 @@ final class EspRom {
         if (rate == baud) return;
         port.changeBaudRate(rate);
         baud = rate;
-        sleep(40);
+        clock.sleep(40);
     }
 
     /**
@@ -699,7 +699,7 @@ final class EspRom {
         try {
             port.changeBaudRate(rate);
             baud = rate;
-            sleep(40);
+            clock.sleep(40);
         } catch (IOException e) {
             log(rate + " baud: bridge refused the rate (" + e.getMessage() + ")");
         }
@@ -719,9 +719,9 @@ final class EspRom {
     private void resetOnly() throws IOException {
         port.flushInput();
         lines(false, true);   // IO0 high, EN low: reset, with both lines defined
-        sleep(120);
+        clock.sleep(120);
         lines(false, false);  // EN released: BOOT decides flash or download mode
-        sleep(120);
+        clock.sleep(120);
     }
 
     private void enterBootloader() throws IOException {
@@ -734,12 +734,12 @@ final class EspRom {
         // all across eleven attempts.
         io0(false);           // IO0 high
         en(true);             // EN low: chip held in reset
-        sleep(100);
+        clock.sleep(100);
         io0(true);            // IO0 low: the strap the ROM samples
         en(false);            // EN high: chip leaves reset into download mode
-        sleep(50);
+        clock.sleep(50);
         io0(false);           // IO0 high again, strap already sampled
-        sleep(120);
+        clock.sleep(120);
     }
 
     /**
@@ -751,11 +751,11 @@ final class EspRom {
         log("reset: IO0 high, EN pulsed (boot from flash)");
         port.flushInput();
         lines(false, false); // IO0 high, EN released
-        sleep(60);
+        clock.sleep(60);
         lines(false, true);  // EN low: reset
-        sleep(150);
+        clock.sleep(150);
         lines(false, false); // EN released, IO0 high: boot from flash
-        sleep(200);
+        clock.sleep(200);
         connected = false;
     }
 
@@ -981,11 +981,11 @@ final class EspRom {
         previewCap = BANNER_BYTES;
         port.flushInput();
         lines(false, true);   // EN low: reset, IO0 stays high
-        sleep(120);
+        clock.sleep(120);
         lines(false, false);  // EN released: the ROM prints its banner now
-        final long deadline = System.currentTimeMillis() + windowMs;
+        final long deadline = clock.now() + windowMs;
         final byte[] buffer = new byte[64];
-        while (System.currentTimeMillis() < deadline) {
+        while (clock.now() < deadline) {
             final int read = port.read(buffer, 50);
             if (read <= 0) continue;
             bytesIn += read;
@@ -1007,9 +1007,9 @@ final class EspRom {
         preview.reset();
         previewCap = BANNER_BYTES;
         port.flushInput();
-        final long deadline = System.currentTimeMillis() + windowMs;
+        final long deadline = clock.now() + windowMs;
         final byte[] buffer = new byte[64];
-        while (System.currentTimeMillis() < deadline) {
+        while (clock.now() < deadline) {
             final int read = port.read(buffer, 50);
             if (read <= 0) continue;
             bytesIn += read;
@@ -1032,9 +1032,9 @@ final class EspRom {
         preview.reset();
         previewCap = BANNER_BYTES;
         int seen = 0;
-        final long deadline = System.currentTimeMillis() + windowMs;
+        final long deadline = clock.now() + windowMs;
         final byte[] buffer = new byte[64];
-        while (System.currentTimeMillis() < deadline) {
+        while (clock.now() < deadline) {
             final int read = port.read(buffer, 50);
             if (read <= 0) continue;
             seen += read;
@@ -1064,7 +1064,7 @@ final class EspRom {
         for (int attempt = 0; attempt < attempts; ++attempt) {
             sendCommand(OP_SYNC, payload, payloadChecksum);
             if (awaitResponse(OP_SYNC, 200) != null) return;
-            sleep(50);
+            clock.sleep(50);
         }
         throw new IOException("no answer from the bootloader");
     }
@@ -1120,7 +1120,7 @@ final class EspRom {
         progress.update(98, "rebooting into the new firmware");
         sendCommand(OP_FLASH_END, new byte[]{0, 0, 0, 0}, 0);  // 0 = reboot
         connected = false;
-        sleep(300);
+        clock.sleep(300);
         hardReset();
         progress.update(100, "written and verified");
     }
@@ -1285,8 +1285,8 @@ final class EspRom {
 
     /** Waits for a reply with the given opcode, skipping anything else. */
     private Response awaitResponse(int op, int timeoutMs) throws IOException {
-        final long deadline = System.currentTimeMillis() + timeoutMs;
-        while (System.currentTimeMillis() < deadline) {
+        final long deadline = clock.now() + timeoutMs;
+        while (clock.now() < deadline) {
             final byte[] frame = readFrame(150);
             if (frame == null) continue;
             if (frame.length < 8 || frame[0] != 0x01) continue;
@@ -1300,11 +1300,11 @@ final class EspRom {
 
     /** One SLIP frame, unescaped, or null when nothing complete arrived. */
     private byte[] readFrame(int timeoutMs) throws IOException {
-        final long deadline = System.currentTimeMillis() + timeoutMs;
+        final long deadline = clock.now() + timeoutMs;
         final byte[] one = new byte[1];
         ByteArrayOutputStream body = null;
 
-        while (System.currentTimeMillis() < deadline) {
+        while (clock.now() < deadline) {
             if (port.read(one, 40) <= 0) continue;
             ++bytesIn;
             final int value = one[0] & 0xFF;
@@ -1368,7 +1368,41 @@ final class EspRom {
                 | ((buffer[offset + 3] & 0xFF) << 24);
     }
 
-    private static void sleep(long millis) {
+    /**
+     * Time as this class sees it: every deadline below and every pause between
+     * attempts. Real by default, and nothing in the app replaces it.
+     *
+     * `test.sh` installs a virtual clock so the probe's real seconds — five
+     * wirings, two windows each, a silent board — cost milliseconds on a host with
+     * no board. The stub port advances the same clock, because a port that blocks
+     * is where most of the waiting happens.
+     */
+    interface Clock {
+        long now();
+
+        void sleep(long millis);
+    }
+
+    private static final Clock REAL_CLOCK = new Clock() {
+        @Override
+        public long now() {
+            return System.currentTimeMillis();
+        }
+
+        @Override
+        public void sleep(long millis) {
+            pause(millis);
+        }
+    };
+
+    private static volatile Clock clock = REAL_CLOCK;
+
+    /** Tests only: a clock that advances when something sleeps. */
+    static void useClock(Clock replacement) {
+        clock = replacement == null ? REAL_CLOCK : replacement;
+    }
+
+    private static void pause(long millis) {
         try {
             Thread.sleep(millis);
         } catch (InterruptedException e) {

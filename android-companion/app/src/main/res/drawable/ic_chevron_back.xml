@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The crumb's back chevron, drawn rather than typed.
+
+     The crumb used to open with U+2039, so the way back was a character in the
+     monospace face: its weight and its optical size were the font's, not the
+     bar's, and it sat on the text baseline instead of the row's centre. This is a
+     described chevron — two parallel edges, apex at x=6 — centred by the row it
+     sits in and tinted at the call site, so it matches the gear beside it.
+
+     A band, not a stroke: filled geometry renders identically on every API level,
+     where a stroked path leans on the renderer's line caps. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M15,5 L6,12 L15,19 L13,19 L5,12 L13,5 Z" />
+</vector>

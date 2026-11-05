@@ -5,29 +5,54 @@ waits for a phone to write its Phone Link characteristics. Android has no built-
 way to do that, so this app is the phone side — and it is also where the CYDs are
 monitored and where firmware sketches are kept for ArduinoDroid.
 
-The drawer is the front page; it opens three sections, and the gear at the outer end of the top bar, past the link pill, opens
-settings:
+Two controls, as on the owner's site. The **pull-down** in the left corner of the
+top bar carries where you go; the **side panel** behind the burger carries how the
+app is set up:
 
-| Section | What it is for |
+| Where | What it is for |
 | --- | --- |
-| **PAIRED** | Live link: what is connected, signal, uptime, packets, nearby decks |
-| **BOARDS** | Alphabetical shelf: every project folded to its name, kind and status, opening to its body, log, links and actions, under one libraries disclaimer |
-| **SERIAL** | Target board, OTG connection, bootloader probe, image flashing, serial monitor |
-| **SETTINGS** (gear, top bar) | Permissions, battery, bridge switch, last crash |
+| **PAIRED** (pull-down) | The link, then every deck the phone knows: the marquee chasing for the linked board, steady for one it has met, dark for one it has not, and each row drawn in the palette that deck is set to, with that palette's swatch ringed |
+| **BOARDS** (pull-down) | Alphabetical shelf: every project folded to its name, kind and status, opening to its body, log, links and actions, under one libraries disclaimer |
+| **SERIAL** (pull-down) | Target board, OTG connection, bootloader probe, image flashing, serial monitor |
+| **SETTINGS** (side panel) | All permissions in one list with a lit or dark LED, the notification filter, battery, last crash |
+| **BRIDGE** (side panel) | The bridge's own start and stop, its state, and what it refuses to do without Bluetooth |
+| **APPEARANCE** (side panel) | The three palettes and the one page switch, and the same pair as one row at the panel's foot |
 
 Ask it anything about the deck's state and it answers from the link itself, not
 from guesswork: `linked 4m 12s · -62 dBm · 18 packets · 5 notices`.
 
+**Three palettes, two pages.** The app draws the site's own three colour sets —
+**GREEN**, **MOSS** and **NAVY** — each with a light page and a dark one, chosen in
+**APPEARANCE** and stored in its own preferences file. **The band never turns
+over:** only the page does, so the header is identical in both modes, and the
+mark is tinted with the band's own ink, which is what the site does with
+`currentColor`. Every deck carries the same three swatches and the same
+sun/crescent circle on its row on PAIRED, and the chosen palette is the one that
+carries the ring — the row's own inks stay the app's, so three decks still read as
+one list. The page half is the board's own: a CYD's sketch carries two pages,
+**PAPER** and **INK**, and the page circle writes that byte down the link to that
+board alone, so the phone and the deck can sit on different pages without either
+switch knowing about the other.
+
 ## Monitoring your CYDs
 
 - The bridge scans for decks advertising the Phone Link service (or the name
-  "Phone Deck") and lists them under **NEARBY** with signal strength.
+  "Phone Deck") and lists them under **OFF** on PAIRED with signal strength and a
+  **LINK**.
 - **One deck is linked at a time.** That is a firmware and Android limit, not an
   app choice: each CYD accepts one phone, and the app keeps a single GATT link.
 - Tapping **LINK** on a row pins the bridge to that board. Once pinned, another
   CYD in range never steals the connection; the choice survives restarts.
-- Every deck that links is remembered under **SAVED DECKS** with its last-seen
+- Every deck that links is remembered as its own tile on PAIRED with its last-seen
   time, so a board that is switched off still shows up.
+  Its linked row carries **RENAME**, which writes a name of up to 16
+  characters to the board and stores it there, so the name follows the
+  deck rather than the phone.
+- **UNLINK** drops the link and forgets the row in one tap, on the deck's own row
+  where it sits beside **RENAME**. The scan
+  keeps running but stops linking by itself until you tap LINK, so the board you
+  just forgot is not taken straight back. A deck that is only remembered carries
+  **FORGET**, which removes the record and leaves the current link alone.
 - The header pill reads `LINKED`, `SCANNING` or `IDLE`, and the monitor refreshes
   once a second. RSSI is polled from the live link every 10 s.
 
@@ -89,8 +114,9 @@ links it needs.
 - **FILES** holds imports. **IMPORT A FILE** takes any `.ino`/`.bin` through the
   system picker and keeps the copy inside the app, with COPY / SAVE / FLASH /
   DELETE. The bundled decks are read-only.
-- The catalogue is still fixed at the four seeded projects: adding, editing and
-  deleting projects, and attaching a file to a card, is the next step.
+- Adding, editing and deleting projects, attaching a file to a card, and starting a
+  new project from an imported `.ino` are all on the shelf: `ADD A PROJECT` can
+  take the sketch first, name the card from it, and attach it on save.
 
 ## Direct USB
 
@@ -196,6 +222,20 @@ ROM protocol: SLIP framing, sync, register reads, `FLASH_BEGIN`/`FLASH_DATA`/
 | Notification | `6f2d0004-…` | UTF-8 `App\|Title\|Text`, truncated to 120 bytes |
 | Identity | `6f2d0005-…` | **read** — the deck's one line of JSON, parsed by `DeckIdentity`; a network deck answers the same document at `GET /deck.json` |
 | Now playing | `6f2d0006-…` | UTF-8 `state\|position\|duration\|title\|artist\|album`, whole seconds, state `play`/`pause`/`stop`, written once a second while something plays |
+| Theme | `6f2d0008-…` | **read/write**, 1 byte: `2 + palette * 2 + (light ? 0 : 1)`, plus `0`/`1` for the neutral pair. A deck's swatches and page circle on PAIRED write it, so the glass draws the palette that row rings; the app's appearance switch never touches one |
+
+The palette lives at both ends, and each end has its own switch. The app's is in
+the side panel: APPEARANCE, or the same row at the panel's foot, and it changes
+only the app. A deck's is on its own row on PAIRED: three swatches for the palette
+that row is drawn in, and a sun/crescent circle for the page; both write one byte
+(`2 + palette * 2 + (light ? 0 : 1)`) down the link to that board alone, and the
+sketch draws that row of its own `THEMES[]`. Only a linked row can write its page —
+the link carries one deck at a time — so an unlinked row says `LINK TO SET THE
+PAGE` instead of a circle that would write nowhere. A deck flashed
+before `6f2d0008-…` existed has no palette characteristic, and nothing is written
+rather than writing nowhere. The two choices stay independent because the two
+surfaces are: a board read from across a room need not be set the way the phone is
+held.
 
 Service UUID is `6f2d0001-9a3c-4b57-9d21-6a1e0c4f8b10`; full UUIDs are in
 [`DeckService.java`](app/src/main/java/dev/phonedesk/companion/DeckService.java).
@@ -209,8 +249,11 @@ session — through the notification access the app already needs — and `NowPa
 writes one line a second, so nothing here talks to Spotify and no account is
 involved. The three text fields are clamped to 47, 31 and 31 bytes and any `|`
 becomes `/`, because the characteristic splits on it. The deck draws what it is
-told and cannot control playback, which is why its now-playing page has no
-transport buttons.
+told and cannot change playback on its own, so a tap on one of its transport
+chips is a **request** sent back up the link: `LinkCommand` parses
+`<serial>|<action>` out of the notify and `NowPlaying.run` presses the key on the
+same session the mirror reads, with `toggle` reading `PlaybackState` rather than
+a remembered state. The next mirror line is what shows it worked.
 
 **Which apps get through is the user's choice.** SETTINGS lists every launchable app
 with a checkbox, and the first **SAVE** turns filtering on: after that only the
@@ -243,20 +286,37 @@ icon, requires `INTERNET` and cleartext (the sign-in hand-off is one request to
 the deck), refuses an APK that is `debuggable`, targets anything but 35 or ships
 without an icon, and prints the size and SHA-256 of what it copied to `dist/`.
 
+**The APK carries a copy of each sketch, not the sketch itself.**
+`syncWidgets` copies every `*/widget.json` beside this folder, and the sketch each
+descriptor names, into `app/src/main/assets/widgets/<id>/`, wiping the destination
+first so a removed widget does not live on in the APK. It is wired before
+`preBuild`, so any Gradle build runs it; that tree is gitignored build output and
+never belongs in a commit. `check_widget_assets.py` in the root compares the
+copies with `../<folder>/<sketch>.ino` and prints `2 widgets bundled, every copy
+matches` in a second without Gradle — the cheaper alarm to run after a sketch
+edit — and `toolchain.sh` reads the sketch back out of the finished APK and
+refuses a mismatched md5, which is the one that catches a build that skipped the
+sync.
+
 Android Studio still works: open the `android-companion` folder (Ladybug or
 newer), let it sync, and run the `app` configuration.
 
 `minSdk` is 26, `targetSdk` is 35 — what a new store listing requires. Targeting
-35 puts the app edge to edge on Android 15, so `MainActivity` pads the top bar and
-insets the content by the system bar height there, and leaves older releases
-alone: below
-15 the window still fits the bars itself and that padding would double it. The
+35 puts the app edge to edge on Android 15, so `MainActivity` adds the window's
+insets to the band, the page and both overlays there, and leaves older releases
+alone: below 15 the window still fits the bars itself and that padding would double
+it. The inset is the union of `systemBars()` and `displayCutout()`, so a camera
+punch-hole — a Flip's sits in the top centre — moves the band's words down while
+its colour stays behind the hole, and the sides are read too so the band, the
+pull-down and the side panel clear a cutout that lands on the long edge when the
+phone is turned. The status bar's icons follow the band on 15 and above, because
+that is the colour the clock is actually drawn on. The
 sketch is only bundled when the build goes
 through Gradle; a raw `javac` build produces an APK-less class check and the
 BOARDS deck card reports that the bundled sketch is missing.
 
 A prebuilt debug APK is committed at
-[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (168 kB,
+[`dist/PhoneDeckBridge-debug.apk`](dist/PhoneDeckBridge-debug.apk) (270 kB,
 package `dev.phonedesk.companion`, debug-signed). Install it with
 `adb install -r dist/PhoneDeckBridge-debug.apk`, or copy it to the phone and open
 it with "install unknown apps" allowed.
@@ -289,9 +349,12 @@ false` on the debug type for exactly that reason. INTERNET is the one permission
 here that took a property away: the app can reach the network now, and the deck's
 own address is the only host it ever calls.
 
-The APK is still signed with the debug certificate, which only affects updates: a
-build made on a different machine carries a different key, so it will not install
-over the previous one. Uninstall first, or build on the machine that made it.
+The APK in `dist/` is signed with the debug certificate, which only affects
+updates: a build made on a different machine carries a different key, so it will
+not install over the previous one. Uninstall first, or build on the machine that
+made it. A release archive is signed by a key of its own — made and kept outside
+the tree by [`release.sh`](release.sh), which is why `dist/` never holds one — and
+for the same reason it installs over nothing that came before it.
 
 ## Setup on the phone
 

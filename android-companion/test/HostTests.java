@@ -18,7 +18,9 @@ import java.util.List;
  * the wrong opcode is skipped, a refused write is blamed on the bridge rather
  * than the board, a silent board fails, flash refuses a session that never synced,
  * a hand on BOOT and RESET is tried before any wiring is, and the wiring the serial
- * card's buttons name is the first one the fallback sweep tries.
+ * card's buttons name is the first one the fallback sweep tries. The palette is in
+ * there too: every ink the app draws is measured against the surface it sits on,
+ * because an alpha is the one design decision that can go wrong one step at a time.
  */
 public final class HostTests {
 
@@ -33,8 +35,38 @@ public final class HostTests {
     private static int checks;
     private static final List<String> failures = new ArrayList<>();
 
+    /**
+     * Time the tests drive. EspRom's windows are real seconds wide, and every
+     * wiring is tried: on this clock a sleep advances the deadline instead of
+     * waiting for it, so "a silent board fails every wiring" still runs every
+     * wiring and every window, in milliseconds.
+     */
+    private static final class VirtualClock implements EspRom.Clock {
+        private long ms = 1_000_000L;
+
+        @Override
+        public long now() {
+            return ms;
+        }
+
+        @Override
+        public void sleep(long millis) {
+            ms += Math.max(1, millis);
+        }
+    }
+
+    private static final VirtualClock CLOCK = new VirtualClock();
+
     public static void main(String[] args) throws Exception {
+        sketchStamp();
+        deckVersion();
+        EspRom.useClock(CLOCK);
+        UsbSerialCh340.clock = CLOCK;
         framingRoundTrip();
+        bondAdvice();
+        noticeText();
+        contrast();
+        labels();
         syncChecksum();
         handshakeIntoDownloadMode();
         quietSyncUsesNoControlLines();
@@ -57,6 +89,9 @@ public final class HostTests {
         deckIdentity();
         deckAddresses();
         nowPacket();
+        linkCommand();
+        deckTheme();
+        deckLook();
 
         System.out.println();
         if (failures.isEmpty()) {
@@ -164,6 +199,32 @@ public final class HostTests {
                 port.commands.size() == 1 && port.commands.get(0)[0] == OP_SYNC);
         check("the ping counts as no reset at all",
                 joined(trace).contains("control lines untouched"));
+
+        // The bytes as they leave the port, not as this app's own decoder reads
+        // them: the stub's decoded lists assume the header layout sendCommand
+        // writes, so only a literal pin can catch that layout being wrong. These
+        // are esptool's sync frame — 0xC0, direction 0x00, opcode 0x08, size 36,
+        // checksum 0xDD, the 0x20120707 request and 32 0x55s, 0xC0 — and 46 bytes
+        // is what made "552 B out" twelve attempts on the phone's log.
+        final byte[] expected = new byte[46];
+        int at = 0;
+        expected[at++] = (byte) 0xC0;
+        expected[at++] = 0x00;
+        expected[at++] = (byte) OP_SYNC;
+        expected[at++] = 36;
+        expected[at++] = 0x00;
+        expected[at++] = (byte) 0xDD;
+        expected[at++] = 0x00;
+        expected[at++] = 0x00;
+        expected[at++] = 0x00;
+        expected[at++] = 0x07;
+        expected[at++] = 0x07;
+        expected[at++] = 0x12;
+        expected[at++] = 0x20;
+        for (int i = 0; i < 32; ++i) expected[at++] = 0x55;
+        expected[at] = (byte) 0xC0;
+        check("the sync frame on the wire is esptool's 46 bytes",
+                Arrays.equals(expected, port.wire.toByteArray()));
     }
 
     /**
@@ -687,6 +748,58 @@ public final class HostTests {
                 !NowPacket.word("buffering").equals("play") && !NowPacket.word(null).equals("play"));
     }
 
+    // ---------------------------------------------------------- link command ---
+
+    /**
+     * The deck's tap line, held to the sketch's own buffer: {@code <serial>|<action>}
+     * in at most 20 bytes, only three actions, serial from 1, and the same serial
+     * twice is one gesture. Nothing here needs a phone: the parser is plain Java.
+     */
+    private static void linkCommand() {
+        final LinkCommand toggle = LinkCommand.parse("3|toggle");
+        check("the deck's own tap line parses",
+                toggle != null && toggle.serial == 3
+                        && LinkCommand.TOGGLE.equals(toggle.action));
+
+        check("every action a chip can raise is understood",
+                LinkCommand.parse("1|prev") != null
+                        && LinkCommand.parse("2|toggle") != null
+                        && LinkCommand.parse("3|next") != null);
+
+        check("a key this app cannot run is dropped rather than guessed",
+                LinkCommand.parse("7|seek") == null
+                        && LinkCommand.parse("7|TOGGLE") == null
+                        && LinkCommand.parse("7|Toggle") == null);
+
+        check("a line with no serial or no action is dropped",
+                LinkCommand.parse("|toggle") == null
+                        && LinkCommand.parse("toggle") == null
+                        && LinkCommand.parse("9|") == null);
+
+        check("a serial that is not a positive number is dropped",
+                LinkCommand.parse("0|toggle") == null
+                        && LinkCommand.parse("x1|toggle") == null
+                        && LinkCommand.parse("-4|next") == null);
+
+        check("a line past the sketch's 20-byte buffer is dropped",
+                LinkCommand.parse("1|toggle" + "xxxxxxxxxxxx") == null
+                        && "1|toggle".getBytes(StandardCharsets.UTF_8).length
+                                <= LinkCommand.MAX_BYTES);
+
+        check("the value the stack hands over is the same line as the bytes",
+                LinkCommand.parse("12|next".getBytes(StandardCharsets.UTF_8)) != null
+                        && LinkCommand.parse("12|next".getBytes(StandardCharsets.UTF_8)).serial == 12);
+
+        check("a terminator the sketch never sends is padding, not a bad character",
+                LinkCommand.parse("4|next\0") != null
+                        && LinkCommand.parse(" 5|prev ") != null);
+
+        check("the same notify twice is one tap, and a rebooted counter is a new one",
+                !LinkCommand.fresh(LinkCommand.parse("8|toggle"), 8)
+                        && LinkCommand.fresh(LinkCommand.parse("1|toggle"), 8)
+                        && !LinkCommand.fresh(null, 0));
+    }
+
     // ------------------------------------------------------------- helpers ---
 
     private static Object invoke(String name, Object argument) throws Exception {
@@ -726,6 +839,350 @@ public final class HostTests {
 
     private static String joined(List<String> lines) {
         return String.join("\n", lines);
+    }
+
+    private static void bondAdvice() {
+        check("a failed connect while bonded asks for the stale bond to go",
+                BondAdvice.forFailure(BondAdvice.ERROR, BondAdvice.BOND_BONDED)
+                        .equals(BondAdvice.FORGET));
+        check("a refused write with no bond asks for one",
+                BondAdvice.forFailure(BondAdvice.INSUFFICIENT_AUTHENTICATION, BondAdvice.BOND_NONE)
+                        .equals(BondAdvice.PAIR));
+        check("a clean disconnect, and a refusal from an already-bonded phone, ask for nothing",
+                BondAdvice.forFailure(BondAdvice.SUCCESS, BondAdvice.BOND_BONDED)
+                        .equals(BondAdvice.NONE)
+                        && BondAdvice.forFailure(BondAdvice.INSUFFICIENT_AUTHENTICATION,
+                                BondAdvice.BOND_BONDED).equals(BondAdvice.NONE));
+        check("a bonding phone is still asked to pair rather than have its bond dropped",
+                BondAdvice.forFailure(BondAdvice.ERROR, BondAdvice.BOND_BONDING)
+                        .equals(BondAdvice.NONE));
+    }
+
+    private static void noticeText() {
+        NoticeText plain = NoticeText.from("Mail", "Subject", null, "Body", null, null, null);
+        check("title and text are used when an app sets them",
+                plain.title.equals("Subject") && plain.body.equals("Body"));
+
+        NoticeText ticking = NoticeText.from("Chat", null, null, null, null, "3 new", null);
+        check("an app that only sets a ticker still says something",
+                ticking.title.equals("3 new") && ticking.body.isEmpty());
+
+        NoticeText inbox = NoticeText.from("Chat", null, null, null, "2 unread",
+                null, Arrays.asList("first line", "second"));
+        check("a sub-text and an inbox line fill in for the missing body",
+                inbox.body.equals("2 unread"));
+
+        NoticeText named = NoticeText.from("Wallet", null, null, null, null, null, null);
+        check("a custom layout with nothing readable still names the app",
+                named.title.equals("Wallet") && !named.empty());
+
+        check("nothing at all is still nothing, not an empty post",
+                NoticeText.from(null, null, null, null, null, null, null).empty());
+    }
+
+    /**
+     * The palette's floor, measured rather than asserted in prose.
+     *
+     * The inks are the band grey at an alpha, so a quieter hint is always one small
+     * edit away and never looks wrong in a diff. This walks what the app actually
+     * draws — words on the field, words on the band, text on a filled action, and the
+     * one hairline — and holds each to a ratio: 4.5:1 for body ink, 3:1 for a hint or
+     * a status word, 1.5:1 for a line, which only has to be visible. It also pins that
+     * a 48 % ink FAILS, so the check cannot quietly pass everything.
+     */
+    private static void contrast() {
+        inks("dark", Palette.DARK_FIELD, Palette.DARK_PRIMARY, Palette.DARK_ON_FIELD,
+                new int[] {Palette.DARK_TEXT, Palette.DARK_PRIMARY, Palette.DARK_ALOUD},
+                Palette.DARK_ON_ACTION, Palette.DARK_RULES);
+        inks("light", Palette.LIGHT_FIELD, Palette.LIGHT_PRIMARY, Palette.LIGHT_ON_FIELD,
+                new int[] {Palette.LIGHT_TEXT, Palette.LIGHT_PRIMARY, Palette.LIGHT_ALOUD},
+                Palette.LIGHT_ON_ACTION, Palette.LIGHT_RULES);
+        for (int ink : Palette.ON_BAND) {
+            check("contrast: " + percent(ink) + " on the band clears 3:1 ("
+                            + tenths(Contrast.ratio(ink, Palette.BAND)) + ")",
+                    Contrast.ratio(ink, Palette.BAND) >= Contrast.QUIET);
+        }
+        check("contrast: black ink on the band carries body text at 4.5:1 ("
+                        + tenths(Contrast.ratio(Palette.INK, Palette.BAND)) + ")",
+                Contrast.ratio(Palette.INK, Palette.BAND) >= Contrast.BODY);
+        check("contrast: the band's own paper reads under black ink at 4.5:1 ("
+                        + tenths(Contrast.ratio(Palette.BAND, Palette.INK)) + ")",
+                Contrast.ratio(Palette.BAND, Palette.INK) >= Contrast.BODY);
+        // The refusal: this is the ink strength the sheet shipped that read as a
+        // hairline, and the reason the check exists. If it ever passes, the floor
+        // stopped meaning anything.
+        check("contrast: a quarter-strength ink on the off-white is refused ("
+                        + tenths(Contrast.ratio(0x40000000, Palette.LIGHT_FIELD)) + " < 3.0)",
+                Contrast.ratio(0x40000000, Palette.LIGHT_FIELD) < Contrast.QUIET);
+        sitePalettes();
+    }
+
+    /**
+     * The site's three palettes, both pages of each, held to the same floors the
+     * monochrome pair is.
+     *
+     * These are the app's own colours now, copied from the owner's stylesheet, and a
+     * copy is exactly the kind of thing that keeps every one of its floors while a
+     * page turns over and one ink lands on the wrong ground — moss's lime accent on
+     * moss's own cream page measures 1.03:1, which is why the "good" status is
+     * allowed to fall back to body ink instead of the accent.
+     *
+     * The band's four values are measured against the band, not the page, because the
+     * band is the ground they are drawn on and it does not turn over.
+     */
+    private static void sitePalettes() {
+        for (Palette.Scheme scheme : Palette.SCHEMES) {
+            page(scheme.id + " dark", scheme.pageDark, scheme.onDark, scheme.dimDark,
+                    scheme.ruleDark);
+            page(scheme.id + " light", scheme.pageLight, scheme.onLight, scheme.dimLight,
+                    scheme.ruleLight);
+            check("contrast: " + scheme.id + " band ink carries body text at 4.5:1 ("
+                            + tenths(Contrast.ratio(scheme.bandInk, scheme.band)) + ")",
+                    Contrast.ratio(scheme.bandInk, scheme.band) >= Contrast.BODY);
+            check("contrast: " + scheme.id + " band hint clears 3:1 ("
+                            + tenths(Contrast.ratio(scheme.bandDim, scheme.band)) + ")",
+                    Contrast.ratio(scheme.bandDim, scheme.band) >= Contrast.QUIET);
+            check("contrast: " + scheme.id + " band rule is visible at 1.5:1 ("
+                            + tenths(Contrast.ratio(scheme.bandLine, scheme.band)) + ")",
+                    Contrast.ratio(scheme.bandLine, scheme.band) >= Contrast.RULE);
+            check("contrast: " + scheme.id + " ink on the accent clears 4.5:1 ("
+                            + tenths(Contrast.ratio(scheme.accentInk, scheme.accent)) + ")",
+                    Contrast.ratio(scheme.accentInk, scheme.accent) >= Contrast.BODY);
+        }
+    }
+
+    /** One page of one palette: body ink, hint ink and the hairline on it. */
+    private static void page(String name, int page, int on, int dim, int rule) {
+        check("contrast: " + name + " body ink on the page clears 4.5:1 ("
+                        + tenths(Contrast.ratio(on, page)) + ")",
+                Contrast.ratio(on, page) >= Contrast.BODY);
+        check("contrast: " + name + " hint ink on the page clears 3:1 ("
+                        + tenths(Contrast.ratio(dim, page)) + ")",
+                Contrast.ratio(dim, page) >= Contrast.QUIET);
+        check("contrast: " + name + " hairline is visible at 1.5:1 ("
+                        + tenths(Contrast.ratio(rule, page)) + ")",
+                Contrast.ratio(rule, page) >= Contrast.RULE);
+    }
+
+    /**
+     * One theme's floors: every ink that carries a word on the page, the ones that
+     * carry body text, the ones that sit on a filled action, and the hairline. The
+     * page is two values, so the ramp order is what stops a theme that keeps every
+     * floor while collapsing two steps into one.
+     */
+    private static void inks(String name, int field, int primary, int[] onField,
+                             int[] body, int[] onAction, int[] rules) {
+        for (int ink : onField) {
+            check("contrast: " + name + " " + percent(ink) + " ink on the page clears 3:1 ("
+                            + tenths(Contrast.ratio(ink, field)) + ")",
+                    Contrast.ratio(ink, field) >= Contrast.QUIET);
+        }
+        for (int ink : body) {
+            check("contrast: " + name + " " + percent(ink)
+                            + " ink carries body text at 4.5:1 ("
+                            + tenths(Contrast.ratio(ink, field)) + ")",
+                    Contrast.ratio(ink, field) >= Contrast.BODY);
+        }
+        for (int fill : onAction) {
+            check("contrast: " + name + " ink on a filled action clears 4.5:1 ("
+                            + tenths(Contrast.ratio(fill, primary)) + ")",
+                    Contrast.ratio(fill, primary) >= Contrast.BODY);
+        }
+        for (int rule : rules) {
+            check("contrast: the " + name + " hairline is visible at 1.5:1 ("
+                            + tenths(Contrast.ratio(rule, field)) + ")",
+                    Contrast.ratio(rule, field) >= Contrast.RULE);
+        }
+        // Quietest first, so each step has to be at least as loud as the one before.
+        double previous = 0;
+        boolean ordered = true;
+        final StringBuilder ramp = new StringBuilder();
+        for (int ink : onField) {
+            final double ratio = Contrast.ratio(ink, field);
+            ordered &= ratio >= previous;
+            previous = ratio;
+            ramp.append(tenths(ratio)).append(' ');
+        }
+        check("contrast: the " + name + " ramp stays in order, quietest first ("
+                        + ramp.toString().trim() + ")", ordered);
+    }
+
+    /**
+     * Every control fills its own background and then draws its own label on it, and
+     * the pair is what has to clear the floor: a fill can be lifted a step at a time
+     * until the word on it is as quiet as the page around it, while every check that
+     * measures an ink against the page still passes. That is how a button went from
+     * reading as a panel to reading as a caption, and no paragraph caught it.
+     */
+    private static void labels() {
+        label("dark", Palette.DARK_FIELD, Palette.DARK_WASH, Palette.DARK_INPUT,
+                Palette.DARK_TEXT, Palette.DARK_DIM, Palette.DARK_PRIMARY, 0xFF000000);
+        label("light", Palette.LIGHT_FIELD, Palette.LIGHT_WASH, Palette.LIGHT_INPUT,
+                Palette.LIGHT_TEXT, Palette.LIGHT_DIM, Palette.LIGHT_PRIMARY, 0xFFF1F0EB);
+    }
+
+    private static void label(String name, int page, int wash, int input, int text, int dim,
+                              int filled, int onFilled) {
+        // The wash and the field fill are translucent, so each is laid over the page
+        // first: a ratio taken against a half-transparent colour measures nothing.
+        final int washOnPage = Contrast.over(wash, page);
+        final int inputOnPage = Contrast.over(input, page);
+        check("contrast: " + name + " a secondary action's label on its own wash clears "
+                        + "4.5:1 (" + tenths(Contrast.ratio(text, washOnPage)) + ")",
+                Contrast.ratio(text, washOnPage) >= Contrast.BODY);
+        check("contrast: " + name + " a field's text on its own fill clears 4.5:1 ("
+                        + tenths(Contrast.ratio(text, inputOnPage)) + ")",
+                Contrast.ratio(text, inputOnPage) >= Contrast.BODY);
+        check("contrast: " + name + " a field's placeholder on that fill clears 3:1 ("
+                        + tenths(Contrast.ratio(dim, inputOnPage)) + ")",
+                Contrast.ratio(dim, inputOnPage) >= Contrast.QUIET);
+        check("contrast: " + name + " the live segment's label on the page ink clears 4.5:1 ("
+                        + tenths(Contrast.ratio(onFilled, text)) + ")",
+                Contrast.ratio(onFilled, text) >= Contrast.BODY);
+        check("contrast: " + name + " the primary action's label on its fill clears 4.5:1 ("
+                        + tenths(Contrast.ratio(onFilled, filled)) + ")",
+                Contrast.ratio(onFilled, filled) >= Contrast.BODY);
+    }
+
+    /** {@code 0xA8D9D9D9} reads as "66 %", which is how the palette is described. */
+    private static String percent(int argb) {
+        return Math.round(100.0 * ((argb >>> 24) & 0xFF) / 255.0) + " %";
+    }
+
+    private static String tenths(double ratio) {
+        return String.format(java.util.Locale.US, "%.2f:1", ratio);
+    }
+
+    /**
+     * The palette byte is the one thing both ends must agree on: 0 PAPER, 1 INK,
+     * then 2 + palette * 2 + (light ? 0 : 1) for the site's palettes on both pages —
+     * the arithmetic the sketch's THEMES[] is indexed by. The app draws "MOSS DARK"
+     * on a chip that sends 5 to a board whose own row 5 is moss dark, so a swap here
+     * is a switch that lies in both directions at once.
+     */
+    private static void deckTheme() {
+        check("theme: PAPER is the byte 0 the board's table calls paper",
+                DeckTheme.payload(DeckTheme.PAPER)[0] == 0);
+        check("theme: INK is the byte 1 the board's table calls ink",
+                DeckTheme.payload(DeckTheme.INK)[0] == 1);
+        check("theme: a read of 0 decodes to PAPER",
+                DeckTheme.decode(new byte[] {0}) == DeckTheme.PAPER);
+        check("theme: a read of 1 decodes to INK",
+                DeckTheme.decode(new byte[] {1}) == DeckTheme.INK);
+        check("theme: green, moss and navy are rows 2 to 7, light before dark",
+                DeckTheme.of(Palette.GREEN, true) == 2
+                        && DeckTheme.of(Palette.GREEN, false) == 3
+                        && DeckTheme.of(Palette.MOSS, true) == 4
+                        && DeckTheme.of(Palette.MOSS, false) == 5
+                        && DeckTheme.of(Palette.NAVY, true) == 6
+                        && DeckTheme.of(Palette.NAVY, false) == 7);
+        check("theme: a row says which palette and which page it is",
+                DeckTheme.palette(5) == Palette.MOSS && !DeckTheme.page(5)
+                        && DeckTheme.palette(6) == Palette.NAVY && DeckTheme.page(6)
+                        && DeckTheme.palette(DeckTheme.PAPER) == DeckTheme.UNKNOWN);
+        check("theme: a palette the board does not have is unknown, not guessed",
+                DeckTheme.decode(new byte[] {8}) == DeckTheme.UNKNOWN
+                        && DeckTheme.decode(new byte[] {(byte) 0xFF}) == DeckTheme.UNKNOWN
+                        && DeckTheme.decode(new byte[0]) == DeckTheme.UNKNOWN
+                        && DeckTheme.decode(null) == DeckTheme.UNKNOWN);
+        check("theme: the chips are named the way the deck's table spells them",
+                DeckTheme.name(DeckTheme.PAPER).equals("PAPER")
+                        && DeckTheme.name(DeckTheme.INK).equals("INK")
+                        && DeckTheme.name(5).equals("MOSS DARK")
+                        && DeckTheme.name(2).equals("GREEN LIGHT"));
+    }
+
+    /**
+     * A deck's look is the site's palette for the app's drawing and the board's byte
+     * for the board's. The two halves have to stay one object: a page that drew the
+     * light field while the board was sent INK would be a row that describes a deck it
+     * is not looking at.
+     */
+    private static void deckLook() {
+        check("look: the light page is that palette's light row",
+                new DeckLook(Palette.MOSS, true).boardTheme() == 4
+                        && new DeckLook(Palette.GREEN, true).boardTheme() == 2
+                        && DeckTheme.page(new DeckLook(Palette.NAVY, true).boardTheme()));
+        check("look: the dark page is that palette's dark row",
+                new DeckLook(Palette.MOSS, false).boardTheme() == 5
+                        && new DeckLook(Palette.NAVY, false).boardTheme() == 7
+                        && !DeckTheme.page(
+                                new DeckLook(Palette.GREEN, false).boardTheme()));
+        check("look: the page drawn is that palette's own pair",
+                new DeckLook(Palette.GREEN, true).page() == Palette.GREEN_SCHEME.pageLight
+                        && new DeckLook(Palette.GREEN, true).on()
+                                == Palette.GREEN_SCHEME.onLight
+                        && new DeckLook(Palette.NAVY, false).page()
+                                == Palette.NAVY_SCHEME.pageDark
+                        && new DeckLook(Palette.NAVY, false).on()
+                                == Palette.NAVY_SCHEME.onDark);
+        check("look: the marquee and the live chip take that palette's accent",
+                new DeckLook(Palette.NAVY, true).accent() == Palette.NAVY_SCHEME.accent
+                        && new DeckLook(Palette.NAVY, true).accentInk()
+                                == Palette.NAVY_SCHEME.accentInk);
+        DeckLook stored = new DeckLook(Palette.NAVY, true);
+        check("look: a stored look reads back as the one that was stored",
+                stored.encode().equals("2|1")
+                        && DeckLook.decode(stored.encode(), DeckLook.DEFAULT).palette
+                                == Palette.NAVY
+                        && DeckLook.decode(stored.encode(), DeckLook.DEFAULT).light);
+        check("look: nothing stored, or nothing readable, draws the default",
+                DeckLook.decode(null, DeckLook.DEFAULT) == DeckLook.DEFAULT
+                        && DeckLook.decode("", DeckLook.DEFAULT).palette == Palette.MOSS
+                        && DeckLook.decode("9|0", DeckLook.DEFAULT).light == false
+                        && DeckLook.decode("1|7", DeckLook.DEFAULT).palette == Palette.MOSS
+                        && DeckLook.decode("x|0", DeckLook.DEFAULT).palette == Palette.MOSS);
+        check("look: a palette past the three is clamped, not a crash",
+                new DeckLook(7, false).palette == Palette.MOSS
+                        && new DeckLook(-1, false).palette == Palette.MOSS
+                        && new DeckLook(7, true).withPalette(2).palette == Palette.NAVY);
+    }
+
+    /**
+     * The stamp on the flash shelf is what stops a stale COPY being flashed as if
+     * it were today's sketch: the shelf names the bytes, Arduino names the size it
+     * compiled, and this tree quotes the md5. These are the formatting rules the
+     * card promises, so a change to them has to be a deliberate one.
+     */
+    private static void sketchStamp() {
+        byte[] abc = "abc".getBytes(StandardCharsets.UTF_8);
+        check("stamp: a sketch reads as its size and the first eight md5 digits",
+                SketchStamp.of(abc).equals("3 B  ·  90015098"));
+        check("stamp: the digest is the md5 this tree quotes, to eight digits",
+                SketchStamp.digest(abc).equals("90015098")
+                        && SketchStamp.digest("".getBytes(StandardCharsets.UTF_8))
+                                .equals("d41d8cd9"));
+        check("stamp: thousands are separated the way the docs write them",
+                SketchStamp.of(new byte[150544]).startsWith("150,544 B  ·  "));
+        check("stamp: nothing to read says so instead of looking like a build",
+                SketchStamp.of(null).equals("unreadable")
+                        && SketchStamp.of(new byte[0]).equals("empty"));
+    }
+
+    /**
+     * One constant per sketch names the build, and both readers have to agree with
+     * it: the identity document carries it so a linked deck says what it runs, and
+     * the shelf reads the same declaration out of the bundled text.
+     */
+    private static void deckVersion() {
+        DeckIdentity named = DeckIdentity.parse("{\"id\":\"phone_deck_cyd24R-A1B2C3\","
+                + "\"widget\":\"phone_deck_cyd24R\",\"v\":\"1.0.0\",\"link\":\"ble\"}");
+        check("version: a deck's own build is read from the document",
+                named.version.equals("1.0.0") && named.usable());
+        DeckIdentity older = DeckIdentity.parse("{\"id\":\"phone_deck_cyd24R-A1B2C3\","
+                + "\"widget\":\"phone_deck_cyd24R\",\"link\":\"ble\"}");
+        check("version: a deck flashed before the key reads empty, not a guess",
+                older.version.isEmpty() && older.usable() && older.bluetooth());
+        check("version: a sketch names its build in one declaration",
+                SketchVersion.of("static const char DECK_VERSION[] = \"1.0.0\";").equals("1.0.0")
+                        && SketchVersion.of("static constexpr char DECK_VERSION[] = \"2.3.1\";")
+                                .equals("2.3.1"));
+        check("version: a sketch that declares none reads empty",
+                SketchVersion.of("/* nothing here */").isEmpty()
+                        && SketchVersion.of(null).isEmpty());
+        check("version: a card writes it the way a person reads it",
+                SketchVersion.label("1.0.0").equals("v1.0.0")
+                        && SketchVersion.label("").isEmpty());
     }
 
     private static void check(String name, boolean ok) {

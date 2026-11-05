@@ -44,6 +44,11 @@ public class SpotifyCallbackActivity extends Activity {
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
+        // This window is part of the app too, so it follows the same palette and
+        // the same bars as every other screen rather than always drawing the ink
+        // one.
+        Appearance.apply(this);
+        Ui.applySystemBars(this);
         setContentView(buildUi());
         handle(getIntent());
     }

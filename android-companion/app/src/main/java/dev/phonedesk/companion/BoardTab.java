@@ -63,6 +63,8 @@ final class BoardTab extends ScrollView {
     private boolean swappedLines;
     /** The rate the last handshake answered at; PROBE and FLASH try it first. */
     private int probeBaud = 115200;
+    /** A file the shelf handed over, drawn as chosen so the two screens agree. */
+    private String pickedFromShelf;
 
     /**
      * The CH340 is one resource for the whole process, not one per Activity.
@@ -199,8 +201,8 @@ final class BoardTab extends ScrollView {
         monitorInput.setTextSize(12);
         monitorInput.setTextColor(Ui.TEXT);
         monitorInput.setHintTextColor(Ui.DIM);
-        monitorInput.setTypeface(Typeface.MONOSPACE);
-        monitorInput.setBackground(Ui.rounded(activity, Ui.CARD_HI, Ui.EDGE, 8));
+        monitorInput.setTypeface(Ui.face(monitorInput.getContext()));
+        monitorInput.setBackground(Ui.rounded(activity, Ui.INPUT, Ui.EDGE, 8));
         monitorInput.setPadding(Ui.dp(activity, 10), Ui.dp(activity, 8),
                 Ui.dp(activity, 10), Ui.dp(activity, 8));
     }
@@ -217,7 +219,8 @@ final class BoardTab extends ScrollView {
                 .append(usbProbing).append(usbFlashing)
                 .append('l').append(logVersion)
                 .append('m').append(monitorMode).append(monitorOpen).append(monitorBaud)
-                .append('p').append(portOwner);
+                .append('p').append(portOwner)
+                .append('k').append(pickedFromShelf);
         if (!sig.toString().equals(signature)) {
             signature = sig.toString();
             int keepScroll = getScrollY();
@@ -243,6 +246,18 @@ final class BoardTab extends ScrollView {
             signature = "";
             refresh();
         }
+    }
+
+    /**
+     * A card on the shelf asked for its image to be flashed. It is picked here, not
+     * started: the cable, the board and the confirm are this screen's business, and
+     * a flash is not something a tap on another screen should begin.
+     */
+    void pick(String name) {
+        pickedFromShelf = name;
+        if (monitorMode) setMode(false);
+        signature = "";
+        refresh();
     }
 
     private void build(List<FlashLibrary.Entry> entries) {
@@ -427,14 +442,22 @@ final class BoardTab extends ScrollView {
         Button start = Ui.action(activity, monitorOpen ? "STOP MONITOR" : "START MONITOR",
                 !monitorOpen);
         start.setOnClickListener(v -> toggleMonitor());
-        Ui.space(activity, start, 10);
-        card.addView(start);
 
         Button restart = Ui.action(activity, "RESTART + WATCH", false);
         restart.setEnabled(monitorOpen);
         restart.setOnClickListener(v -> requestMonitorReset());
-        Ui.space(activity, restart, 8);
-        card.addView(restart);
+
+        // One row of equal halves: stretched one above the other they read as two
+        // panels, and the pair is one choice — open the port, or reboot and watch.
+        LinearLayout monitorActions = Ui.row(activity);
+        Ui.space(activity, monitorActions, 10);
+        monitorActions.addView(start, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams restartParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        restartParams.leftMargin = Ui.dp(activity, 8);
+        monitorActions.addView(restart, restartParams);
+        card.addView(monitorActions);
 
         card.addView(Ui.section(activity, "OUTPUT"));
 
@@ -1494,10 +1517,27 @@ final class BoardTab extends ScrollView {
         TextView name = Ui.text(activity, entry.name, 15, Ui.TEXT);
         card.addView(name);
 
-        TextView size = Ui.text(activity, Ui.size(entry.size) + "  ·  "
-                + (entry.textual() ? "text" : "binary"), 12, Ui.DIM);
+        // The bytes on this card are the bytes COPY pastes, so the card names
+        // them: a sketch copied out of an older install has a different size and
+        // digest, and Arduino's own "Sketch uses" line has to match this one.
+        String detail = Ui.size(entry.size) + "  ·  " + (entry.textual() ? "text" : "binary");
+        if (entry.textual()) {
+            byte[] bytes = FlashLibrary.readBytes(activity, entry);
+            detail += "  ·  " + SketchStamp.of(bytes);
+            String build = SketchVersion.label(SketchVersion.of(
+                    bytes == null ? null : new String(bytes, java.nio.charset.StandardCharsets.UTF_8)));
+            if (!build.isEmpty()) detail += "  ·  " + build;
+        }
+        TextView size = Ui.text(activity, detail, 12, Ui.DIM);
         size.setPadding(0, Ui.dp(activity, 2), 0, 0);
         card.addView(size);
+
+        if (entry.name.equals(pickedFromShelf)) {
+            TextView picked = Ui.text(activity, "PICKED FROM THE SHELF", 10, Ui.ACCENT);
+            picked.setLetterSpacing(0.12f);
+            picked.setPadding(0, Ui.dp(activity, 4), 0, 0);
+            card.addView(picked);
+        }
 
         LinearLayout actions = Ui.row(activity);
         actions.setPadding(0, Ui.dp(activity, 10), 0, 0);
@@ -1514,7 +1554,7 @@ final class BoardTab extends ScrollView {
         actions.addView(save);
 
         if (!entry.textual()) {
-            Button flash = Ui.action(activity, "FLASH", false);
+            Button flash = Ui.action(activity, "FLASH", entry.name.equals(pickedFromShelf));
             flash.setTextColor(Ui.ACCENT);
             flash.setOnClickListener(v -> flashBinary(entry));
             actions.addView(flash);

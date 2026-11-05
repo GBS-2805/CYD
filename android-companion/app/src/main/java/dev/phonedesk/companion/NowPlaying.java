@@ -74,25 +74,53 @@ final class NowPlaying {
         handler.removeCallbacks(poll);
     }
 
+    /**
+     * Runs one transport key against the session the mirror is reading. The deck
+     * asked; this is the phone answering on its own player, which is why no token
+     * and no Web API call are involved.
+     *
+     * {@code toggle} reads {@link PlaybackState} rather than remembering what was
+     * last sent, because the user may have paused from the phone's own screen — and
+     * a stored guess would then play when they meant to pause.
+     *
+     * Returns false when there is nothing to drive, so the caller can say a tap
+     * arrived and landed nowhere instead of implying it worked.
+     */
+    boolean run(String action) {
+        if (sessions == null) {
+            sessions = (MediaSessionManager) context.getSystemService(Context.MEDIA_SESSION_SERVICE);
+            if (sessions == null) return false;
+        }
+        final ComponentName listener = new ComponentName(context, DeckNotificationListener.class);
+        final MediaController controller;
+        try {
+            controller = pick(sessions.getActiveSessions(listener));
+        } catch (SecurityException e) {
+            // Notification access revoked since the link came up.
+            return false;
+        }
+        if (controller == null) return false;
+
+        final MediaController.TransportControls keys = controller.getTransportControls();
+        if (keys == null) return false;
+        if (LinkCommand.PREVIOUS.equals(action)) {
+            keys.skipToPrevious();
+        } else if (LinkCommand.NEXT.equals(action)) {
+            keys.skipToNext();
+        } else if (LinkCommand.TOGGLE.equals(action)) {
+            if (isPlaying(controller)) keys.pause();
+            else keys.play();
+        } else {
+            return false;
+        }
+        return true;
+    }
+
     private void sample() {
         final ComponentName listener = new ComponentName(context, DeckNotificationListener.class);
         final List<MediaController> active = sessions.getActiveSessions(listener);
 
-        MediaController controller = null;
-        for (MediaController candidate : active) {
-            if (SPOTIFY.equals(candidate.getPackageName())) {
-                controller = candidate;
-                break;
-            }
-        }
-        if (controller == null) {
-            for (MediaController candidate : active) {
-                if (isPlaying(candidate)) {
-                    controller = candidate;
-                    break;
-                }
-            }
-        }
+        final MediaController controller = pick(active);
         if (controller == null) {
             publish(NOTHING);
             return;
@@ -125,6 +153,21 @@ final class NowPlaying {
             if (since > 0) position += (long) (since * state.getPlaybackSpeed());
         }
         return position;
+    }
+
+    /**
+     * Which session the mirror reads and the chips drive: Spotify when it is there,
+     * otherwise whatever is playing. One choice for both directions, so a key runs
+     * on the player whose title is on the glass.
+     */
+    private static MediaController pick(List<MediaController> active) {
+        for (MediaController candidate : active) {
+            if (SPOTIFY.equals(candidate.getPackageName())) return candidate;
+        }
+        for (MediaController candidate : active) {
+            if (isPlaying(candidate)) return candidate;
+        }
+        return null;
     }
 
     private static boolean isPlaying(MediaController controller) {

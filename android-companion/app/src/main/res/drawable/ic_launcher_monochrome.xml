@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Themed icons (Android 13+) keep one layer's alpha and tint it. The four
-     subpaths are the logo's own; evenOdd turns the eyes and the mouth into
-     holes, which is the only form of this mark that survives being flattened
+     subpaths are the mark's own; evenOdd folds the letter and its marks into
+     one shape, the only form of this mark that survives being flattened
      to a single tint. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"

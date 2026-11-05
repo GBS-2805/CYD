@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The logo's ground. Its single black contour carries the ghost as a
-         hole, so white here is what the ghost is drawn as. -->
+    <!-- The logo's ground. The G is one ink contour, so the plate behind it is
+         the white the letter is cut against. -->
     <color name="ic_launcher_background">#FFFFFF</color>
 </resources>
