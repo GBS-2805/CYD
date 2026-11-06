@@ -3,14 +3,13 @@
 # One gate, two speeds. A rule has one home, and this is where to run them from.
 #
 #   ./check.sh          what a commit must pass            (4.5 s)
-#   ./check.sh --full   what a release must pass           (423 s cold, 345 s warm):
+#   ./check.sh --full   what a release must pass           (428.8 s on 2026-11-06):
 #                       every deck on both cores, the old ones compared with
 #                       old_core.json, each deck built twice, every frame redrawn,
-#                       the APK built and rebuilt. Both figures were measured here
-#                       on 2026-11-05 with both decks, the second after the Arduino
-#                       build caches had warmed: 345015 ms over fifteen steps, of
-#                       which the sketch repro took 166 s and the old core 64 s.
-#                       The gap is the cache, so quote the run you made.
+#                       the APK built and rebuilt. Measured here on 2026-11-06
+#                       with both decks: 428841 ms over sixteen steps, of which
+#                       the sketch repro took 164 s and the old core 64 s. The
+#                       figure is cache-dependent, so quote the run you made.
 #                       It needs all three toolchains: source
 #                       ~/.arduino-cyd-3/env.sh, ~/.arduino-cyd-2/env.sh (or
 #                       ~/.arduino15/env.sh) for the old core, and
@@ -37,10 +36,10 @@
 # The gate passes on this tree every day, so its failure paths are the part
 # nobody exercises: --selftest runs the fourteen selftest_*.py files, which hand each
 # checker a throwaway repo and a stand-in (compiler, capture script, git repo) and
-# make it refuse. The full run's pair was timed on 2026-11-05 with both decks and
-# all three toolchains; the fast and selftest figures were re-taken on 2026-11-06.
-# A reader on a slower machine knows which figures to re-take before trusting the
-# gap. Every run prints its own total on the last line (`took 4.5 s (4528 ms)`), so re-taking
+# make it refuse. All three durations in this header were timed on this tree on
+# 2026-11-06 — the full run with both decks and all three toolchains — so a reader
+# on a slower machine knows which figures to re-take before trusting the gap. Every
+# run prints its own total on the last line (`took 4.5 s (4528 ms)`), so re-taking
 # one is a run, not a stopwatch.
 #
 # Fast:  docs (figures, links, prose, the recorded APK bytes and its ceiling),
