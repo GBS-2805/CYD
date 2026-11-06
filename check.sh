@@ -2,7 +2,7 @@
 #
 # One gate, two speeds. A rule has one home, and this is where to run them from.
 #
-#   ./check.sh          what a commit must pass            (3.8 s)
+#   ./check.sh          what a commit must pass            (4.5 s)
 #   ./check.sh --full   what a release must pass           (423 s cold, 345 s warm):
 #                       every deck on both cores, the old ones compared with
 #                       old_core.json, each deck built twice, every frame redrawn,
@@ -32,22 +32,23 @@
 #                       compiled again. Evidence about a deck or a file this tree
 #                       no longer holds is dropped before the run. For working on
 #                       the tree, never for a release.
-#   ./check.sh --selftest  the checkers' own refusals       (13.7 s, no toolchain)
+#   ./check.sh --selftest  the checkers' own refusals       (13.9 s, no toolchain)
 #
 # The gate passes on this tree every day, so its failure paths are the part
-# nobody exercises: --selftest runs the twelve selftest_*.py files, which hand each
+# nobody exercises: --selftest runs the fourteen selftest_*.py files, which hand each
 # checker a throwaway repo and a stand-in (compiler, capture script, git repo) and
-# make it refuse. All three durations in this header were timed on this tree on
-# 2026-11-05 — the full run with both decks and all three toolchains — so a reader
-# on a slower machine knows which figures to re-take before trusting the gap. Every
-# run prints its own total on the last line (`took 3.8 s (3811 ms)`), so re-taking
+# make it refuse. The full run's pair was timed on 2026-11-05 with both decks and
+# all three toolchains; the fast and selftest figures were re-taken on 2026-11-06.
+# A reader on a slower machine knows which figures to re-take before trusting the
+# gap. Every run prints its own total on the last line (`took 4.5 s (4528 ms)`), so re-taking
 # one is a run, not a stopwatch.
 #
 # Fast:  docs (figures, links, prose, the recorded APK bytes and its ceiling),
 #        widget assets, the
 #        index (no source file left outside it), the 2.0.17 record's shape (no
-#        compiler needed), the screen counts, the host tests, and the nine render
-#        captures whenever a staged file could move a pixel.
+#        compiler needed), the screen counts, the public bundle's handoff check, the
+#        host tests, and the nine render captures whenever a staged file could move
+#        a pixel.
 # Full:  the above, plus deck headroom on 3.3.12, the 2.0.17 decks compared with
 #        old_core.json, the nine render captures, the APK build with its signature,
 #        alignment and bundled-sketch checks, two more builds of that APK that must
@@ -219,6 +220,7 @@ if [ "$selftest" -eq 1 ]; then
   step "core selftest"   'branches of check_old_core'       python3 selftest_old_core.py
   step "render selftest" 'branches of check_renders'        python3 selftest_renders.py
   step "screens selftest" 'branches of check_screens'       python3 selftest_screens.py
+  step "publish selftest" 'branches of check_publish'       python3 selftest_publish.py
   step "repro selftest" 'branches of check_repro'          python3 selftest_repro.py
   step "sketch selftest" 'branches of check_sketch_repro'   python3 selftest_sketch_repro.py
   step "gate selftest"   'branches of check.sh'            python3 selftest_gate.py
@@ -279,6 +281,10 @@ step "fonts"      'glyphs packed'      python3 check_fonts.py
 # said seven for a week after the app drew nine. This reads the tracked prose against
 # the frames git holds, so the count has one home instead of eight.
 step "screens"    'screen count'      python3 check_screens.py
+# The handoff is the owner's page, not the site's. A build in a throwaway tree
+# proves the publisher cannot put it in the public bundle, and a bundle already in
+# this worktree is scanned too, so an old leaked file cannot sit there quietly.
+step "publish"    'no handoff'       python3 check_publish.py
 # test.sh finds its own JDK — $JAVA_HOME, then android-companion/jdk, then the
 # off-site root, then PATH — so the gate looks in the same four places before it
 # says the suite did not run. Asking only PATH skipped the suite on a machine that

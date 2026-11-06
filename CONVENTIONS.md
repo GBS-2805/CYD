@@ -708,7 +708,7 @@ deleted. What is left is the part that was never about the count.
   adds deck headroom on 3.3.12, the 2.0.17 decks compared with `old_core.json`,
   the nine render captures, the APK build, two more builds of that APK that must
   match it byte for byte, and every deck compiled twice with its clock pinned,
-  whose images must match too, the decks compiling concurrently — and `./check.sh --selftest` runs the twelve
+  whose images must match too, the decks compiling concurrently — and `./check.sh --selftest` runs the fourteen
   `selftest_*.py` files in about ten seconds. It also refuses a source file that is in the worktree but not in the
   index: every commit here stages tracked files, which cannot pick up a new one,
   and `LinkCommand.java` was referenced by two tracked classes for a day while a

@@ -1010,7 +1010,8 @@ before it fills it, so a file that leaves the pipeline does not keep answering: 
 `decks/` folder is gone. Production is the one public environment; the preview is
 unpublished. The handoff page is owner-only source at
 [`artifacts/site/handoff.html`](../artifacts/site/handoff.html); it is deliberately not
-copied into the bundle and has no public URL. The phone view in a render message is the labelled per-screen links above, not the whole
+copied into the bundle and has no public URL. The fast gate's `publish` step builds the
+bundle in a throwaway tree and refuses it if the handoff is present. The phone view in a render message is the labelled per-screen links above, not the whole
 page and not the strip: the strip is a single row nine frames wide, so a phone shrinks
 each frame to a thumbnail. The page is the one address for the app, its APK and its
 pictures; the strip is a desktop extra.
