@@ -997,7 +997,6 @@ of an earlier capture.
 | The site (one scroll: APK, nine screens, deck palettes, mark, strip) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/ |
 | One screen | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/paired.png — likewise `pull-down`, `side-panel`, `bridge-sheet`, `appearance-sheet`, `projects`, `projects-open`, `serial`, `settings` |
 | The strip (one row of the nine, for a desktop message — not a phone view) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/chat-sheet.jpg |
-| Handoff note | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/handoff.html — the one-page report beside the site |
 | Bundle source | [`artifacts/site/`](../artifacts/site/) (`worker.js`, `manifest.json`), built by [`artifacts/publish_renders.py`](../artifacts/publish_renders.py) into the gitignored `artifacts/site/public/` |
 | Site | Freebuff Sites `3f6c1a9e-8b47-4d2c-9f11-5a7e2c4d8b60` — **production is the only public environment**; preview is unpublished |
 
@@ -1009,8 +1008,9 @@ time it installs frames, so the files the site serves cannot lag a capture; depl
 is a separate step, and publishing still needs asking. The publisher empties the bundle
 before it fills it, so a file that leaves the pipeline does not keep answering: the old
 `decks/` folder is gone. Production is the one public environment; the preview is
-unpublished. The one-page bundle, its handoff page, and the publisher change are deployed from this
-working tree, but are not committed yet. The phone view in a render message is the labelled per-screen links above, not the whole
+unpublished. The handoff page is owner-only source at
+[`artifacts/site/handoff.html`](../artifacts/site/handoff.html); it is deliberately not
+copied into the bundle and has no public URL. The phone view in a render message is the labelled per-screen links above, not the whole
 page and not the strip: the strip is a single row nine frames wide, so a phone shrinks
 each frame to a thumbnail. The page is the one address for the app, its APK and its
 pictures; the strip is a desktop extra.
