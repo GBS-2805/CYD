@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Off-site · handoff · 6 Nov 2026</title>
+<style>
+  :root {
+    --bg: #131513; --ink: #f2eee3; --muted: #aaa79e; --line: #393b36;
+    --mint: #5fe3b5; --mint-ink: #0a1b15; --panel: #171a17; --soft: #18231d;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  a { color: inherit; }
+  code, .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .92em;
+  }
+  .page { max-width: 1080px; margin: 0 auto; padding: 0 18px 60px; }
+  header { padding: 38px 0 26px; }
+  .eyebrow {
+    margin: 0; color: var(--mint); font: 11px/1.4 ui-monospace, SFMono-Regular,
+    Menlo, Consolas, monospace; letter-spacing: .14em; text-transform: uppercase;
+  }
+  h1 {
+    margin: 10px 0 16px; font-size: clamp(38px, 6vw, 58px); font-weight: 400;
+    letter-spacing: -.045em; line-height: 1.05;
+  }
+  .lede { margin: 0 0 22px; max-width: 38em; color: var(--muted); font-size: 17px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+  .button {
+    display: inline-block; border: 1px solid var(--line); padding: 10px 14px;
+    color: var(--ink); text-decoration: none; font-size: 13px;
+  }
+  .button.primary { border-color: var(--mint); background: var(--mint); color: var(--mint-ink); }
+  .button:hover { border-color: var(--mint); }
+  .meta {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    border: 1px solid var(--line); margin: 26px 0 18px;
+  }
+  .meta > div { padding: 12px 14px; border-left: 1px solid var(--line); min-width: 0; }
+  .meta > div:first-child { border-left: 0; }
+  .meta span {
+    display: block; margin-bottom: 5px; color: var(--muted); font: 10px/1.2
+    ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .meta b { display: block; font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+  .callout {
+    max-width: 800px; margin: 0 0 20px; padding: 14px 16px; border-left: 3px solid var(--mint);
+    background: var(--soft); color: #d8e8df; font-size: 14px;
+  }
+  .callout b { color: var(--mint); font-weight: 600; }
+  .tabs {
+    display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs a {
+    flex: 0 0 auto; border: 1px solid var(--line); padding: 7px 10px;
+    color: var(--muted); text-decoration: none; font-size: 12px; white-space: nowrap;
+  }
+  .tabs a:hover { color: var(--ink); border-color: var(--mint); }
+  main section { margin-top: 34px; scroll-margin-top: 16px; }
+  h2 { margin: 0 0 14px; font-size: 24px; font-weight: 500; letter-spacing: -.02em; }
+  .todo {
+    margin-top: 26px; padding: 22px 22px 18px; border: 1px solid rgba(95, 227, 181, .5);
+    background: var(--panel);
+  }
+  .todo-head { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; }
+  .todo-head h2 { margin: 0; }
+  .when {
+    color: var(--muted); font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace; text-align: right;
+  }
+  .todo-grid {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px;
+    margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line);
+  }
+  .step .num {
+    color: var(--mint); font: 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace; letter-spacing: .1em;
+  }
+  .step h3 { margin: 6px 0 6px; font-size: 15px; font-weight: 600; }
+  .step p { margin: 0; color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+  .step a { color: var(--mint); text-decoration: underline; text-underline-offset: 3px; }
+  .keep {
+    margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 13px;
+  }
+  .keep b { color: var(--ink); font-weight: 500; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+  .latest { margin: 0; padding: 0; list-style: none; }
+  .latest li {
+    display: grid; grid-template-columns: 60px minmax(0, 1fr); gap: 10px;
+    padding: 12px 0; border-bottom: 1px solid var(--line);
+  }
+  .latest .date {
+    color: var(--mint); font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace;
+  }
+  .latest b { display: block; font-size: 14px; font-weight: 500; }
+  .latest p { margin: 3px 0 0; color: var(--muted); font-size: 14px; }
+  .open { margin: 0; padding: 0; list-style: none; }
+  .open li { position: relative; margin: 0 0 11px; padding-left: 16px; color: var(--muted); font-size: 14px; }
+  .open li::before {
+    content: ""; position: absolute; left: 0; top: .65em; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--mint);
+  }
+  .shots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .shot { margin: 0; border: 1px solid var(--line); background: var(--panel); }
+  .shot a { display: block; }
+  .shot img { display: block; width: 100%; height: auto; }
+  .shot figcaption {
+    padding: 8px 10px 10px; border-top: 1px solid var(--line); color: var(--muted);
+    font-size: 12px;
+  }
+  .shot b { display: block; color: var(--ink); font-weight: 500; }
+  .note { margin: 14px 0 0; color: var(--muted); font-size: 12px; }
+  .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; margin: 0; padding: 0; list-style: none; }
+  .rules li { padding: 10px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+  .rules b { color: var(--ink); font-weight: 500; }
+  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 26px; margin: 0; padding: 0; list-style: none; }
+  .checks li { display: flex; gap: 9px; color: var(--muted); font-size: 14px; }
+  .checks .mark { color: var(--mint); font-weight: 600; }
+  .gate-note { margin: 18px 0 0; color: var(--muted); font-size: 13px; }
+  .fold { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+  summary { cursor: pointer; color: var(--mint); font-size: 13px; }
+  .gate-list { margin: 12px 0 0; padding: 0; list-style: none; max-width: 850px; }
+  .gate-list li { padding: 7px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  .gate-list b { color: var(--ink); font-weight: 500; }
+  .words { display: grid; grid-template-columns: 1fr 1fr; gap: 0 30px; margin: 0; }
+  .words div { padding: 10px 0; border-top: 1px solid var(--line); }
+  .words dt { color: var(--ink); font-size: 14px; font-weight: 500; }
+  .words dd { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+  .link-groups { margin-top: 14px; }
+  .link-groups h3 {
+    margin: 18px 0 5px; color: var(--muted); font: 10px/1.3 ui-monospace,
+    SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .13em; text-transform: uppercase;
+  }
+  .link-groups ul { margin: 0; padding: 0; list-style: none; }
+  .link-groups li { padding: 5px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .link-groups li span { color: var(--muted); }
+  .link-groups a { color: var(--mint); text-decoration: none; }
+  .link-groups a:hover { text-decoration: underline; }
+  footer {
+    display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 42px; padding-top: 16px;
+    border-top: 1px solid var(--line); color: var(--muted); font-size: 12px;
+  }
+  footer a { color: var(--mint); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  @media (max-width: 800px) {
+    .meta { grid-template-columns: 1fr 1fr; }
+    .meta > div:nth-child(3) { border-left: 0; border-top: 1px solid var(--line); }
+    .meta > div:nth-child(4) { border-top: 1px solid var(--line); }
+    .todo-grid { grid-template-columns: 1fr; gap: 16px; }
+    .split { grid-template-columns: 1fr; gap: 26px; }
+    .shots { grid-template-columns: 1fr 1fr; }
+    .rules, .checks, .words { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 460px) {
+    .page { padding: 0 14px 48px; }
+    header { padding-top: 28px; }
+    h1 { font-size: 38px; }
+    .meta { grid-template-columns: 1fr; }
+    .meta > div { border-left: 0; border-top: 1px solid var(--line); }
+    .meta > div:first-child { border-top: 0; }
+    .todo { padding: 18px 16px 16px; }
+    .todo-head { display: block; }
+    .when { text-align: left; margin-top: 5px; }
+    .shots { gap: 10px; }
+    .shot figcaption { padding: 7px 8px 8px; font-size: 11px; }
+  }
+</style>
+</head>
+<body id="top">
+<div class="page">
+  <header>
+    <p class="eyebrow">Off-site · handoff · 6 Nov 2026</p>
+    <h1>Cutout clear.<br>One site.</h1>
+    <p class="lede">The app's edges clear the camera hole, the render site is one page,
+      and the APK is built. No phone has installed it yet.</p>
+    <div class="actions">
+      <a class="button primary" href="./">Open the one site</a>
+      <a class="button" href="PhoneDeckBridge-debug.apk">Install the APK</a>
+    </div>
+  </header>
+
+  <div class="meta">
+    <div><span>Build</span><b>1.0 · code 1</b></div>
+    <div><span>APK</span><b>270 kB · 276,305 bytes</b></div>
+    <div><span>Deck</span><b>1.0.1 phone · 1.0.0 Spotify</b></div>
+    <div><span>Live</span><b>one page · preview offline</b></div>
+  </div>
+
+  <p class="callout"><b>Not device-tested.</b> The cutout fix is checked by the JVM
+    capture only; no APK has been installed on a phone, and the deck hardware checklist
+    has not run. The one-page site and the APK are live.</p>
+
+  <nav class="tabs" aria-label="Handoff sections">
+    <a href="#todo">To do</a>
+    <a href="#latest">Latest</a>
+    <a href="#open">Open</a>
+    <a href="#screens">Screens</a>
+    <a href="#rules">Rules</a>
+    <a href="#gates">Gates</a>
+    <a href="#words">Words</a>
+    <a href="#links">Links &amp; files</a>
+  </nav>
+
+  <main>
+    <section class="todo" id="todo">
+      <div class="todo-head">
+        <h2>To do</h2>
+        <span class="when">before the next hardware pass</span>
+      </div>
+      <div class="todo-grid">
+        <div class="step">
+          <span class="num">1</span>
+          <h3>Install this APK.</h3>
+          <p>Use the <a href="PhoneDeckBridge-debug.apk">current build</a> — 276,305 B,
+            SHA-256 <code>9cae9c60…</code> — not an older install. On the Z Flip 7,
+            open all nine screens and check the top camera hole and status icons.</p>
+        </div>
+        <div class="step">
+          <span class="num">2</span>
+          <h3>Bring the deck current.</h3>
+          <p>If the board is not on phone 1.0.1 or Spotify 1.0.0, flash it from
+            ArduinoDroid with the sketch's own <code>huge_app</code> partition. The
+            app's USB flasher is still unproven; do not use it as the deck test.</p>
+        </div>
+        <div class="step">
+          <span class="num">3</span>
+          <h3>Prove the link.</h3>
+          <p>BOARDS → the board row. Then mirror a notification, tap play/pause on the
+            deck, forget the bond once, and walk away and back. Record the exact log
+            lines and the deck's tag.</p>
+        </div>
+      </div>
+      <p class="keep"><b>Keep in mind:</b> the cutout geometry is the platform's insets,
+        not a measurement from this VM; the APK cannot flash a deck; the site source is
+        uncommitted.</p>
+    </section>
+
+    <section id="latest">
+      <div class="split">
+        <div>
+          <h2>Latest</h2>
+          <ul class="latest">
+            <li><span class="date">6 Nov</span><div><b>One page live.</b><p>APK,
+              nine screens, eight deck palettes, mark and strip at one address.
+              <code>/decks/</code> is 404; the preview is unpublished.</p></div></li>
+            <li><span class="date">5 Nov</span><div><b>Cutout fix merged.</b><p>Commit
+              <code>1f23e1e</code>: every edge uses the union of system bars and the
+              display cutout; status icons use the band ink on 15+.</p></div></li>
+            <li><span class="date">5 Nov</span><div><b>APK built.</b><p>276,305 B,
+              SHA-256 <code>9cae9c60…</code>; debug-signed with the tree's key.</p></div></li>
+            <li><span class="date">5 Nov</span><div><b>Branch clean.</b><p><code>main</code>
+              tracks <code>origin/main</code>; the merged local feature branch was
+              deleted.</p></div></li>
+          </ul>
+        </div>
+        <div id="open">
+          <h2>Open</h2>
+          <ul class="open">
+            <li>No install or device test. The cutout fix has not met a real
+              camera-hole phone.</li>
+            <li>No deck hardware test. Only the Spotify deck's Bluetooth half ran, on
+              3 Nov; the phone deck has not.</li>
+            <li>The app's USB flasher is unproven. ArduinoDroid is the deck path.</li>
+            <li>Two-deck, stale-bond and auto-reconnect behaviour are unverified.</li>
+            <li>The one-page site source is uncommitted on <code>main</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="screens">
+      <h2>Screenshots</h2>
+      <p class="note">9 app views · tap to open · captures, not device screenshots.</p>
+      <div class="shots">
+        <figure class="shot"><a href="paired.png"><img src="paired.png" alt="Paired screen" loading="lazy" decoding="async"></a><figcaption><b>Paired</b>the link and three deck palettes</figcaption></figure>
+        <figure class="shot"><a href="pull-down.png"><img src="pull-down.png" alt="Pull-down screen" loading="lazy" decoding="async"></a><figcaption><b>The pull-down</b>PAIRED, BOARDS, SERIAL</figcaption></figure>
+        <figure class="shot"><a href="side-panel.png"><img src="side-panel.png" alt="Side panel screen" loading="lazy" decoding="async"></a><figcaption><b>The side panel</b>settings, decks, bridge, appearance</figcaption></figure>
+        <figure class="shot"><a href="bridge-sheet.png"><img src="bridge-sheet.png" alt="Bridge screen" loading="lazy" decoding="async"></a><figcaption><b>Bridge</b>the switch and its state</figcaption></figure>
+        <figure class="shot"><a href="appearance-sheet.png"><img src="appearance-sheet.png" alt="Appearance screen" loading="lazy" decoding="async"></a><figcaption><b>Appearance</b>three palettes, one page switch</figcaption></figure>
+        <figure class="shot"><a href="projects.png"><img src="projects.png" alt="Boards screen" loading="lazy" decoding="async"></a><figcaption><b>Boards</b>the shelf, folded and alphabetical</figcaption></figure>
+        <figure class="shot"><a href="projects-open.png"><img src="projects-open.png" alt="Open board screen" loading="lazy" decoding="async"></a><figcaption><b>One board open</b>notes, log, deck block, actions</figcaption></figure>
+        <figure class="shot"><a href="serial.png"><img src="serial.png" alt="Serial screen" loading="lazy" decoding="async"></a><figcaption><b>Serial</b>target, flasher, monitor</figcaption></figure>
+        <figure class="shot"><a href="settings.png"><img src="settings.png" alt="Settings screen" loading="lazy" decoding="async"></a><figcaption><b>Settings</b>permissions, each with its LED</figcaption></figure>
+      </div>
+      <p class="note">The frames are drawn by Android's renderer on the JVM from the
+        app's own views. A padding, a row height or a cutout inset here is the app's
+        arithmetic; a device screenshot is still the missing proof.</p>
+    </section>
+
+    <section id="rules">
+      <h2>Rules</h2>
+      <ul class="rules">
+        <li><b>One site.</b> Production is the only public address; the preview stays
+          saved and offline.</li>
+        <li><b>Render before deploy.</b> A UI change gets a public labelled link before
+          commit, push or deploy.</li>
+        <li><b>The APK is exact.</b> The site serves the bytes in
+          <code>android-companion/dist/</code>; the hash is the check.</li>
+        <li><b>The deck is separate.</b> The APK carries the sketch text, not a flash.
+          ArduinoDroid is the proven path.</li>
+        <li><b>No device, no claim.</b> A JVM capture is not a phone screenshot; label
+          hardware as unverified until it runs.</li>
+        <li><b>Fix the cause.</b> A red gate names drift; it is fixed, never skipped.</li>
+      </ul>
+    </section>
+
+    <section id="gates">
+      <h2>Gates</h2>
+      <ul class="checks">
+        <li><span class="mark">✓</span><span><b>Fast gate</b> · <code>./check.sh</code>
+          green in 4.1 s: docs, widgets, APK bytes, fonts, screens, 229 host checks.</span></li>
+        <li><span class="mark">✓</span><span><b>Phone page</b> · 390 px: no horizontal
+          overflow, 18 figures, all 18 images loaded.</span></li>
+        <li><span class="mark">✓</span><span><b>Live</b> · page 200, APK 200,
+          <code>/decks/</code> 404, preview 404.</span></li>
+        <li><span class="mark">✓</span><span><b>Cutout geometry</b> · a 44 dp top hole
+          and a 30 dp side hole pass through the activity on the JVM.</span></li>
+        <li><span class="mark">✓</span><span><b>APK bytes</b> · 276,305 B and
+          <code>9cae9c60…</code>, byte-identical to <code>dist/</code>.</span></li>
+      </ul>
+      <p class="gate-note"><b>Not run:</b> the full release gate was not repeated for the
+        site-only edit; no phone or deck hardware was available.</p>
+      <details class="fold">
+        <summary>What each gate protects</summary>
+        <ul class="gate-list">
+          <li><b>Docs</b> — quoted sizes, md5s and relative links still resolve.</li>
+          <li><b>Widgets</b> — the two bundled sketches match their descriptors and the
+            app's copies.</li>
+          <li><b>Screens</b> — every written screen count is nine, or names it in the
+            same paragraph.</li>
+          <li><b>Host checks</b> — 229 checks over notifications, palettes, layout and
+            the USB probe's clock.</li>
+          <li><b>Cutout</b> — the activity receives the platform's inset and the test
+            dispatches a top and a side hole.</li>
+          <li><b>Live</b> — the public page, APK and assets answer; removed
+            <code>/decks/</code> paths do not.</li>
+        </ul>
+      </details>
+    </section>
+
+    <section id="words">
+      <h2>Words</h2>
+      <p class="note">What the page means, in the order you meet it.</p>
+      <dl class="words">
+        <div><dt>APK</dt><dd>The installable Android package. It contains the app and the
+          bundled sketch text, not the deck's flashed firmware.</dd></div>
+        <div><dt>Debug build</dt><dd>The version here is signed with the project key in
+          the tree. Installable, reproducible, not a store build.</dd></div>
+        <div><dt>SHA-256</dt><dd>A fingerprint of the file's exact bytes. Compare it
+          with the published hash; one changed byte changes the hash.</dd></div>
+        <div><dt>Cutout / inset</dt><dd>The camera hole or notch, and the padding the app
+          adds so words and controls stay outside it and the system bars.</dd></div>
+        <div><dt>Status bar icons</dt><dd>The clock, signal and battery. On Android 15+
+          they are drawn in the band's ink because the band is the colour behind them.</dd></div>
+        <div><dt>Capture</dt><dd>The app's own views drawn by Android's renderer on a
+          JVM. It proves arithmetic, not a device's fonts or camera hole.</dd></div>
+        <div><dt>Fast gate</dt><dd><code>./check.sh</code>: the checks a commit must pass
+          before it lands. A red step is fixed, not waived.</dd></div>
+        <div><dt>Production / preview</dt><dd>The public address versus the saved copy
+          kept offline. Off-site has one public environment: production.</dd></div>
+        <div><dt>Phone deck / Spotify deck</dt><dd>The two CYD sketches, version 1.0.1
+          and 1.0.0. They are separate from the app and each needs its own flash.</dd></div>
+        <div><dt>ArduinoDroid</dt><dd>The Android app that compiles and uploads a sketch
+          over OTG. It is the proven deck path; the companion app's own uploader is not.</dd></div>
+        <div><dt>BLE / Phone Link</dt><dd>The Bluetooth service the phone deck exposes;
+          one deck is linked at a time.</dd></div>
+        <div><dt>Mirror</dt><dd>The phone's media line written to the deck about once a
+          second. The deck draws what it was told; it does not fetch Spotify itself.</dd></div>
+        <div><dt>Tap round-trip</dt><dd>A deck chip sends a play/pause notify to the
+          phone. The next mirror line, not the lit chip, proves the action ran.</dd></div>
+        <div><dt>Stale bond</dt><dd>A Bluetooth pairing the phone or deck no longer
+          agrees on. Both sides try to forget it and link again.</dd></div>
+        <div><dt>Walk-away</dt><dd>Leaving range and returning. The expected line is a
+          reconnect without a fresh scan; the log decides whether it worked.</dd></div>
+      </dl>
+    </section>
+
+    <section id="links">
+      <h2>Links &amp; files</h2>
+      <p class="note">All 22 public links, then the files by area. Source is in the
+        private repository at <code>1f23e1e</code>; the site changes are uncommitted.</p>
+      <details class="fold">
+        <summary>All links (22)</summary>
+        <div class="link-groups">
+          <h3>Install</h3>
+          <ul>
+            <li><a href="./">The one site</a> <span>· the page you are reading beside</span></li>
+            <li><a href="PhoneDeckBridge-debug.apk">PhoneDeckBridge-debug.apk</a>
+              <span>· 276,305 B · <code>9cae9c60…</code></span></li>
+          </ul>
+          <h3>Screens</h3>
+          <ul>
+            <li><a href="paired.png">Paired</a> <span>· the link, then three decks</span></li>
+            <li><a href="pull-down.png">The pull-down</a> <span>· PAIRED, BOARDS, SERIAL</span></li>
+            <li><a href="side-panel.png">The side panel</a> <span>· settings, decks, bridge, appearance</span></li>
+            <li><a href="bridge-sheet.png">Bridge</a> <span>· the switch and its state</span></li>
+            <li><a href="appearance-sheet.png">Appearance</a> <span>· three palettes and the page switch</span></li>
+            <li><a href="projects.png">Boards</a> <span>· the folded shelf</span></li>
+            <li><a href="projects-open.png">One board open</a> <span>· notes, log, actions</span></li>
+            <li><a href="serial.png">Serial</a> <span>· target, flasher, monitor</span></li>
+            <li><a href="settings.png">Settings</a> <span>· permissions and LEDs</span></li>
+            <li><a href="chat-sheet.jpg">The wide strip</a> <span>· 1868 × 768, desktop extra</span></li>
+          </ul>
+          <h3>Deck palettes</h3>
+          <ul>
+            <li><a href="deck-phone-home-paper.png">Paper</a></li>
+            <li><a href="deck-phone-home-ink.png">Ink</a></li>
+            <li><a href="deck-phone-home-green-light.png">Green · light</a></li>
+            <li><a href="deck-phone-home-green-dark.png">Green · dark</a></li>
+            <li><a href="deck-phone-home-moss-light.png">Moss · light</a></li>
+            <li><a href="deck-phone-home-moss-dark.png">Moss · dark</a></li>
+            <li><a href="deck-phone-home-navy-light.png">Navy · light</a></li>
+            <li><a href="deck-phone-home-navy-dark.png">Navy · dark</a></li>
+            <li><a href="logo-compare.png">The mark, five densities</a></li>
+            <li><a href="handoff.html">This handoff</a> <span>· standalone page</span></li>
+          </ul>
+        </div>
+      </details>
+      <details class="fold">
+        <summary>Files by area</summary>
+        <div class="link-groups">
+          <h3>Install</h3>
+          <ul>
+            <li><a href="PhoneDeckBridge-debug.apk">APK</a> <span>· debug build, byte-identical to <code>dist/</code></span></li>
+            <li><a href="./">One-page site</a> <span>· APK, screens, deck, mark, strip</span></li>
+          </ul>
+          <h3>Review proof</h3>
+          <ul>
+            <li><a href="paired.png">Paired</a>, <a href="pull-down.png">pull-down</a>,
+              <a href="side-panel.png">side panel</a>, <a href="bridge-sheet.png">bridge</a>,
+              <a href="appearance-sheet.png">appearance</a>, <a href="projects.png">boards</a>,
+              <a href="projects-open.png">one board</a>, <a href="serial.png">serial</a>,
+              <a href="settings.png">settings</a></li>
+            <li><a href="chat-sheet.jpg">chat-sheet.jpg</a> <span>· one row of nine</span></li>
+            <li><a href="logo-compare.png">logo-compare.png</a> <span>· five densities</span></li>
+          </ul>
+          <h3>Project</h3>
+          <ul>
+            <li><a href="handoff.html">handoff.html</a> <span>· this page</span></li>
+            <li><span>Source: private repo, commit <code>1f23e1e</code>; site changes uncommitted.</span></li>
+            <li><span>Deck: <code>phone_deck_cyd24R</code> 1.0.1; <code>spotify_deck_cyd24R</code> 1.0.0.</span></li>
+          </ul>
+        </div>
+      </details>
+    </section>
+  </main>
+
+  <footer>
+    <span>Off-site · handoff · 6 Nov 2026</span>
+    <a href="./">one site</a>
+    <a href="#screens">screens</a>
+    <a href="#top">top</a>
+  </footer>
+</div>
+</body>
+</html>

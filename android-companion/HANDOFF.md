@@ -986,28 +986,34 @@ bytes) is not in the APK`; over the real archive it prints all five and exits 0.
 
 ## Where the renders live
 
-The nine frames and the chat strip are published as a static site, because a link a
-person can tap is what the render rule in `CONVENTIONS.md` asks for and a workspace path
-opens nothing. The strip is drawn by `publish_renders.py` from those same nine frames on
-every run, so it is never a picture of an earlier capture.
+The app, its APK, the nine frames, the deck's palette pages, the mark and the chat strip
+are published as one static page, because a link a person can tap is what the render rule
+in `CONVENTIONS.md` asks for and a workspace path opens nothing. The strip is drawn by
+`publish_renders.py` from those same nine frames on every run, so it is never a picture
+of an earlier capture.
 
 | What | Where |
 | --- | --- |
-| Gallery (a scroll, one screen under the next) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/ |
+| The site (one scroll: APK, nine screens, deck palettes, mark, strip) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/ |
 | One screen | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/paired.png — likewise `pull-down`, `side-panel`, `bridge-sheet`, `appearance-sheet`, `projects`, `projects-open`, `serial`, `settings` |
 | The strip (one row of the nine, for a desktop message — not a phone view) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/chat-sheet.jpg |
-| Preview copy | https://site-c4870019b7c74299bae95043c45330f8.freebuff.page/ — the same bundle, deployed first and kept for a second look |
+| Handoff note | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/handoff.html — the one-page report beside the site |
 | Bundle source | [`artifacts/site/`](../artifacts/site/) (`worker.js`, `manifest.json`), built by [`artifacts/publish_renders.py`](../artifacts/publish_renders.py) into the gitignored `artifacts/site/public/` |
-| Site | Freebuff Sites `3f6c1a9e-8b47-4d2c-9f11-5a7e2c4d8b60` — **production published**, preview published beside it |
+| Site | Freebuff Sites `3f6c1a9e-8b47-4d2c-9f11-5a7e2c4d8b60` — **production is the only public environment**; preview is unpublished |
 
 The worker serves `env.ASSETS` and 404s everything else: there is no route, no state and
 no secret on it, and the bundle is a copy of pixels git already holds, so the site cannot
 show a screen the app no longer draws. `public/` is ignored by git — the frames beside it
 are the source. Nothing in the app reads this host. `capture.sh` rebuilds the bundle every
 time it installs frames, so the files the site serves cannot lag a capture; deploying them
-is a separate step, and publishing still needs asking. The phone view is the labelled
-per-screen links above, not the gallery and not the strip: the strip is a single row
-nine frames wide, so a phone shrinks each frame to a thumbnail.
+is a separate step, and publishing still needs asking. The publisher empties the bundle
+before it fills it, so a file that leaves the pipeline does not keep answering: the old
+`decks/` folder is gone. Production is the one public environment; the preview is
+unpublished. The one-page bundle, its handoff page, and the publisher change are deployed from this
+working tree, but are not committed yet. The phone view in a render message is the labelled per-screen links above, not the whole
+page and not the strip: the strip is a single row nine frames wide, so a phone shrinks
+each frame to a thumbnail. The page is the one address for the app, its APK and its
+pictures; the strip is a desktop extra.
 
 ### What a capture costs
 

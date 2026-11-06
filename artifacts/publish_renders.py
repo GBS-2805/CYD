@@ -1,28 +1,27 @@
 #!/usr/bin/env python3
-"""Build the bundle that puts the app's renders at public https addresses.
+"""Build the one public page that carries the app, its APK and its pictures.
 
-CONVENTIONS.md asks for a labelled link to every touched screen before a UI change
-ships, and a chat client cannot open a file in this workspace. So the frames that git
-already holds are copied, unchanged, into `artifacts/site/public/` with a gallery page,
-and that folder is deployed as a static site. Nothing here draws anything: the pixels
-are `artifacts/renders/`'s, and `check_renders.py` is what keeps those honest.
+CONVENTIONS.md asks for a labelled public link to every touched screen before a UI
+change ships, and the owner reads the chat on a phone. So the frames that git already
+holds are copied, unchanged, into `artifacts/site/public/` with one page that walks the
+app from top to bottom: the download, the nine captures, the deck's palette pages, the
+mark, and the optional wide strip. One address, one scroll.
 
-The gallery is a **scroll**, not a contact sheet: one screen under the next at phone
-width, separated by a hairline and one line of caption, so opening it and dragging down
-walks the app from its first page to settings. A strip of thumbnails shows the
-shape of the app and nothing readable; this shows what the phone shows.
+Nothing here draws the app. The pixels are `artifacts/renders/`'s and the deck pages are
+`artifacts/decks/`'s; `check_renders.py` and the deck checkers keep those honest. This
+script copies them, draws the strip from the same nine frames, and writes the page. The
+handoff note beside it is copied too, so the one site carries its own report.
 
-The strip is the one exception, because a desktop message can take one wide picture.
-It is not a phone view — nine frames across shrink to thumbnails — so a phone message
-carries one labelled link per screen instead, as `CONVENTIONS.md` asks. It is drawn
-here from the same frames the page uses, so it cannot be a strip an earlier capture
-left in `renders/` while the app grew more screens.
+The bundle is cleared before it is filled, so a file that leaves the pipeline cannot
+survive as an orphan URL. The old `public/decks/` did exactly that: a folder no current
+step wrote, still served under the gallery because the cleanup only removed `*.png`.
 
     python3 artifacts/publish_renders.py          # rebuild the bundle
     # then deploy artifacts/site/manifest.json with the sites tooling
 
 `public/` is build output and is ignored by git; the frames beside it are the source.
 """
+import hashlib
 import shutil
 from pathlib import Path
 
@@ -46,60 +45,173 @@ SCREENS = [
     ("settings", "Settings", "every permission in one list, each with its LED"),
 ]
 
+# The phone deck's front page in each palette. `deck_screens.py` draws these from the
+# sketch's own draw calls; the site only carries the proof.
+DECK_ORDER = [
+    "phone-home-paper.png",
+    "phone-home-ink.png",
+    "phone-home-green-light.png",
+    "phone-home-green-dark.png",
+    "phone-home-moss-light.png",
+    "phone-home-moss-dark.png",
+    "phone-home-navy-light.png",
+    "phone-home-navy-dark.png",
+]
+DECK_LABELS = {
+    "phone-home-paper.png": "Paper",
+    "phone-home-ink.png": "Ink",
+    "phone-home-green-light.png": "Green · light",
+    "phone-home-green-dark.png": "Green · dark",
+    "phone-home-moss-light.png": "Moss · light",
+    "phone-home-moss-dark.png": "Moss · dark",
+    "phone-home-navy-light.png": "Navy · light",
+    "phone-home-navy-dark.png": "Navy · dark",
+}
+
 PAGE = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Off-site — the app, scrolling</title>
+<title>Off-site — the app, screen by screen</title>
 <style>
   :root {{
     /* Moss, the app's own default: the page, its band, and the ink on each. */
     --field: #0e2a24; --band: #005043; --ink: #e7ddce;
     --on: #e7ddce; --dim: rgba(231, 221, 206, .72); --rule: rgba(231, 221, 206, .24);
+    --card: rgba(231, 221, 206, .05);
   }}
   * {{ box-sizing: border-box; }}
+  html {{ scroll-behavior: smooth; }}
   body {{
     margin: 0; background: var(--field); color: var(--on);
-    font: 15px/1.55 Poppins, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    font: 16px/1.6 Poppins, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
           sans-serif;
   }}
-  header {{
-    position: sticky; top: 0; z-index: 2; background: var(--band); color: var(--ink);
-    padding: 14px 18px; border-bottom: 1px solid rgba(0, 0, 0, .14);
+  a {{ color: inherit; }}
+  .top {{
+    position: sticky; top: 0; z-index: 3; background: var(--band);
+    color: var(--ink); border-bottom: 1px solid rgba(0, 0, 0, .14);
   }}
-  header h1 {{ margin: 0; font-size: 15px; letter-spacing: .01em; font-weight: 600; }}
-  header p {{ margin: 3px 0 0; font-size: 12px; color: rgba(0, 0, 0, .58); }}
-  main {{ max-width: 420px; margin: 0 auto; }}
-  figure {{ margin: 0; }}
+  .bar {{
+    max-width: 760px; margin: 0 auto; padding: 12px 18px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }}
+  .brand {{
+    font-size: 15px; font-weight: 600; letter-spacing: .02em;
+    text-decoration: none; white-space: nowrap;
+  }}
+  nav {{ display: flex; gap: 14px; font-size: 11px; letter-spacing: .09em;
+         text-transform: uppercase; }}
+  nav a {{ color: rgba(231, 221, 206, .70); text-decoration: none; }}
+  nav a:hover {{ color: var(--ink); }}
+  .hero {{ max-width: 760px; margin: 0 auto; padding: 30px 18px 24px; }}
+  .eyebrow {{
+    margin: 0 0 8px; font-size: 11px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--dim);
+  }}
+  h1 {{ margin: 0 0 10px; font-size: 30px; line-height: 1.15; font-weight: 600; }}
+  .lede {{ margin: 0 0 20px; max-width: 34em; color: var(--dim); }}
+  .download {{
+    display: inline-flex; align-items: baseline; gap: 10px;
+    background: var(--ink); color: var(--band); text-decoration: none;
+    font-size: 14px; font-weight: 600; padding: 12px 16px;
+  }}
+  .download span {{ font-weight: 400; opacity: .65; }}
+  .meta {{ margin: 10px 0 0; font-size: 12px; color: var(--dim); }}
+  main {{ max-width: 760px; margin: 0 auto; }}
+  section {{ padding: 26px 18px 10px; scroll-margin-top: 70px; }}
+  section + section {{ border-top: 1px solid var(--rule); }}
+  h2 {{ margin: 0 0 4px; font-size: 19px; font-weight: 600; }}
+  .section-note {{ margin: 0 0 16px; color: var(--dim); font-size: 13px; }}
+  .app-list {{ max-width: 420px; margin: 0 auto; }}
+  figure {{ margin: 0; background: var(--card); border: 1px solid var(--rule); }}
   figure img {{ display: block; width: 100%; height: auto; }}
-  figcaption {{
-    padding: 10px 18px 16px; font-size: 12px; color: var(--dim);
-    border-bottom: 1px solid var(--rule);
+  figcaption {{ padding: 9px 11px 11px; font-size: 12px; color: var(--dim);
+                border-top: 1px solid var(--rule); }}
+  figcaption b {{ display: block; color: var(--on); font-weight: 500; }}
+  figcaption span {{ display: block; }}
+  .app-list figure {{ margin-bottom: 14px; }}
+  .app-list figure:last-child {{ margin-bottom: 0; }}
+  .deck-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px; }}
+  .mark {{ max-width: 560px; margin: 0 auto; }}
+  .mark img {{ background: var(--ink); padding: 10px; }}
+  .strip-link {{
+    display: inline-block; border: 1px solid var(--rule); padding: 10px 12px;
+    font-size: 13px; text-decoration: none;
   }}
-  figcaption b {{ color: var(--on); font-weight: 400; }}
-  figcaption span {{ display: block; color: var(--dim); }}
+  .strip-link:hover {{ background: var(--card); }}
   footer {{
-    padding: 18px 18px 48px; font-size: 12px; color: var(--dim);
-    border-top: 1px solid var(--rule);
+    max-width: 760px; margin: 0 auto; padding: 18px 18px 48px;
+    border-top: 1px solid var(--rule); color: var(--dim); font-size: 12px;
+  }}
+  footer p + p {{ margin: 8px 0 0; }}
+  footer a {{ color: var(--on); text-decoration: underline; text-underline-offset: 3px; }}
+  footer code {{ font-size: .95em; }}
+  @media (min-width: 620px) {{
+    h1 {{ font-size: 36px; }}
+    .hero {{ padding-top: 38px; }}
+    section {{ padding-top: 34px; }}
+    .deck-grid {{ grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }}
   }}
 </style>
 </head>
 <body>
-<header>
-  <h1>Off-site — the app, scrolling</h1>
-  <p>drag down: front page to settings, one screen at a time</p>
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="#top">Off-site</a>
+    <nav>
+      <a href="#app">App</a>
+      <a href="#deck">Deck</a>
+      <a href="#mark">Mark</a>
+    </nav>
+  </div>
 </header>
+<div class="hero" id="top">
+  <p class="eyebrow">Android companion</p>
+  <h1>The app, screen by screen.</h1>
+  <p class="lede">The phone side of the desk deck: link a CYD, keep its projects,
+    flash its board, and see every page it draws.</p>
+  {download}
+</div>
 <main>
+  <section id="app">
+    <h2>The app</h2>
+    <p class="section-note">Nine views, captured by Android's renderer on a JVM —
+      not device screenshots.</p>
+    <div class="app-list">
 {figures}
-  <footer>
-    Captures of the app's own views, drawn by Android's renderer on a JVM — not device
-    screenshots, so a padding or a row height here is the app's own arithmetic. The
-    frames are <code>artifacts/renders/</code>'s; this page is generated by
-    <code>artifacts/publish_renders.py</code>, and <code>check_renders.py</code> fails
-    when a committed frame stops matching what the app draws.
-  </footer>
+    </div>
+  </section>
+  <section id="deck">
+    <h2>The deck's glass</h2>
+    <p class="section-note">The phone deck's home page in each palette, drawn from
+      the sketch's own draw calls. Reconstructions, not captures.</p>
+    <div class="deck-grid">
+{deck_figures}
+    </div>
+  </section>
+  <section id="mark">
+    <h2>The mark</h2>
+    <p class="section-note">The owner's mark on the band, at five densities. The
+      ghost is the band showing through the C.</p>
+{mark}
+  </section>
+  <section id="strip">
+    <h2>The wide strip</h2>
+    <p class="section-note">All nine screens in one image. It is a desktop extra —
+      on a phone, use the screens above.</p>
+    <a class="strip-link" href="chat-sheet.jpg">Open the strip · {strip_dim}</a>
+  </section>
 </main>
+<footer>
+  <p>Frames are <code>artifacts/renders/</code>; deck pages are
+  <code>artifacts/decks/</code>. Both are redrawn and checked by the gate. The APK
+  is <code>android-companion/dist/PhoneDeckBridge-debug.apk</code>. This page is
+  generated by <code>artifacts/publish_renders.py</code>.</p>
+  <p><a href="handoff.html">Handoff note</a></p>
+</footer>
 </body>
 </html>
 """
@@ -122,8 +234,8 @@ def strip():
     The page is a scroll because frames side by side are unreadable at phone
     width; this is those same frames as one picture, so it is drawn rather than
     carried in `renders/`, where a copy dates while the app moves. The frames keep
-    their own
-    proportions and hang from the same top edge, so a short screen is a short card.
+    their own proportions and hang from the same top edge, so a short screen is a
+    short card.
     """
     shots = []
     for name, _, _ in SCREENS:
@@ -143,10 +255,24 @@ def strip():
     return canvas.size
 
 
-def main():
+def reset_public():
+    """Remove every old bundle entry, including subdirectories.
+
+    The old gallery only deleted `*.png`, so a folder an earlier publisher wrote
+    (`public/decks/`) stayed in the bundle and kept answering under the live site.
+    A bundle is a product of this script; nothing in it should outlive a run.
+    """
+    if PUBLIC.exists():
+        for child in PUBLIC.iterdir():
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
     PUBLIC.mkdir(parents=True, exist_ok=True)
-    for stale in PUBLIC.glob("*.png"):
-        stale.unlink()
+
+
+def main():
+    reset_public()
 
     figures = []
     for name, title, blurb in SCREENS:
@@ -166,12 +292,35 @@ def main():
     logo = HERE / "logo-compare.png"
     if logo.is_file():
         shutil.copyfile(logo, PUBLIC / logo.name)
+        mark = (
+            '    <figure class="mark">\n'
+            '      <img src="logo-compare.png" '
+            'alt="The mark at five densities">\n'
+            '      <figcaption><b>Five densities</b>'
+            '<span>mdpi through xxxhdpi</span></figcaption>\n'
+            '    </figure>'
+        )
+    else:
+        mark = '    <p class="meta">The mark sheet is not in this tree.</p>'
 
     # The deck's own glass: the phone deck's front page in every palette row, drawn
     # by artifacts/deck_screens.py from the sketch's own draw calls. Copied so a
     # palette can be looked at on a phone, not only inside the app's frames.
-    for page in sorted((HERE / "decks").glob("phone-home-*.png")):
+    deck_figures = []
+    deck_pages = sorted(
+        (HERE / "decks").glob("phone-home-*.png"),
+        key=lambda page: (DECK_ORDER.index(page.name)
+                          if page.name in DECK_ORDER else len(DECK_ORDER)))
+    for page in deck_pages:
         shutil.copyfile(page, PUBLIC / ("deck-" + page.name))
+        label = DECK_LABELS.get(page.name,
+                                page.stem.replace("phone-home-", "").replace("-", " ").title())
+        deck_figures.append(
+            '    <figure>\n      <img src="deck-%s" alt="%s">\n'
+            '      <figcaption><b>%s</b><span>phone deck</span></figcaption>\n'
+            '    </figure>' % (page.name, label, label))
+    if not deck_figures:
+        deck_figures = ['    <p class="meta">No deck sheets are in this tree.</p>']
 
     # The download has to be the APK this tree built. It used to be copied by hand
     # after every build, which is a step that gets skipped exactly when the build
@@ -180,11 +329,33 @@ def main():
     apk = HERE.parent / "android-companion" / "dist" / "PhoneDeckBridge-debug.apk"
     if apk.is_file():
         shutil.copyfile(apk, PUBLIC / apk.name)
+        size_b = apk.stat().st_size
+        digest = hashlib.sha256(apk.read_bytes()).hexdigest()[:8]
+        download = (
+            '<a class="download" href="%s">Download the app <span>%s kB</span></a>\n'
+            '  <p class="meta">%s bytes · sha256 %s… · debug build</p>'
+            % (apk.name, round(size_b / 1024), format(size_b, ","), digest))
     else:
+        download = ('<p class="meta">The APK is not built in this tree.</p>')
         print("note: %s is not built, so the bundle carries no APK"
               % apk.relative_to(HERE.parent))
 
-    (PUBLIC / "index.html").write_text(PAGE.format(figures="\n".join(figures)))
+    (PUBLIC / "index.html").write_text(PAGE.format(
+        download=download,
+        figures="\n".join(figures),
+        deck_figures="\n".join(deck_figures),
+        mark=mark,
+        strip_dim="%d × %d" % (size[0], size[1]),
+    ))
+
+    # The handoff note is source beside this script, not a second site. Copy it into
+    # the bundle so the one address serves the page and its own report.
+    handoff = HERE / "site" / "handoff.html"
+    if handoff.is_file():
+        shutil.copyfile(handoff, PUBLIC / handoff.name)
+    else:
+        print("note: %s is missing, so the bundle carries no handoff page"
+              % handoff.relative_to(HERE.parent))
 
     files = sorted(p.name for p in PUBLIC.iterdir())
     print("bundle: %d files in %s" % (len(files), PUBLIC.relative_to(HERE.parent)))
