@@ -82,6 +82,7 @@ public class MainActivity extends Activity {
     private AppearanceSheet appearanceSheet;
     private PullDown pullDown;
     private SidePanel sidePanel;
+    private DeckPreviewBubble previewBubble;
     private Sheet sheet;
     private FrameLayout content;
     private TopBar topBar;
@@ -250,6 +251,10 @@ public class MainActivity extends Activity {
         page.setBackgroundColor(Ui.BG);
         page.addView(buildTopBar(), new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        // The band's own hairline. The study closes the header with a rule rather
+        // than with a shadow, and on a near-black page a shadow would not show.
+        page.addView(Ui.rule(this), new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Ui.dp(this, 1))));
 
         // The pull-down is in flow, not an overlay: a menu that covers the page it is
         // a menu for makes you close it to see where you are.
@@ -272,6 +277,7 @@ public class MainActivity extends Activity {
         });
         setupTab = new SetupTab(this);
         decksTab.setId(ID_DECKS);
+        decksTab.onPreview(this::openPreview);
         projectsTab.setId(ID_PROJECTS);
         boardTab.setId(ID_SERIAL);
         setupTab.setId(ID_SETTINGS);
@@ -292,6 +298,11 @@ public class MainActivity extends Activity {
 
         sidePanel = new SidePanel(this, this::openPanelRow);
         root.addView(sidePanel, frameParams());
+
+        // The preview is above the panel: it is opened from a row, so it belongs to
+        // the list rather than to the chrome.
+        previewBubble = new DeckPreviewBubble(this, this::setDeckLook);
+        root.addView(previewBubble, frameParams());
 
         applySystemBarInsets(page);
         showSection(SECTION_DECKS);
@@ -419,6 +430,56 @@ public class MainActivity extends Activity {
         } else {
             appearanceSheet.refresh();
             sheet.open("Appearance", appearanceSheet);
+        }
+    }
+
+    /**
+     * A tap on a deck's plate: the bubble with the deck's own screen on it. A deck
+     * the store does not know (an unpaired row, named but never linked) still opens,
+     * because the picture belongs to the sketch rather than to the link — that is
+     * what a person is about to flash.
+     */
+    private void openPreview(String key, View plate) {
+        DeckStore.Known saved = null;
+        for (DeckStore.Known known : DeckStore.all(this)) {
+            if (known.key().equals(key) || known.mac.equalsIgnoreCase(key)) {
+                saved = known;
+                break;
+            }
+        }
+
+        final WidgetCatalog.Widget widget = saved != null
+                ? WidgetCatalog.byId(this, saved.widget) : widgetFor(key);
+        final String sketch = saved != null ? saved.widget : (widget == null ? "" : widget.id);
+        final String name = saved != null ? saved.name
+                : (widget == null ? key : (widget.name.isEmpty() ? widget.id : widget.name));
+        final String facts = saved != null
+                ? DeckPreviewBubble.factsFor(saved, DeckStore.look(this, key))
+                : (sketch.isEmpty() ? "no sketch named" : sketch);
+        previewBubble.show(key, name, sketch, facts, DeckStore.look(this, key), plate,
+                this::setDeckLook);
+    }
+
+    /** A row that never paired names its sketch, not its id; match either. */
+    private WidgetCatalog.Widget widgetFor(String key) {
+        WidgetCatalog.Widget exact = WidgetCatalog.byId(this, key);
+        if (exact != null) return exact;
+        for (WidgetCatalog.Widget widget : WidgetCatalog.all(this)) {
+            if (widget.name.equalsIgnoreCase(key) || widget.id.equalsIgnoreCase(key)) return widget;
+        }
+        return null;
+    }
+
+    /** A swatch inside the bubble: store it, and write it if that deck is linked. */
+    private void setDeckLook(String key, DeckLook look) {
+        DeckStore.setLook(this, key, look);
+        DeckService.Snapshot snapshot = DeckService.snapshot();
+        if (!snapshot.linked) return;
+        for (DeckStore.Known known : DeckStore.all(this)) {
+            if (known.key().equals(key) && known.mac.equalsIgnoreCase(snapshot.deviceMac)) {
+                DeckService.setDeckTheme(known.mac, look.boardTheme());
+                return;
+            }
         }
     }
 

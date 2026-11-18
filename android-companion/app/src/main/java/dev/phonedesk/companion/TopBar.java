@@ -50,8 +50,12 @@ final class TopBar {
     private static final int TOP_DP = 12;
     private static final int BOTTOM_DP = 12;
 
-    /** The page names, in {@link MainActivity}'s section order. */
-    private static final String[] TITLES = {"PAIRED", "BOARDS", "SERIAL", "SETTINGS"};
+    /**
+     * The page names, in {@link MainActivity}'s section order. Sentence case, the
+     * same words the screens print as their own titles: the bar is a crumb, not a
+     * second heading, and two casings for one page read as two pages.
+     */
+    private static final String[] TITLES = {"Decks", "Shelf", "Serial", "Setup"};
 
     TopBar(Context context) {
         bar = Ui.row(context);
@@ -67,9 +71,9 @@ final class TopBar {
         chevron = Ui.icon(context, R.drawable.ic_chevron_back, 22, Ui.BAND_INK);
         chevron.setRotation(-90f);
 
-        crumbText = Ui.text(context, TITLES[0], 15, Ui.BAND_INK);
+        crumbText = Ui.text(context, TITLES[0], 14, Ui.BAND_INK);
         crumbText.setTypeface(Ui.medium(context));
-        crumbText.setLetterSpacing(0.02f);
+        crumbText.setLetterSpacing(-0.01f);
         crumbText.setPadding(Ui.dp(context, 6), Ui.dp(context, 8), Ui.dp(context, 10),
                 Ui.dp(context, 8));
 
@@ -95,9 +99,9 @@ final class TopBar {
         logoParams.rightMargin = Ui.dp(context, 10);
         bar.addView(logo, logoParams);
 
-        pill = Ui.text(context, "IDLE", 11, Ui.BAND_DIM);
-        pill.setLetterSpacing(0.1f);
-        pill.setTypeface(Ui.medium(context));
+        pill = Ui.text(context, "IDLE", 10, Ui.BAND_DIM);
+        pill.setLetterSpacing(0.12f);
+        pill.setTypeface(Ui.mono(context));
         pill.setBackground(Ui.rounded(context, 0, Ui.BAND_RULE, 0));
         pill.setPadding(Ui.dp(context, 9), Ui.dp(context, 5), Ui.dp(context, 9),
                 Ui.dp(context, 5));

@@ -91,8 +91,8 @@ sketch and the descriptor `id`, which always move together:
   Read the marking, never a product listing.
 * **Budget for 4 MB of flash and no PSRAM.** Both decks are built and flashed on
   `PartitionScheme=huge_app`, which gives the app 3,145,728 bytes. The phone deck
-  takes 1,179,690 of them, 37 % of its 3,145,728-byte slot, and the Spotify deck
-  1,891,309, 60 % of the same 3,145,728-byte slot. They moved on 2026-11-04 because the phone
+  takes 1,180,382 of them, 37 % of its 3,145,728-byte slot, and the Spotify deck
+  1,892,033, 60 % of the same 3,145,728-byte slot. They moved on 2026-11-04 because the phone
   deck's radio alone measured 816,643 B, which left it 128 kB of the default
   1,310,720-byte slot — under the gate's own floor plus one framebuffer. DRAM is 327,680 bytes with ~300 kB of heap
   free at boot once the display and touch drivers are up; a 320x240 RGB565
@@ -207,7 +207,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app my_widget
   own deck's current size, globals and md5. It keeps its last measurement in a
   gitignored `.build_figures.json` and reuses it only while that deck's sketch,
   its FQBN and the compiler behind it are all unchanged, so a prose-only commit
-  costs a second instead of a minute; `--refresh` rebuilds anyway, and every run
+  costs a second instead of a minute; `--refresh` rebuilds and replaces the cache, and every run
   names the decks that came from the file. A past build may stay in the prose,
   but only by name in that file's `HISTORICAL` table, next to the reason. The
   table holds two cases and the reason says which: the file that printed a number
@@ -232,9 +232,12 @@ arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app my_widget
   measured at one end: `1,878,613-1,878,661` sat in five places with only the top
   end ever observed, and the next build printed 1,878,661 twice.
 * **A size names the root that printed it, and here that root is
-  `~/.arduino-cyd-3`.** The current 3.3.12 figures in these docs — phone deck
+  `~/.arduino-cyd-3`.** On 2026-11-18, CLI 1.6.0 on core 3.3.12 under
+  `/home/ubuntu/.arduino-cyd-3` measured 1,180,382 B for Phone Deck and
+  1,892,033 B for Spotify Deck, with unchanged globals. The earlier 3.3.12
+  figures in these docs — phone deck
   1,179,690 B / 45,332 B of globals, the linked Spotify deck 1,891,309 B /
-  69,164 B on `huge_app`, the unlinked Spotify deck 1,125,781 B — are that
+  69,180 B on `huge_app`, the unlinked Spotify deck 1,125,781 B — are that
   root's, read through `arduino-cli` 1.5.2-rc.1 on 2026-11-02. It is the root
   worth naming because its `env.sh` pins its own data, download and user dirs;
   `~/.arduino-cyd/env.sh` sets only `PATH`, so sourcing it builds through
@@ -989,7 +992,7 @@ the front page needs no second navigation.
   screen — `[Paired](https://…/paired.png)` — because the label is the only part
   the client makes tappable. The gallery is an optional second link;
   `chat-sheet.jpg` is a desktop extra and never the way a phone is asked to read
-  the screens: it is one row nine frames wide, so every frame lands as a
+  the screens: it is one row ten frames wide, so every frame lands as a
   thumbnail. A message whose only link is the gallery or the strip has not sent
   the renders. **A link is not a
   gate at all unless it opens.** The first links this repo posted 404'd because the
@@ -1003,15 +1006,15 @@ the front page needs no second navigation.
   `python3 artifacts/publish_renders.py`, then the deploy, then one *labelled* link
   per touched screen — `[Paired](https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/paired.png)`. Publishing the renders
   is part of shipping them; publishing the code still needs asking. The fast gate
-  itself draws the nine frames whenever a staged file could move a pixel — the
+  itself draws the ten frames whenever a staged file could move a pixel — the
   app's Java, its resources or the capture — so a commit cannot leave them behind;
   posting the link is the one step no checker can do for you. "It compiles"
   says nothing about what a page looks like, and a change nobody looked at is a
   change to be undone later. A change that alters something which is not one of
-  those nine screens — the launcher icon, a design page, `dist/index.html`, the
+  those ten screens — the launcher icon, a design page, `dist/index.html`, the
   app's own copy in `artifacts/` — gets a sheet of its own under `artifacts/` and
   the same link, because the rule is "what a user sees ships with its picture",
-  not "the renderer's nine frames". The PNGs are the page's own images —
+  not "the renderer's ten frames". The PNGs are the page's own images —
   `tokens.json`'s `screens` maps each frame to one — so a change that redraws a
   screen regenerates that render and commits it with the code and the page. A
   render is a capture of the app, not a device screenshot — say which.

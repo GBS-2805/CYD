@@ -80,9 +80,9 @@ deliberately one file; splitting one fails with
 and neither fits the default 1,310,720-byte slot any more — the phone deck's radio
 alone measured 816,643 B — so pick that scheme in ArduinoDroid's board menu before
 compiling. The scheme is written at flash time: a board carrying the default
-partition keeps it until an upload built for this one lands. `1,179,690 B` of
-`3,145,728` for the phone deck, `1,891,309 B` for the Spotify deck, both measured
-on core 3.3.12.
+partition keeps it until an upload built for this one lands. `1,180,382 B` of
+`3,145,728` for the phone deck, `1,892,033 B` for the Spotify deck, both measured
+on core 3.3.12 on 2026-11-18.
 
 ## Install Marauder, Bruce or Launcher on the CYD
 
@@ -255,6 +255,10 @@ bytes because the dex files carry build-time data. Treat the printed number as
 
 ## Flash an image from the phone over USB
 
+If the app cannot discover or probe any board, start with the read-only
+[hardware spike](HANDOFF.md#hardware-spike-android-usb-discovery-probe-and-flash)
+before importing or writing an image.
+
 1. Connect the CYD with an OTG adapter and a USB **data** cable, with the right
    board chosen under **TARGET BOARD** (only the 2432S024R is listed today).
 2. **BOARD → PROBE USB**, accept Android's permission prompt.
@@ -277,12 +281,25 @@ magic, the MAC, block progress and both MD5s. COPY LOG puts all of it on the
 clipboard, CLEAR empties it. It keeps earlier runs on purpose, so the attempt
 before a failure is still there to compare against.
 
-**Black screen and a red LED** means the board is in its ROM download mode, not
-broken. Tap **RESTART BOARD** to boot the firmware that is still in flash, or
+**Black screen and a red LED** can mean the board is in ROM download mode.
+Confirm with a boot banner or **USB TOOLS → SYNC ONLY**. Tap **RESTART BOARD** to boot the firmware that is still in flash, or
 unplug the cable. The flash is only erased once a write has actually started.
 
-**No CH340 on the USB bus**: the phone cannot see the bridge — check the adapter,
-try another cable, and confirm the phone supports USB host mode.
+**Target board**: the Serial screen's picker lists the classic ESP32 CYDs this
+app can write: 2432S024R (the deck's own board, and the default), 2432S024C,
+2432S028R, 3248S035R, 3248S035C and 3248S040. The choice is stored as a code, so
+it survives restarts and table edits. It changes the flash dialog's target line
+and the recipe text; it does not change the ROM protocol, which is the same on
+every classic ESP32. An image larger than the board's 4 MB flash is refused
+before anything is erased. ESP32-S3 CYDs (8048S0xx) are deliberately absent:
+they answer a different sync and need a different loader.
+
+**No USB device detected**: Android sees nothing on the bus. Check OTG, board
+power, and the data cable. **USB device detected, but no supported adapter**:
+Android sees something, but it does not match the app's CH340/CH341A filter.
+Copy **PROBE LOG** for the adapter IDs. **USB permission was not granted**:
+retry the USB action and tap **Allow**. Open **USB TOOLS** for **SYNC ONLY**,
+**RESTART BOARD**, and the advanced wiring options.
 
 **no answer from the bootloader**: read **PROBE LOG** from the top, in this order.
 

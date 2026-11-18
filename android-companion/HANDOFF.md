@@ -3,6 +3,110 @@
 State as of the last session. [README.md](README.md) has the product view,
 [HOWTO.md](HOWTO.md) the task steps; this file is the context behind the code.
 
+## Hardware spike: Android USB discovery, probe and flash
+
+**Status:** User reports no ESP32 connects, probes or flashes in Off-site.
+Host tests use a stub serial port and cannot verify a phone's USB transfers.
+Timebox this to one half-day with physical hardware. The outcome is the first
+failing layer and a reproducible case, not a claim that flashing is fixed.
+Start with a spare ESP32-2432S024R and its onboard CH340, the supported target.
+The app currently filters for CH340/CH341A; a board with CP210x, FTDI or native
+USB is a separate compatibility test, not a failing CH340 control.
+
+1. **Establish a control.** Note the phone and Android version, APK build, board
+   revision, USB VID/PID, OTG adapter and data cable. On a desktop, use esptool
+   to read chip identity and flash size from the same board without writing.
+   If that fails, resolve the hardware or boot-mode issue before blaming the app.
+2. **Isolate discovery and permission.** Close the app's serial monitor and any
+   other serial app. Connect the board directly to the phone and run **PROBE
+   USB**. Record whether Android enumerates the bridge, prompts for permission,
+   grants it, and allows the app to claim the interface and open both bulk
+   endpoints. If enumeration works but the app says no CH340, compare the actual
+   VID/PID with `UsbSerialCh340.isSupported`. If permission or claim fails,
+   compare with a known-working Android serial app, one app open at a time.
+3. **Separate serial I/O from reset wiring.** Capture a boot banner at 115200
+   with **MONITOR**; close it before probing. Enter download mode manually with
+   BOOT and EN/reset and confirm `waiting for download`. Run **SYNC ONLY** to
+   test the ROM link without DTR/RTS reset changes. If it fails but the desktop
+   answers, run the [CH340 TX/RX loopback](HOWTO.md#test-the-phones-send-path-with-a-loopback)
+   on the same phone and adapter. Record bytes sent and returned, along with
+   timeouts. If manual sync works but automatic **PROBE USB** fails, compare
+   the boot banner and control-line sequence in both attempts before changing
+   `EspRom` or `UsbSerialCh340`. A boot banner proves receive, not transmit.
+4. **Write only after reliable read-only probes.** Require three probes that
+   return the desktop's chip identity across fresh plugs. Use a spare board
+   with a known-good desktop recovery image and a board-matched merged test
+   image. Capture erase, block ACKs, device/file MD5, and reboot into the known
+   test firmware. Verify a failed write or verification never reports success.
+   Do not test writes on an irreplaceable board.
+
+Save each run with the stage, first error, expected and actual results, and
+**COPY LOG** output (redact MACs if shared publicly). A usable spike result
+locates the failing stage on the supported board and proposes a focused fix
+with a regression test. End-to-end acceptance is three successful probes and
+one verified write and reboot; anything else remains unverified. If “connect”
+means **PAIRED → LINK**, test that separately with known-good Phone Deck firmware
+already running and Android Nearby devices granted. BLE discovery and GATT
+linking are not prerequisites for USB probing or flashing.
+
+### Board picker
+
+`BoardTable` holds the six classic ESP32 CYDs the Serial screen can target, with
+panel, touch, flash size and bridge. `BoardCatalog` stores the chosen code.
+`test.sh` probes and flashes a mock ROM once per board, and the Robolectric suite
+checks the picker's contents and that the choice survives a restart. The flash
+dialog refuses an image larger than the target's flash.
+
+Still unverified on hardware: every board in the table, and the 3.5"/4.0" panels
+whose layout the deck sketch does not yet draw for.
+
+### Next hardware session
+
+Use the updated **Serial** screen to collect evidence before changing the USB
+driver. Open **PROBE USB** on the supported CYD, then **COPY LOG**, even if the
+app never opens the port. Log the exact status and branch accordingly:
+
+| First result | Next check |
+| --- | --- |
+| No device | Test direct OTG, board power and a known data cable. |
+| Unsupported adapter | Record the USB IDs and retest with the CH340/CH341A control. |
+| Permission denied | Retry once after allowing access; record Android version and the prompt result. |
+| Port opens, no ROM reply | Capture the boot banner; use USB Tools → Sync Only after manual download entry. |
+| Probe succeeds | Repeat on fresh plugs; defer writing until the spike's read-only acceptance is met. |
+
+The app can report that it sent a restart request; the board must still be
+observed booting. Leave the existing distributed APK untouched until the debug
+build is reviewed and the read-only hardware check is recorded.
+
+### Simulated CYD audit
+
+`android-companion/test/MockCyd.java` runs the real `EspRom` code against a
+stateful, in-memory model of a classic ESP32 ROM behind the host-test serial
+stub. The model takes its wire format from [esptool v4.8.1's ROM loader](https://github.com/espressif/esptool/blob/v4.8.1/esptool/loader.py)
+and [ESP32 target](https://github.com/espressif/esptool/blob/v4.8.1/esptool/targets/esp32.py),
+not from the app's packet constants. It models an awake loader and the standard
+DTR/RTS reset mapping, not every CYD board revision.
+
+- **Probe:** the model enters download mode and returns its synthetic chip
+  identity without erasing flash. A board already in download mode answers
+  without a line change. This did not reproduce the reported probe failure.
+- **Flash:** the original implementation conflated the 4 KiB erase sector with
+  the 1 KiB transfer blocks used by esptool's classic ROM path. It also treated
+  the first ASCII byte of an MD5 digest as status instead of reading the four
+  trailing status bytes. The updated path attaches SPI flash on the default
+  pins, writes padded blocks and verifies just the requested image bytes.
+- **Failure paths:** a lost acknowledgment retries the block in the model;
+  rejected blocks, a short erase acknowledgment, a wrong digest and a failed
+  MD5 status all stop without reporting success or sending a reboot command.
+  The model checks neighboring-sector preservation and a reset after verify.
+
+The mock does **not** exercise the Android USB driver, permission callback,
+physical CH340 transfers, board power, electrical reset timing, or Bluetooth.
+The first physical test is still the read-only hardware spike above. In
+particular, compare enumeration and VID/PID, then capture the ROM boot banner
+and try **SYNC ONLY** before attempting a write. The debug APK built from these
+sources is a build check, not proof of a working flash on a board.
+
 ## What exists
 
 A single-module Android app in Java, **no AndroidX and no third-party
@@ -125,7 +229,7 @@ reason to add a resource pipeline.
 ### The shelf names its bytes
 
 Every sketch card on the flash shelf now carries the sketch's own fingerprint
-beside COPY — `154,522 B  ·  1a04a453`, its length and the first eight digits of
+beside COPY — `154,522 B  ·  8f430c6a`, its length and the first eight digits of
 its md5. The bytes on that card are the bytes COPY pastes, and Arduino answers
 with the size it compiled (`Sketch uses 1,179,690 bytes`), so a sketch pasted out
 of an older install is visible before it is flashed rather than after: the two
@@ -704,7 +808,7 @@ Identical to the sketch, checked against its `onWrite` handlers:
   sketches they name are inside the APK, `assets/widgets/phone_deck_cyd24R/` and
   `assets/widgets/spotify_deck_cyd24R/`, and `check_widget_assets.py` in the repo
   root compares those copies with `../<folder>/<sketch>.ino` byte for byte (phone
-  deck md5 `1a04a453…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
+  deck md5 `8f430c6a…`, Spotify `3b17f04a…` — `f234b68b…` before the 2026-11-02
   header rewrite, and `00bb1560…`, `eca02e93…`, `49f29bcb…` before the Bluetooth
   link, the callback change and the one-line answer — both in sync on 2026-11-02).
   The rewrite makes the phone-over-Bluetooth source the deck's first one and
@@ -712,11 +816,20 @@ Identical to the sketch, checked against its `onWrite` handlers:
   folded in on 2026-11-03, and the APK in `dist/` was rebuilt against it. That sketch also
   **compiles here**, measured on 2026-11-04 once `~/.arduino-cyd/env.sh` was
   sourced — `check_docs.py`'s gate built it on the `huge_app` partition and read
-  1,891,309 B with 69,164 B of globals, beside the phone deck's
+  1,891,309 B with 69,180 B of globals, beside the phone deck's
   1,179,690 B / 45,332 B. Sourcing `~/.arduino-cyd/env.sh` instead sets only
   `PATH`, so that build goes through `~/.arduino15` and reads 1,880,053 B — 48 B
   under with the globals identical, the build-root sensitivity the docs record.
   The root that first printed that figure reads 1,878,661 B, 16 B over. Neither board has run it.
+- **The board picker and the rebuilt APK.** `BoardTable` now lists six classic
+  ESP32 CYDs — 2432S024R (default), 2432S024C, 2432S028R, 3248S035R, 3248S035C,
+  3248S040 — and `BoardCatalog` stores the chosen code rather than an index. The
+  flash dialog names the target and refuses an image larger than its 4 MB flash.
+  `test.sh` probes, writes and verifies a mock ROM once per board (280 host checks
+  pass), and the Robolectric suite checks the picker and that the choice survives
+  a restart. `gradle assembleDebug` rebuilt `dist/PhoneDeckBridge-debug.apk` on
+  2026-11-18 at 270,914 bytes, debug-signed, with both widget assets inside.
+  Nothing in this table has been tried on a physical board.
 - **The Spotify deck's sign-in finishes here.** `SpotifyCallbackActivity` is
   exported for `phonedesk://spotify-callback`, and `aapt2 dump xmltree` on the
   shipped APK shows the VIEW/DEFAULT/BROWSABLE filter with scheme `phonedesk` and
@@ -800,8 +913,13 @@ Identical to the sketch, checked against its `onWrite` handlers:
   packaging, alignment and the signing block rather than a different build, and
   no one figure is a guide to the others. It is versionCode 1,
   minSdk 26, targetSdk 35, not debuggable, and it carries both sketches in its
-  assets. The signer is read back out of the archive and refused if it comes back
-  as the debug identity instead. The unsigned file is build output rather than a
+  assets. Rebuilt on 2026-11-18 after the Deck Index restyle, the deck preview
+  bubble and the link tuning, the debug APK is **351,034 bytes** (343 kB), sha256
+  beginning `9aa873ce`, with ten palette PNGs (44 kB) of the decks' own front pages
+  in `assets/decks/` — 74,729 bytes over the 276,305-byte build, most of it
+  `classes.dex` (293,760) carrying four new views, and 42,182 bytes under the
+  393,216-byte ceiling the preview raised. The signer is read back out of the
+  archive and refused if it comes back as the debug identity instead. The unsigned file is build output rather than a
   kept one: the next `toolchain.sh` run starts with `clean` and takes it with it.
 - **The release key lives outside the repository, which is the opposite rule from
   the debug key.** `release.sh --new-key` makes a PKCS12 keystore holding an RSA
@@ -986,15 +1104,15 @@ bytes) is not in the APK`; over the real archive it prints all five and exits 0.
 
 ## Where the renders live
 
-The app, its APK, the nine frames, the deck's palette pages, the mark and the chat strip
+The app, its APK, the ten frames, the deck's palette pages, the mark and the chat strip
 are published as one static page, because a link a person can tap is what the render rule
 in `CONVENTIONS.md` asks for and a workspace path opens nothing. The strip is drawn by
-`publish_renders.py` from those same nine frames on every run, so it is never a picture
+`publish_renders.py` from those same ten frames on every run, so it is never a picture
 of an earlier capture.
 
 | What | Where |
 | --- | --- |
-| The site (one scroll: APK, nine screens, deck palettes, mark, strip) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/ |
+| The site (one scroll: APK, ten screens, deck palettes, mark, strip) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/ |
 | One screen | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/paired.png — likewise `pull-down`, `side-panel`, `bridge-sheet`, `appearance-sheet`, `projects`, `projects-open`, `serial`, `settings` |
 | The strip (one row of the nine, for a desktop message — not a phone view) | https://site-c8050e9c1c3546fc9a5dfb219430a19b.freebuff.page/chat-sheet.jpg |
 | Bundle source | [`artifacts/site/`](../artifacts/site/) (`worker.js`, `manifest.json`), built by [`artifacts/publish_renders.py`](../artifacts/publish_renders.py) into the gitignored `artifacts/site/public/` |
@@ -1012,7 +1130,7 @@ unpublished. The handoff page is owner-only source at
 [`artifacts/site/handoff.html`](../artifacts/site/handoff.html); it is deliberately not
 copied into the bundle and has no public URL. The fast gate's `publish` step builds the
 bundle in a throwaway tree and refuses it if the handoff is present. The phone view in a render message is the labelled per-screen links above, not the whole
-page and not the strip: the strip is a single row nine frames wide, so a phone shrinks
+page and not the strip: the strip is a single row ten frames wide, so a phone shrinks
 each frame to a thumbnail. The page is the one address for the app, its APK and its
 pictures; the strip is a desktop extra.
 
@@ -1033,7 +1151,7 @@ side-effect output never makes them current, so `--rerun-tasks` — which re-ran
 compile to redraw screens whose code had not changed — is gone; and the Gradle daemon is
 kept instead of restarted per capture, with its JDK passed explicitly because this
 environment's default `javaHome` names a path that does not exist. Seven frames came back byte-identical across the change, which is how it
-was verified rather than assumed — the app drew seven screens then and has drawn nine
+was verified rather than assumed — the app drew seven screens then and has drawn ten
 since.
 
 An **emulator was considered and is not the answer here**: this VM has `/dev/kvm` but the

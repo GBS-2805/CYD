@@ -4,12 +4,12 @@
 CONVENTIONS.md asks for a labelled public link to every touched screen before a UI
 change ships, and the owner reads the chat on a phone. So the frames that git already
 holds are copied, unchanged, into `artifacts/site/public/` with one page that walks the
-app from top to bottom: the download, the nine captures, the deck's palette pages, the
+app from top to bottom: the download, the ten captures, the deck's palette pages, the
 mark, and the optional wide strip. One address, one scroll.
 
 Nothing here draws the app. The pixels are `artifacts/renders/`'s and the deck pages are
 `artifacts/decks/`'s; `check_renders.py` and the deck checkers keep those honest. This
-script copies them, draws the strip from the same nine frames, and writes the page. The
+script copies them, draws the strip from the same ten frames, and writes the page. The
 handoff note beside it is the owner's own copy and is deliberately not published.
 
 The bundle is cleared before it is filled, so a file that leaves the pipeline cannot
@@ -34,6 +34,8 @@ PUBLIC = HERE / "site" / "public"
 # Every frame the capture writes, in the order a person meets them in the app.
 SCREENS = [
     ("paired", "Paired", "the link, then three decks drawn in their own three palettes"),
+    ("preview", "Deck preview",
+     "the bubble a plate opens: the deck's own front page in a 2.4\" bezel"),
     ("pull-down", "The pull-down", "PAIRED, BOARDS, SERIAL, in flow under the header"),
     ("side-panel", "The side panel",
      "SETTINGS, DECKS, BRIDGE, APPEARANCE, and the palette at its foot"),
@@ -200,7 +202,7 @@ PAGE = """<!doctype html>
   </section>
   <section id="strip">
     <h2>The wide strip</h2>
-    <p class="section-note">All nine screens in one image. It is a desktop extra —
+    <p class="section-note">All ten screens in one image. It is a desktop extra —
       on a phone, use the screens above.</p>
     <a class="strip-link" href="chat-sheet.jpg">Open the strip · {strip_dim}</a>
   </section>

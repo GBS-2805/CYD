@@ -42,10 +42,13 @@ final class AppearanceStrip extends LinearLayout {
         setPadding(0, Ui.dp(activity, 12), 0, Ui.dp(activity, 4));
 
         final int live = Appearance.palette(activity);
-        for (int i = 0; i < Palette.SCHEMES.length; ++i) {
-            final Palette.Scheme scheme = Palette.SCHEMES[i];
-            final int index = i;
-            View swatch = swatch(activity, scheme, i == live, Ui.TEXT);
+        // The app's own page comes first, then the three deck palettes: four
+        // swatches, because the app can be drawn in any of them and the first is
+        // what a fresh install gets.
+        for (int i = 0; i < Palette.APP_SCHEMES.length; ++i) {
+            final Palette.Scheme scheme = Palette.APP_SCHEMES[i];
+            final int index = i == 0 ? Palette.FIELD : i - 1;
+            View swatch = swatch(activity, scheme, index == live, Ui.TEXT);
             swatch.setOnClickListener(v -> pick.palette(index));
             swatch.setContentDescription("Palette " + scheme.id);
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(

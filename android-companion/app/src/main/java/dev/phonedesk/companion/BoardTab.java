@@ -52,13 +52,15 @@ final class BoardTab extends ScrollView {
     private final LinearLayout body;
     private String signature = "";
 
-    private String usbStatus = "Plug the CYD in with an OTG cable, then tap PROBE.";
+    private String usbStatus = "Ready to check USB.";
     private int usbStatusColor = Ui.DIM;
     private boolean usbProbing;
     private boolean usbFlashing;
     private int usbPercentShown = -1;
     /** Never drive IO0 low; pulse EN from here and let BOOT hold the strap. */
     private boolean manualReset;
+    private boolean usbToolsExpanded;
+    private boolean permissionPending;
     /** DTR drives EN and RTS drives IO0; see EspRom.setSwappedLines(). */
     private boolean swappedLines;
     /** The rate the last handshake answered at; PROBE and FLASH try it first. */
@@ -142,15 +144,17 @@ final class BoardTab extends ScrollView {
         public void onReceive(Context context, Intent intent) {
             if (!ACTION_USB_PERMISSION.equals(intent.getAction())) return;
             unregisterUsbPermission();
+            permissionPending = false;
+            final int purpose = permissionPurpose;
+            permissionPurpose = PURPOSE_PROBE;
             final UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
             final boolean granted =
                     intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false);
             if (!granted || device == null) {
-                setUsbStatus("Android denied access to the CH340.", Ui.PINK);
+                usbIssue("USB permission was not granted. Tap the USB action again and choose Allow.");
                 return;
             }
-            if (permissionPurpose == PURPOSE_PING) {
-                permissionPurpose = PURPOSE_PROBE;
+            if (purpose == PURPOSE_PING) {
                 final UsbManager manager =
                         (UsbManager) activity.getSystemService(Context.USB_SERVICE);
                 if (manager == null) {
@@ -160,15 +164,15 @@ final class BoardTab extends ScrollView {
                 pingLoader(device);
                 return;
             }
-            if (permissionPurpose == PURPOSE_MONITOR) {
-                permissionPurpose = PURPOSE_PROBE;
+            if (purpose == PURPOSE_MONITOR) {
                 final UsbManager manager =
                         (UsbManager) activity.getSystemService(Context.USB_SERVICE);
                 if (manager == null) {
                     setUsbStatus("This phone has no USB host support.", Ui.PINK);
                     return;
                 }
-                openMonitor(manager, device);
+                if (monitorMode) openMonitor(manager, device);
+                else setUsbStatus("USB access granted. Switch to Monitor to start reading.", Ui.DIM);
                 return;
             }
             probeUsb(device);
@@ -271,11 +275,11 @@ final class BoardTab extends ScrollView {
         monitorView = null;
         monitorBox = null;
 
-        body.addView(Ui.text(activity, "SERIAL", 20, Ui.TEXT));
-        TextView subtitle = Ui.text(activity, monitorMode
+        body.addView(Ui.title(activity, "Serial"));
+        TextView subtitle = Ui.subtitle(activity, monitorMode
                 ? "Connect over OTG, then watch what the board prints."
-                : "Connect over OTG, then flash an image.", 12, Ui.DIM);
-        subtitle.setPadding(0, Ui.dp(activity, 4), 0, 0);
+                : "Check the USB connection before writing firmware.");
+        subtitle.setPadding(0, Ui.dp(activity, 4), 0, Ui.dp(activity, 4));
         body.addView(subtitle);
 
         body.addView(boardPicker());
@@ -378,12 +382,10 @@ final class BoardTab extends ScrollView {
     // --------------------------------------------------------- serial stream ---
 
     private LinearLayout monitorCard() {
-        LinearLayout card = Ui.card(activity);
+        LinearLayout card = Ui.column(activity);
+        card.setPadding(0, Ui.dp(activity, 10), 0, 0);
 
-        TextView tag = Ui.text(activity, "SERIAL", 11, Ui.VIOLET);
-        tag.setLetterSpacing(0.14f);
-        card.addView(tag);
-
+        card.addView(Ui.section(activity, "MONITOR"));
         TextView hint = Ui.text(activity,
                 "START opens the CH340 and prints what the board sends. Flashing needs the "
                         + "cable to itself, so leaving this mode stops the stream. Baud can "
@@ -391,18 +393,18 @@ final class BoardTab extends ScrollView {
                         + "SEND writes the typed line plus a line ending, so a sketch waiting "
                         + "on Serial can be answered.",
                 11, Ui.DIM);
-        hint.setPadding(0, Ui.dp(activity, 6), 0, 0);
         hint.setLineSpacing(Ui.dp(activity, 2), 1f);
         card.addView(hint);
 
         TextView status = Ui.text(activity, usbStatus, 12, usbStatusColor);
-        status.setPadding(0, Ui.dp(activity, 10), 0, 0);
+        status.setPadding(0, Ui.dp(activity, 12), 0, 0);
         status.setLineSpacing(Ui.dp(activity, 2), 1f);
         card.addView(status);
+        card.addView(Ui.rule(activity));
 
         LinearLayout baudRow = Ui.row(activity);
-        TextView baudLabel = Ui.text(activity, "BAUD", 11, Ui.DIM);
-        baudLabel.setLetterSpacing(0.14f);
+        baudRow.setPadding(0, Ui.dp(activity, 4), 0, 0);
+        TextView baudLabel = Ui.text(activity, "Baud", 12, Ui.DIM);
         baudRow.addView(baudLabel);
 
         final List<String> rates = new ArrayList<>();
@@ -467,6 +469,7 @@ final class BoardTab extends ScrollView {
                 : monitorTranscript(), 10, monitorText.length() == 0 ? Ui.DIM : Ui.TEXT);
         monitorView.setTextIsSelectable(true);
         monitorView.setLineSpacing(Ui.dp(activity, 2), 1f);
+        if (monitorText.length() > 0) Ui.mono(monitorView);
 
         final ScrollView box = new ScrollView(activity);
         box.addView(monitorView);
@@ -534,8 +537,6 @@ final class BoardTab extends ScrollView {
         ending.setOnClickListener(v -> toggleLineEnding());
         actions.addView(ending);
         card.addView(actions);
-
-        Ui.space(activity, card, 10);
         return card;
     }
 
@@ -568,19 +569,11 @@ final class BoardTab extends ScrollView {
         startRetries = 0;
 
         final UsbManager manager = (UsbManager) activity.getSystemService(Context.USB_SERVICE);
-        if (manager == null) {
-            setUsbStatus("This phone has no USB host support.", Ui.PINK);
-            return;
-        }
-        final UsbDevice device = UsbSerialCh340.find(manager);
-        if (device == null) {
-            setUsbStatus("No CH340 on the USB bus. Check the OTG adapter and the cable.", Ui.PINK);
-            return;
-        }
+        if (permissionPending) return;
+        final UsbDevice device = findUsbDevice(manager);
+        if (device == null) return;
         if (!manager.hasPermission(device)) {
-            permissionPurpose = PURPOSE_MONITOR;
-            setUsbStatus("Asking Android for the CH340…", Ui.ACCENT);
-            requestUsbPermission(manager, device);
+            requestUsbPermission(manager, device, PURPOSE_MONITOR);
             return;
         }
         openMonitor(manager, device);
@@ -905,20 +898,19 @@ final class BoardTab extends ScrollView {
         return false;
     }
 
-    /** Target-board pull-down. One board today; the list is the extension point. */
+    /** Target-board pull-down. The table is {@link BoardTable}; this only draws it. */
     private LinearLayout boardPicker() {
-        LinearLayout card = Ui.card(activity);
+        LinearLayout card = Ui.column(activity);
+        card.setPadding(0, Ui.dp(activity, 10), 0, 0);
 
-        TextView tag = Ui.text(activity, "TARGET", 11, Ui.VIOLET);
-        tag.setLetterSpacing(0.14f);
-        card.addView(tag);
+        card.addView(Ui.section(activity, "TARGET BOARD"));
 
-        final List<BoardCatalog.Board> boards = BoardCatalog.all();
+        final List<BoardTable.Board> boards = BoardCatalog.all();
         final List<String> labels = new ArrayList<>();
-        for (BoardCatalog.Board board : boards) labels.add(board.spinnerLabel());
+        for (BoardTable.Board board : boards) labels.add(board.spinnerLabel());
 
-        final TextView note = Ui.text(activity, BoardCatalog.selected(activity).note, 11, Ui.DIM);
-        note.setPadding(0, Ui.dp(activity, 6), 0, 0);
+        final TextView note = Ui.text(activity, boardNote(BoardCatalog.selected(activity)), 11, Ui.DIM);
+        note.setPadding(0, Ui.dp(activity, 8), 0, 0);
         note.setLineSpacing(Ui.dp(activity, 2), 1f);
 
         Spinner spinner = new Spinner(activity);
@@ -932,7 +924,7 @@ final class BoardTab extends ScrollView {
             public void onItemSelected(AdapterView<?> parent, android.view.View view,
                                        int position, long id) {
                 BoardCatalog.select(activity, position);
-                note.setText(boards.get(position).note);
+                note.setText(boardNote(boards.get(position)));
             }
 
             @Override
@@ -944,131 +936,80 @@ final class BoardTab extends ScrollView {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
-        params.topMargin = Ui.dp(activity, 6);
+        params.topMargin = Ui.dp(activity, 2);
         card.addView(spinner, params);
         card.addView(note);
 
-        Ui.space(activity, card, 10);
+        TextView caveat = Ui.text(activity,
+                "Only classic ESP32 CYDs are listed. An ESP32-S3 CYD answers a different "
+                        + "ROM sync and cannot be flashed from this app.", 11, Ui.DIM);
+        caveat.setPadding(0, Ui.dp(activity, 10), 0, Ui.dp(activity, 4));
+        caveat.setLineSpacing(Ui.dp(activity, 2), 1f);
+        card.addView(caveat);
+        card.addView(Ui.rule(activity));
         return card;
     }
 
+    /** The picker's note: what the board is, then what the choice changes. */
+    private static String boardNote(BoardTable.Board board) {
+        return board.summary() + "\n" + board.note;
+    }
+
     private LinearLayout usbCard() {
-        LinearLayout card = Ui.card(activity);
+        LinearLayout card = Ui.column(activity);
+        card.setPadding(0, Ui.dp(activity, 10), 0, 0);
 
-        TextView tag = Ui.text(activity, "USB", 11, Ui.VIOLET);
-        tag.setLetterSpacing(0.14f);
-        card.addView(tag);
-
-        TextView hint = Ui.text(activity,
-                "PROBE reads the chip ID and MAC, then restarts the board into its firmware. "
-                        + "It listens first, then asks for BOOT + RESET, and only then "
-                        + "pulses the reset lines itself. RESTART BOARD boots the firmware "
-                        + "that is already there. SYNC ONLY sends one packet with no reset, "
-                        + "for a chip already in its loader.",
-                11, Ui.DIM);
-        hint.setPadding(0, Ui.dp(activity, 6), 0, 0);
+        card.addView(Ui.section(activity, "USB"));
+        TextView hint = Ui.text(activity, "Connect a CYD with a CH340 or CH341A adapter"
+                + " using OTG and a USB data cable. Probe checks the bootloader without"
+                + " writing firmware.", 11, Ui.DIM);
         hint.setLineSpacing(Ui.dp(activity, 2), 1f);
         card.addView(hint);
 
         TextView status = Ui.text(activity, usbStatus, 12, usbStatusColor);
-        status.setPadding(0, Ui.dp(activity, 10), 0, 0);
+        status.setPadding(0, Ui.dp(activity, 12), 0, Ui.dp(activity, 2));
         status.setLineSpacing(Ui.dp(activity, 2), 1f);
         card.addView(status);
+        card.addView(Ui.rule(activity));
 
         Button probe = Ui.action(activity, usbProbing ? "PROBING…" : "PROBE USB", true);
-        probe.setEnabled(!usbProbing);
+        boolean idle = !usbProbing && !usbFlashing && !permissionPending && portOwner.isEmpty();
+        usbActionEnabled(probe, idle);
         probe.setOnClickListener(v -> detectUsb());
         Ui.space(activity, probe, 10);
         card.addView(probe);
 
-        Button sync = Ui.action(activity, "SYNC ONLY", false);
-        sync.setEnabled(!usbProbing && !usbFlashing);
-        sync.setOnClickListener(v -> detectPing());
-        Ui.space(activity, sync, 8);
-        card.addView(sync);
-
-        Button restart = Ui.action(activity, "RESTART BOARD", false);
-        restart.setEnabled(!usbProbing && !usbFlashing);
-        restart.setOnClickListener(v -> restartBoard());
-        Ui.space(activity, restart, 8);
-        card.addView(restart);
-
-        Button manual = Ui.action(activity, "MANUAL BOOT: " + (manualReset ? "ON" : "OFF"),
-                manualReset);
-        manual.setOnClickListener(v -> setManualReset(!manualReset));
-        Ui.space(activity, manual, 8);
-        card.addView(manual);
-
-        Button swapped = Ui.action(activity, "LINES: " + (swappedLines ? "SWAPPED" : "NORMAL"),
-                swappedLines);
-        swapped.setOnClickListener(v -> setSwappedLines(!swappedLines));
-        Ui.space(activity, swapped, 8);
-        card.addView(swapped);
-
-        TextView sweepNote = Ui.text(activity,
-                "PROBE works in three steps: it listens with nothing touched, then asks"
-                        + " for BOOT held and RESET tapped, then falls back to four wirings"
-                        + " of its own, starting with the one the two buttons select —"
-                        + " normal and swapped lines, each with the reset driven here and"
-                        + " with EN pulsed while BOOT is held. FLASH walks the same three"
-                        + " steps before it writes.", 11, Ui.DIM);
-        sweepNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
-        sweepNote.setLineSpacing(Ui.dp(activity, 2), 1f);
-        card.addView(sweepNote);
-
-        if (swappedLines) {
-            TextView swapNote = Ui.text(activity,
-                    "DTR drives EN and RTS drives IO0 instead of the other way round. PROBE"
-                            + " tries this wiring first and sets the button to whichever one"
-                            + " answered, so this button is the sweep's starting point, not a"
-                            + " leftover: hand it on to send PROBE, FLASH and RESTART to"
-                            + " swapped lines first.", 11, Ui.ACCENT);
-            swapNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
-            swapNote.setLineSpacing(Ui.dp(activity, 2), 1f);
-            card.addView(swapNote);
-        }
-
-        if (manualReset) {
-            TextView manualNote = Ui.text(activity,
-                    "EN pulse, IO0 held high: FLASH and RESTART leave the strap to the"
-                            + " BOOT button, so hold it while they run. PROBE tries this mode"
-                            + " first, then its other three wirings, and leaves the button on"
-                            + " whichever one answered.", 11, Ui.ACCENT);
-            manualNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
-            manualNote.setLineSpacing(Ui.dp(activity, 2), 1f);
-            card.addView(manualNote);
-        }
-
-        if (probeBaud != 115200) {
-            TextView baudNote = Ui.text(activity,
-                    "The last handshake answered at " + probeBaud + " baud, so PROBE and"
-                            + " FLASH try that rate first and 115200 after it. A rate that"
-                            + " stops answering falls through to the others on its own.",
-                    11, Ui.ACCENT);
-            baudNote.setPadding(0, Ui.dp(activity, 6), 0, 0);
-            baudNote.setLineSpacing(Ui.dp(activity, 2), 1f);
-            card.addView(baudNote);
-        }
+        Button tools = Ui.action(activity, usbToolsExpanded ? "HIDE USB TOOLS" : "USB TOOLS", false);
+        tools.setOnClickListener(v -> {
+            usbToolsExpanded = !usbToolsExpanded;
+            signature = "";
+            refresh();
+        });
+        Ui.space(activity, tools, 8);
+        card.addView(tools);
+        if (usbToolsExpanded) addUsbTools(card, idle);
 
         card.addView(Ui.section(activity, "PROBE LOG"));
 
         final String log = logText();
         TextView logView = Ui.text(activity, log.isEmpty()
-                ? "Nothing yet. PROBE and FLASH write each handshake step here, and a "
-                + "quiet ROM reports the raw bytes it did send."
-                : log, 11, log.isEmpty() ? Ui.DIM : Ui.TEXT);
+                ? "No USB attempts yet. If a check fails, copy this log to share where it stopped."
+                : log, 10, log.isEmpty() ? Ui.DIM : Ui.TEXT);
         logView.setTextIsSelectable(true);
         logView.setLineSpacing(Ui.dp(activity, 2), 1f);
+        if (!log.isEmpty()) Ui.mono(logView);
         card.addView(logView);
 
         LinearLayout logActions = Ui.row(activity);
         logActions.setPadding(0, Ui.dp(activity, 8), 0, 0);
         Button copyLog = Ui.action(activity, "COPY LOG", false);
+        usbActionEnabled(copyLog, !log.isEmpty());
         copyLog.setOnClickListener(v -> Actions.copyOrSay(activity, "probe log", logText()));
         logActions.addView(copyLog);
 
         Button clearLog = Ui.action(activity, "CLEAR", false);
         clearLog.setTextColor(Ui.DIM);
+        usbActionEnabled(clearLog, !log.isEmpty());
         LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -1084,14 +1025,77 @@ final class BoardTab extends ScrollView {
         });
         logActions.addView(clearLog);
         card.addView(logActions);
-
-        Ui.space(activity, card, 10);
         return card;
+    }
+
+    private void addUsbTools(LinearLayout card, boolean idle) {
+        TextView note = Ui.text(activity, "Sync Only checks a board already in download mode."
+                + " Restart requests a normal boot without writing. The wiring options set"
+                + " which automatic probe setup is tried first.", 11, Ui.DIM);
+        Ui.space(activity, note, 8);
+        card.addView(note);
+        usbTool(card, "SYNC ONLY", false, idle, this::detectPing);
+        usbTool(card, "RESTART BOARD", false, idle, this::restartBoard);
+        usbTool(card, "MANUAL BOOT: " + (manualReset ? "ON" : "OFF"), manualReset, idle,
+                () -> setManualReset(!manualReset));
+        usbTool(card, "LINES: " + (swappedLines ? "SWAPPED" : "NORMAL"), swappedLines, idle,
+                () -> setSwappedLines(!swappedLines));
+        if (probeBaud != 115200) {
+            card.addView(Ui.text(activity, "Last successful rate: " + probeBaud + " baud.", 11, Ui.DIM));
+        }
+    }
+
+    private void usbTool(LinearLayout card, String label, boolean primary, boolean enabled,
+                         Runnable action) {
+        Button button = Ui.action(activity, label, primary);
+        usbActionEnabled(button, enabled);
+        button.setOnClickListener(v -> action.run());
+        Ui.space(activity, button, 8);
+        card.addView(button);
+    }
+
+    private static void usbActionEnabled(Button button, boolean enabled) {
+        button.setEnabled(enabled);
+        button.setAlpha(enabled ? 1f : 0.5f);
+    }
+
+    private void usbIssue(String message) {
+        setUsbStatus(message, Ui.PINK);
+        trace(message);
+    }
+
+    private UsbDevice findUsbDevice(UsbManager manager) {
+        if (manager == null) {
+            usbIssue("USB host is not available on this phone.");
+            return null;
+        }
+        UsbDevice device = UsbSerialCh340.find(manager);
+        if (device != null) return device;
+        java.util.Map<String, UsbDevice> devices = manager.getDeviceList();
+        if (devices.isEmpty()) {
+            usbIssue("No USB device detected. Check OTG, board power, and the data cable.");
+        } else {
+            java.util.Set<String> ids = new java.util.TreeSet<>();
+            for (UsbDevice item : devices.values()) {
+                ids.add(String.format(Locale.US, "%04x:%04x", item.getVendorId(), item.getProductId()));
+            }
+            usbIssue("USB device detected (" + String.join(", ", ids)
+                    + "), but no supported CH340 or CH341A adapter was found.");
+        }
+        return null;
     }
 
     /** One handshake line from the USB thread; the view is rebuilt on the main one. */
     private void trace(String text) {
         activity.runOnUiThread(() -> {
+            if (activity.isDestroyed()) return;
+            if ((usbProbing || usbFlashing) && text.startsWith("  step 2:")) {
+                usbStatus = "Hold BOOT, tap RESET, then release BOOT. Waiting for the bootloader…";
+                usbStatusColor = Ui.ACCENT;
+            } else if ((usbProbing || usbFlashing) && text.startsWith("  step 3:")) {
+                usbStatus = "Trying automatic reset and looking for the bootloader…";
+                usbStatusColor = Ui.ACCENT;
+            }
             synchronized (usbLog) {
                 usbLog.add(clock.format(new Date()) + "  " + text);
                 while (usbLog.size() > LOG_MAX) usbLog.remove(0);
@@ -1114,19 +1118,12 @@ final class BoardTab extends ScrollView {
     }
 
     private void detectUsb() {
+        if (usbProbing || usbFlashing || permissionPending || portTaken()) return;
         final UsbManager manager = (UsbManager) activity.getSystemService(Context.USB_SERVICE);
-        if (manager == null) {
-            setUsbStatus("This phone has no USB host support.", Ui.PINK);
-            return;
-        }
-        final UsbDevice device = UsbSerialCh340.find(manager);
-        if (device == null) {
-            setUsbStatus("No CH340 on the USB bus. Check the OTG adapter and the cable.", Ui.PINK);
-            return;
-        }
+        final UsbDevice device = findUsbDevice(manager);
+        if (device == null) return;
         if (!manager.hasPermission(device)) {
-            setUsbStatus("Asking Android for the CH340…", Ui.ACCENT);
-            requestUsbPermission(manager, device);
+            requestUsbPermission(manager, device, PURPOSE_PROBE);
             return;
         }
         probeUsb(device);
@@ -1134,20 +1131,12 @@ final class BoardTab extends ScrollView {
 
     /** SYNC ONLY: asks for the port the way PROBE does, then sends one packet. */
     private void detectPing() {
+        if (usbProbing || usbFlashing || permissionPending || portTaken()) return;
         final UsbManager manager = (UsbManager) activity.getSystemService(Context.USB_SERVICE);
-        if (manager == null) {
-            setUsbStatus("This phone has no USB host support.", Ui.PINK);
-            return;
-        }
-        final UsbDevice device = UsbSerialCh340.find(manager);
-        if (device == null) {
-            setUsbStatus("No CH340 on the USB bus. Check the OTG adapter and the cable.", Ui.PINK);
-            return;
-        }
+        final UsbDevice device = findUsbDevice(manager);
+        if (device == null) return;
         if (!manager.hasPermission(device)) {
-            permissionPurpose = PURPOSE_PING;
-            setUsbStatus("Asking Android for the CH340…", Ui.ACCENT);
-            requestUsbPermission(manager, device);
+            requestUsbPermission(manager, device, PURPOSE_PING);
             return;
         }
         pingLoader(device);
@@ -1207,13 +1196,25 @@ final class BoardTab extends ScrollView {
         }, "usb-sync").start();
     }
 
-    private void requestUsbPermission(UsbManager manager, UsbDevice device) {
-        registerUsbPermission();
+    private void requestUsbPermission(UsbManager manager, UsbDevice device, int purpose) {
+        if (permissionPending) return;
+        permissionPurpose = purpose;
+        permissionPending = true;
+        setUsbStatus("Waiting for Android USB permission. Tap Allow to continue.", Ui.ACCENT);
+        trace("Requesting USB permission for " + describe(device));
         final Intent intent = new Intent(ACTION_USB_PERMISSION)
                 .setPackage(activity.getPackageName());
         final int flags = PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT;
         final PendingIntent pending = PendingIntent.getBroadcast(activity, 0, intent, flags);
-        manager.requestPermission(device, pending);
+        try {
+            registerUsbPermission();
+            manager.requestPermission(device, pending);
+        } catch (RuntimeException e) {
+            unregisterUsbPermission();
+            permissionPending = false;
+            usbIssue("Could not request USB access. Reconnect the board and try again.");
+            trace(e.toString());
+        }
     }
 
     private void registerUsbPermission() {
@@ -1288,7 +1289,7 @@ final class BoardTab extends ScrollView {
             if (opened) {
                 try {
                     rom.hardReset();
-                    message += "\nBoard restarted into its firmware.";
+                    message += "\nRestart requested; check the board for normal startup.";
                 } catch (Exception e) {
                     message += "\nCould not restart it — unplug to boot it again.";
                     trace("reset failed: "
@@ -1352,15 +1353,16 @@ final class BoardTab extends ScrollView {
 
     /** Boots what is in flash without entering the bootloader. */
     private void restartBoard() {
-        if (usbProbing || usbFlashing) return;
-        if (!claimPortOrSay("restart")) return;
+        if (usbProbing || usbFlashing || permissionPending || portTaken()) return;
         final UsbManager manager = (UsbManager) activity.getSystemService(Context.USB_SERVICE);
-        final UsbDevice device = UsbSerialCh340.find(manager);
-        if (manager == null || device == null) {
-            setUsbStatus("No CH340 on the USB bus.", Ui.PINK);
+        final UsbDevice device = findUsbDevice(manager);
+        if (device == null) return;
+        if (!manager.hasPermission(device)) {
+            usbIssue("USB access is required. Run Probe USB and allow access before restarting.");
             return;
         }
-        setUsbStatus("Restarting the board…", Ui.ACCENT);
+        if (!claimPortOrSay("restart")) return;
+        setUsbStatus("Requesting a board restart…", Ui.ACCENT);
         new Thread(() -> {
             String message;
             int color;
@@ -1373,7 +1375,7 @@ final class BoardTab extends ScrollView {
                 port.open();
                 trace("port opened");
                 rom.hardReset();
-                message = "Board restarted.";
+                message = "Restart requested. Check the board for normal startup.";
                 color = Ui.GOOD;
             } catch (Exception e) {
                 final String reason = e.getMessage() == null ? e.toString() : e.getMessage();
@@ -1393,23 +1395,32 @@ final class BoardTab extends ScrollView {
 
     /** Confirms, then writes the image at 0x0 — the merged-image offset. */
     private void flashBinary(final FlashLibrary.Entry entry) {
-        if (usbProbing || usbFlashing || portTaken()) return;
+        if (usbProbing || usbFlashing || permissionPending || portTaken()) return;
         final byte[] image = FlashLibrary.readBytes(activity, entry);
         if (image == null || image.length == 0) {
             Actions.toast(activity, "Could not read " + entry.name);
             return;
         }
         final UsbManager manager = (UsbManager) activity.getSystemService(Context.USB_SERVICE);
-        final UsbDevice device = UsbSerialCh340.find(manager);
-        if (device == null) {
-            setUsbStatus("No CH340 on the USB bus.", Ui.PINK);
+        final UsbDevice device = findUsbDevice(manager);
+        if (device == null) return;
+        if (!manager.hasPermission(device)) {
+            usbIssue("USB access is required. Run Probe USB and allow access before flashing.");
             return;
         }
 
+        final BoardTable.Board target = BoardCatalog.selected(activity);
+        if (!BoardTable.fits(target, image.length)) {
+            usbIssue("That image is " + Ui.size(image.length) + ", larger than the "
+                    + target.flashMb + " MB flash on " + target.code + ". Pick the board "
+                    + "it was built for, or use a smaller merged image.");
+            return;
+        }
         final int eraseKb = ((image.length + 4095) / 4096) * 4;
         new AlertDialog.Builder(activity)
                 .setTitle("Flash " + entry.name)
-                .setMessage(Ui.size(image.length) + " at 0x0, after erasing " + eraseKb
+                .setMessage("Target: " + target.summary() + "\n\n"
+                        + Ui.size(image.length) + " at 0x0, after erasing " + eraseKb
                         + " kB, then checked by MD5.\n\nKeep the board in reach: it asks "
                         + "for BOOT held and RESET tapped to enter its loader.\n\n0x0 "
                         + "expects a merged image. Do not unplug while it runs.")
@@ -1442,7 +1453,8 @@ final class BoardTab extends ScrollView {
             rom.setSwappedLines(swappedLines);
             rom.setManualReset(manualReset);
             rom.setPreferredBaud(probeBaud);
-            trace("== FLASH " + name + " · " + Ui.size(image.length) + " ==");
+            trace("== FLASH " + name + " · " + Ui.size(image.length) + " · "
+                    + BoardCatalog.selected(activity).code + " ==");
             try {
                 port.open();
                 trace("port opened");
@@ -1452,7 +1464,7 @@ final class BoardTab extends ScrollView {
                 final EspRom.Sweep sweep = rom.connectAll();
                 trace("loader found: " + describeWiring(sweep));
                 rom.flash(0, image, this::reportProgress);
-                message = name + " written and verified. The board rebooted into it.";
+                message = name + " written and verified. Check the board for normal startup.";
                 color = Ui.GOOD;
             } catch (Exception e) {
                 final String reason = e.getMessage() == null ? e.toString() : e.getMessage();
@@ -1512,9 +1524,10 @@ final class BoardTab extends ScrollView {
     }
 
     private LinearLayout entryCard(FlashLibrary.Entry entry) {
-        LinearLayout card = Ui.card(activity);
+        LinearLayout card = Ui.column(activity);
+        card.setPadding(0, Ui.dp(activity, 12), 0, Ui.dp(activity, 12));
 
-        TextView name = Ui.text(activity, entry.name, 15, Ui.TEXT);
+        TextView name = Ui.text(activity, entry.name, 14, Ui.TEXT);
         card.addView(name);
 
         // The bytes on this card are the bytes COPY pastes, so the card names
@@ -1528,8 +1541,9 @@ final class BoardTab extends ScrollView {
                     bytes == null ? null : new String(bytes, java.nio.charset.StandardCharsets.UTF_8)));
             if (!build.isEmpty()) detail += "  ·  " + build;
         }
-        TextView size = Ui.text(activity, detail, 12, Ui.DIM);
-        size.setPadding(0, Ui.dp(activity, 2), 0, 0);
+        TextView size = Ui.text(activity, detail, 10, Ui.DIM);
+        Ui.mono(size);
+        size.setPadding(0, Ui.dp(activity, 3), 0, 0);
         card.addView(size);
 
         if (entry.name.equals(pickedFromShelf)) {
@@ -1556,6 +1570,8 @@ final class BoardTab extends ScrollView {
         if (!entry.textual()) {
             Button flash = Ui.action(activity, "FLASH", entry.name.equals(pickedFromShelf));
             flash.setTextColor(Ui.ACCENT);
+            usbActionEnabled(flash, !usbProbing && !usbFlashing && !permissionPending
+                    && portOwner.isEmpty());
             flash.setOnClickListener(v -> flashBinary(entry));
             actions.addView(flash);
         }
@@ -1574,7 +1590,7 @@ final class BoardTab extends ScrollView {
         actions.addView(delete);
 
         card.addView(actions);
-        Ui.space(activity, card, 10);
+        card.addView(Ui.rule(activity));
         return card;
     }
 

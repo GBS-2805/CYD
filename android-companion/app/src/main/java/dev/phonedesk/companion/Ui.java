@@ -68,6 +68,7 @@ final class Ui {
     private static Typeface regular;
     private static Typeface mediumFace;
     private static Typeface strongFace;
+    private static Typeface monoFace;
 
     /**
      * Swap every ink for the chosen palette and page. Called before the first view
@@ -81,7 +82,7 @@ final class Ui {
      * light.
      */
     static void applyTheme(int palette, boolean lightPage) {
-        scheme = Palette.scheme(palette);
+        scheme = Palette.appScheme(palette);
         light = lightPage;
         final boolean l = lightPage;
         BG = l ? scheme.pageLight : scheme.pageDark;
@@ -124,29 +125,44 @@ final class Ui {
     }
 
     /**
-     * Poppins, subset to what this app prints, from {@code res/font}. It is the same
-     * three weights the owner's site sets its prose in, and it is what makes the
-     * phone read as the site rather than as a generic Android app.
+     * Inter Tight, subset to what this app prints, from {@code res/font}. It is the
+     * face the Deck Index study sets its prose in: tight, neutral, and legible at
+     * 11sp, which is where most of this app's words live.
      *
      * A build with no font resource — a stripped APK, a host render with no
      * resources — falls back to the platform face instead of failing: a screen in
      * Roboto is a wrong typeface, a crash is a missing screen.
      */
     static Typeface face(Context context) {
-        if (regular == null) regular = load(context, R.font.poppins_400);
+        if (regular == null) regular = load(context, R.font.inter_tight_400);
         return regular;
     }
 
     /** 500: a row's name, a live chip, the word on a filled action. */
     static Typeface medium(Context context) {
-        if (mediumFace == null) mediumFace = load(context, R.font.poppins_500);
+        if (mediumFace == null) mediumFace = load(context, R.font.inter_tight_500);
         return mediumFace;
     }
 
     /** 600: the loudest word on a screen, and nothing else. */
     static Typeface strong(Context context) {
-        if (strongFace == null) strongFace = load(context, R.font.poppins_600);
+        if (strongFace == null) strongFace = load(context, R.font.inter_tight_600);
         return strongFace;
+    }
+
+    /**
+     * Geist Mono, for the things that are read as data rather than prose: a deck
+     * tag, a MAC, a probe log, a build string. A monospace is what makes a column
+     * of hex line up, and it is the second voice the study uses.
+     */
+    static Typeface mono(Context context) {
+        if (monoFace == null) monoFace = load(context, R.font.geist_mono_400);
+        return monoFace;
+    }
+
+    /** Put a view's word in the mono face. */
+    static void mono(TextView view) {
+        view.setTypeface(mono(view.getContext()));
     }
 
     private static Typeface load(Context context, int id) {
@@ -217,6 +233,52 @@ final class Ui {
         view.setTextColor(color);
         view.setLineSpacing(0, 1.35f);
         return view;
+    }
+
+    /**
+     * A screen's title: the study's big tight heading, 27sp at 500. It is the one
+     * place a screen raises its voice, and it is what makes a page read as a page
+     * rather than as a stack of cards.
+     */
+    static TextView title(Context context, String value) {
+        TextView view = text(context, value, 27, TEXT);
+        view.setTypeface(medium(context));
+        view.setLetterSpacing(-0.03f);
+        view.setLineSpacing(0, 1.12f);
+        return view;
+    }
+
+    /** The line under a title: what this screen is for, in one sentence. */
+    static TextView subtitle(Context context, String value) {
+        TextView view = text(context, value, 13, DIM);
+        view.setLineSpacing(dp(context, 2), 1f);
+        return view;
+    }
+
+    /**
+     * A label/value row: the study's metadata list. The label is quiet prose, the
+     * value is the answer, right-aligned, and a hairline closes each row. This is
+     * what replaced a card per fact.
+     */
+    static LinearLayout fact(Context context, String label, String value, int valueColor) {
+        LinearLayout row = row(context);
+        row.setPadding(0, dp(context, 9), 0, dp(context, 9));
+        TextView name = text(context, label, 12, DIM);
+        row.addView(name, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView answer = text(context, value, 13, valueColor);
+        answer.setGravity(android.view.Gravity.END);
+        row.addView(answer);
+        return row;
+    }
+
+    /** A fact whose value is data: a tag, a MAC, a build string. */
+    static LinearLayout monoFact(Context context, String label, String value, int valueColor) {
+        LinearLayout row = fact(context, label, value, valueColor);
+        TextView answer = (TextView) row.getChildAt(1);
+        answer.setTextSize(11);
+        mono(answer);
+        return row;
     }
 
     /**
@@ -343,27 +405,33 @@ final class Ui {
     }
 
     /**
-     * The one filled action on a screen: the band colour, the band's ink, square,
-     * 56dp tall. {@code primary == false} is the same box outlined instead of filled,
-     * so a pair reads as one offer and its alternative rather than two offers.
+     * The one filled action on a screen: the accent, with the ink that sits on it,
+     * square, 44dp tall. {@code primary == false} is the same box outlined instead of
+     * filled, so a pair reads as one offer and its alternative rather than two offers.
+     *
+     * The fill is the accent rather than the band: on the study's near-black page a
+     * band-coloured button is the page with a word on it, which is not a button. The
+     * accent is the one thing on the screen that is not the page, so it is what a
+     * primary action is made of.
      */
     static Button action(Context context, String label, boolean primary) {
         Button button = new Button(context);
         button.setText(label);
         button.setAllCaps(false);
-        button.setTypeface(medium(context));
-        button.setTextSize(14);
-        button.setTextColor(primary ? ON_FILL : TEXT);
-        button.setBackground(rounded(context, primary ? BAND : Color.TRANSPARENT,
+        button.setTypeface(primary ? strong(context) : medium(context));
+        button.setTextSize(13);
+        button.setTextColor(primary ? ON_ACCENT : TEXT);
+        button.setBackground(rounded(context, primary ? ACCENT : Color.TRANSPARENT,
                 primary ? 0 : EDGE, 0));
         pressable(context, button, 0);
-        // 48dp is the shortest a finger hits reliably; the site's control is 56dp.
-        button.setMinHeight(dp(context, 52));
-        button.setMinimumHeight(dp(context, 52));
+        // 48dp is the shortest a finger hits reliably; the study's control is 40dp
+        // and this keeps a little more air for a thumb on a phone.
+        button.setMinHeight(dp(context, 44));
+        button.setMinimumHeight(dp(context, 44));
         button.setMinWidth(0);
         button.setMinimumWidth(0);
-        button.setPadding(dp(context, 18), dp(context, 10), dp(context, 18), dp(context, 10));
-        button.setLetterSpacing(0.04f);
+        button.setPadding(dp(context, 15), dp(context, 8), dp(context, 15), dp(context, 8));
+        button.setLetterSpacing(0.005f);
         return button;
     }
 
@@ -390,6 +458,27 @@ final class Ui {
         button.setMinimumWidth(0);
         button.setPadding(dp(context, 12), dp(context, 8), dp(context, 12), dp(context, 8));
         return button;
+    }
+
+    /**
+     * The study's status pill: a small dot and a mono word, no box. A boxed chip is
+     * a control; a pill is a reading, and the difference is what keeps a row from
+     * looking like it has three buttons on it.
+     */
+    static LinearLayout pill(Context context, String label, boolean live) {
+        LinearLayout row = row(context);
+        View dot = new View(context);
+        dot.setBackground(circle(context, live ? ACCENT : EDGE, 0));
+        LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(
+                dp(context, 5), dp(context, 5));
+        dotParams.rightMargin = dp(context, 6);
+        row.addView(dot, dotParams);
+        TextView word = text(context, label.toUpperCase(java.util.Locale.US), 10,
+                live ? ACCENT : DIM);
+        word.setLetterSpacing(0.1f);
+        mono(word);
+        row.addView(word);
+        return row;
     }
 
     /** A chip: an uppercase word in a hairline box, or the accent fill when live. */

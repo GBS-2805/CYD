@@ -14,8 +14,8 @@ import java.util.Locale;
  *
  * Framing matches esptool and esp-serial-flasher (Apache-2.0): a command is
  * 0x00, opcode, size, checksum, payload — SLIP-encoded; a reply is 0x01, opcode,
- * size, value, payload. Register values and command status both come from the
- * reply header, which is what esptool's check_command does.
+ * size, value, payload. Register values are in the header; the classic ESP32
+ * ROM puts four status bytes at the end of the payload.
  */
 final class EspRom {
 
@@ -24,10 +24,13 @@ final class EspRom {
     private static final int OP_FLASH_END = 0x04;
     private static final int OP_SYNC = 0x08;
     private static final int OP_READ_REG = 0x0A;
+    private static final int OP_SPI_ATTACH = 0x0D;
     private static final int OP_SPI_FLASH_MD5 = 0x13;
 
-    /** Largest block the ROM accepts for a flash write. */
-    static final int FLASH_BLOCK = 0x1000;
+    private static final int FLASH_SECTOR = 0x1000;
+    // Use the classic ESP32 ROM transfer size, not the flash erase sector size.
+    private static final int FLASH_BLOCK = 0x400;
+    private static final int ROM_STATUS_BYTES = 4;
     private static final int CHECKSUM_SEED = 0xEF;
     private static final int BLOCK_ATTEMPTS = 3;
 
@@ -1079,12 +1082,17 @@ final class EspRom {
     void flash(int offset, byte[] image, Progress progress) throws IOException {
         if (!connected) throw new IOException("not connected to the bootloader");
         if (image.length == 0) throw new IOException("image is empty");
-        if (offset % FLASH_BLOCK != 0) {
-            throw new IOException("offset must be a multiple of " + FLASH_BLOCK);
+        if (offset < 0 || offset % FLASH_SECTOR != 0) {
+            throw new IOException("offset must be a non-negative multiple of " + FLASH_SECTOR);
         }
 
         final int blocks = (image.length + FLASH_BLOCK - 1) / FLASH_BLOCK;
-        final int eraseSize = blocks * FLASH_BLOCK;
+        final int eraseSize = ((image.length + FLASH_SECTOR - 1) / FLASH_SECTOR) * FLASH_SECTOR;
+
+        // Classic CYD uses the default SPI flash pins. The ESP32 ROM expects
+        // both the pin configuration word and the reserved legacy word.
+        sendCommand(OP_SPI_ATTACH, new byte[8], 0);
+        awaitStatus(OP_SPI_ATTACH, 3000);
 
         log("flash: " + image.length + " B in " + blocks + " blocks at 0x"
                 + Integer.toHexString(offset) + ", erasing " + (eraseSize / 1024) + " kB");
@@ -1100,11 +1108,8 @@ final class EspRom {
         for (int sequence = 0; sequence < blocks; ++sequence) {
             final int from = sequence * FLASH_BLOCK;
             final int to = Math.min(image.length, from + FLASH_BLOCK);
-            byte[] block = Arrays.copyOfRange(image, from, to);
-            if (block.length % 4 != 0) {
-                block = Arrays.copyOf(block, block.length + (4 - block.length % 4));
-                Arrays.fill(block, to - from, block.length, (byte) 0xFF);
-            }
+            final byte[] block = Arrays.copyOfRange(image, from, from + FLASH_BLOCK);
+            Arrays.fill(block, to - from, block.length, (byte) 0xFF);
             writeBlock(block, sequence);
             progress.update(1 + (sequence + 1) * 90 / blocks,
                     "writing block " + (sequence + 1) + "/" + blocks);
@@ -1160,22 +1165,13 @@ final class EspRom {
 
         final Response response = awaitResponse(OP_SPI_FLASH_MD5, 10000);
         if (response == null) throw new IOException("no answer to the MD5 check");
-        if (response.data.length >= 2 && response.data[0] != 0) {
-            throw new IOException(String.format(Locale.US,
-                    "the board rejected the MD5 check (status 0x%02x)", response.data[0] & 0xFF));
-        }
-
-        // The ROM answers with 32 ASCII hex characters, sometimes followed by
-        // padding; take the hex run and stop at the first byte that is not hex.
-        final StringBuilder reported = new StringBuilder(32);
-        for (byte value : response.data) {
-            final char c = (char) (value & 0xFF);
-            if (Character.digit(c, 16) >= 0) reported.append(Character.toLowerCase(c));
-            else if (reported.length() > 0) break;
-        }
+        final int digestLength = checkStatus(response, "the MD5 check");
+        if (digestLength != 32) throw new IOException("unexpected ROM MD5 length: " + digestLength);
+        final String reported = new String(response.data, 0, digestLength,
+                java.nio.charset.StandardCharsets.US_ASCII).toLowerCase(Locale.ROOT);
         final String expected = md5Hex(image);
         log("MD5 board " + reported + ", file " + expected);
-        if (!reported.toString().startsWith(expected)) {
+        if (!expected.equals(reported)) {
             throw new IOException("MD5 mismatch: the board has " + reported
                     + ", the file is " + expected);
         }
@@ -1212,11 +1208,7 @@ final class EspRom {
             throw new IOException(String.format(Locale.US,
                     "timed out reading register 0x%08x", address));
         }
-        if (response.data.length >= 2 && response.data[0] != 0) {
-            throw new IOException(String.format(Locale.US,
-                    "bootloader rejected the read of 0x%08x (status 0x%02x)",
-                    address, response.data[0] & 0xFF));
-        }
+        checkStatus(response, String.format(Locale.US, "the read of 0x%08x", address));
         return response.value;
     }
 
@@ -1276,11 +1268,19 @@ final class EspRom {
             throw new IOException(String.format(Locale.US,
                     "timed out waiting for command 0x%02x", op));
         }
-        if (response.data.length >= 2 && response.data[0] != 0) {
+        checkStatus(response, String.format(Locale.US, "command 0x%02x", op));
+    }
+
+    /** Validates the ROM's trailing status and returns the preceding data length. */
+    private static int checkStatus(Response response, String operation) throws IOException {
+        final int status = response.data.length - ROM_STATUS_BYTES;
+        if (status < 0) throw new IOException("short status for " + operation);
+        if (response.data[status] != 0) {
             throw new IOException(String.format(Locale.US,
-                    "the board rejected command 0x%02x (status 0x%02x)",
-                    op, response.data[0] & 0xFF));
+                    "the board rejected %s (status 0x%02x)",
+                    operation, response.data[status] & 0xFF));
         }
+        return status;
     }
 
     /** Waits for a reply with the given opcode, skipping anything else. */
@@ -1291,6 +1291,8 @@ final class EspRom {
             if (frame == null) continue;
             if (frame.length < 8 || frame[0] != 0x01) continue;
             final int replyOp = frame[1] & 0xFF;
+            final int size = (frame[2] & 0xff) | ((frame[3] & 0xff) << 8);
+            if (size != frame.length - 8) continue;
             if (replyOp != op) continue;                   // e.g. a late sync echo
             return new Response(replyOp, u32(frame, 4),
                     Arrays.copyOfRange(frame, 8, frame.length));

@@ -117,9 +117,79 @@ public final class CaptureTest {
         // SETTINGS is drawn on the light page on purpose: it is the screen the
         // permissions live on, so one frame shows the list and the light page it can
         // be read on, and the light theme is in the gate instead of only described.
-        Ui.applyTheme(Palette.MOSS, true);
+        Ui.applyTheme(Palette.FIELD, true);
         capture("settings", MainActivity.SECTION_SETTINGS, new SetupTab(host), null, null);
         Ui.applyTheme(Appearance.palette(host), Appearance.light(host));
+    }
+
+    @Test
+    public void serialSeparatesMissingDeviceFromUnsupportedAdapter() {
+        Activity activity = Robolectric.buildActivity(Activity.class).setup().get();
+        BoardTab serial = new BoardTab(activity);
+        serial.refresh();
+        assertTrue(!find(serial, "COPY LOG").isEnabled());
+        assertTrue(find(serial, "SYNC ONLY") == null);
+        find(serial, "USB TOOLS").performClick();
+        assertNotNull(find(serial, "SYNC ONLY"));
+        find(serial, "RESTART BOARD").performClick();
+        assertTrue(texts(serial).contains("No USB device detected"));
+        // A disconnected restart must release (or never claim) the port.
+        assertTrue(find(serial, "PROBE USB").isEnabled());
+        assertTrue(find(serial, "COPY LOG").isEnabled());
+
+        android.hardware.usb.UsbManager manager = activity.getSystemService(
+                android.hardware.usb.UsbManager.class);
+        android.hardware.usb.UsbDevice device = org.robolectric.shadow.api.Shadow.newInstanceOf(
+                android.hardware.usb.UsbDevice.class);
+        org.robolectric.util.ReflectionHelpers.setField(device, "mName", "/dev/bus/usb/001/002");
+        org.robolectric.util.ReflectionHelpers.setField(device, "mVendorId", 0x10c4);
+        org.robolectric.util.ReflectionHelpers.setField(device, "mProductId", 0xea60);
+        org.robolectric.Shadows.shadowOf(manager).addOrUpdateUsbDevice(device, false);
+        find(serial, "PROBE USB").performClick();
+        assertTrue(texts(serial).contains("USB device detected (10c4:ea60)"));
+        assertTrue(texts(serial).contains("no supported CH340 or CH341A"));
+        assertTrue(find(serial, "PROBE USB").isEnabled());
+        find(serial, "CLEAR").performClick();
+        assertTrue(!find(serial, "COPY LOG").isEnabled());
+    }
+
+    @Test
+    public void serialOffersEveryCydAndRemembersTheChoice() {
+        Activity activity = Robolectric.buildActivity(Activity.class).setup().get();
+        BoardTab serial = new BoardTab(activity);
+        serial.refresh();
+
+        android.widget.Spinner picker = findSpinner(serial);
+        assertNotNull("the target picker is on the Serial screen", picker);
+        assertEquals(BoardTable.all().size(), picker.getAdapter().getCount());
+        assertEquals("a fresh install targets the deck's own board",
+                BoardTable.defaultBoard().code, BoardCatalog.selected(activity).code);
+        assertTrue(texts(serial).contains("2432S024R"));
+
+        // Choosing a board is a stored code, not a position: the note and the
+        // remembered value both move, and a restart reads the same board back.
+        int index = BoardTable.all().indexOf(BoardTable.byCode("3248S035R"));
+        picker.setSelection(index);
+        assertEquals("3248S035R", BoardCatalog.selected(activity).code);
+        assertTrue(texts(serial).contains("3.5\" · 480×320"));
+        assertEquals(index, BoardCatalog.selectedIndex(activity));
+
+        // A code that is no longer in the table falls back instead of crashing.
+        activity.getSharedPreferences("board", android.content.Context.MODE_PRIVATE)
+                .edit().putString("selected_code", "8048S070").apply();
+        assertEquals(BoardTable.defaultBoard().code, BoardCatalog.selected(activity).code);
+    }
+
+    private static android.widget.Spinner findSpinner(View view) {
+        if (view instanceof android.widget.Spinner) return (android.widget.Spinner) view;
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                android.widget.Spinner hit = findSpinner(group.getChildAt(i));
+                if (hit != null) return hit;
+            }
+        }
+        return null;
     }
 
     /**
@@ -167,6 +237,33 @@ public final class CaptureTest {
      * carried the section across. This drives the platform's own save and restore,
      * the same pair {@code recreate()} calls, rather than a copy of the logic.
      */
+    /**
+     * The preview bubble over PAIRED: the deck's own front page inside a 2.4" bezel,
+     * with the palette it is drawn in. This frame is the answer to "what will the
+     * glass look like if I flash this", so the picture comes from
+     * {@code assets/decks}, which {@code sync_deck_assets.py} fills from the
+     * sketch's own draw functions.
+     */
+    @Test
+    public void capturesTheDeckPreview() throws Exception {
+        host = Robolectric.buildActivity(Activity.class).setup().get();
+        now = System.currentTimeMillis();
+        pinDeck();
+
+        DeckPreviewBubble bubble = new DeckPreviewBubble(host, (key, look) -> { });
+        DeckStore.Known deck = null;
+        for (DeckStore.Known known : DeckStore.all(host)) {
+            if (known.id.equals(DECK_ID)) deck = known;
+        }
+        assertNotNull("the pinned deck is in the store", deck);
+        DeckLook look = DeckStore.look(host, DECK_ID);
+        bubble.show(DECK_ID, deck.name, deck.widget,
+                DeckPreviewBubble.factsFor(deck, look), look, null, (key, next) -> { });
+
+        captureOverlay("preview", MainActivity.SECTION_DECKS,
+                new DecksTab(host, this::linked), linked(), bubble);
+    }
+
     @Test
     public void sectionSurvivesTheRebuild() {
         org.robolectric.android.controller.ActivityController<MainActivity> controller =
@@ -203,8 +300,10 @@ public final class CaptureTest {
         assertNotNull("BOARDS is a screen with a scroll offset", shelf);
         assertTrue("the shelf has to be taller than the screen for this to mean anything",
                 shelf.getChildAt(0).getHeight() > shelf.getHeight());
-        shelf.scrollTo(0, 120);
-        assertEquals(120, shelf.getScrollY());
+        // A value the shelf can actually reach: the restyle tightened the cards, so
+        // the old 120 was past the end and the view clamped it to its own maximum.
+        shelf.scrollTo(0, 60);
+        assertEquals(60, shelf.getScrollY());
 
         controller.recreate();
 
@@ -226,7 +325,7 @@ public final class CaptureTest {
 
         ScrollView again = controller.get().findViewById(MainActivity.ID_PROJECTS);
         assertNotNull(again);
-        assertEquals(120, again.getScrollY());
+        assertEquals(60, again.getScrollY());
     }
 
     /**

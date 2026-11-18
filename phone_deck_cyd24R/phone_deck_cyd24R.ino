@@ -840,6 +840,17 @@ static void releaseOwner() {
 // iPhone path.
 static constexpr bool ENABLE_ANCS = false;
 
+// ------------------------------------------------------------- link tuning ---
+
+// One MTU for the whole link: what the app asks for, what the board grants.
+static constexpr uint16_t BLE_MTU_BYTES = 247;
+// 15 ms to 30 ms, in 1.25 ms units: 12 and 24. No slave latency, so a tap is
+// never held back to save the phone's battery, and a 4 s supervision timeout so
+// a phone at the far end of a room is not declared disconnected mid-notification.
+static constexpr uint16_t BLE_CONN_MIN_MS = 12;
+static constexpr uint16_t BLE_CONN_MAX_MS = 24;
+static constexpr uint16_t BLE_CONN_TIMEOUT_10MS = 400;
+
 static BLEUUID UUID_ANCS_SERVICE("7905f431-b5ce-4e99-a40f-4b1e122d00d0");
 static BLEUUID UUID_ANCS_NOTIFY("9fbf120d-6301-42d9-8c58-25e699a21dbd");
 static BLEUUID UUID_ANCS_CONTROL("69d1d8f3-45e1-49a8-9821-9bbdfdaad9d9");
@@ -1253,6 +1264,33 @@ static void dropBond(esp_bd_addr_t peer, const char *why) {
   Serial.printf("[ble] bond dropped (%s) %s\n", why, text);
 }
 
+// The negotiation Android most often needs twice: it applies its own preferred
+// interval right after connecting, which overwrites the first request. Asking
+// again once that has settled is what makes the second answer the one in force.
+static esp_bd_addr_t g_lastPeer;
+// The live server, kept because core 2.0.17's BLEDevice has no getServer(); the
+// late request reads it instead, and both cores carry the same code path.
+static BLEServer *g_server = nullptr;
+
+// Defined with the radio setup below; the callbacks need it at connect time.
+static void slowAdvertising(bool fastFirst);
+
+static void requestFastLink(BLEServer *server, esp_bd_addr_t peer) {
+  g_server = server;
+  memcpy(g_lastPeer, peer, sizeof(g_lastPeer));
+  server->updateConnParams(peer, BLE_CONN_MIN_MS, BLE_CONN_MAX_MS, 0, BLE_CONN_TIMEOUT_10MS);
+  xTaskCreatePinnedToCore(
+      [](void *) {
+        vTaskDelay(pdMS_TO_TICKS(1200));
+        if (serverConnected && g_server != nullptr) {
+          g_server->updateConnParams(g_lastPeer, BLE_CONN_MIN_MS, BLE_CONN_MAX_MS, 0,
+                                     BLE_CONN_TIMEOUT_10MS);
+        }
+        vTaskDelete(nullptr);
+      },
+      "connparams", 2560, nullptr, 1, nullptr, 1);
+}
+
 class DeckServerCallbacks : public BLEServerCallbacks {
  public:
   void onConnect(BLEServer *server, esp_ble_gatts_cb_param_t *param) override {
@@ -1260,9 +1298,14 @@ class DeckServerCallbacks : public BLEServerCallbacks {
     peerAllowed = true;
     rememberPeer(param->connect.remote_bda);
     linkDirty = true;
-    // 7.5-15 ms with no slave latency, so a tap does not wait three connection
-    // intervals to reach the phone. The phone may grant more; this is a request.
-    server->updateConnParams(param->connect.remote_bda, 6, 12, 0, 400);
+    // 15-30 ms with no slave latency. The previous 7.5-15 ms was a request the
+    // phone often answered with a fraction of the bandwidth it costs the stack;
+    // 15-30 ms is the range every Android build in use accepts without dropping
+    // to a slow interval, and a whole frame of the deck still lands inside two
+    // intervals. The supervision timeout is 4 s, so a phone that steps behind a
+    // door stays connected instead of being declared gone.
+    requestFastLink(server, param->connect.remote_bda);
+    slowAdvertising(false);  // one phone holds the link; a second can wait
     Serial.println("[ble] phone connected");
     if (!ENABLE_ANCS) return;  // Android companions write Phone Link directly
     if (ancsTaskRunning) return;
@@ -1279,6 +1322,7 @@ class DeckServerCallbacks : public BLEServerCallbacks {
     g_controlPoint = nullptr;
     Serial.printf("[ble] phone disconnected (%02x)\n", param->disconnect.reason);
     if (bondIsStale(param->disconnect.reason)) dropBond(param->disconnect.remote_bda, "keys gone");
+    slowAdvertising(true);  // fast for the first few seconds, then quiet
     server->startAdvertising();  // the phone may reconnect at any time
   }
 };
@@ -1537,9 +1581,47 @@ static void addAdvData(BLEAdvertisementData &data, const String &bytes) {
 #endif
 }
 
+/**
+ * Advertising is how a phone that has never met this board finds it, and it is
+ * also a radio running for nothing while a phone is already connected. A
+ * disconnect starts a fast burst (100-150 ms) for three seconds — the window in
+ * which the same phone reconnects — and then drops to the slow interval a
+ * stranger's scan will still see, at a fraction of the power.
+ */
+static void slowAdvertising(bool fastFirst) {
+  BLEAdvertising *advertising = BLEDevice::getAdvertising();
+  if (advertising == nullptr) return;
+  if (!fastFirst) {
+    advertising->setMinInterval(0x1F4);  // 500 ms
+    advertising->setMaxInterval(0x320);  // 800 ms
+    return;
+  }
+  xTaskCreatePinnedToCore(
+      [](void *) {
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        if (!serverConnected) {
+          BLEAdvertising *adv = BLEDevice::getAdvertising();
+          if (adv != nullptr) {
+            adv->setMinInterval(0x1F4);
+            adv->setMaxInterval(0x320);
+          }
+        }
+        vTaskDelete(nullptr);
+      },
+      "advslow", 2560, nullptr, 1, nullptr, 1);
+}
+
 static void startBluetooth() {
   BLEDevice::init(DEVICE_NAME);
-  BLEDevice::setMTU(517);
+  // 247, not 517: the app asks for 247, every Android stack in use agrees on
+  // 247, and an MTU the phone will not grant is only a rejected request. 247
+  // carries a 244-byte payload — the identity document fits in one read and a
+  // notification line fits in one write, so neither is split and retried.
+  BLEDevice::setMTU(BLE_MTU_BYTES);
+  // The radio is the one thing on this board that spends power when nothing is
+  // happening. Leaving the default here and hoping the phone asks for more is
+  // what made a link across a desk feel like it needed a line of sight.
+  BLEDevice::setPower(ESP_PWR_LVL_P9);
   BLEDevice::setSecurityCallbacks(new DeckSecurityCallbacks());
 
   BLEServer *server = BLEDevice::createServer();
@@ -1585,6 +1667,12 @@ static void startBluetooth() {
   scanResponse.setName(DEVICE_NAME);
   advertising->setScanResponseData(scanResponse);
   advertising->setScanResponse(true);
+  // 100-150 ms while nobody is connected: a phone that opens the app finds the
+  // board inside one scan window instead of after a second of silence. The
+  // interval widens once a link is up (see {@link slowAdvertising}), because
+  // advertising during a connection is only there for a second phone.
+  advertising->setMinInterval(0xA0);
+  advertising->setMaxInterval(0xC0);
 
   // Both payloads are configured asynchronously by the stack. Calling start()
   // in the same breath raced that configuration and left the deck invisible on
@@ -2732,6 +2820,8 @@ static const char *const TAB_LABELS[3] = {"MESSAGES", "SPOTIFY", "SETTINGS"};
 
 // Unlit rows are ink on black; the pressed row inverts, which is the page's
 // only state.
+static void drawHomeTab(int index, bool lit);
+
 static void drawHomeTab(int index, bool lit) {
   const Rect r = HOME_TAB[index];
   const uint16_t bg = lit ? C_TEXT : C_BG;
@@ -2818,7 +2908,11 @@ static void formatAge(time_t at, char *out, size_t outLen) {
   }
 }
 
-static void drawNoticeRow(int index) {
+static void drawNoticeRow(int index, bool pressed);
+
+static void drawNoticeRow(int index) { drawNoticeRow(index, false); }
+
+static void drawNoticeRow(int index, bool pressed) {
   const Rect r = NOTIF_ROW[index];
   const bool has = index < noticeCount;
   if (!has) {
@@ -2830,8 +2924,12 @@ static void drawNoticeRow(int index) {
     return;
   }
   const Notice &n = notices[index];
-  tft.fillRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD, C_TILE);
-  tft.drawRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD, n.unread ? C_ACCENT_DIM : C_EDGE);
+  // A finger on a row lifts it: the tile goes one step lighter and its edge
+  // takes the accent. Resistive panels give no other feedback, so a row that
+  // does not answer a press reads as a panel that missed the tap.
+  tft.fillRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD, pressed ? C_TILE_HI : C_TILE);
+  tft.drawRoundRect(r.x, r.y, r.w, r.h, CORNER_CARD,
+                    pressed ? C_ACCENT : (n.unread ? C_ACCENT_DIM : C_EDGE));
 
   const Rect icon = {static_cast<int16_t>(r.x + CARD_PAD),
                      static_cast<int16_t>(r.y + 6), 20, 20};
@@ -3085,7 +3183,12 @@ static void drawCalibrationScreen() {
 // first conversions after touch-down are the worst. Pressure is used only to drop
 // samples that did not convert at all: its scale differs per panel, and a
 // threshold picked blind would kill touch outright.
-static constexpr int TOUCH_SAMPLES = 4;
+// Six conversions per poll, median per axis. Four was one sample away from the
+// panel's worst case: the first conversion after touch-down often lands short,
+// and with four samples a single bad one moved the median. Pressure is used only
+// to drop samples that did not convert at all; its scale differs per panel, and
+// a threshold picked blind would kill touch outright.
+static constexpr int TOUCH_SAMPLES = 6;
 static constexpr int TOUCH_SPREAD_MAX = 300;  // raw units; beyond this a drag, not a tap
 
 static bool readRawTouch(int &rawX, int &rawY) {
@@ -3103,7 +3206,7 @@ static bool readRawTouch(int &rawX, int &rawY) {
     ys[n] = static_cast<int>(y);
     ++n;
   }
-  if (n < 2) return false;
+  if (n < 3) return false;
 
   for (int i = 1; i < n; ++i) {  // insertion sort, n is at most four
     const int vx = xs[i];
@@ -3436,6 +3539,16 @@ void setup() {
   drawHome();
 }
 
+/**
+ * The loop's own tick. 4 ms, not 10: the panel is sampled 250 times a second, so
+ * a tap is caught inside one press rather than at the next tick. vTaskDelay
+ * yields the core to the radio task where delay() busy-spins on it, which is
+ * what kept a notification arriving mid-tap from being felt as a stutter.
+ */
+static void loopPace() {
+  vTaskDelay(pdMS_TO_TICKS(4));
+}
+
 void loop() {
   processUiEvents();
 
@@ -3446,7 +3559,7 @@ void loop() {
   if (ignoreTouchUntilRelease) {
     if (!down) ignoreTouchUntilRelease = false;
     wasTouched = down;
-    delay(10);
+    loopPace();
     return;
   }
 
@@ -3466,7 +3579,7 @@ void loop() {
       return;
     }
     wasTouched = down;
-    delay(10);
+    loopPace();
     return;
   }
 
@@ -3498,7 +3611,7 @@ void loop() {
       }
     }
     wasTouched = down;
-    delay(10);
+    loopPace();
     return;
   }
 
@@ -3525,7 +3638,7 @@ void loop() {
       }
     }
     wasTouched = down;
-    delay(10);
+    loopPace();
     return;
   }
 
@@ -3539,7 +3652,7 @@ void loop() {
       }
     }
     wasTouched = down;
-    delay(10);
+    loopPace();
     return;
   }
 
@@ -3561,7 +3674,7 @@ void loop() {
       return;
     }
     wasTouched = down;
-    delay(10);
+    loopPace();
     return;
   }
 
@@ -3598,6 +3711,11 @@ void loop() {
     pressedUid = (pressedTarget >= 0 && pressedTarget < noticeCount)
                      ? notices[pressedTarget].uid
                      : 0;
+    // The row answers the finger before the release decides what it meant, so
+    // the press is visible for as long as it is held.
+    if (pressedTarget >= 0 && pressedTarget < 3 && pressedTarget < noticeCount) {
+      drawNoticeRow(pressedTarget, true);
+    }
   }
 
   // Hold the title bar for 1.5 s to calibrate.
@@ -3646,6 +3764,9 @@ void loop() {
       } else if (pressedTarget == TARGET_NOW) {
         drawNow();
       } else if (pressedTarget >= 0 && pressedUid != 0) {
+        // Put the row back before the detail page covers it, so returning to
+        // the board does not show a tile still lifted under no finger.
+        drawNoticeRow(pressedTarget);
         openDetail(pressedUid);
       }
     }
@@ -3654,5 +3775,5 @@ void loop() {
   }
 
   wasTouched = down;
-  delay(10);
+  loopPace();
 }

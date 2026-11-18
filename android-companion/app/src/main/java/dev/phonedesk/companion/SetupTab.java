@@ -55,9 +55,11 @@ final class SetupTab extends ScrollView {
                 Ui.dp(activity, 28));
         addView(body, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        TextView title = Ui.text(activity, "Settings", 26, Ui.TEXT);
-        title.setLetterSpacing(-0.01f);
-        body.addView(title);
+        body.addView(Ui.title(activity, "Setup"));
+        TextView sub = Ui.subtitle(activity,
+                "Permissions, what reaches the deck, and how the app looks.");
+        sub.setPadding(0, Ui.dp(activity, 4), 0, 0);
+        body.addView(sub);
 
         body.addView(Ui.section(activity, "ALL PERMISSIONS"));
         permissions = Ui.column(activity);
@@ -65,14 +67,14 @@ final class SetupTab extends ScrollView {
 
         body.addView(Ui.section(activity, "NOTIFICATIONS"));
 
-        LinearLayout noticeCard = Ui.card(activity);
-        noticeText = Ui.text(activity, "", 15, Ui.TEXT);
+        LinearLayout noticeCard = Ui.column(activity);
+        noticeText = Ui.text(activity, "", 14, Ui.TEXT);
         noticeCard.addView(noticeText);
 
         TextView noticeHint = Ui.text(activity,
                 "The deck sits where other people can read it. Pick the apps it may show, "
                         + "and a one-time code or a private message stays on the phone.",
-                13, Ui.DIM);
+                12, Ui.DIM);
         noticeHint.setPadding(0, Ui.dp(activity, 6), 0, 0);
         noticeHint.setLineSpacing(Ui.dp(activity, 2), 1f);
         noticeCard.addView(noticeHint);
@@ -95,8 +97,7 @@ final class SetupTab extends ScrollView {
         allowParams.leftMargin = Ui.dp(activity, 8);
         noticeActions.addView(allowAll, allowParams);
         noticeCard.addView(noticeActions);
-
-        Ui.space(activity, noticeCard, 12);
+        noticeCard.addView(Ui.rule(activity));
         body.addView(noticeCard);
 
         crashCard = Ui.card(activity);
@@ -152,31 +153,36 @@ final class SetupTab extends ScrollView {
     private LinearLayout permission(String name, String detail, Boolean granted,
                                     String action, Runnable tap) {
         LinearLayout row = Ui.row(activity);
-        row.setPadding(0, Ui.dp(activity, 12), 0, Ui.dp(activity, 12));
+        row.setPadding(0, Ui.dp(activity, 13), 0, Ui.dp(activity, 13));
 
+        // A square, not a circle: the study has no round marks except the page
+        // toggle, and a filled square reads as a state rather than as a button.
         View led = new View(activity);
-        led.setBackground(Ui.circle(activity, granted == null ? 0
-                        : (granted ? Ui.ACCENT : 0), granted != null && granted ? 0 : Ui.EDGE));
+        led.setBackground(Ui.rounded(activity, granted != null && granted ? Ui.ACCENT : 0,
+                granted == null ? Ui.EDGE : (granted ? Ui.ACCENT : Ui.EDGE), 0));
         LinearLayout.LayoutParams ledParams = new LinearLayout.LayoutParams(
-                Ui.dp(activity, 8), Ui.dp(activity, 8));
-        ledParams.rightMargin = Ui.dp(activity, 14);
+                Ui.dp(activity, 7), Ui.dp(activity, 7));
+        ledParams.rightMargin = Ui.dp(activity, 13);
         row.addView(led, ledParams);
 
         LinearLayout labels = Ui.column(activity);
-        TextView title = Ui.text(activity, name, 15, Ui.TEXT);
+        TextView title = Ui.text(activity, name, 14, Ui.TEXT);
         title.setTypeface(Ui.medium(activity));
         labels.addView(title);
-        TextView sub = Ui.text(activity, detail, 13, Ui.DIM);
+        TextView sub = Ui.text(activity, detail, 11, Ui.DIM);
         sub.setPadding(0, Ui.dp(activity, 2), 0, 0);
         labels.addView(sub);
         row.addView(labels, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         if (!action.isEmpty()) {
-            TextView chip = Ui.chip(activity, action, false);
+            TextView chip = Ui.text(activity, action, 10, granted != null && granted
+                    ? Ui.DIM : Ui.ACCENT);
+            chip.setLetterSpacing(0.12f);
+            Ui.mono(chip);
             chip.setGravity(Gravity.CENTER);
-            chip.setPadding(Ui.dp(activity, 12), Ui.dp(activity, 7), Ui.dp(activity, 12),
-                    Ui.dp(activity, 7));
+            chip.setPadding(Ui.dp(activity, 10), Ui.dp(activity, 6), Ui.dp(activity, 4),
+                    Ui.dp(activity, 6));
             if (tap != null) chip.setOnClickListener(v -> tap.run());
             Ui.pressable(activity, chip, 0);
             row.addView(chip);

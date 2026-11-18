@@ -24,11 +24,11 @@ import java.util.function.Supplier;
  * PAIRED: the live link, then every deck the app knows.
  *
  * <b>One list, two states.</b> The decks this phone has paired with come first, each
- * led by its own {@link LedMarquee} — lit and chasing for the board the bridge is
- * talking to now, lit and steady for one it has met before. The decks it has never
- * been paired with follow under OFF, dark, including any bundled deck advertising in
- * range with nothing to link, so a board can still be paired without a section of its
- * own.
+ * led by its own {@link DeckPlate} — a mark generated from the deck's id, so a new
+ * board is recognisable on the day it is installed. A live deck carries a LIVE chip
+ * beside its name; the decks it has never been paired with follow dimmed, including
+ * any bundled deck advertising in range with nothing to link, so a board can still be
+ * paired without a section of its own.
  *
  * <b>A deck carries a palette, and the deck is what wears it.</b> Each paired deck has
  * a {@link DeckLook} — one of the site's three palettes and one of its two pages — and
@@ -54,9 +54,21 @@ final class DecksTab extends ScrollView {
     private final Supplier<DeckService.Snapshot> source;
     private String signature = "";
     private TextView liveLine;
+    /** Called when a deck's plate is tapped: the activity opens the preview bubble. */
+    private Preview preview;
+
+    /** What a tap on a plate asks for: a deck's key, and where the plate is. */
+    interface Preview {
+        void open(String key, View plate);
+    }
 
     DecksTab(Activity activity) {
         this(activity, DeckService::snapshot);
+    }
+
+    /** The app wires this once; a capture without it simply has no bubble. */
+    void onPreview(Preview preview) {
+        this.preview = preview;
     }
 
     /**
@@ -127,9 +139,16 @@ final class DecksTab extends ScrollView {
 
     private void build(DeckService.Snapshot snapshot, List<DeckStore.Known> known) {
         body.removeAllViews();
+        body.addView(Ui.title(activity, "Decks"));
+        TextView sub = Ui.subtitle(activity, snapshot.linked
+                ? "One link at a time. " + linkedName(snapshot) + " is on the cable."
+                : "One link at a time. Nothing is linked right now.");
+        sub.setPadding(0, Ui.dp(activity, 4), 0, Ui.dp(activity, 16));
+        body.addView(sub);
+
         body.addView(bridgeCard(snapshot));
 
-        body.addView(Ui.section(activity, "DECKS"));
+        body.addView(Ui.section(activity, "ALL DECKS"));
         if (known.isEmpty()) {
             body.addView(hint("No deck has been paired yet. Start the bridge and link one "
                     + "from the OFF list below."));
@@ -149,22 +168,51 @@ final class DecksTab extends ScrollView {
         body.addView(note);
     }
 
-    /** What the link is doing, and the only card above the list. */
+    /** The deck the bridge is talking to, for the subtitle. */
+    private String linkedName(DeckService.Snapshot snapshot) {
+        for (DeckStore.Known deck : DeckStore.all(activity)) {
+            if (deck.mac.equalsIgnoreCase(snapshot.deviceMac)) return deck.name;
+        }
+        return "A deck";
+    }
+
+    /**
+     * What the link is doing, as the study's metadata list: a status line, then
+     * label/value rows. No card, no heading in caps — the title above already says
+     * which screen this is.
+     */
     private View bridgeCard(DeckService.Snapshot snapshot) {
-        LinearLayout card = Ui.card(activity);
-        TextView heading = Ui.text(activity, snapshot.running ? "BRIDGE ACTIVE" : "BRIDGE STOPPED",
-                11, snapshot.running ? Ui.GOOD : Ui.PINK);
-        heading.setLetterSpacing(0.14f);
-        card.addView(heading);
+        LinearLayout block = Ui.column(activity);
+        block.setPadding(0, 0, 0, Ui.dp(activity, 6));
 
-        liveLine = Ui.text(activity, live(snapshot), 14, Ui.TEXT);
-        liveLine.setPadding(0, Ui.dp(activity, 5), 0, 0);
-        card.addView(liveLine);
+        LinearLayout statusLine = Ui.row(activity);
+        TextView dot = Ui.text(activity, "●", 10, snapshot.running ? Ui.GOOD : Ui.DIM);
+        statusLine.addView(dot);
+        TextView heading = Ui.text(activity,
+                snapshot.running ? "Bridge running" : "Bridge stopped", 12,
+                snapshot.running ? Ui.TEXT : Ui.DIM);
+        heading.setPadding(Ui.dp(activity, 7), 0, 0, 0);
+        statusLine.addView(heading);
+        block.addView(statusLine);
 
-        TextView status = Ui.text(activity, snapshot.status, 12, Ui.DIM);
-        status.setPadding(0, Ui.dp(activity, 5), 0, 0);
-        card.addView(status);
-        return card;
+        liveLine = Ui.text(activity, live(snapshot), 12, Ui.DIM);
+        liveLine.setPadding(0, Ui.dp(activity, 6), 0, Ui.dp(activity, 10));
+        Ui.mono(liveLine);
+        block.addView(liveLine);
+
+        block.addView(Ui.rule(activity));
+        block.addView(Ui.fact(activity, "Bridge",
+                snapshot.running ? "Scanning" : "Stopped",
+                snapshot.running ? Ui.TEXT : Ui.DIM));
+        block.addView(Ui.rule(activity));
+        block.addView(Ui.fact(activity, "Link",
+                snapshot.linked ? snapshot.rssi + " dBm · " + snapshot.writes + " packets" : "—",
+                snapshot.linked ? Ui.TEXT : Ui.DIM));
+        block.addView(Ui.rule(activity));
+        block.addView(Ui.fact(activity, "Notifications",
+                snapshot.linked ? snapshot.notices + " this session" : "Not mirrored", Ui.DIM));
+        block.addView(Ui.rule(activity));
+        return block;
     }
 
     /**
@@ -181,18 +229,27 @@ final class DecksTab extends ScrollView {
         final boolean light = live && DeckTheme.known(snapshot.theme)
                 ? DeckTheme.page(snapshot.theme) : look.light;
 
+        // A row, not a card: the study's list is one column of hairlines, and a
+        // boxed row inside a boxed list is a border around a border.
         LinearLayout card = Ui.column(activity);
-        card.setBackground(Ui.rounded(activity, Color.TRANSPARENT, Ui.EDGE, 0));
-        card.setPadding(Ui.dp(activity, 13), Ui.dp(activity, 11),
-                Ui.dp(activity, 13), Ui.dp(activity, 11));
+        card.setPadding(0, Ui.dp(activity, 12), 0, Ui.dp(activity, 12));
 
         LinearLayout head = Ui.row(activity);
-        LedMarquee marquee = new LedMarquee(activity);
-        marquee.set(live ? LedMarquee.CHASE : LedMarquee.STEADY);
-        LinearLayout.LayoutParams marqueeParams = new LinearLayout.LayoutParams(
-                Ui.dp(activity, 40), Ui.dp(activity, 12));
-        marqueeParams.rightMargin = Ui.dp(activity, 11);
-        head.addView(marquee, marqueeParams);
+        // The plate replaces the marquee: a deck's own generated mark says which
+        // board this is, and the LIVE chip beside the name says what the link is
+        // doing. Two signals, one of them unique to the deck.
+        DeckPlate plate = new DeckPlate(activity);
+        plate.set(deck.key(), deck.tag.isEmpty() ? "" : deck.tag);
+        plate.setBackground(Ui.rounded(activity, 0, Ui.EDGE, 0));
+        plate.setContentDescription("Preview " + deck.name);
+        plate.setOnClickListener(v -> {
+            if (preview != null) preview.open(deck.key(), plate);
+        });
+        Ui.pressable(activity, plate, 0);
+        LinearLayout.LayoutParams plateParams = new LinearLayout.LayoutParams(
+                Ui.dp(activity, 46), Ui.dp(activity, 58));
+        plateParams.rightMargin = Ui.dp(activity, 12);
+        head.addView(plate, plateParams);
 
         LinearLayout labels = Ui.column(activity);
         TextView title = Ui.text(activity, deck.name, 15, Ui.TEXT);
@@ -206,12 +263,13 @@ final class DecksTab extends ScrollView {
                 where + "  ·  " + (live ? "linked now"
                         : "paired " + Ui.ago(deck.seenMs, System.currentTimeMillis()))
                         + (build.isEmpty() ? "" : "  ·  " + build),
-                12, Ui.DIM);
+                11, Ui.DIM);
+        Ui.mono(detail);
         labels.addView(detail);
         head.addView(labels, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        if (live) head.addView(Ui.chip(activity, "LIVE", true));
+        if (live) head.addView(Ui.pill(activity, "live", true));
         card.addView(head);
 
         LinearLayout foot = Ui.row(activity);
@@ -222,6 +280,7 @@ final class DecksTab extends ScrollView {
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         foot.addView(actionButtons(deck, live));
         card.addView(foot);
+        card.addView(Ui.rule(activity));
         return card;
     }
 
@@ -347,18 +406,29 @@ final class DecksTab extends ScrollView {
         LinearLayout row = Ui.row(activity);
         row.setPadding(0, Ui.dp(activity, 10), 0, Ui.dp(activity, 10));
 
-        LedMarquee marquee = new LedMarquee(activity);
-        marquee.set(LedMarquee.OFF);
-        LinearLayout.LayoutParams marqueeParams = new LinearLayout.LayoutParams(
-                Ui.dp(activity, 40), Ui.dp(activity, 12));
-        marqueeParams.rightMargin = Ui.dp(activity, 11);
-        row.addView(marquee, marqueeParams);
+        // An unpaired deck still gets its plate, dimmed: the mark is the deck's,
+        // not the link's, and a board that is switched off should still be
+        // recognisable in the list.
+        DeckPlate plate = new DeckPlate(activity);
+        plate.set(name, "");
+        plate.setAlpha(0.45f);
+        plate.setBackground(Ui.rounded(activity, 0, Ui.EDGE, 0));
+        plate.setContentDescription("Preview " + name);
+        plate.setOnClickListener(v -> {
+            if (preview != null) preview.open(name, plate);
+        });
+        Ui.pressable(activity, plate, 0);
+        LinearLayout.LayoutParams plateParams = new LinearLayout.LayoutParams(
+                Ui.dp(activity, 46), Ui.dp(activity, 58));
+        plateParams.rightMargin = Ui.dp(activity, 12);
+        row.addView(plate, plateParams);
 
         LinearLayout labels = Ui.column(activity);
         TextView title = Ui.text(activity, name, 15, Ui.TEXT);
         title.setTypeface(Ui.medium(activity));
         labels.addView(title);
-        TextView sub = Ui.text(activity, detail, 12, Ui.DIM);
+        TextView sub = Ui.text(activity, detail, 11, Ui.DIM);
+        Ui.mono(sub);
         labels.addView(sub);
         row.addView(labels, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -377,15 +447,15 @@ final class DecksTab extends ScrollView {
         return cell;
     }
 
-    /** The row's own button: 11sp in a hairline box, or the band fill for LINK. */
+    /** The row's own button: 11sp in a hairline box, or the accent fill for LINK. */
     private Button button(String label, boolean primary) {
         Button button = new Button(activity);
         button.setText(label);
         button.setAllCaps(false);
         button.setTypeface(Ui.medium(activity));
         button.setTextSize(11);
-        button.setTextColor(primary ? Ui.ON_FILL : Ui.TEXT);
-        button.setBackground(Ui.rounded(activity, primary ? Ui.BAND : Color.TRANSPARENT,
+        button.setTextColor(primary ? Ui.ON_ACCENT : Ui.TEXT);
+        button.setBackground(Ui.rounded(activity, primary ? Ui.ACCENT : Color.TRANSPARENT,
                 primary ? 0 : Ui.EDGE, 0));
         Ui.pressable(activity, button, 0);
         button.setMinHeight(Ui.dp(activity, 34));

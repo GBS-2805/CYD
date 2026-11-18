@@ -44,6 +44,9 @@ final class UsbSerialCh340 {
     final ByteArrayOutputStream wire = new ByteArrayOutputStream();
     private boolean inFrame;
     private Responder responder;
+    java.util.function.BiConsumer<Boolean, Boolean> lineObserver;
+    private boolean dtr;
+    private boolean rts;
 
     /** Refuse {@link #changeBaudRate(int)} the way a bridge without a divisor would. */
     boolean refuseRates;
@@ -161,7 +164,14 @@ final class UsbSerialCh340 {
         baud = rate;
     }
 
+    private void observeLines(boolean dtr, boolean rts) {
+        this.dtr = dtr;
+        this.rts = rts;
+        if (lineObserver != null) lineObserver.accept(dtr, rts);
+    }
+
     void setDtrRts(boolean dtr, boolean rts) {
+        observeLines(dtr, rts);
         control.add("both dtr=" + dtr + " rts=" + rts);
         printBanner();
     }
@@ -174,11 +184,13 @@ final class UsbSerialCh340 {
      * which is how the round that reached download mode read as "no bytes".
      */
     void setDtr(boolean on) {
+        observeLines(on, rts);
         control.add("dtr " + on);
         if (!on) printBanner();   // false is the line released high, i.e. out of reset
     }
 
     void setRts(boolean on) {
+        observeLines(dtr, on);
         control.add("rts " + on);
         if (!on) printBanner();
     }

@@ -56,6 +56,7 @@ def stub(used=USED):
         'case "$1" in\n'
         "  version) echo 'arduino-cli  Version: 1.1.1 Commit: stand-in'; exit 0;;\n"
         "  core) echo '[{\"id\":\"esp32:esp32\",\"installed\":\"3.3.12\"}]'; exit 0;;\n"
+        "  config) echo '{\"config\":{\"directories\":{\"data\":\"/test/core\"}}}'; exit 0;;\n"
         "esac\n"
         f"echo 'Sketch uses {used} bytes (89%) of program storage space. "
         f"Maximum is {SLOT} bytes.'\n"
@@ -539,6 +540,35 @@ CASES = [
 ]
 
 
+def cache_case(dest):
+    """Current CLI output must reuse the cache, but a core change must not."""
+    tree(dest, USED)
+    cli = dest / "stub-cli.sh"
+    current = stub().replace(
+        '[{"id":"esp32:esp32","installed":"3.3.12"}]',
+        '{"platforms":[{"id":"esp32:esp32","installed_version":"3.3.12"}]}',
+    )
+    cli.write_text(current)
+    cli.chmod(0o755)
+    argv = [sys.executable, str(dest / "check_docs.py"), "--arduino-cli", str(cli)]
+    for label, extra, source in (
+        ("refresh seeds cache", ["--refresh"], "built"),
+        ("same core reuses cache", [], "cache"),
+        ("core upgrade invalidates cache", [], "built"),
+        ("unknown core output is not cached", [], "built"),
+        ("unknown core output still rebuilds", [], "built"),
+    ):
+        if label.startswith("core upgrade"):
+            cli.write_text(current.replace("3.3.12", "3.3.13"))
+        elif label.startswith("unknown"):
+            cli.write_text(current.replace('"installed_version"', '"unexpected"'))
+        done = subprocess.run(argv + extra, cwd=dest, text=True, capture_output=True)
+        rows = [line for line in done.stdout.splitlines() if line.rstrip().endswith(" " + source)]
+        if done.returncode or not rows:
+            raise AssertionError(f"{label}: expected {source}\n{done.stdout}{done.stderr}")
+        print(f"ok   cache: {label}")
+
+
 def main():
     # Floors inherited from the caller would decide cases for it.
     base_env = {k: v for k, v in os.environ.items() if not k.startswith("HEADROOM_")}
@@ -590,12 +620,18 @@ def main():
             else:
                 print(f"ok   {index}. {case['name']}")
 
+        try:
+            cache_case(Path(tmp) / "cache")
+        except AssertionError as exc:
+            failed += 1
+            print(f"FAIL cache: {exc}")
+
     elapsed = time.time() - started
     print()
     if failed:
-        print(f"{failed} of {len(CASES)} cases failed", file=sys.stderr)
+        print(f"{failed} of {len(CASES) + 1} cases failed", file=sys.stderr)
         return 1
-    print(f"all {len(CASES)} branches of check_docs.py behave ({elapsed:.1f} s)")
+    print(f"all {len(CASES)} branches of check_docs.py behave; cache checks passed ({elapsed:.1f} s)")
     return 0
 
 

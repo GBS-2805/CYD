@@ -50,9 +50,9 @@ final class Sheet extends FrameLayout {
         LinearLayout head = Ui.row(activity);
         head.setPadding(Ui.dp(activity, 20), Ui.dp(activity, 18), Ui.dp(activity, 12),
                 Ui.dp(activity, 12));
-        label = Ui.text(activity, "MORE", 11, Ui.DIM);
-        label.setLetterSpacing(0.14f);
-        label.setTypeface(Ui.medium(activity));
+        label = Ui.text(activity, "MORE", 10, Ui.DIM);
+        label.setLetterSpacing(0.16f);
+        label.setTypeface(Ui.mono(activity));
         head.addView(label, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 

@@ -3551,14 +3551,75 @@ class LinkSecurityCallbacks : public BLESecurityCallbacks {
   }
 };
 
+// 15-30 ms, in 1.25 ms units: 12 and 24. No slave latency, so a tap is never
+// held back to save the phone's battery, and a 4 s supervision timeout so a phone
+// at the far end of a room is not declared disconnected mid-notification.
+static constexpr uint16_t LINK_CONN_MIN = 12;
+static constexpr uint16_t LINK_CONN_MAX = 24;
+static constexpr uint16_t LINK_CONN_TIMEOUT_10MS = 400;
+// Advertising: a fast burst while a phone may be coming back, then the slow
+// interval that costs almost nothing to leave running.
+static constexpr uint16_t ADV_FAST_MIN = 0xA0;  // 100 ms
+static constexpr uint16_t ADV_FAST_MAX = 0xC0;  // 150 ms
+static constexpr uint16_t ADV_SLOW_MIN = 0x1F4;  // 500 ms
+static constexpr uint16_t ADV_SLOW_MAX = 0x320;  // 800 ms
+
+static esp_bd_addr_t linkLastPeer;
+static bool linkPeerReady = false;
+// The live server, kept because core 2.0.17's BLEDevice has no getServer(); the
+// late request reads it instead, and both cores carry the same code path.
+static BLEServer *linkServer = nullptr;
+
+static void linkAdvertising(bool fastFirst) {
+  BLEAdvertising *adv = BLEDevice::getAdvertising();
+  if (adv == nullptr) return;
+  if (!fastFirst) {
+    adv->setMinInterval(ADV_SLOW_MIN);
+    adv->setMaxInterval(ADV_SLOW_MAX);
+    return;
+  }
+  adv->setMinInterval(ADV_FAST_MIN);
+  adv->setMaxInterval(ADV_FAST_MAX);
+  xTaskCreatePinnedToCore(
+      [](void *) {
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        BLEAdvertising *live = BLEDevice::getAdvertising();
+        if (!linkConnected && live != nullptr) {
+          live->setMinInterval(ADV_SLOW_MIN);
+          live->setMaxInterval(ADV_SLOW_MAX);
+        }
+        vTaskDelete(nullptr);
+      },
+      "advslow", 2560, nullptr, 1, nullptr, 1);
+}
+
+// The negotiation Android most often needs twice: it applies its own preferred
+// interval right after connecting, which overwrites the first request. Asking
+// again once that has settled is what makes the second answer the one in force.
+static void linkFastParams(BLEServer *server, esp_bd_addr_t peer) {
+  linkServer = server;
+  memcpy(linkLastPeer, peer, sizeof(linkLastPeer));
+  linkPeerReady = true;
+  server->updateConnParams(peer, LINK_CONN_MIN, LINK_CONN_MAX, 0, LINK_CONN_TIMEOUT_10MS);
+  xTaskCreatePinnedToCore(
+      [](void *) {
+        vTaskDelay(pdMS_TO_TICKS(1200));
+        if (linkConnected && linkPeerReady && linkServer != nullptr) {
+          linkServer->updateConnParams(linkLastPeer, LINK_CONN_MIN, LINK_CONN_MAX, 0,
+                                       LINK_CONN_TIMEOUT_10MS);
+        }
+        vTaskDelete(nullptr);
+      },
+      "connparams", 2560, nullptr, 1, nullptr, 1);
+}
+
 class LinkServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer *server, esp_ble_gatts_cb_param_t *param) override {
     linkConnected = true;
     linkChip = 0;
     linkChipMs = 0;
-    // 7.5–15 ms with no slave latency, so a tap does not wait three connection
-    // intervals to reach the phone. The phone may grant more; this is a request.
-    server->updateConnParams(param->connect.remote_bda, 6, 12, 0, 400);
+    linkFastParams(server, param->connect.remote_bda);
+    linkAdvertising(false);  // one phone holds the link; a second can wait
     memcpy(linkPeerBda, param->connect.remote_bda, 6);
     linkPeerKnown = true;
     Serial.println("[link] phone connected");
@@ -3569,6 +3630,7 @@ class LinkServerCallbacks : public BLEServerCallbacks {
     linkChip = 0;
     // Bluedroid stops advertising when a phone connects and never resumes it, so
     // without this the deck is invisible to the next scan once a phone walks off.
+    linkAdvertising(true);  // fast for the three seconds a reconnect needs
     BLEDevice::startAdvertising();
     Serial.println("[link] phone gone, advertising again");
     if (bondIsStale(param->disconnect.reason)) {
@@ -3635,7 +3697,15 @@ static void startBluetooth() {
   char name[28];
   snprintf(name, sizeof(name), "%s %s", DECK_NAME, deckTag);
   BLEDevice::init(name);
-  BLEDevice::setMTU(185);
+  // 247, the same ceiling the companion app asks for: its 244-byte payload
+  // carries the identity document in one read and a notification line in one
+  // write. This deck used to ask 185, which split both and paid for it in round
+  // trips; Android takes the smaller of the two, so raising it here is what
+  // makes the app's request stick.
+  BLEDevice::setMTU(247);
+  // Full radio power. The default is a level chosen for a phone in a pocket, and
+  // this board sits on a desk with a wall between it and the sofa.
+  BLEDevice::setPower(ESP_PWR_LVL_P9);
 
   BLEServer *server = BLEDevice::createServer();
   server->setCallbacks(new LinkServerCallbacks());
@@ -3686,6 +3756,7 @@ static void startBluetooth() {
   advertising->setScanResponse(true);
   advertising->setMinPreferred(0x06);
   advertising->setMaxPreferred(0x12);
+  linkAdvertising(true);  // 100-150 ms until a phone is on
   BLEDevice::startAdvertising();
   Serial.printf("[link] advertising as %s\n", name);
 }
@@ -3792,12 +3863,12 @@ static void drawCalibrationScreen() {
 
 // ------------------------------------------------------------------ touch ---
 
-// Four conversions per poll, median per axis. The XPT2046 answers a wild sample
-// often enough that a single read lands a tap on the neighbouring chip, and the
-// first conversions after touch-down are the worst. Pressure is used only to drop
-// samples that did not convert at all: its scale differs per panel, and a
-// threshold picked blind would kill touch outright.
-static constexpr int TOUCH_SAMPLES = 4;
+// Six conversions per poll, median per axis. Four was one sample away from the
+// panel's worst case: the first conversion after touch-down often lands short, and
+// with four a single bad one moved the median onto the neighbouring chip.
+// Pressure is used only to drop samples that did not convert at all: its scale
+// differs per panel, and a threshold picked blind would kill touch outright.
+static constexpr int TOUCH_SAMPLES = 6;
 static constexpr int TOUCH_SPREAD_MAX = 300;  // raw units
 
 static bool readRawTouch(int &rawX, int &rawY) {
@@ -3815,9 +3886,9 @@ static bool readRawTouch(int &rawX, int &rawY) {
     ys[n] = static_cast<int>(y);
     ++n;
   }
-  if (n < 2) return false;
+  if (n < 3) return false;
 
-  for (int i = 1; i < n; ++i) {  // insertion sort, n is at most four
+  for (int i = 1; i < n; ++i) {  // insertion sort, n is at most six
     const int vx = xs[i];
     const int vy = ys[i];
     int j = i - 1;
@@ -4096,6 +4167,14 @@ void setup() {
   ensureNetTask();
 }
 
+/**
+ * The loop's own tick: 4 ms, so the panel is sampled 250 times a second and a tap
+ * is caught inside one press. vTaskDelay yields the core to the radio task where
+ * delay() busy-spins on it, which is what kept an arriving track from being felt
+ * as a stutter in the touch handling.
+ */
+static void linkPace() { vTaskDelay(pdMS_TO_TICKS(4)); }
+
 void loop() {
   const uint32_t now = millis();
 
@@ -4129,7 +4208,7 @@ void loop() {
   if (ignoreTouchUntilRelease) {
     if (!down) ignoreTouchUntilRelease = false;
     wasTouched = down;
-    delay(10);
+    linkPace();
     return;
   }
 
@@ -4154,7 +4233,7 @@ void loop() {
       return;
     }
     wasTouched = down;
-    delay(10);
+    linkPace();
     return;
   }
 
@@ -4163,7 +4242,7 @@ void loop() {
     // Nothing to do here: the wizard is driven by the phone's page and by the
     // serial monitor, both pumped above. The card is redrawn on a step change.
     wasTouched = down;
-    delay(10);
+    linkPace();
     return;
   }
 
@@ -4277,5 +4356,5 @@ void loop() {
   }
 
   wasTouched = down;
-  delay(10);
+  linkPace();
 }

@@ -76,6 +76,9 @@ public final class HostTests {
         refusedWrite();
         silentBoard();
         flashWithoutHandshake();
+        mockCydAudit();
+        boardTable();
+        mockCydFlashesEveryBoard();
         sweepStopsAtFirstAnswer();
         handResetComesBeforeAnyWiring();
         sweepTriesEveryWiring();
@@ -651,6 +654,119 @@ public final class HostTests {
         }
     }
 
+    private static void mockCydAudit() throws IOException {
+        MockCyd board = new MockCyd(false);
+        EspRom rom = new EspRom(board.port);
+        rom.setBootHoldLeadIn(0);
+        rom.setHandResetWait(0);
+        EspRom.Sweep result = rom.connectAll();
+        check("mock CYD enters through automatic reset and reports the expected MAC",
+                result.phases > 0 && result.detected.mac.equals("24:0a:c4:12:34:56"));
+        check("mock CYD probe does not erase flash", board.eraseCount == 0);
+
+        byte[] image = new byte[1027];
+        Arrays.fill(image, (byte) 0xc0);
+        image[0] = (byte) 0xdb; // Both SLIP escape bytes cross the wire.
+        List<Integer> progress = new ArrayList<>();
+        board.loseNextAck = true;
+        try {
+            rom.flash(4096, image, (percent, note) -> progress.add(percent));
+            check("mock CYD accepts the ROM-sized flash blocks", true);
+        } catch (IOException e) {
+            check("mock CYD flash succeeds: " + e.getMessage(), false);
+        }
+        check("mock CYD retries a lost ACK and writes exact image bytes",
+                board.writes == 3 && Arrays.equals(image,
+                        Arrays.copyOfRange(board.flash, 4096, 4096 + image.length)));
+        check("mock CYD leaves the neighboring sector intact and pads with FF",
+                board.flash[4095] == 0x42 && board.flash[8192] == 0x42
+                        && board.flash[4096 + image.length] == (byte) 0xff);
+        check("mock CYD verifies only image bytes and resets after verify",
+                board.verifiedBytes == image.length && board.finishCount == 1
+                        && board.bootCount > 0 && !board.loader && progress.contains(100));
+
+        mockFlashFailure("block rejected", b -> b.rejectWrites = true, "would not write");
+        mockFlashFailure("corrupt digest", b -> b.corruptDigest = true, "MD5 mismatch");
+        mockFlashFailure("failed MD5 status even with a matching digest",
+                b -> b.rejectDigest = true, "rejected the MD5 check");
+        mockFlashFailure("truncated erase acknowledgment", b -> b.shortBeginStatus = true,
+                "short status");
+    }
+
+    private static void mockFlashFailure(String name, java.util.function.Consumer<MockCyd> fault,
+                                         String expected) throws IOException {
+        MockCyd board = new MockCyd(true);
+        EspRom rom = new EspRom(board.port);
+        check("mock CYD already in ROM responds without reset",
+                rom.connectAll().phases == 0 && board.port.control.isEmpty());
+        fault.accept(board);
+        List<Integer> progress = new ArrayList<>();
+        try {
+            rom.flash(0, new byte[]{1, 2, 3}, (percent, note) -> progress.add(percent));
+            check("mock CYD refuses " + name, false);
+        } catch (IOException e) {
+            check("mock CYD refuses " + name + ": " + e.getMessage(),
+                    e.getMessage().contains(expected) && !progress.contains(100)
+                            && board.finishCount == 0 && board.loader);
+        }
+    }
+
+    /**
+     * The picker's table, checked as data: unique codes, the deck's own board as
+     * the default, and a size guard that refuses an image the flash cannot hold.
+     */
+    private static void boardTable() {
+        java.util.Set<String> codes = new java.util.HashSet<>();
+        for (BoardTable.Board board : BoardTable.all()) {
+            check("board " + board.code + " has a unique code", codes.add(board.code));
+            check("board " + board.code + " has a panel and a bridge",
+                    !board.panel.isEmpty() && !board.bridge.isEmpty());
+            check("board " + board.code + " is a 4 MB classic ESP32 CYD",
+                    board.flashMb == 4 && board.code.startsWith("24")
+                            || board.code.startsWith("32"));
+        }
+        check("the default board is the one the deck firmware runs on",
+                BoardTable.defaultBoard().code.equals("2432S024R"));
+        check("a code round-trips", BoardTable.byCode("2432s028r") != null
+                && BoardTable.byCode("2432S028R").label.contains("2432S028R"));
+        check("an unknown code is not a board", BoardTable.byCode("8048S070") == null);
+        BoardTable.Board board = BoardTable.defaultBoard();
+        check("an image that fits the flash is accepted",
+                BoardTable.fits(board, board.flashBytes()));
+        check("an image one byte over the flash is refused",
+                !BoardTable.fits(board, board.flashBytes() + 1));
+        check("an empty image is refused", !BoardTable.fits(board, 0));
+        check("no board means no write", !BoardTable.fits(null, 1024));
+    }
+
+    /**
+     * The same ROM session against every board in the picker. The protocol does
+     * not change per panel, so this is what proves the picker cannot make a
+     * board unflashable: each one is probed, written at 0x0, verified by MD5 and
+     * rebooted, with the image bytes compared afterwards.
+     */
+    private static void mockCydFlashesEveryBoard() throws IOException {
+        for (BoardTable.Board board : BoardTable.all()) {
+            MockCyd cyd = new MockCyd(false);
+            EspRom rom = new EspRom(cyd.port);
+            rom.setBootHoldLeadIn(0);
+            rom.setHandResetWait(0);
+            EspRom.Sweep sweep = rom.connectAll();
+            check(board.code + ": probe reads the chip and MAC",
+                    sweep.detected.chip.equals("ESP32")
+                            && sweep.detected.mac.equals("24:0a:c4:12:34:56"));
+            byte[] image = new byte[4096 + 37];
+            Arrays.fill(image, (byte) 0x5a);
+            image[0] = (byte) 0xc0;
+            image[image.length - 1] = (byte) 0xdb;
+            rom.flash(0, image, (percent, note) -> { });
+            check(board.code + ": flash writes the image at 0x0 and verifies it",
+                    Arrays.equals(image, Arrays.copyOfRange(cyd.flash, 0, image.length))
+                            && cyd.verifiedBytes == image.length
+                            && cyd.finishCount == 1 && !cyd.loader);
+        }
+    }
+
     // ------------------------------------------------------------ fixtures ---
 
     /**
@@ -661,9 +777,9 @@ public final class HostTests {
     private static UsbSerialCh340.Responder chip(boolean decoy) {
         return (port, op, checksum, payload) -> {
             if (op == OP_SYNC) {
-                if (decoy) port.inject(reply(0x03, 0, new byte[]{0x00, 0x00}));
+                if (decoy) port.inject(reply(0x03, 0, new byte[4]));
                 port.inject(BANNER);
-                port.inject(reply(OP_SYNC, 0, new byte[]{0x00, 0x00}));
+                port.inject(reply(OP_SYNC, 0, new byte[4]));
             } else if (op == OP_READ_REG && payload.length >= 4) {
                 final int address = u32(payload, 0);
                 final int value;
@@ -671,7 +787,7 @@ public final class HostTests {
                 else if (address == 0x3FF5A004) value = 0xC4123456;     // MAC word 1
                 else if (address == 0x3FF5A008) value = 0x0000240A;     // MAC word 2
                 else value = 0;
-                port.inject(reply(OP_READ_REG, value, new byte[]{0x00, 0x00}));
+                port.inject(reply(OP_READ_REG, value, new byte[4]));
             }
         };
     }

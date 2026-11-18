@@ -168,17 +168,19 @@ final class ProjectsTab extends ScrollView {
         List<ProjectStore.Project> projects = new ArrayList<>(ProjectStore.all(activity));
         projects.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
 
-        body.addView(Ui.text(activity, "BOARDS", 20, Ui.TEXT));
+        body.addView(Ui.title(activity, "Shelf"));
 
         // Which board the shelf below belongs to. The bar's crumb already carries
         // the way back, so this line does not repeat the section name.
         TextView trail = Ui.text(activity, breadcrumb(projects), 10, Ui.DIM);
         trail.setLetterSpacing(0.12f);
+        Ui.mono(trail);
         trail.setPadding(0, Ui.dp(activity, 6), 0, 0);
         body.addView(trail);
 
-        TextView subtitle = Ui.text(activity, "Alphabetical. Tap a name for its notes.", 12, Ui.DIM);
-        subtitle.setPadding(0, Ui.dp(activity, 4), 0, 0);
+        TextView subtitle = Ui.subtitle(activity,
+                "Project notes, logs, and the sketches that produced them.");
+        subtitle.setPadding(0, Ui.dp(activity, 4), 0, Ui.dp(activity, 4));
         body.addView(subtitle);
 
         // The disclaimer comes before the shelf: what to install is a precondition
@@ -369,16 +371,30 @@ final class ProjectsTab extends ScrollView {
         return wrapper;
     }
 
+    /**
+     * One filter, as the study's underlined tab: a word, and a rule under the live
+     * one. A filled chip was a second kind of button on a screen that already has
+     * buttons; a tab says "this is the same list, filtered" without competing.
+     */
     private void addChip(LinearLayout row, String label, int filter) {
         final boolean on = activeFilter == filter;
-        TextView chip = Ui.text(activity, label, 10, on ? Ui.BAND_INK : Ui.DIM);
-        chip.setLetterSpacing(0.1f);
-        Ui.strong(chip);
-        chip.setBackground(Ui.rounded(activity, on ? Ui.ACCENT : Ui.CARD_HI,
-                on ? Ui.ACCENT : Ui.EDGE, 8));
-        chip.setPadding(Ui.dp(activity, 9), Ui.dp(activity, 5),
-                Ui.dp(activity, 9), Ui.dp(activity, 5));
-        chip.setOnClickListener(v -> {
+        LinearLayout tab = Ui.column(activity);
+        tab.setClickable(true);
+        Ui.pressable(activity, tab, 0);
+
+        TextView word = Ui.text(activity, label, 11, on ? Ui.TEXT : Ui.DIM);
+        word.setLetterSpacing(0.06f);
+        if (on) Ui.medium(word);
+        word.setPadding(Ui.dp(activity, 2), Ui.dp(activity, 6),
+                Ui.dp(activity, 2), Ui.dp(activity, 6));
+        tab.addView(word);
+
+        View underline = new View(activity);
+        underline.setBackgroundColor(on ? Ui.ACCENT : android.graphics.Color.TRANSPARENT);
+        tab.addView(underline, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, Math.max(1, Ui.dp(activity, 1))));
+
+        tab.setOnClickListener(v -> {
             activeFilter = filter;
             signature = "";
             refresh();
@@ -387,8 +403,8 @@ final class ProjectsTab extends ScrollView {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
-        params.rightMargin = Ui.dp(activity, 6);
-        row.addView(chip, params);
+        params.rightMargin = Ui.dp(activity, 18);
+        row.addView(tab, params);
     }
 
     /**
@@ -397,7 +413,8 @@ final class ProjectsTab extends ScrollView {
      * aims at anyway.
      */
     private LinearLayout projectCard(ProjectStore.Project project) {
-        LinearLayout card = Ui.card(activity);
+        LinearLayout card = Ui.column(activity);
+        card.setPadding(0, Ui.dp(activity, 14), 0, Ui.dp(activity, 14));
         final boolean open = expanded.contains(project.id);
 
         LinearLayout header = Ui.row(activity);
@@ -406,16 +423,14 @@ final class ProjectsTab extends ScrollView {
         LinearLayout meta = Ui.row(activity);
         TextView kind = Ui.text(activity, project.kindLabel(), 10, Ui.DIM);
         kind.setLetterSpacing(0.12f);
-        kind.setBackground(Ui.rounded(activity, Ui.CARD_HI, Ui.EDGE, 6));
-        kind.setPadding(Ui.dp(activity, 6), Ui.dp(activity, 2),
-                Ui.dp(activity, 6), Ui.dp(activity, 2));
+        Ui.mono(kind);
         meta.addView(kind);
 
         TextView status = Ui.text(activity, ProjectStore.statusLabel(project.status), 10,
                 ProjectStore.statusColor(project.status));
         status.setLetterSpacing(0.12f);
-        Ui.strong(status);
-        status.setPadding(Ui.dp(activity, 8), 0, 0, 0);
+        Ui.mono(status);
+        status.setPadding(Ui.dp(activity, 10), 0, 0, 0);
         meta.addView(status);
 
         // A filed card says so while folded: whether it can run a file is the
@@ -423,10 +438,8 @@ final class ProjectsTab extends ScrollView {
         if (!project.fileName.isEmpty() && !project.catalog) {
             TextView file = Ui.text(activity, "FILE", 10, Ui.ACCENT);
             file.setLetterSpacing(0.12f);
-            Ui.strong(file);
-            file.setBackground(Ui.rounded(activity, Ui.CARD_HI, Ui.ACCENT, 6));
-            file.setPadding(Ui.dp(activity, 6), Ui.dp(activity, 2),
-                    Ui.dp(activity, 6), Ui.dp(activity, 2));
+            Ui.mono(file);
+            file.setPadding(Ui.dp(activity, 10), 0, 0, 0);
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -436,12 +449,14 @@ final class ProjectsTab extends ScrollView {
         header.addView(meta, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        TextView fold = Ui.text(activity, open ? "-" : "+", 16, Ui.DIM);
+        TextView fold = Ui.text(activity, open ? "\u2212" : "+", 15, Ui.DIM);
         header.addView(fold);
         card.addView(header);
 
-        TextView name = Ui.text(activity, project.name, 16, Ui.TEXT);
-        name.setPadding(0, Ui.dp(activity, 6), 0, 0);
+        TextView name = Ui.text(activity, project.name, 17, Ui.TEXT);
+        name.setTypeface(Ui.medium(activity));
+        name.setLetterSpacing(-0.01f);
+        name.setPadding(0, Ui.dp(activity, 7), 0, 0);
         card.addView(name);
 
         View.OnClickListener flip = v -> toggle(project.id);
@@ -454,7 +469,7 @@ final class ProjectsTab extends ScrollView {
         fold.setOnClickListener(flip);
 
         if (!open) {
-            Ui.space(activity, card, 8);
+            card.addView(Ui.rule(activity));
             return card;
         }
 
@@ -544,7 +559,7 @@ final class ProjectsTab extends ScrollView {
             secondary.addView(recipe, spaced(8));
         }
         card.addView(secondary);
-        Ui.space(activity, card, 8);
+        card.addView(Ui.rule(activity));
         return card;
     }
 
@@ -1100,7 +1115,7 @@ final class ProjectsTab extends ScrollView {
 
     /** A flash recipe, not code: these are PlatformIO builds, not ArduinoDroid sketches. */
     private void copyRecipe(ProjectStore.Project project) {
-        BoardCatalog.Board board = BoardCatalog.selected(activity);
+        BoardTable.Board board = BoardCatalog.selected(activity);
         StringBuilder text = new StringBuilder();
         text.append("# ").append(project.name).append(" — ").append(board.label)
                 .append(" (").append(board.code).append(")\n")

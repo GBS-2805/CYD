@@ -93,6 +93,8 @@ HISTORICAL = {
              "against before they moved to huge_app on 2026-11-04 - default.csv "
              "sizes app0 and app1 at 1,310,720 each, so a past build's share of "
              "it is still arithmetic rather than a guess",
+    1179690: "the original Phone Deck measurement on the earlier Arduino root",
+    1891309: "the original linked Spotify Deck measurement on the earlier Arduino root",
     1122249: "the Spotify sketch on 2.0.17 on its own path, before the 3.x jump",
     1122281: "the Spotify sketch on 2.0.17 through toolchain.sh's root",
     1114485: "an earlier note's Spotify figure, which did not reproduce",
@@ -217,34 +219,37 @@ def toolchain_fingerprint(cli):
     a different core is a size that no longer exists, which is exactly what this
     check exists to stop passing quietly.
     """
-    stamp = {}
+    def run(*args):
+        return subprocess.run(
+            [cli, *args], capture_output=True, text=True, timeout=30, check=True
+        ).stdout
+
     try:
-        done = subprocess.run(
-            [cli, "version"], capture_output=True, text=True, timeout=30
-        )
-    except (OSError, subprocess.SubprocessError):
-        return {}
-    lines = (done.stdout or done.stderr).strip().splitlines()
-    if not lines:
-        return {}
-    stamp["cli"] = lines[0]
-    try:
-        done = subprocess.run(
-            [cli, "core", "list", "--format", "json"],
-            capture_output=True, text=True, timeout=120,
-        )
-        cores = []
-        for entry in json.loads(done.stdout or "[]"):
-            if isinstance(entry, dict):
-                cores.append("%s %s" % (entry.get("id"), entry.get("installed")))
-            else:
-                cores.append(str(entry))
+        version = run("version").strip().splitlines()
+        payload = json.loads(run("core", "list", "--format", "json"))
+        platforms = payload.get("platforms") if isinstance(payload, dict) else payload
+        if not version or not isinstance(platforms, list) or not platforms:
+            return {}
+        cores = {}
+        for entry in platforms:
+            if not isinstance(entry, dict):
+                return {}
+            name = entry.get("id")
+            installed = entry.get("installed_version", entry.get("installed"))
+            if not isinstance(name, str) or not name or name in cores:
+                return {}
+            if not isinstance(installed, str) or not installed:
+                return {}
+            cores[name] = installed
+        config = json.loads(run("config", "dump", "--format", "json"))
+        if isinstance(config, dict):
+            config = config.get("config", config)
+        if not isinstance(config, dict):
+            return {}
+        # Data and user paths can affect the bytes even at the same core version.
+        return {"cli": version[0], "cores": cores, "directories": config.get("directories", {})}
     except (OSError, subprocess.SubprocessError, ValueError):
         return {}
-    if not cores:
-        return {}
-    stamp["cores"] = json.dumps(cores, sort_keys=True)
-    return stamp
 
 
 def load_cache():
@@ -722,7 +727,7 @@ def main():
         return 2
 
     cache = {} if args.refresh else load_cache()
-    fingerprint = {} if args.refresh else toolchain_fingerprint(cli)
+    fingerprint = toolchain_fingerprint(cli)
     built = []
     for folder in headroom.find_sketches(args.decks):
         deck = measure(cli, folder, args.timeout, cache, fingerprint)

@@ -37,17 +37,22 @@ final class Appearance {
     private Appearance() {
     }
 
-    /** {@link Palette#MOSS} on a fresh install: what the owner's own screens show. */
+    /**
+     * {@link Palette#FIELD} on a fresh install: the Deck Index page, near-black with
+     * one pale moss accent. The three deck palettes are still selectable, because an
+     * install that chose one should keep it.
+     */
     static int palette(Context context) {
-        if (context == null) return Palette.MOSS;
+        if (context == null) return Palette.FIELD;
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         int stored = prefs.getInt(KEY_PALETTE, -1);
+        if (stored == Palette.FIELD) return Palette.FIELD;
         if (stored >= 0 && stored < Palette.SCHEMES.length) return stored;
         // Nothing stored yet. An install from before the restyle had a single
         // theme; keep its light/dark answer rather than resetting it to dark.
         int legacy = prefs.getInt(KEY_LEGACY, -1);
-        if (legacy == 1) return Palette.MOSS;
-        return Palette.MOSS;
+        if (legacy == 1) return Palette.FIELD;
+        return Palette.FIELD;
     }
 
     /** Dark unless this install asked for the light page. */
@@ -59,7 +64,7 @@ final class Appearance {
     }
 
     static void setPalette(Context context, int palette) {
-        if (palette < 0 || palette >= Palette.SCHEMES.length) return;
+        if (palette != Palette.FIELD && (palette < 0 || palette >= Palette.SCHEMES.length)) return;
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().putInt(KEY_PALETTE, palette).apply();
     }

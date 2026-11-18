@@ -111,6 +111,13 @@ final class Palette {
     static final int MOSS = 1;
     /** Navy. Its light page is a powder blue-grey, not a white. */
     static final int NAVY = 2;
+    /**
+     * Field: the app's own page, and the default. Near-black, one pale moss accent,
+     * a paper light page. It is not a deck palette — the firmware's THEMES[] table
+     * has no row for it — so it is deliberately outside {@link #SCHEMES} and the
+     * three swatches a deck carries.
+     */
+    static final int FIELD = 3;
 
     /**
      * One palette: four colours for the dark page and their light twins, plus the
@@ -219,13 +226,32 @@ final class Palette {
             0xFF1C1D2F, 0xFFA1B0C3, 0xA3A1B0C3, 0x38A1B0C3, 0x14A1B0C3,
             0xFFA1B0C3, 0xFF1C1D2F, 0xA81C1D2F, 0x3D1C1D2F, 0x121C1D2F});
 
-    /** Every scheme, by {@link #GREEN}, {@link #MOSS}, {@link #NAVY}. */
+    /**
+     * The app's own page: the Deck Index study's near-black field, pale moss accent
+     * and paper light page. Measured against the same floors as the deck palettes.
+     */
+    static final Scheme FIELD_SCHEME = new Scheme("field", new int[] {
+            0xFF0B0C0E, 0xFFECECEF, 0xB38D8D97, 0x24FFFFFF, 0xFF1D1E23,
+            0xFFC9F2C6, 0xFF10200F,
+            0xFF101114, 0xFFECECEF, 0xFF8D8D97, 0x24FFFFFF, 0xFF1D1E23,
+            0xFFF2F0E9, 0xFF101114, 0xFF5C5C63, 0x2E000000, 0xFFE7E4DA});
+
+    /** Every deck palette, by {@link #GREEN}, {@link #MOSS}, {@link #NAVY}. */
     static final Scheme[] SCHEMES = {GREEN_SCHEME, MOSS_SCHEME, NAVY_SCHEME};
+
+    /** Every scheme the app can draw its own page in, deck palettes then field. */
+    static final Scheme[] APP_SCHEMES = {FIELD_SCHEME, GREEN_SCHEME, MOSS_SCHEME, NAVY_SCHEME};
 
     /** The stored value, clamped: a preference is not a promise. */
     static Scheme scheme(int index) {
         if (index < 0 || index >= SCHEMES.length) return MOSS_SCHEME;
         return SCHEMES[index];
+    }
+
+    /** The app's own page, by {@link #FIELD} or one of the three deck palettes. */
+    static Scheme appScheme(int index) {
+        if (index == FIELD) return FIELD_SCHEME;
+        return scheme(index);
     }
 
     private Palette() {

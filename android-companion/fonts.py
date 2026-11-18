@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch Poppins 400/500/600, subset them, and install them as app resources.
+"""Fetch Inter Tight 400/500/600 and Geist Mono 400/500, subset them, and install them as app resources.
 
 Run once. The app packages the TTFs from `app/src/main/res/font/`, which is what
 `Ui.face()` loads; nothing at runtime downloads a font.
@@ -12,12 +12,17 @@ import sys
 from fontTools.ttLib import TTFont
 from fontTools import subset
 
-OUT = "/workspace/chats/e9252a57e411c2e2ed13a226/android-companion/app/src/main/res/font"
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app/src/main/res/font")
 FACES = {
-    "poppins_400": ("Poppins-Regular.ttf", "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf"),
-    "poppins_500": ("Poppins-Medium.ttf", "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Medium.ttf"),
-    "poppins_600": ("Poppins-SemiBold.ttf", "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-SemiBold.ttf"),
+    "inter_tight_400": ("InterTight-Regular.ttf", "https://raw.githubusercontent.com/google/fonts/main/ofl/intertight/InterTight%5Bwght%5D.ttf"),
+    "inter_tight_500": ("InterTight-Medium.ttf", "https://raw.githubusercontent.com/google/fonts/main/ofl/intertight/InterTight%5Bwght%5D.ttf"),
+    "inter_tight_600": ("InterTight-SemiBold.ttf", "https://raw.githubusercontent.com/google/fonts/main/ofl/intertight/InterTight%5Bwght%5D.ttf"),
+    "geist_mono_400": ("GeistMono-Regular.ttf", "https://raw.githubusercontent.com/google/fonts/main/ofl/geistmono/GeistMono%5Bwght%5D.ttf"),
+    "geist_mono_500": ("GeistMono-Medium.ttf", "https://raw.githubusercontent.com/google/fonts/main/ofl/geistmono/GeistMono%5Bwght%5D.ttf"),
 }
+# A variable font is instanced at the weight each face needs before subsetting.
+WEIGHTS = {"inter_tight_400": 400, "inter_tight_500": 500, "inter_tight_600": 600,
+           "geist_mono_400": 400, "geist_mono_500": 500}
 
 # Everything the app can print: ASCII, the punctuation it uses in prose, the
 # arrows and marks it puts in rows, and the currency and accent letters a deck
@@ -31,8 +36,8 @@ KEEP = (
 
 
 def fetch(name, url):
-    path = os.path.join("/tmp/poppins", name)
-    os.makedirs("/tmp/poppins", exist_ok=True)
+    path = os.path.join("/tmp/offsite-fonts", name)
+    os.makedirs("/tmp/offsite-fonts", exist_ok=True)
     if os.path.exists(path) and os.path.getsize(path) > 60000:
         return path
     subprocess.run(["curl", "-sSfL", "-o", path, url], check=True)
@@ -45,6 +50,9 @@ def main():
     for face, (file, url) in FACES.items():
         source = fetch(file, url)
         font = TTFont(source)
+        if "fvar" in font:
+            from fontTools.varLib import instancer
+            font = instancer.instantiateVariableFont(font, {"wght": WEIGHTS[face]})
         options = subset.Options()
         options.layout_features = ["kern", "liga"]
         options.name_IDs = ["*"]

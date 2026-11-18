@@ -40,9 +40,9 @@ final class PullDown extends LinearLayout {
                 Ui.dp(activity, SIDE_DP), Ui.dp(activity, UNDER_DP));
 
         addView(Ui.rule(activity));
-        addRow("PAIRED", "live link", () -> nav.openSection(MainActivity.SECTION_DECKS));
-        addRow("BOARDS", "the shelf", () -> nav.openSection(MainActivity.SECTION_PROJECTS));
-        addRow("SERIAL", "usb · flash", () -> nav.openSection(MainActivity.SECTION_SERIAL));
+        addRow("Decks", "live link", () -> nav.openSection(MainActivity.SECTION_DECKS));
+        addRow("Shelf", "the projects", () -> nav.openSection(MainActivity.SECTION_PROJECTS));
+        addRow("Serial", "usb · flash", () -> nav.openSection(MainActivity.SECTION_SERIAL));
     }
 
     /**
@@ -59,10 +59,12 @@ final class PullDown extends LinearLayout {
         row.setPadding(0, Ui.dp(activity, 13), 0, Ui.dp(activity, 13));
         TextView title = Ui.text(activity, name, 15, Ui.TEXT);
         title.setTypeface(Ui.medium(activity));
-        title.setLetterSpacing(0.02f);
+        title.setLetterSpacing(-0.01f);
         row.addView(title, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        row.addView(Ui.text(activity, hint, 13, Ui.DIM));
+        TextView aside = Ui.text(activity, hint, 10, Ui.DIM);
+        Ui.mono(aside);
+        row.addView(aside);
         row.setOnClickListener(v -> tap.run());
         Ui.pressable(activity, row, 0);
 

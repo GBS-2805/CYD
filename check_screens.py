@@ -16,7 +16,7 @@ cost table's "one capture" is one command — so the scan starts at three.
 
 A file may still describe a past state: a claim is allowed when the paragraph
 around it also spells the count this tree draws. That is what makes it a history
-("the strip came to show a week-old seven frames while the app drew nine") rather
+("the strip came to show a week-old seven frames while the app drew ten") rather
 than a claim, and it reads as one to a person too. The selftests are skipped, because a
 fixture's whole job is to say the wrong number out loud.
 

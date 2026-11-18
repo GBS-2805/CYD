@@ -111,10 +111,31 @@ public class DeckService extends Service {
     private static final int SCAN_FILTER_LIMIT = 5;
     /** autoConnect waits for an advertisement for ever; a scan is the way back. */
     private static final long AUTO_CONNECT_MS = 12_000L;
+    /**
+     * How long to let the stack settle before asking for the fast interval again.
+     * Android applies its own preference right after connecting and that overwrites
+     * the first request; 1200 ms is when the deck asks again, so the two halves of
+     * the link land on the same interval instead of across two.
+     */
+    private static final long LINK_SETTLE_MS = 1_200L;
     private static final long SCAN_TIMEOUT_MS = 15_000L;
     private static final long RSSI_POLL_MS = 10_000L;
     private static final long NEARBY_TTL_MS = 30_000L;
     private static final int NEARBY_MAX = 12;
+
+    /**
+     * Ask for the fast interval a second time, once Android has stopped applying its
+     * own. Called on the handler, so it reads {@code gatt} on the thread that owns it.
+     */
+    private void settleLink() {
+        final BluetoothGatt live = gatt;
+        if (live == null) return;
+        try {
+            live.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH);
+        } catch (Exception ignored) {
+            // Optional; the deck's own request is the other half.
+        }
+    }
     private static final int NOTICE_LIMIT_BYTES = 120;
 
     private static volatile DeckService instance;
@@ -426,9 +447,12 @@ public class DeckService extends Service {
                     g.requestMtu(MTU_BYTES);
                     g.discoverServices();
                     try {
-                        // The deck asks for 7.5-15 ms, but the central decides, so
-                        // ask here too or the interval stays at Android's default.
+                        // The deck asks for 15-30 ms, but the central decides, so ask
+                        // here too or the interval stays at Android's default. Android
+                        // overwrites this with its own choice once the link settles, so
+                        // it is asked again below — the second answer is the one kept.
                         g.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH);
+                        handler.postDelayed(DeckService.this::settleLink, LINK_SETTLE_MS);
                     } catch (Exception ignored) {
                         // Optional: the deck's own request is the other half.
                     }
@@ -457,8 +481,11 @@ public class DeckService extends Service {
                 // A cold start still scans: that is faster to a first link.
                 if (everLinked && lastDevice != null && reconnectAuto()) return;
                 setStatus("Disconnected, scanning");
-                ++scanMisses;
-                scheduleScan(nextScanDelay());
+                // The deck advertises at 100-150 ms for three seconds after a
+                // disconnect, then widens. Scanning straight away is what catches
+                // that burst; a backoff here would spend those three seconds asleep.
+                scanMisses = 0;
+                scheduleScan(200);
             }
         }
 
@@ -588,6 +615,16 @@ public class DeckService extends Service {
 
         @Override
         public void onMtuChanged(BluetoothGatt g, int mtu, int statusCode) {
+            // A granted MTU is the point the link can carry a whole notification line,
+            // so the fast interval asked for at connect is asked for again here: this
+            // is after Android's own priority pass, not before it.
+            try {
+                if (statusCode == BluetoothGatt.GATT_SUCCESS && mtu >= 100) {
+                    g.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH);
+                }
+            } catch (Exception ignored) {
+                // Optional; the deck's own request covers it.
+            }
             // The first read can land before the MTU is agreed and come back
             // truncated, which names no widget. This is the second ask, once the
             // link carries the whole document.

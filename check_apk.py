@@ -26,10 +26,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 APK = ROOT / "android-companion" / "dist" / "PhoneDeckBridge-debug.apk"
 
-# 320 kB. The build measured 239,217 B when this was set, so there is room for a
-# screen or a feature and not for a dependency that doubles the app. Raise it in
-# the same change that grows the app, and say why in that message.
-CEILING = 327_680
+# 384 kB, raised from 320 kB when the deck preview arrived: the bubble bundles the
+# sketches' own front pages so the picture of a deck is the deck's pixels rather
+# than a second mockup. Ten palette PNGs are 44 kB of that, and the build measured
+# 346,938 B. Raising it further is an edit with a reason, not a number nobody reads.
+CEILING = 393_216
 
 
 def shown(path):

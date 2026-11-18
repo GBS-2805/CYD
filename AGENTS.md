@@ -22,3 +22,6 @@ Non-negotiables if you read nothing else:
   mechanics and the shape a link has to have.
 * Do not commit, push or deploy unless asked, and do not touch another widget's
   folder.
+
+* For USB regressions, follow the hardware spike in the Android handoff.
+  A host test is not evidence of USB discovery, ROM sync or a verified write.

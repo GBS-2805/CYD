@@ -64,9 +64,9 @@ final class SidePanel extends FrameLayout {
         LinearLayout head = Ui.row(activity);
         head.setMinimumHeight(Ui.dp(activity, 56));
         head.setPadding(0, Ui.dp(activity, 6), 0, 0);
-        TextView label = Ui.text(activity, "MORE", 11, Ui.DIM);
-        label.setLetterSpacing(0.14f);
-        label.setTypeface(Ui.medium(activity));
+        TextView label = Ui.text(activity, "MORE", 10, Ui.DIM);
+        label.setLetterSpacing(0.16f);
+        label.setTypeface(Ui.mono(activity));
         head.addView(label, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         TextView close = Ui.text(activity, "\u00d7", 20, Ui.TEXT);
@@ -80,9 +80,9 @@ final class SidePanel extends FrameLayout {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         panel.addView(Ui.rule(activity));
 
-        panel.addView(row("SETTINGS", "all permissions", () -> nav.open(ROW_SETTINGS)));
-        panel.addView(row("BRIDGE", "start · stop", () -> nav.open(ROW_BRIDGE)));
-        panel.addView(row("APPEARANCE", "palette · page", () -> nav.open(ROW_APPEARANCE)));
+        panel.addView(row("Setup", "all permissions", () -> nav.open(ROW_SETTINGS)));
+        panel.addView(row("Bridge", "start · stop", () -> nav.open(ROW_BRIDGE)));
+        panel.addView(row("Appearance", "palette · page", () -> nav.open(ROW_APPEARANCE)));
 
         // The palette at the foot, under its own border, exactly where the site
         // keeps it: the links stay the top of the panel and the look stays within a
@@ -96,7 +96,7 @@ final class SidePanel extends FrameLayout {
         foot.addView(Ui.rule(activity));
         TextView note = Ui.text(activity,
                 "The app's own palette. Each deck keeps its own, set from its row on "
-                        + "PAIRED.", 12, Ui.DIM);
+                        + "Decks.", 11, Ui.DIM);
         note.setPadding(0, Ui.dp(activity, 12), 0, 0);
         note.setLineSpacing(Ui.dp(activity, 2), 1f);
         foot.addView(note);
@@ -118,8 +118,9 @@ final class SidePanel extends FrameLayout {
         panel.addView(foot, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        status = Ui.text(activity, "", 11, Ui.DIM);
+        status = Ui.text(activity, "", 10, Ui.DIM);
         status.setLetterSpacing(0.14f);
+        Ui.mono(status);
         status.setPadding(0, Ui.dp(activity, 10), 0, 0);
         panel.addView(status, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -147,10 +148,11 @@ final class SidePanel extends FrameLayout {
         row.setPadding(0, Ui.dp(activity, 13), 0, Ui.dp(activity, 13));
         TextView title = Ui.text(activity, name, 15, Ui.TEXT);
         title.setTypeface(Ui.medium(activity));
-        title.setLetterSpacing(0.02f);
+        title.setLetterSpacing(-0.01f);
         row.addView(title, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        TextView aside = Ui.text(activity, hint, 13, Ui.DIM);
+        TextView aside = Ui.text(activity, hint, 10, Ui.DIM);
+        Ui.mono(aside);
         row.addView(aside);
         row.setOnClickListener(v -> tap.run());
         Ui.pressable(activity, row, 0);

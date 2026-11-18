@@ -29,7 +29,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 APP = ROOT / "android-companion"
 FRESH = APP / "app" / "build" / "capture"
-SCREENS = ["paired", "pull-down", "side-panel", "bridge-sheet",
+SCREENS = ["paired", "preview", "pull-down", "side-panel", "bridge-sheet",
            "appearance-sheet", "projects", "projects-open", "serial", "settings"]
 
 

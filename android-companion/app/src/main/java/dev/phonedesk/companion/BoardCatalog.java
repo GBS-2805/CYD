@@ -3,18 +3,19 @@ package dev.phonedesk.companion;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-import java.util.Arrays;
 import java.util.List;
 
 /**
- * Boards the Flash tab can target. One entry today — the 2.4" CYD this deck
- * runs on — but the picker exists so more can be added without reshaping the UI
- * or the firmware catalogue keyed off it.
+ * Boards the Flash tab can target, and the one the person picked.
+ *
+ * The table itself lives in {@link BoardTable} so the host suite can read it
+ * without Android. This class is only the remembered choice: a code, not an
+ * index, so inserting a board in the middle of the table does not silently move
+ * somebody's selection to a different panel.
  */
 final class BoardCatalog {
 
     static final class Board {
-        /** Short code used in section headers, e.g. 2432S024R. */
         final String code;
         final String label;
         final String note;
@@ -30,34 +31,31 @@ final class BoardCatalog {
         }
     }
 
-    private static final List<Board> BOARDS = Arrays.asList(
-            new Board("2432S024R", "ESP32-2432S024R",
-                    "2.4\" CYD · resistive touch · CH340 USB bridge · 4 MB flash. "
-                            + "This is the board the deck firmware runs on."));
-
     private static final String PREFS = "board";
-    private static final String KEY = "selected";
+    private static final String KEY = "selected_code";
 
     private BoardCatalog() {
     }
 
-    static List<Board> all() {
-        return BOARDS;
+    static List<BoardTable.Board> all() {
+        return BoardTable.all();
     }
 
     static int selectedIndex(Context context) {
-        final SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        final int index = prefs.getInt(KEY, 0);
-        return (index < 0 || index >= BOARDS.size()) ? 0 : index;
+        final BoardTable.Board selected = selected(context);
+        return Math.max(0, all().indexOf(selected));
     }
 
-    static Board selected(Context context) {
-        return BOARDS.get(selectedIndex(context));
+    static BoardTable.Board selected(Context context) {
+        final SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        final BoardTable.Board stored = BoardTable.byCode(prefs.getString(KEY, ""));
+        return stored == null ? BoardTable.defaultBoard() : stored;
     }
 
     static void select(Context context, int index) {
-        if (index < 0 || index >= BOARDS.size()) return;
+        final List<BoardTable.Board> boards = all();
+        if (index < 0 || index >= boards.size()) return;
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit().putInt(KEY, index).apply();
+                .edit().putString(KEY, boards.get(index).code).apply();
     }
 }

@@ -523,28 +523,23 @@ flash and 3.7 kB of RAM more, depending on the path.
 
 ### Headroom
 
-Measured here on 2026-11-04 with [`../check_headroom.py`](../check_headroom.py),
-core **3.3.12**, `PartitionScheme=huge_app`:
+Measured on 2026-11-18 with [`../check_docs.py`](../check_docs.py) `--refresh`,
+Arduino CLI 1.6.0, core **3.3.12** under `/home/ubuntu/.arduino-cyd-3`, and
+`PartitionScheme=huge_app`:
 
 | | used | free | ceiling |
 | --- | --- | --- | --- |
-| flash | 1,179,690 | **1,966,038** | 3,145,728 (37 % used) |
-| DRAM | 45,332 globals | **282,348** | 327,680 |
+| flash | 1,180,382 | **1,965,346** | 3,145,728 (37 % used) |
+| DRAM | 45,340 globals | **282,340** | 327,680 |
 
-The root behind those figures is `~/.arduino-cyd/env.sh`, the one whose `env.sh`
-pins its own data and library dirs: `check_docs.py --refresh` re-read 1,179,690 B
-and 45,332 B from it on 2026-11-04. While that script set only `PATH` the same
-build went through `~/.arduino15` and printed 1,168,282 B — 32 B under with the
-globals identical — another worktree's root prints the same size, and
-`/tmp/arduino-cyd-3` was read at 1,168,170 B, 144 B under. Quote the root with the
-number (see
-[the build note](../CONVENTIONS.md#build)).
+Earlier runs on a different toolchain install reported 1,179,690 B with the
+same globals. [The build note](../CONVENTIONS.md#build) explains why to record the
+root and CLI alongside a measurement.
 
 The check refuses a deck that overflows, that drops under **64 KiB** of free flash
 or that leaves under **160 KiB** of DRAM — the last floor is just over the
 153,600 B a full 320x240 RGB565 framebuffer needs. So this deck has almost two megabytes of flash to grow into, and one
-framebuffer's worth of DRAM slack. It takes a **1,966,038-byte** addition to
-overflow the slot now. On the default scheme it took far less: a
+framebuffer's worth of DRAM slack. The table gives the measured flash margin. On the default scheme it took far less: a
 1,400,000-byte const table measured 1,668,748 B and overflowed the
 1,310,720-byte slot it was built for, which is the refusal that named the need
 for `huge_app` rather than a bare `compile failed`. Re-measure with `python3 ../check_headroom.py phone_deck_cyd24R`
@@ -567,12 +562,12 @@ from the repo root, after sourcing a toolchain.
     [`old_core.json`](../old_core.json) — size, globals and md5 together, measured
     2026-11-04 through `~/.arduino-cyd-2` — because a 2.0.17 figure quoted here
     would be checked against the 3.3.12 build and refused.
-* Core **3.3.12** links it at 1,179,690 bytes (37 % of 3,145,728) with 45,332 bytes of RAM
-  (13 % of 327,680), `EXIT=0` under `--warnings all`, re-measured on 2026-11-05 with the eight-row palette. An earlier 3.3.12 build on a shorter path reported 1,163,930 / 45,004,
+* Core **3.3.12** links it at 1,180,382 bytes (37 % of 3,145,728) with 45,340 bytes of RAM
+  (13 % of 327,680), `EXIT=0` under `--warnings all`, re-measured on 2026-11-18 with the link tuning. An earlier 3.3.12 build on a shorter path reported 1,163,930 / 45,004,
   so 3.x is path-sensitive too — 1,137–1,141 kB, not a fixed count.
 * The bundled copy matches byte for byte after `:app:syncWidgets`;
   `check_widget_assets.py` prints `2 widgets bundled, every copy matches`
-  (this sketch md5 `1a04a453…`, the Spotify one `0a2147b9…`).
+  (this sketch md5 `8f430c6a…`, the Spotify one `f7079149…`).
 * Core 3.x costs this sketch ~1.1 kB of flash and ~3.6 kB of RAM over 2.0.17 —
   nothing like the Spotify deck's 155 kB gap, which is that sketch's network
   stack rather than the core (see the build note in
@@ -612,6 +607,5 @@ The first flash of a new board is the test of those, not a formality.
 
 ## Measured
 
-`check_headroom.py` built this sketch on 2026-11-05 with core 3.3.12 and read
-`Sketch uses 1,179,690 bytes` and `45,332 bytes` of globals; this folder's sketch
-md5 is `1a04a453…`.
+The current build measurement is in [Headroom](#headroom); this folder's
+sketch md5 is `8f430c6a…`.
